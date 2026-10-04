@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f4f6f8;
+  --card: #ffffff;
+  --fg: #0f172a;
+  --muted: #64748b;
+  --line: #e2e8f0;
+  --primary: #0f766e;
+  --primary-fg: #ffffff;
+  --filled: #15803d;
+  --filled-soft: #dcfce7;
+  --empty: #be123c;
+  --empty-soft: #ffe4e6;
+  --idle-soft: #e2e8f0;
+  --warn: #b45309;
+  --warn-soft: #fef3c7;
+  color-scheme: light;
+}
+
+/* Dipakai malam hari di luar rumah, jadi mode gelap mengikuti HP. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1220;
+    --card: #131c2e;
+    --fg: #e5e9f0;
+    --muted: #94a3b8;
+    --line: #243046;
+    --primary: #2dd4bf;
+    --primary-fg: #04201d;
+    --filled: #4ade80;
+    --filled-soft: #12361f;
+    --empty: #fb7185;
+    --empty-soft: #3d1420;
+    --idle-soft: #243046;
+    --warn: #fbbf24;
+    --warn-soft: #3a2a0a;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  --color-filled: var(--filled);
+  --color-filled-soft: var(--filled-soft);
+  --color-empty: var(--empty);
+  --color-empty-soft: var(--empty-soft);
+  --color-idle-soft: var(--idle-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+}
