@@ -6,6 +6,7 @@ Web app untuk mencatat jimpitan saat ronda. Setiap rumah punya stiker QR di deka
 
 - **Scan QR per rumah** langsung dari halaman Ronda. Ada tombol senter untuk HP Android dan mendukung iPhone.
 - **Ada / Kosong + nominal.** Nominal awal bisa diatur dan diubah saat mencatat (Rp 500, 1.000, dst).
+- **Catat manual kalau QR gagal di-scan:** ketik "A12", "12", atau nama KK, lewat tombol **Manual**, **Ketik manual** di scanner, atau saat kamera tidak bisa dibuka. Catatannya ditandai "manual" di riwayat.
 - **Tetap jalan tanpa sinyal.** Catatan disimpan di HP dulu, lalu terkirim otomatis begitu online. Halaman Ronda juga bisa dibuka ulang saat offline.
 - **Kotak per blok berwarna:** hijau = ada, merah = kosong, putih = belum dicek. Ada filter "yang belum saja" supaya tidak ada rumah terlewat.
 - **Denah perumahan:** rumah tampil di atas gambar denah (foto denah developer, gambar tangan, atau screenshot Google Maps) dengan warna status yang sama, bisa di-zoom dan diketuk untuk mencatat. Tanpa gambar, rumah bisa disusun otomatis per blok. Denah juga muncul di riwayat tiap malam.

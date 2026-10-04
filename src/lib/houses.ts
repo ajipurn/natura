@@ -60,3 +60,42 @@ export function parseNumberList(input: string, max = 500): string[] | null {
 export function normalizeHouseField(value: string): string {
   return value.trim().replace(/\s+/g, " ").toUpperCase();
 }
+
+/** "Blok A No. 12", "a-12", "A 12" → "A12" */
+function compactLabel(value: string): string {
+  return value
+    .toUpperCase()
+    .replace(/\b(BLOK|BLK|NOMOR|NO)\b\.?/g, "")
+    .replace(/[^0-9A-Z]/g, "");
+}
+
+/**
+ * Cari rumah dari ketikan petugas (cadangan kalau QR gagal di-scan).
+ * Menerima "A12", "a-12", "blok a no 12", nomor saja ("12" → semua blok), atau potongan nama KK.
+ */
+export function searchHouses<T extends HouseRef & { ownerName?: string | null }>(
+  houses: T[],
+  query: string,
+  limit = 30,
+): T[] {
+  const text = query.trim();
+  if (!text) return [];
+  const key = compactLabel(text);
+  const name = text.toLowerCase();
+  const numberOnly = /^\d+[A-Z]?$/.test(key);
+
+  const matches: { house: T; rank: number }[] = [];
+  for (const house of houses) {
+    const label = compactLabel(`${house.block}${house.number}`);
+    let rank = -1;
+    if (key && label === key) rank = 0;
+    else if (numberOnly && compactLabel(house.number) === key) rank = 1;
+    else if (key && label.startsWith(key)) rank = 2;
+    else if (name.length >= 2 && house.ownerName?.toLowerCase().includes(name)) rank = 3;
+    if (rank >= 0) matches.push({ house, rank });
+  }
+  return matches
+    .sort((a, b) => a.rank - b.rank || compareHouses(a.house, b.house))
+    .slice(0, limit)
+    .map((m) => m.house);
+}

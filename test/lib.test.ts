@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addDays, daysInMonth, formatDateLong, isIsoDate, rondaDate, shiftMonth } from "@/lib/dates";
 import { formatAmountShort, formatRupiah } from "@/lib/format";
-import { compareHouses, groupByBlock, parseNumberList } from "@/lib/houses";
+import { compareHouses, groupByBlock, parseNumberList, searchHouses } from "@/lib/houses";
 import { houseUrl, newToken, parseQrToken } from "@/lib/qr";
 import { buildRecapText, summarize } from "@/lib/recap";
 
@@ -125,5 +125,40 @@ describe("formatAmountShort", () => {
     expect(formatAmountShort(500)).toBe("500");
     expect(formatAmountShort(1000)).toBe("1rb");
     expect(formatAmountShort(2500)).toBe("2,5rb");
+  });
+});
+
+describe("searchHouses", () => {
+  const houses = [
+    { block: "A", number: "1", ownerName: "Pak Budi" },
+    { block: "A", number: "10", ownerName: null },
+    { block: "A", number: "12", ownerName: "Bu Sari" },
+    { block: "B", number: "12", ownerName: null },
+    { block: "B", number: "2", ownerName: "Pak Andi" },
+  ];
+  const labels = (q: string) => searchHouses(houses, q).map((h) => `${h.block}-${h.number}`);
+
+  it("menerima berbagai cara mengetik blok dan nomor", () => {
+    expect(labels("a12")).toEqual(["A-12"]);
+    expect(labels("A-12")).toEqual(["A-12"]);
+    expect(labels("blok a no. 12")).toEqual(["A-12"]);
+  });
+
+  it("nomor saja mencari di semua blok", () => {
+    expect(labels("12")).toEqual(["A-12", "B-12"]);
+  });
+
+  it("awalan menampilkan yang persis cocok lebih dulu", () => {
+    expect(labels("a1")).toEqual(["A-1", "A-10", "A-12"]);
+  });
+
+  it("mencari nama KK", () => {
+    expect(labels("budi")).toEqual(["A-1"]);
+    expect(labels("pak")).toEqual(["A-1", "B-2"]);
+  });
+
+  it("kosong atau tidak cocok", () => {
+    expect(labels("")).toEqual([]);
+    expect(labels("zz")).toEqual([]);
   });
 });
