@@ -9,7 +9,7 @@ Web app untuk mencatat jimpitan saat ronda. Setiap rumah punya stiker QR di deka
 - **Catat manual kalau QR gagal di-scan:** ketik "A12", "12", atau nama KK, lewat tombol **Manual**, **Ketik manual** di scanner, atau saat kamera tidak bisa dibuka. Catatannya ditandai "manual" di riwayat.
 - **Tetap jalan tanpa sinyal.** Catatan disimpan di HP dulu, lalu terkirim otomatis begitu online. Halaman Ronda juga bisa dibuka ulang saat offline.
 - **Kotak per blok berwarna:** hijau = ada, merah = kosong, putih = belum dicek. Ada filter "yang belum saja" supaya tidak ada rumah terlewat.
-- **Denah Cluster Natura (SVG):** denah digambar ulang sebagai kode dari denah cetak (95 kavling, jalan, taman, saluran). Kavling diwarnai sesuai status, kavling kosong diarsir, bisa di-zoom dan diketuk untuk mencatat. Denah juga muncul di riwayat tiap malam.
+- **Denah Cluster Natura (SVG):** denah digambar ulang sebagai kode dari denah cetak (95 kavling, jalan, taman, saluran). Kavling diwarnai sesuai status, kavling yang belum dibangun diarsir, bisa di-zoom dan diketuk untuk mencatat. Denah juga muncul di riwayat tiap malam.
 - **Tampilan 3D (tambahan):** denah yang sama sebagai maket 3D (three.js). Rumah berdiri di atas kavlingnya, atap berwarna sesuai status, bisa diputar/zoom/digeser, dan diketuk untuk mencatat. Kodenya hanya diunduh saat tab 3D dibuka.
 - **Rekap ke WhatsApp** sekali tekan, misalnya: *✅ Ada: 47 rumah · ⭕ Kosong: 3 (A-3, B-7, C-1) · 💰 Total: Rp 23.500 · 👮 Petugas: Andi, Budi*.
 - **Status rumah kosong/mudik** supaya tidak dihitung bolong.
@@ -33,7 +33,7 @@ Ronda yang lewat tengah malam tetap dihitung malam sebelumnya: jam 00.00–11.59
 
 ### Mengubah denah
 
-Denah ada di `src/site-plan/natura.ts`. Koordinatnya piksel pada foto denah cetak (2000×1125). Tiap kavling berisi blok, nomor, `built` (`false` = dicoret / belum ada rumah), dan titik-titik kelilingnya. Kalau ada rumah baru dibangun, ubah `built` kavling itu menjadi `true`, lalu daftarkan dari halaman Denah. Untuk perumahan lain tanpa denah kode, isi `SITE_PLAN` di `src/site-plan/index.ts` dengan `null`: halaman Denah kembali ke mode gambar + penanda yang diatur admin.
+Denah ada di `src/site-plan/natura.ts`. Koordinatnya piksel pada foto denah cetak (2000×1125). Tiap kavling berisi blok, nomor, `built` (`false` = dicoret / belum dibangun), dan titik-titik kelilingnya. Kalau ada rumah baru dibangun, ubah `built` kavling itu menjadi `true`, lalu daftarkan dari halaman Denah. Untuk perumahan lain tanpa denah kode, isi `SITE_PLAN` di `src/site-plan/index.ts` dengan `null`: halaman Denah kembali ke mode gambar + penanda yang diatur admin.
 
 > Kamera hanya bisa dipakai lewat **HTTPS** (atau `localhost`). Isi `APP_URL` sebelum mencetak stiker, karena alamat di QR tidak bisa diubah setelah ditempel. Kalau stiker rusak atau hilang, buat QR baru untuk rumah itu di halaman Data rumah.
 

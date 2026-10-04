@@ -16,7 +16,7 @@ const blockA = lotRow(
 );
 
 const blockAA: PlanLot[] = [
-  // Deretan atas, semuanya masih kavling kosong.
+  // Deretan atas, semuanya belum dibangun.
   ...lotRow(
     "AA",
     ["1", "2", "3", "4", "5", "6"],

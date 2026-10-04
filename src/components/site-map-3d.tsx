@@ -421,7 +421,7 @@ function buildMarkerScene(ctx: BuildContext, size: MapSize, imageUrl: string | n
   };
 }
 
-/** Denah kode: maket kawasan, taman, saluran, kavling kosong, dan rumah di atas kavlingnya. */
+/** Denah kode: maket kawasan, taman, saluran, kavling belum dibangun, dan rumah di atas kavlingnya. */
 function buildPlanScene(ctx: BuildContext, plan: SitePlan): BuiltScene {
   const { scene, track, cssColor } = ctx;
   const { scale, toWorld: project } = planProjection(plan.viewBox);
@@ -461,7 +461,7 @@ function buildPlanScene(ctx: BuildContext, plan: SitePlan): BuiltScene {
   for (const lot of plan.lots) {
     const house = lotHouse.get(lot);
     if (!house) {
-      // Kavling kosong (dicoret) lebih rendah; kavling berpenghuni yang belum terdaftar sedikit lebih tinggi.
+      // Kavling belum dibangun (dicoret) lebih rendah; kavling berpenghuni yang belum terdaftar sedikit lebih tinggi.
       slab(world(shrinkPolygon(lot.points, 0.92)), 0.3, lot.built ? 0.5 : 0.3, lot.built ? yardMat : emptyLotMat);
       continue;
     }

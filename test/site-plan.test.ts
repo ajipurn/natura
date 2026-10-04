@@ -38,7 +38,7 @@ describe("denah Natura", () => {
     }
   });
 
-  it("kavling tanpa nomor selalu kavling kosong", () => {
+  it("kavling tanpa nomor selalu belum dibangun", () => {
     for (const lot of plan.lots.filter((l) => l.number === null)) expect(lot.built).toBe(false);
   });
 });

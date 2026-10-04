@@ -29,7 +29,7 @@ export default async function AdminSiteMapPage() {
           <div className="grid grid-cols-3 gap-2 text-center">
             <Stat label="Rumah terdaftar" value={`${lotHouse.size}/${builtCount}`} />
             <Stat label="Belum terdaftar" value={missing.length} tone={missing.length ? "warn" : undefined} />
-            <Stat label="Kavling kosong" value={emptyCount} />
+            <Stat label="Belum dibangun" value={emptyCount} />
           </div>
           {missing.length > 0 && (
             <p className="text-sm text-muted">
@@ -58,7 +58,7 @@ export default async function AdminSiteMapPage() {
         <SectionTitle>Pratinjau</SectionTitle>
         <SitePlanMap plan={SITE_PLAN} houses={houses} highlightMissing />
         <p className="mt-2 text-xs text-muted">
-          Kavling berarsir = kavling kosong (dicoret di denah asli). Bentuk denah diatur di kode{" "}
+          Kavling berarsir = kavling yang belum dibangun (dicoret di denah asli). Bentuk denah diatur di kode{" "}
           <code className="rounded bg-idle-soft px-1">src/site-plan/natura.ts</code>.
         </p>
       </>

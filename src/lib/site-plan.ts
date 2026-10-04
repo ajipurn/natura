@@ -9,7 +9,7 @@ export type PlanLot = {
   number: string | null;
   /** Teks di denah kalau berbeda dari nomor rumahnya (mis. "1-2" untuk kavling gabungan). */
   label?: string;
-  /** false = kavling kosong / belum ada rumah (dicoret di denah asli). */
+  /** false = kavling belum dibangun, belum ada rumah (dicoret di denah asli). */
   built: boolean;
   points: PlanPoint[];
 };
