@@ -1,4 +1,4 @@
-import { ChevronRight, Home, LogOut, Settings, Smartphone, Users } from "lucide-react";
+import { ChevronRight, Home, LogOut, Map as MapIcon, Settings, Smartphone, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SubmitButton } from "@/components/submit-button";
@@ -11,6 +11,7 @@ export const metadata: Metadata = { title: "Menu" };
 
 const ADMIN_LINKS = [
   { href: "/admin/rumah", label: "Data rumah & cetak QR", icon: Home },
+  { href: "/admin/denah", label: "Denah", icon: MapIcon },
   { href: "/admin/petugas", label: "Petugas ronda", icon: Users },
   { href: "/admin/pengaturan", label: "Pengaturan", icon: Settings },
 ];
