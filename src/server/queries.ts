@@ -6,6 +6,7 @@ import { DEFAULT_MAP_SIZE } from "@/lib/site-map";
 import type { CollectionDTO, HouseDTO, RondaSnapshot, SiteMapInfo } from "@/lib/types";
 import type { SessionUser } from "./auth";
 import { getDb } from "./db";
+import { listSchedule } from "./schedule";
 import { collections, houses, patrols, settings, siteMap, users } from "./schema";
 
 export const DEFAULT_SETTINGS = { communityName: "Lingkungan Kita", defaultAmount: 500 };
@@ -153,11 +154,12 @@ export async function getSiteMapImage() {
 
 export async function getRondaSnapshot(user: SessionUser, now = new Date()): Promise<RondaSnapshot> {
   const date = rondaDate(now);
-  const [settingsRow, houseRows, collectionRows, siteMapInfo] = await Promise.all([
+  const [settingsRow, houseRows, collectionRows, siteMapInfo, schedule] = await Promise.all([
     getSettings(),
     listHouses(),
     getCollectionsForDate(date),
     getSiteMapInfo(),
+    listSchedule(),
   ]);
   return {
     date,
@@ -167,6 +169,7 @@ export async function getRondaSnapshot(user: SessionUser, now = new Date()): Pro
     houses: houseRows,
     collections: collectionRows,
     siteMap: siteMapInfo,
+    schedule,
   };
 }
 

@@ -1,4 +1,14 @@
-import { ChevronRight, Home, LogOut, Map as MapIcon, Settings, Smartphone, Users } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronRight,
+  Home,
+  LogOut,
+  Map as MapIcon,
+  Settings,
+  Smartphone,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SubmitButton } from "@/components/submit-button";
@@ -9,7 +19,11 @@ import { ChangePinForm } from "./change-pin-form";
 
 export const metadata: Metadata = { title: "Menu" };
 
-const ADMIN_LINKS = [
+type MenuLink = { href: string; label: string; icon: LucideIcon };
+
+const RONDA_LINKS: MenuLink[] = [{ href: "/jadwal", label: "Jadwal ronda", icon: CalendarDays }];
+
+const ADMIN_LINKS: MenuLink[] = [
   { href: "/admin/rumah", label: "Data rumah & cetak QR", icon: Home },
   { href: "/admin/denah", label: "Denah", icon: MapIcon },
   { href: "/admin/petugas", label: "Petugas ronda", icon: Users },
@@ -23,20 +37,13 @@ export default async function MenuPage() {
     <>
       <PageHeader title={user.name} subtitle={user.role === "admin" ? "Admin" : "Petugas ronda"} />
 
+      <SectionTitle>Ronda</SectionTitle>
+      <LinkList links={RONDA_LINKS} />
+
       {user.role === "admin" && (
         <>
           <SectionTitle>Admin</SectionTitle>
-          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
-            {ADMIN_LINKS.map(({ href, label, icon: Icon }) => (
-              <li key={href}>
-                <Link href={href} className="flex items-center gap-3 px-4 py-3.5 active:bg-idle-soft">
-                  <Icon className="size-5 text-primary" />
-                  <span className="flex-1 font-medium">{label}</span>
-                  <ChevronRight className="size-5 text-muted" />
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <LinkList links={ADMIN_LINKS} />
         </>
       )}
 
@@ -61,5 +68,21 @@ export default async function MenuPage() {
         </SubmitButton>
       </form>
     </>
+  );
+}
+
+function LinkList({ links }: { links: MenuLink[] }) {
+  return (
+    <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
+      {links.map(({ href, label, icon: Icon }) => (
+        <li key={href}>
+          <Link href={href} className="flex items-center gap-3 px-4 py-3.5 active:bg-idle-soft">
+            <Icon className="size-5 text-primary" />
+            <span className="flex-1 font-medium">{label}</span>
+            <ChevronRight className="size-5 text-muted" />
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }

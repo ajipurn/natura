@@ -2,6 +2,7 @@ import {
   boolean,
   date,
   doublePrecision,
+  index,
   integer,
   pgEnum,
   pgTable,
@@ -117,6 +118,23 @@ export const siteMap = pgTable("site_map", {
     .notNull()
     .defaultNow(),
 }).enableRLS();
+
+/**
+ * Jadwal ronda mingguan. `dayOfWeek` = hari malamnya (0 = Ahad/malam Senin … 6 = Sabtu/malam Minggu).
+ * Rumah dicatat lewat blok + nomor (bukan id) supaya jadwal tetap tersimpan walau rumahnya belum terdaftar.
+ */
+export const rondaSchedule = pgTable(
+  "ronda_schedule",
+  {
+    id: serial("id").primaryKey(),
+    dayOfWeek: integer("day_of_week").notNull(),
+    position: integer("position").notNull(),
+    name: text("name"),
+    block: text("block").notNull(),
+    number: text("number").notNull(),
+  },
+  (t) => [index("ronda_schedule_day_idx").on(t.dayOfWeek, t.position)],
+).enableRLS();
 
 export type User = typeof users.$inferSelect;
 export type House = typeof houses.$inferSelect;

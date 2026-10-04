@@ -31,6 +31,7 @@ import { SITE_PLAN } from "@/site-plan";
 import type { CollectionMethod, CollectionStatus, HouseDTO } from "@/lib/types";
 import { HouseSearch } from "./house-search";
 import { HouseSheet } from "./house-sheet";
+import { TonightGuards } from "./tonight-guards";
 import { useRondaStore, type MergedCollection, type SyncStatus } from "./use-ronda-store";
 
 type Toast = { text: string; tone: "ok" | "error" };
@@ -173,6 +174,8 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
       </header>
 
       <StatusNotice status={store.status} />
+      {/* Data lama di HP (sebelum ada jadwal) belum punya `schedule`. */}
+      <TonightGuards schedule={snapshot.schedule ?? []} date={store.date} />
       {store.rejections.length > 0 && (
         <div className="mb-4">
           <Alert>

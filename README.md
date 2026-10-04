@@ -13,6 +13,7 @@ Web app untuk mencatat jimpitan saat ronda. Setiap rumah punya stiker QR di deka
 - **Tampilan 3D (tambahan):** denah yang sama sebagai maket 3D (three.js). Rumah berdiri di atas kavlingnya, atap berwarna sesuai status, bisa diputar/zoom/digeser, dan diketuk untuk mencatat. Kodenya hanya diunduh saat tab 3D dibuka.
 - **Rekap ke WhatsApp** sekali tekan, misalnya: *✅ Ada: 47 rumah · ⭕ Kosong: 3 (A-3, B-7, C-1) · 💰 Total: Rp 23.500 · 👮 Petugas: Andi, Budi*.
 - **Status rumah kosong/mudik** supaya tidak dihitung bolong.
+- **Jadwal ronda:** admin menempel tabel jadwal dari Excel/Google Sheets (atau teks per hari). Nama KK ikut terisi otomatis, halaman Ronda menampilkan siapa yang **jaga malam ini**, dan semua petugas bisa melihat jadwal seminggu di Menu → Jadwal ronda.
 - **Riwayat per malam**, termasuk jam, petugas, cara mencatat (scan/manual), dan koreksi oleh admin.
 - **Rekap bulanan** berupa tabel rumah × tanggal yang bisa diunduh sebagai CSV (Excel/Google Sheets).
 - **Halaman warga:** scan stiker QR pakai kamera HP biasa untuk melihat riwayat jimpitan rumah itu tanpa login. Nama KK hanya terlihat oleh petugas.
@@ -28,8 +29,9 @@ Ronda yang lewat tengah malam tetap dihitung malam sebelumnya: jam 00.00–11.59
 2. Di **Admin → Denah**, tekan **Daftarkan rumah dari denah**. Semua kavling berpenghuni langsung jadi data rumah. Nama KK dan rumah tambahan bisa diisi di **Admin → Data rumah**.
 3. Di **Admin → Data rumah**, klik **Cetak QR**, cetak di kertas stiker (sebaiknya vinyl atau dilaminasi), lalu tempel dekat wadah jimpitan.
 4. Di **Admin → Petugas ronda**, buat akun untuk setiap petugas beserta PIN-nya.
-5. Petugas membuka halaman **Ronda** sekali saat ada sinyal (supaya tersimpan untuk offline), lalu tekan **Scan QR** saat keliling. Pilih tampilan **Daftar**, **Denah**, atau **3D** sesuai selera.
-6. Selesai ronda, tekan **Bagikan rekap** dan kirim ke grup WA.
+5. Di **Menu → Jadwal ronda**, tempel tabel jadwal (salin langsung dari spreadsheet: baris judul hari seperti "AHAD (MALAM SENIN)", isinya "NAMA (BLOK-NO)"). Pratinjau menunjukkan kode rumah yang belum terdaftar dan nama ganda sebelum disimpan.
+6. Petugas membuka halaman **Ronda** sekali saat ada sinyal (supaya tersimpan untuk offline), lalu tekan **Scan QR** saat keliling. Pilih tampilan **Daftar**, **Denah**, atau **3D** sesuai selera.
+7. Selesai ronda, tekan **Bagikan rekap** dan kirim ke grup WA.
 
 ### Mengubah denah
 
@@ -84,6 +86,7 @@ src/
     (main)/ronda/        Halaman Ronda: scanner, kotak per rumah, antrean offline
     (main)/riwayat/      Riwayat per malam + koreksi admin
     (main)/rekap/        Rekap bulanan + unduh CSV
+    (main)/jadwal/       Jadwal ronda mingguan + impor (admin)
     (main)/admin/        Data rumah, cetak QR, denah, petugas, pengaturan
     r/[token]/           Halaman rumah (tujuan QR)
     api/ronda, api/setoran  Data malam ini & sinkronisasi antrean

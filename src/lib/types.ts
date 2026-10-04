@@ -31,6 +31,17 @@ export type CollectionDTO = {
   collectorName: string | null;
 };
 
+/** Satu baris jadwal ronda, sudah dicocokkan dengan data rumah (kalau ada). */
+export type ScheduleDTO = {
+  day: number;
+  position: number;
+  name: string | null;
+  block: string;
+  number: string;
+  houseId: number | null;
+  ownerName: string | null;
+};
+
 export type RondaSnapshot = {
   date: string;
   serverTime: string;
@@ -39,6 +50,7 @@ export type RondaSnapshot = {
   houses: HouseDTO[];
   collections: CollectionDTO[];
   siteMap: SiteMapInfo;
+  schedule: ScheduleDTO[];
 };
 
 /** Satu catatan dari HP petugas. `none` = hapus catatan rumah itu untuk malam tersebut. */
