@@ -95,9 +95,9 @@ export default async function RiwayatDetailPage({ params }: PageProps<"/riwayat/
                       {c && (
                         <p className="flex items-center gap-1 text-xs text-muted">
                           {c.method === "scan" ? (
-                            <ScanLine className="size-3.5" aria-label="scan QR" />
+                            <ScanLine className="size-3.5" role="img" aria-label="scan QR" />
                           ) : (
-                            <Hand className="size-3.5" aria-label="manual" />
+                            <Hand className="size-3.5" role="img" aria-label="manual" />
                           )}
                           {formatTime(c.recordedAt)}
                           {c.collectorName && ` · ${c.collectorName}`}

@@ -1,6 +1,16 @@
 "use client";
 
-import { CloudOff, CloudUpload, LayoutGrid, LogIn, Map as MapIcon, RefreshCw, ScanLine, ShieldAlert } from "lucide-react";
+import {
+  CloudOff,
+  CloudUpload,
+  Keyboard,
+  LayoutGrid,
+  LogIn,
+  Map as MapIcon,
+  RefreshCw,
+  ScanLine,
+  ShieldAlert,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { QrScanner } from "@/components/qr-scanner";
@@ -14,6 +24,7 @@ import { parseQrToken } from "@/lib/qr";
 import { buildRecapText, summarize } from "@/lib/recap";
 import { DEFAULT_MAP_SIZE } from "@/lib/site-map";
 import type { CollectionMethod, CollectionStatus, HouseDTO } from "@/lib/types";
+import { HouseSearch } from "./house-search";
 import { HouseSheet } from "./house-sheet";
 import { useRondaStore, type MergedCollection, type SyncStatus } from "./use-ronda-store";
 
@@ -25,6 +36,7 @@ const VIEW_KEY = "jimpitan:ronda-view";
 export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   const store = useRondaStore();
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [active, setActive] = useState<{ house: HouseDTO; method: CollectionMethod } | null>(null);
   const [onlyUnchecked, setOnlyUnchecked] = useState(false);
   const [view, setView] = useState<View>("list");
@@ -82,7 +94,10 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
     const token = parseQrToken(text);
     const house = token ? byToken.get(token) : undefined;
     if (!house) {
-      showToast(token ? "QR rumah tidak dikenal. Data rumah diperbarui, coba lagi." : "Ini bukan QR jimpitan.", "error");
+      showToast(
+        token ? "QR rumah tidak dikenal. Coba lagi atau ketik manual." : "Ini bukan QR jimpitan.",
+        "error",
+      );
       if (token) store.sync();
       return;
     }
@@ -303,21 +318,47 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
               )}
             </div>
           )}
-          {/* Ruang supaya baris terakhir tidak tertutup tombol Scan QR. */}
+          {/* Ruang supaya baris terakhir tidak tertutup tombol Manual / Scan QR. */}
           <div className="h-20" aria-hidden />
 
-          <button
-            type="button"
-            onClick={() => setScannerOpen(true)}
-            className="fixed bottom-[calc(env(safe-area-inset-bottom)+76px)] left-1/2 z-20 flex h-14 -translate-x-1/2 items-center gap-2 rounded-full bg-primary px-8 text-lg font-bold text-primary-fg shadow-lg shadow-black/20 active:scale-[0.97]"
-          >
-            <ScanLine className="size-6" /> Scan QR
-          </button>
+          <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+76px)] left-1/2 z-20 flex -translate-x-1/2 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="flex h-14 items-center gap-1.5 rounded-full border border-line bg-card px-4 font-semibold text-fg shadow-lg shadow-black/20 active:scale-[0.97]"
+            >
+              <Keyboard className="size-5" /> Manual
+            </button>
+            <button
+              type="button"
+              onClick={() => setScannerOpen(true)}
+              className="flex h-14 items-center gap-2 whitespace-nowrap rounded-full bg-primary px-7 text-lg font-bold text-primary-fg shadow-lg shadow-black/20 active:scale-[0.97]"
+            >
+              <ScanLine className="size-6" /> Scan QR
+            </button>
+          </div>
         </>
       )}
 
       {scannerOpen && (
-        <QrScanner paused={active !== null} onDetect={handleDetect} onClose={() => setScannerOpen(false)} />
+        <QrScanner
+          paused={active !== null || searchOpen}
+          onDetect={handleDetect}
+          onClose={() => setScannerOpen(false)}
+          onManual={() => setSearchOpen(true)}
+        />
+      )}
+
+      {searchOpen && (
+        <HouseSearch
+          houses={houses}
+          collections={store.collections}
+          onPick={(house) => {
+            setSearchOpen(false);
+            setActive({ house, method: "manual" });
+          }}
+          onClose={() => setSearchOpen(false)}
+        />
       )}
 
       {active && (

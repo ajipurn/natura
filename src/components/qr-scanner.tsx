@@ -1,7 +1,7 @@
 "use client";
 
 import jsQR from "jsqr";
-import { Flashlight, FlashlightOff, X } from "lucide-react";
+import { Flashlight, FlashlightOff, Keyboard, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cx } from "./ui";
 
@@ -65,11 +65,14 @@ export function QrScanner({
   paused,
   onDetect,
   onClose,
+  onManual,
 }: {
   /** Tidak memicu onDetect (mis. saat lembar rumah sedang terbuka), kamera tetap menyala. */
   paused: boolean;
   onDetect: (text: string) => void;
   onClose: () => void;
+  /** Cadangan kalau QR tidak terbaca: cari rumah dengan mengetik. */
+  onManual?: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const trackRef = useRef<MediaStreamTrack | null>(null);
@@ -201,14 +204,38 @@ export function QrScanner({
           <p className="absolute inset-x-0 top-1/2 text-center text-white/80">Membuka kamera…</p>
         )}
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center p-6">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6">
             <p className="rounded-2xl bg-white/10 p-4 text-center">{error}</p>
+            {onManual && (
+              <button
+                type="button"
+                onClick={onManual}
+                className="flex h-12 items-center gap-2 rounded-full bg-white px-6 font-semibold text-black"
+              >
+                <Keyboard className="size-5" /> Catat manual
+              </button>
+            )}
           </div>
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-3 px-4 pb-[max(env(safe-area-inset-bottom),16px)] pt-3">
+      {/* Saat kamera error, tombol manual sudah ada di tengah layar. */}
+      <div
+        className={cx(
+          "flex items-center justify-between gap-3 px-4 pb-[max(env(safe-area-inset-bottom),16px)] pt-3",
+          error && "invisible",
+        )}
+      >
         <p className="text-sm text-white/80">Arahkan kamera ke stiker QR di wadah jimpitan.</p>
+        {onManual && (
+          <button
+            type="button"
+            onClick={onManual}
+            className="flex h-12 shrink-0 items-center gap-2 rounded-full bg-white/15 px-4 text-sm font-semibold"
+          >
+            <Keyboard className="size-5" /> Ketik manual
+          </button>
+        )}
         {torchSupported && (
           <button
             type="button"
