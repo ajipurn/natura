@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { QrScanner } from "@/components/qr-scanner";
 import { ShareRecap } from "@/components/share-recap";
 import { SiteMap, type MarkerState } from "@/components/site-map";
+import { SitePlanMap } from "@/components/site-plan-map";
 import { Alert, Card, buttonClass, cx } from "@/components/ui";
 import { formatDateLong } from "@/lib/dates";
 import { formatAmountShort, formatRupiah } from "@/lib/format";
@@ -25,6 +26,8 @@ import { groupByBlock, houseLabel, houseLabelLong } from "@/lib/houses";
 import { parseQrToken } from "@/lib/qr";
 import { buildRecapText, summarize } from "@/lib/recap";
 import { DEFAULT_MAP_SIZE } from "@/lib/site-map";
+import { matchPlan } from "@/lib/site-plan";
+import { SITE_PLAN } from "@/site-plan";
 import type { CollectionMethod, CollectionStatus, HouseDTO } from "@/lib/types";
 import { HouseSearch } from "./house-search";
 import { HouseSheet } from "./house-sheet";
@@ -39,7 +42,7 @@ const VIEW_KEY = "jimpitan:ronda-view";
 const SiteMap3D = dynamic(() => import("@/components/site-map-3d"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-[60vh] min-h-72 items-center justify-center rounded-2xl border border-line bg-card text-muted">
+    <div className="flex aspect-[4/3] max-h-[60vh] min-h-72 items-center justify-center rounded-2xl border border-line bg-card text-muted">
       Memuat tampilan 3D…
     </div>
   ),
@@ -62,7 +65,14 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   const summary = useMemo(() => summarize(houses, collectionList), [houses, collectionList]);
   const groups = useMemo(() => groupByBlock(houses), [houses]);
   const siteMap = snapshot?.siteMap ?? { imageUrl: null, ...DEFAULT_MAP_SIZE };
-  const placedCount = useMemo(() => houses.filter((h) => h.mapX != null && h.mapY != null).length, [houses]);
+  // Rumah yang tampil di denah: dari denah kode (cocok blok+nomor) atau dari penanda denah manual.
+  const placedCount = useMemo(
+    () =>
+      SITE_PLAN
+        ? matchPlan(SITE_PLAN, houses).lotHouse.size
+        : houses.filter((h) => h.mapX != null && h.mapY != null).length,
+    [houses],
+  );
   const markers = useMemo(() => {
     const result: Record<number, MarkerState> = {};
     for (const h of houses) {
@@ -272,8 +282,12 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
               {placedCount === 0 ? (
                 <Card className="text-center">
                   <MapIcon className="mx-auto size-10 text-muted" />
-                  <p className="mt-2 font-semibold">Denah belum diatur</p>
-                  <p className="mt-1 text-sm text-muted">Admin perlu menaruh rumah-rumah di denah dulu.</p>
+                  <p className="mt-2 font-semibold">{SITE_PLAN ? "Rumah belum terdaftar" : "Denah belum diatur"}</p>
+                  <p className="mt-1 text-sm text-muted">
+                    {SITE_PLAN
+                      ? "Admin perlu mendaftarkan rumah dari denah dulu."
+                      : "Admin perlu menaruh rumah-rumah di denah dulu."}
+                  </p>
                   {isAdmin && (
                     <Link href="/admin/denah" className={cx(buttonClass("primary"), "mt-4")}>
                       Atur denah
@@ -282,7 +296,15 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                 </Card>
               ) : (
                 <>
-                  {view === "map" ? (
+                  {view === "map" && SITE_PLAN ? (
+                    <SitePlanMap
+                      plan={SITE_PLAN}
+                      houses={houses}
+                      markers={markers}
+                      pending={pendingIds}
+                      onHouseClick={(h) => setActive({ house: h, method: "manual" })}
+                    />
+                  ) : view === "map" ? (
                     <SiteMap
                       houses={houses}
                       size={siteMap}
@@ -294,6 +316,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                   ) : (
                     <SiteMap3D
                       houses={houses}
+                      plan={SITE_PLAN}
                       size={siteMap}
                       imageUrl={siteMap.imageUrl}
                       markers={markers}

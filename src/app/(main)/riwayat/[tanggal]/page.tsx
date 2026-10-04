@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ShareRecap } from "@/components/share-recap";
 import { SiteMap, type MarkerState } from "@/components/site-map";
+import { SitePlanMap } from "@/components/site-plan-map";
 import { Card, PageHeader, cx } from "@/components/ui";
 import { addDays, formatDateLong, formatTime, isIsoDate } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
@@ -11,6 +12,7 @@ import { groupByBlock, houseLabel } from "@/lib/houses";
 import { buildRecapText, summarize } from "@/lib/recap";
 import { requireUser } from "@/server/auth";
 import { getCollectionsForDate, getSettings, getSiteMapInfo, listHouses } from "@/server/queries";
+import { SITE_PLAN } from "@/site-plan";
 import { CorrectionForm } from "./correction-form";
 
 export async function generateMetadata({ params }: PageProps<"/riwayat/[tanggal]">): Promise<Metadata> {
@@ -31,7 +33,7 @@ export default async function RiwayatDetailPage({ params }: PageProps<"/riwayat/
   ]);
   const summary = summarize(houses, collections);
   const byHouse = new Map(collections.map((c) => [c.houseId, c]));
-  const hasMap = houses.some((h) => h.mapX != null && h.mapY != null);
+  const hasMap = SITE_PLAN !== null || houses.some((h) => h.mapX != null && h.mapY != null);
   const markers: Record<number, MarkerState> = Object.fromEntries(
     houses.map((h) => [h.id, byHouse.get(h.id)?.status ?? (h.status === "vacant" ? "vacant" : "unchecked")]),
   );
@@ -74,7 +76,11 @@ export default async function RiwayatDetailPage({ params }: PageProps<"/riwayat/
             <span className="group-open:hidden">Lihat di denah</span>
             <span className="hidden group-open:inline">Sembunyikan denah</span>
           </summary>
-          <SiteMap className="mt-2" houses={houses} size={siteMap} imageUrl={siteMap.imageUrl} markers={markers} />
+          {SITE_PLAN ? (
+            <SitePlanMap className="mt-2" plan={SITE_PLAN} houses={houses} markers={markers} />
+          ) : (
+            <SiteMap className="mt-2" houses={houses} size={siteMap} imageUrl={siteMap.imageUrl} markers={markers} />
+          )}
         </details>
       )}
 
