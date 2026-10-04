@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  doublePrecision,
   integer,
   pgEnum,
   pgTable,
@@ -31,7 +32,7 @@ export const settings = pgTable("settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}).enableRLS();
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -46,7 +47,7 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}).enableRLS();
 
 export const houses = pgTable(
   "houses",
@@ -58,12 +59,15 @@ export const houses = pgTable(
     /** Kode acak yang dicetak di QR. */
     token: text("token").notNull().unique(),
     status: houseStatusEnum("status").notNull().default("active"),
+    /** Posisi di denah, 0–1 relatif terhadap lebar/tinggi denah. Null = belum ditaruh. */
+    mapX: doublePrecision("map_x"),
+    mapY: doublePrecision("map_y"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (t) => [uniqueIndex("houses_block_number_idx").on(t.block, t.number)],
-);
+).enableRLS();
 
 /** Satu malam ronda. Jam 00:00–11:59 masih dihitung malam sebelumnya. */
 export const patrols = pgTable("patrols", {
@@ -72,7 +76,7 @@ export const patrols = pgTable("patrols", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}).enableRLS();
 
 export const collections = pgTable(
   "collections",
@@ -99,7 +103,20 @@ export const collections = pgTable(
   (t) => [
     uniqueIndex("collections_patrol_house_idx").on(t.patrolId, t.houseId),
   ],
-);
+).enableRLS();
+
+/** Denah perumahan (satu baris, id = 1). Gambar latar opsional, disimpan sebagai base64. */
+export const siteMap = pgTable("site_map", {
+  id: integer("id").primaryKey().default(1),
+  imageData: text("image_data"),
+  imageType: text("image_type"),
+  /** Ukuran denah dalam piksel; menentukan perbandingan lebar:tinggi. */
+  width: integer("width").notNull().default(1000),
+  height: integer("height").notNull().default(1300),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+}).enableRLS();
 
 export type User = typeof users.$inferSelect;
 export type House = typeof houses.$inferSelect;

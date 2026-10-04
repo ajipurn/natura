@@ -3,13 +3,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ShareRecap } from "@/components/share-recap";
+import { SiteMap, type MarkerState } from "@/components/site-map";
 import { Card, PageHeader, cx } from "@/components/ui";
 import { addDays, formatDateLong, formatTime, isIsoDate } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { groupByBlock, houseLabel } from "@/lib/houses";
 import { buildRecapText, summarize } from "@/lib/recap";
 import { requireUser } from "@/server/auth";
-import { getCollectionsForDate, getSettings, listHouses } from "@/server/queries";
+import { getCollectionsForDate, getSettings, getSiteMapInfo, listHouses } from "@/server/queries";
 import { CorrectionForm } from "./correction-form";
 
 export async function generateMetadata({ params }: PageProps<"/riwayat/[tanggal]">): Promise<Metadata> {
@@ -22,13 +23,18 @@ export default async function RiwayatDetailPage({ params }: PageProps<"/riwayat/
   const { tanggal: date } = await params;
   if (!isIsoDate(date)) notFound();
 
-  const [houses, collections, settings] = await Promise.all([
+  const [houses, collections, settings, siteMap] = await Promise.all([
     listHouses(),
     getCollectionsForDate(date),
     getSettings(),
+    getSiteMapInfo(),
   ]);
   const summary = summarize(houses, collections);
   const byHouse = new Map(collections.map((c) => [c.houseId, c]));
+  const hasMap = houses.some((h) => h.mapX != null && h.mapY != null);
+  const markers: Record<number, MarkerState> = Object.fromEntries(
+    houses.map((h) => [h.id, byHouse.get(h.id)?.status ?? (h.status === "vacant" ? "vacant" : "unchecked")]),
+  );
   const isAdmin = user.role === "admin";
 
   return (
@@ -61,6 +67,16 @@ export default async function RiwayatDetailPage({ params }: PageProps<"/riwayat/
           text={buildRecapText({ communityName: settings.communityName, date, houses, collections })}
         />
       </Card>
+
+      {hasMap && (
+        <details className="group mt-4">
+          <summary className="cursor-pointer list-none text-sm font-semibold text-primary">
+            <span className="group-open:hidden">Lihat di denah</span>
+            <span className="hidden group-open:inline">Sembunyikan denah</span>
+          </summary>
+          <SiteMap className="mt-2" houses={houses} size={siteMap} imageUrl={siteMap.imageUrl} markers={markers} />
+        </details>
+      )}
 
       {houses.length === 0 && <p className="mt-6 text-center text-muted">Belum ada data rumah.</p>}
 

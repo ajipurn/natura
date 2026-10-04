@@ -15,6 +15,13 @@
       "when": 1791122523095,
       "tag": "0001_enable_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791124662847,
+      "tag": "0002_site_map",
+      "breakpoints": true
     }
   ]
 }

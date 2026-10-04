@@ -10,6 +10,16 @@ export type HouseDTO = {
   ownerName: string | null;
   token: string;
   status: HouseStatus;
+  /** Posisi di denah (0–1), null kalau belum ditaruh. */
+  mapX: number | null;
+  mapY: number | null;
+};
+
+export type SiteMapInfo = {
+  /** URL gambar latar (sudah termasuk versi), null kalau denah tanpa gambar. */
+  imageUrl: string | null;
+  width: number;
+  height: number;
 };
 
 export type CollectionDTO = {
@@ -28,6 +38,7 @@ export type RondaSnapshot = {
   user: { id: number; name: string; role: Role };
   houses: HouseDTO[];
   collections: CollectionDTO[];
+  siteMap: SiteMapInfo;
 };
 
 /** Satu catatan dari HP petugas. `none` = hapus catatan rumah itu untuk malam tersebut. */

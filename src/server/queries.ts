@@ -2,10 +2,11 @@ import "server-only";
 import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { daysInMonth, localDate, rondaDate } from "@/lib/dates";
 import { compareHouses } from "@/lib/houses";
-import type { CollectionDTO, HouseDTO, RondaSnapshot } from "@/lib/types";
+import { DEFAULT_MAP_SIZE } from "@/lib/site-map";
+import type { CollectionDTO, HouseDTO, RondaSnapshot, SiteMapInfo } from "@/lib/types";
 import type { SessionUser } from "./auth";
 import { getDb } from "./db";
-import { collections, houses, patrols, settings, users } from "./schema";
+import { collections, houses, patrols, settings, siteMap, users } from "./schema";
 
 export const DEFAULT_SETTINGS = { communityName: "Lingkungan Kita", defaultAmount: 500 };
 
@@ -55,6 +56,8 @@ const houseColumns = {
   ownerName: houses.ownerName,
   token: houses.token,
   status: houses.status,
+  mapX: houses.mapX,
+  mapY: houses.mapY,
 };
 
 export async function listHouses(): Promise<HouseDTO[]> {
@@ -114,12 +117,47 @@ export async function getCollectionsForDate(date: string): Promise<CollectionDTO
   return patrol ? collectionsForPatrol(patrol.id) : [];
 }
 
+export const SITE_MAP_IMAGE_PATH = "/api/denah/gambar";
+
+/** Info denah tanpa isi gambarnya (gambar diambil terpisah lewat SITE_MAP_IMAGE_PATH). */
+export async function getSiteMapInfo(): Promise<SiteMapInfo> {
+  const db = await getDb();
+  const [row] = await db
+    .select({
+      hasImage: sql<boolean>`${siteMap.imageData} is not null`,
+      width: siteMap.width,
+      height: siteMap.height,
+      updatedAt: siteMap.updatedAt,
+    })
+    .from(siteMap)
+    .where(eq(siteMap.id, 1))
+    .limit(1);
+  if (!row) return { imageUrl: null, ...DEFAULT_MAP_SIZE };
+  return {
+    // Versi di URL supaya gambar boleh di-cache selamanya dan tetap berganti saat diperbarui.
+    imageUrl: row.hasImage ? `${SITE_MAP_IMAGE_PATH}?v=${row.updatedAt.getTime()}` : null,
+    width: row.width,
+    height: row.height,
+  };
+}
+
+export async function getSiteMapImage() {
+  const db = await getDb();
+  const [row] = await db
+    .select({ data: siteMap.imageData, type: siteMap.imageType })
+    .from(siteMap)
+    .where(eq(siteMap.id, 1))
+    .limit(1);
+  return row?.data && row.type ? { data: row.data, type: row.type } : null;
+}
+
 export async function getRondaSnapshot(user: SessionUser, now = new Date()): Promise<RondaSnapshot> {
   const date = rondaDate(now);
-  const [settingsRow, houseRows, collectionRows] = await Promise.all([
+  const [settingsRow, houseRows, collectionRows, siteMapInfo] = await Promise.all([
     getSettings(),
     listHouses(),
     getCollectionsForDate(date),
+    getSiteMapInfo(),
   ]);
   return {
     date,
@@ -128,6 +166,7 @@ export async function getRondaSnapshot(user: SessionUser, now = new Date()): Pro
     user,
     houses: houseRows,
     collections: collectionRows,
+    siteMap: siteMapInfo,
   };
 }
 

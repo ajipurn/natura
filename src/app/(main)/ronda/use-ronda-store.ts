@@ -48,6 +48,27 @@ function writeJson(key: string, value: unknown) {
   }
 }
 
+/** Masukkan catatan yang sudah diterima server ke salinan lokal, sebelum data terbaru diambil. */
+function withAccepted(snapshot: StoredSnapshot, entries: (PendingEntry & { serverDate: string })[]): StoredSnapshot {
+  const byHouse = new Map(snapshot.collections.map((c) => [c.houseId, c]));
+  for (const e of entries) {
+    if (e.serverDate !== snapshot.date) continue;
+    if (e.status === "none") {
+      byHouse.delete(e.houseId);
+    } else {
+      byHouse.set(e.houseId, {
+        houseId: e.houseId,
+        status: e.status,
+        amount: e.amount,
+        method: e.method,
+        recordedAt: e.recordedAt,
+        collectorName: e.collectorName,
+      });
+    }
+  }
+  return { ...snapshot, collections: [...byHouse.values()] };
+}
+
 function newClientId(): string {
   return typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
@@ -78,6 +99,12 @@ export function useRondaStore() {
   const clockOffset = snapshot?.clockOffset ?? 0;
   const serverNow = useCallback(() => new Date(Date.now() + (snapshotRef.current?.clockOffset ?? 0)), []);
 
+  const saveSnapshot = useCallback((next: StoredSnapshot) => {
+    snapshotRef.current = next;
+    writeJson(SNAPSHOT_KEY, next);
+    setSnapshot(next);
+  }, []);
+
   const refresh = useCallback(async () => {
     try {
       const res = await fetch("/api/ronda", { cache: "no-store" });
@@ -87,15 +114,12 @@ export function useRondaStore() {
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as RondaSnapshot;
-      const next: StoredSnapshot = { ...data, clockOffset: new Date(data.serverTime).getTime() - Date.now() };
-      snapshotRef.current = next;
-      writeJson(SNAPSHOT_KEY, next);
-      setSnapshot(next);
+      saveSnapshot({ ...data, clockOffset: new Date(data.serverTime).getTime() - Date.now() });
       setStatus((s) => (s === "syncing" ? s : "idle"));
     } catch {
       setStatus("offline");
     }
-  }, []);
+  }, [saveSnapshot]);
 
   /** Kirim antrean sekali. `false` kalau gagal (offline / perlu login). */
   const pushPending = useCallback(async (): Promise<boolean> => {
@@ -134,6 +158,14 @@ export function useRondaStore() {
         const house = entry && houses.get(entry.houseId);
         failed.push({ clientId: r.clientId, label: house ? houseLabel(house) : "?", error: r.error });
       }
+      // Catatan yang diterima langsung masuk salinan lokal, supaya kotak rumah tidak sempat
+      // kembali ke "belum dicek" selama menunggu data terbaru (bisa lama kalau sinyal lemah).
+      const serverDates = new Map(results.flatMap((r) => (r.ok ? [[r.clientId, r.date] as const] : [])));
+      const accepted = batch.flatMap((e) => {
+        const serverDate = serverDates.get(e.clientId);
+        return serverDate ? [{ ...e, serverDate }] : [];
+      });
+      if (snapshotRef.current && accepted.length > 0) saveSnapshot(withAccepted(snapshotRef.current, accepted));
       // Hanya buang yang sudah diproses; catatan baru selama sinkron tetap di antrean.
       setPending((prev) => prev.filter((e) => !done.has(e.clientId)));
       if (failed.length > 0) setRejections((prev) => [...prev, ...failed]);
@@ -143,7 +175,7 @@ export function useRondaStore() {
       setStatus("offline");
       return false;
     }
-  }, [setPending]);
+  }, [saveSnapshot, setPending]);
 
   const sync = useCallback(async () => {
     if (syncingRef.current) {

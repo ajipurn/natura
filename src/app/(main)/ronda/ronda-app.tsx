@@ -1,27 +1,33 @@
 "use client";
 
-import { CloudOff, CloudUpload, LogIn, RefreshCw, ScanLine, ShieldAlert } from "lucide-react";
+import { CloudOff, CloudUpload, LayoutGrid, LogIn, Map as MapIcon, RefreshCw, ScanLine, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { QrScanner } from "@/components/qr-scanner";
 import { ShareRecap } from "@/components/share-recap";
+import { SiteMap, type MarkerState } from "@/components/site-map";
 import { Alert, Card, buttonClass, cx } from "@/components/ui";
 import { formatDateLong } from "@/lib/dates";
 import { formatAmountShort, formatRupiah } from "@/lib/format";
 import { groupByBlock, houseLabel, houseLabelLong } from "@/lib/houses";
 import { parseQrToken } from "@/lib/qr";
 import { buildRecapText, summarize } from "@/lib/recap";
+import { DEFAULT_MAP_SIZE } from "@/lib/site-map";
 import type { CollectionMethod, CollectionStatus, HouseDTO } from "@/lib/types";
 import { HouseSheet } from "./house-sheet";
 import { useRondaStore, type MergedCollection, type SyncStatus } from "./use-ronda-store";
 
 type Toast = { text: string; tone: "ok" | "error" };
+type View = "list" | "map";
+
+const VIEW_KEY = "jimpitan:ronda-view";
 
 export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   const store = useRondaStore();
   const [scannerOpen, setScannerOpen] = useState(false);
   const [active, setActive] = useState<{ house: HouseDTO; method: CollectionMethod } | null>(null);
   const [onlyUnchecked, setOnlyUnchecked] = useState(false);
+  const [view, setView] = useState<View>("list");
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -31,8 +37,40 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   const collectionList = useMemo(() => [...store.collections.values()], [store.collections]);
   const summary = useMemo(() => summarize(houses, collectionList), [houses, collectionList]);
   const groups = useMemo(() => groupByBlock(houses), [houses]);
+  const siteMap = snapshot?.siteMap ?? { imageUrl: null, ...DEFAULT_MAP_SIZE };
+  const placedCount = useMemo(() => houses.filter((h) => h.mapX != null && h.mapY != null).length, [houses]);
+  const markers = useMemo(() => {
+    const result: Record<number, MarkerState> = {};
+    for (const h of houses) {
+      result[h.id] = store.collections.get(h.id)?.status ?? (h.status === "vacant" ? "vacant" : "unchecked");
+    }
+    return result;
+  }, [houses, store.collections]);
+  const pendingIds = useMemo(
+    () => new Set(collectionList.filter((c) => c.pending).map((c) => c.houseId)),
+    [collectionList],
+  );
 
   useEffect(() => () => clearTimeout(toastTimer.current), []);
+
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- pilihan tampilan tersimpan di HP
+      if (localStorage.getItem(VIEW_KEY) === "map") setView("map");
+    } catch {}
+  }, []);
+
+  // Ambil gambar denah sekali saat online supaya ikut tersimpan untuk dipakai offline.
+  useEffect(() => {
+    if (siteMap.imageUrl) fetch(siteMap.imageUrl).catch(() => {});
+  }, [siteMap.imageUrl]);
+
+  function changeView(next: View) {
+    setView(next);
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {}
+  }
 
   function showToast(text: string, tone: Toast["tone"] = "ok") {
     clearTimeout(toastTimer.current);
@@ -164,51 +202,107 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
             />
           </Card>
 
-          <div className="mt-5 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Daftar rumah</h2>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={onlyUnchecked}
-                onChange={(e) => setOnlyUnchecked(e.target.checked)}
-                className="size-4 accent-[var(--primary)]"
-              />
-              Yang belum saja
-            </label>
-          </div>
-
-          <div className="mt-2 space-y-4">
-            {groups.map(([block, list]) => {
-              const visible = onlyUnchecked
-                ? list.filter((h) => h.status === "active" && !store.collections.has(h.id))
-                : list;
-              if (visible.length === 0) return null;
-              const checked = list.filter((h) => store.collections.has(h.id)).length;
-              return (
-                <section key={block}>
-                  <h3 className="mb-2 flex items-baseline justify-between font-semibold">
-                    Blok {block}
-                    <span className="text-sm font-normal text-muted">
-                      {checked}/{list.length}
-                    </span>
-                  </h3>
-                  <div className="grid grid-cols-5 gap-2 sm:grid-cols-8">
-                    {visible.map((h) => (
-                      <HouseTile
-                        key={h.id}
-                        house={h}
-                        collection={store.collections.get(h.id)}
-                        onClick={() => setActive({ house: h, method: "manual" })}
-                      />
-                    ))}
-                  </div>
-                </section>
-              );
-            })}
-            {onlyUnchecked && summary.unchecked.length === 0 && (
-              <p className="py-6 text-center text-muted">Semua rumah sudah dicek 🎉</p>
+          <div className="mt-5 flex items-center justify-between gap-3">
+            <div role="tablist" aria-label="Tampilan" className="flex rounded-xl border border-line bg-card p-0.5">
+              {(
+                [
+                  ["list", "Daftar", LayoutGrid],
+                  ["map", "Denah", MapIcon],
+                ] as const
+              ).map(([value, label, Icon]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={view === value}
+                  onClick={() => changeView(value)}
+                  className={cx(
+                    "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold",
+                    view === value ? "bg-primary text-primary-fg" : "text-muted",
+                  )}
+                >
+                  <Icon className="size-4" /> {label}
+                </button>
+              ))}
+            </div>
+            {view === "list" && (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={onlyUnchecked}
+                  onChange={(e) => setOnlyUnchecked(e.target.checked)}
+                  className="size-4 accent-[var(--primary)]"
+                />
+                Yang belum saja
+              </label>
             )}
           </div>
+
+          {view === "map" ? (
+            <div className="mt-3">
+              {placedCount === 0 ? (
+                <Card className="text-center">
+                  <MapIcon className="mx-auto size-10 text-muted" />
+                  <p className="mt-2 font-semibold">Denah belum diatur</p>
+                  <p className="mt-1 text-sm text-muted">Admin perlu menaruh rumah-rumah di denah dulu.</p>
+                  {isAdmin && (
+                    <Link href="/admin/denah" className={cx(buttonClass("primary"), "mt-4")}>
+                      Atur denah
+                    </Link>
+                  )}
+                </Card>
+              ) : (
+                <>
+                  <SiteMap
+                    houses={houses}
+                    size={siteMap}
+                    imageUrl={siteMap.imageUrl}
+                    markers={markers}
+                    pending={pendingIds}
+                    onHouseClick={(h) => setActive({ house: h, method: "manual" })}
+                  />
+                  {placedCount < houses.length && (
+                    <p className="mt-2 text-sm text-muted">
+                      {houses.length - placedCount} rumah belum ada di denah — lihat tampilan Daftar.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="mt-2 space-y-4">
+              {groups.map(([block, list]) => {
+                const visible = onlyUnchecked
+                  ? list.filter((h) => h.status === "active" && !store.collections.has(h.id))
+                  : list;
+                if (visible.length === 0) return null;
+                const checked = list.filter((h) => store.collections.has(h.id)).length;
+                return (
+                  <section key={block}>
+                    <h3 className="mb-2 flex items-baseline justify-between font-semibold">
+                      Blok {block}
+                      <span className="text-sm font-normal text-muted">
+                        {checked}/{list.length}
+                      </span>
+                    </h3>
+                    <div className="grid grid-cols-5 gap-2 sm:grid-cols-8">
+                      {visible.map((h) => (
+                        <HouseTile
+                          key={h.id}
+                          house={h}
+                          collection={store.collections.get(h.id)}
+                          onClick={() => setActive({ house: h, method: "manual" })}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+              {onlyUnchecked && summary.unchecked.length === 0 && (
+                <p className="py-6 text-center text-muted">Semua rumah sudah dicek 🎉</p>
+              )}
+            </div>
+          )}
           {/* Ruang supaya baris terakhir tidak tertutup tombol Scan QR. */}
           <div className="h-20" aria-hidden />
 

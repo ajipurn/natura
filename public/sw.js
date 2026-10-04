@@ -1,7 +1,7 @@
 // Service worker Jimpitan: halaman Ronda tetap bisa dibuka walau sinyal hilang.
 // Data catatan disimpan di HP (localStorage) oleh halaman Ronda dan dikirim saat online.
 
-const CACHE = "jimpitan-v2";
+const CACHE = "jimpitan-v3";
 const OFFLINE_PAGES = ["/ronda"];
 const NETWORK_TIMEOUT_MS = 4000;
 
@@ -25,8 +25,12 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // File build Next.js punya nama unik per versi, aman disimpan selamanya.
-  if (url.pathname.startsWith("/_next/static/") || /^\/icons\//.test(url.pathname)) {
+  // File build Next.js dan gambar denah (?v=versi) punya URL unik per versi, aman disimpan selamanya.
+  if (
+    url.pathname.startsWith("/_next/static/") ||
+    url.pathname.startsWith("/icons/") ||
+    (url.pathname === "/api/denah/gambar" && url.searchParams.has("v"))
+  ) {
     event.respondWith(cacheFirst(request));
     return;
   }
