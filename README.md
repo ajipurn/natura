@@ -10,6 +10,7 @@ Web app untuk mencatat jimpitan saat ronda. Setiap rumah punya stiker QR di deka
 - **Tetap jalan tanpa sinyal.** Catatan disimpan di HP dulu, lalu terkirim otomatis begitu online. Halaman Ronda juga bisa dibuka ulang saat offline.
 - **Kotak per blok berwarna:** hijau = ada, merah = kosong, putih = belum dicek. Ada filter "yang belum saja" supaya tidak ada rumah terlewat.
 - **Denah perumahan:** rumah tampil di atas gambar denah (foto denah developer, gambar tangan, atau screenshot Google Maps) dengan warna status yang sama, bisa di-zoom dan diketuk untuk mencatat. Tanpa gambar, rumah bisa disusun otomatis per blok. Denah juga muncul di riwayat tiap malam.
+- **Tampilan 3D (tambahan):** denah yang sama sebagai maket 3D (three.js). Atap rumah berwarna sesuai status, bisa diputar/zoom/digeser, dan rumahnya bisa diketuk untuk mencatat. Kodenya hanya diunduh saat tab 3D dibuka.
 - **Rekap ke WhatsApp** sekali tekan, misalnya: *✅ Ada: 47 rumah · ⭕ Kosong: 3 (A-3, B-7, C-1) · 💰 Total: Rp 23.500 · 👮 Petugas: Andi, Budi*.
 - **Status rumah kosong/mudik** supaya tidak dihitung bolong.
 - **Riwayat per malam**, termasuk jam, petugas, cara mencatat (scan/manual), dan koreksi oleh admin.
@@ -28,7 +29,7 @@ Ronda yang lewat tengah malam tetap dihitung malam sebelumnya: jam 00.00–11.59
 3. Klik **Cetak QR**, cetak di kertas stiker (sebaiknya vinyl atau dilaminasi), lalu tempel dekat wadah jimpitan.
 4. (Opsional) Di **Admin → Denah**, unggah gambar denah, lalu ketuk posisi tiap rumah. Setelah satu rumah ditaruh, rumah berikutnya otomatis terpilih. Tanpa gambar, tekan **Susun otomatis**.
 5. Di **Admin → Petugas ronda**, buat akun untuk setiap petugas beserta PIN-nya.
-6. Petugas membuka halaman **Ronda** sekali saat ada sinyal (supaya tersimpan untuk offline), lalu tekan **Scan QR** saat keliling. Pilih tampilan **Daftar** atau **Denah** sesuai selera.
+6. Petugas membuka halaman **Ronda** sekali saat ada sinyal (supaya tersimpan untuk offline), lalu tekan **Scan QR** saat keliling. Pilih tampilan **Daftar**, **Denah**, atau **3D** sesuai selera.
 7. Selesai ronda, tekan **Bagikan rekap** dan kirim ke grup WA.
 
 > Kamera hanya bisa dipakai lewat **HTTPS** (atau `localhost`). Isi `APP_URL` sebelum mencetak stiker, karena alamat di QR tidak bisa diubah setelah ditempel. Kalau stiker rusak atau hilang, buat QR baru untuk rumah itu di halaman Data rumah.
@@ -68,6 +69,7 @@ Migrasi juga mengaktifkan Row Level Security di semua tabel, supaya data tidak b
 - [Next.js 16](https://nextjs.org) (App Router, Server Actions) + React 19 + Tailwind CSS 4
 - [Drizzle ORM](https://orm.drizzle.team) + PostgreSQL (`postgres-js` di production, [PGlite](https://pglite.dev) untuk lokal/tes)
 - Pemindai QR: `BarcodeDetector` bawaan browser bila ada, [jsQR](https://github.com/cozmo/jsQR) sebagai cadangan (iPhone)
+- Tampilan 3D: [three.js](https://threejs.org) (dimuat terpisah saat dibutuhkan)
 - Login: PIN di-hash dengan scrypt, sesi berupa JWT di cookie httpOnly ([jose](https://github.com/panva/jose))
 - Offline: service worker (`public/sw.js`) + antrean di `localStorage`
 
@@ -83,7 +85,7 @@ src/
     r/[token]/           Halaman rumah (tujuan QR)
     api/ronda, api/setoran  Data malam ini & sinkronisasi antrean
     api/denah/gambar     Gambar latar denah (unggah: admin, lihat: petugas)
-  components/            Komponen UI, pemindai QR, denah
+  components/            Komponen UI, pemindai QR, denah 2D & 3D
   lib/                   Logika bersama (tanggal ronda, rekap, format, QR, susun denah)
   server/                Database, skema, login, query
 drizzle/                 Migrasi SQL

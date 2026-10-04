@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Box,
   CloudOff,
   CloudUpload,
   Keyboard,
@@ -11,6 +12,7 @@ import {
   ScanLine,
   ShieldAlert,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { QrScanner } from "@/components/qr-scanner";
@@ -29,9 +31,19 @@ import { HouseSheet } from "./house-sheet";
 import { useRondaStore, type MergedCollection, type SyncStatus } from "./use-ronda-store";
 
 type Toast = { text: string; tone: "ok" | "error" };
-type View = "list" | "map";
+type View = "list" | "map" | "3d";
 
 const VIEW_KEY = "jimpitan:ronda-view";
+
+// three.js cukup besar; hanya diunduh saat tab 3D dibuka.
+const SiteMap3D = dynamic(() => import("@/components/site-map-3d"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[60vh] min-h-72 items-center justify-center rounded-2xl border border-line bg-card text-muted">
+      Memuat tampilan 3D…
+    </div>
+  ),
+});
 
 export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   const store = useRondaStore();
@@ -67,8 +79,9 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
 
   useEffect(() => {
     try {
+      const saved = localStorage.getItem(VIEW_KEY);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- pilihan tampilan tersimpan di HP
-      if (localStorage.getItem(VIEW_KEY) === "map") setView("map");
+      if (saved === "map" || saved === "3d") setView(saved);
     } catch {}
   }, []);
 
@@ -223,6 +236,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                 [
                   ["list", "Daftar", LayoutGrid],
                   ["map", "Denah", MapIcon],
+                  ["3d", "3D", Box],
                 ] as const
               ).map(([value, label, Icon]) => (
                 <button
@@ -253,7 +267,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
             )}
           </div>
 
-          {view === "map" ? (
+          {view !== "list" ? (
             <div className="mt-3">
               {placedCount === 0 ? (
                 <Card className="text-center">
@@ -268,14 +282,24 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                 </Card>
               ) : (
                 <>
-                  <SiteMap
-                    houses={houses}
-                    size={siteMap}
-                    imageUrl={siteMap.imageUrl}
-                    markers={markers}
-                    pending={pendingIds}
-                    onHouseClick={(h) => setActive({ house: h, method: "manual" })}
-                  />
+                  {view === "map" ? (
+                    <SiteMap
+                      houses={houses}
+                      size={siteMap}
+                      imageUrl={siteMap.imageUrl}
+                      markers={markers}
+                      pending={pendingIds}
+                      onHouseClick={(h) => setActive({ house: h, method: "manual" })}
+                    />
+                  ) : (
+                    <SiteMap3D
+                      houses={houses}
+                      size={siteMap}
+                      imageUrl={siteMap.imageUrl}
+                      markers={markers}
+                      onHouseClick={(h) => setActive({ house: h, method: "manual" })}
+                    />
+                  )}
                   {placedCount < houses.length && (
                     <p className="mt-2 text-sm text-muted">
                       {houses.length - placedCount} rumah belum ada di denah — lihat tampilan Daftar.
