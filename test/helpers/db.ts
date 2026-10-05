@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
-import postgres from "postgres";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
+import pg from "pg";
 import { afterAll } from "vitest";
 import { app } from "@/server/app";
 import { createDb, type Db } from "@/server/db";
@@ -26,15 +26,16 @@ async function createTestDb(): Promise<Db> {
     return local.db;
   }
   const name = `natura_test_${randomUUID().replaceAll("-", "")}`;
-  const admin = postgres(server, { onnotice: () => {} });
-  await admin.unsafe(`create database ${name}`);
+  const admin = new pg.Client({ connectionString: server });
+  await admin.connect();
+  await admin.query(`create database ${name}`);
   const url = new URL(server);
   url.pathname = `/${name}`;
   const db = createDb(url.href);
   await migrate(db, { migrationsFolder: "drizzle" });
   cleanups.push(async () => {
     await db.$client.end();
-    await admin.unsafe(`drop database ${name} with (force)`);
+    await admin.query(`drop database ${name} with (force)`);
     await admin.end();
   });
   return db;

@@ -185,7 +185,7 @@ describe("dua petugas mencatat rumah yang sama", () => {
     expect(empty).toMatchObject({ ok: false, error: expect.stringMatching(/^Sudah dicatat Ada Rp.500 oleh Budi pukul 22\.00\./) });
     expect(removed.ok).toBe(false);
     expect(await saved(house)).toMatchObject({ status: "filled", amount: 500, collectorName: "Budi" });
-    const logs = await db.select().from(collectionLogs).where(eq(collectionLogs.houseId, house));
+    const logs = await db.select().from(collectionLogs).where(eq(collectionLogs.houseId, house)).orderBy(collectionLogs.id);
     expect(logs.map((l) => l.status)).toEqual(["filled", "empty", "none"]);
   });
 

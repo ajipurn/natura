@@ -33,6 +33,8 @@ const result = await Bun.build({
   target: "node",
   format: "esm",
   sourcemap: "linked",
+  // Binding native opsional milik `pg`, tidak dipakai (dan tidak terpasang).
+  external: ["pg-native"],
 });
 if (!result.success) {
   for (const log of result.logs) console.error(log);

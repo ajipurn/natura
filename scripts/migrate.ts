@@ -9,7 +9,7 @@
  */
 import { sql } from "drizzle-orm";
 import { readMigrationFiles } from "drizzle-orm/migrator";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { openTarget } from "./db-target";
 
 const remote = process.argv.includes("--remote");
@@ -25,10 +25,12 @@ async function main() {
   console.log(`Migrasi ke ${target.label}…`);
 
   const local = new Set(readMigrationFiles({ migrationsFolder }).map((m) => m.hash));
-  const [{ history }] = await db.execute<{ history: string | null }>(sql`select to_regclass('drizzle.__drizzle_migrations')::text as history`);
-  const applied = history ? await db.execute<{ hash: string }>(sql`select hash from drizzle.__drizzle_migrations`) : [];
+  const {
+    rows: [{ history }],
+  } = await db.execute<{ history: string | null }>(sql`select to_regclass('drizzle.__drizzle_migrations')::text as history`);
+  const applied = history ? (await db.execute<{ hash: string }>(sql`select hash from drizzle.__drizzle_migrations`)).rows : [];
   const foreign = applied.filter((m) => !local.has(m.hash));
-  const tables = await db.execute<{ name: string }>(
+  const { rows: tables } = await db.execute<{ name: string }>(
     sql`select table_name as name from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'`,
   );
   if (foreign.length > 0 || (applied.length === 0 && tables.length > 0)) {
