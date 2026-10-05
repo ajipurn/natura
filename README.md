@@ -30,7 +30,7 @@ Stiker QR berisi alamat `/r/<kode>`: dibuka pakai kamera HP biasa, warga melihat
 - **Data petugas dan rumah satu sumber:** nama warga di rumah yang dihuni petugas adalah nama akunnya, dan jadwal hanya menyimpan rujukan ke akun atau rumah. Nama yang diubah di **Petugas** atau di **Rumah & QR** langsung berubah di jadwal, denah, app petugas, dan halaman warga; petugas yang pindah rumah membawa jadwalnya. Nama boleh kembar asal rumahnya beda; di halaman masuk rumahnya ikut ditampilkan.
 - **Dashboard admin:** ringkasan malam ini, total bulan ini, grafik 30 malam terakhir, rumah yang sering kosong, dan daftar hal yang belum disiapkan.
 - **Riwayat per malam** (jam, petugas, scan/manual) dan koreksi oleh admin.
-- **Rekap bulanan** berupa tabel rumah × tanggal, bisa diunduh sebagai CSV.
+- **Rekap bulanan** berupa tabel rumah × tanggal per blok (nominal tiap malam, kosong, tidak dicek), dengan pencarian, saringan, dan urutan. Bisa diunduh sebagai Excel (.xlsx, lembar per rumah dan per malam, berwarna) atau CSV.
 - **Halaman warga** dengan kode bersama dari pengurus: pengumuman, jadwal, rekap per bulan, status per rumah (tanpa nama), dan kontak (telepon/WhatsApp). Ganti kode kapan saja; akses lama otomatis tidak berlaku.
 - **Cetak stiker QR** di kertas A4, bisa difilter per blok.
 - **Login nama + PIN.** Akun terkunci 15 menit setelah 5 kali PIN salah. Login bertahan lama supaya petugas tidak perlu login tiap malam.

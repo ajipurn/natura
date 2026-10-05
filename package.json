@@ -28,6 +28,7 @@
     "react-dom": "19.2.8",
     "react-router": "^8.4.0",
     "three": "^0.186.1",
+    "write-excel-file": "^4.1.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -44,6 +45,7 @@
     "eslint": "^10.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
+    "fflate": "^0.8.3",
     "globals": "^17.13.0",
     "happy-dom": "^20.14.5",
     "miniflare": "^5.20261001.0-alpha",

@@ -1,163 +1,339 @@
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Search } from "lucide-react";
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { QueryState } from "@/components/query-state";
-import { Card, PageHeader, buttonClass, cx } from "@/components/ui";
-import { formatMonth, isMonth, rondaDate, shiftMonth } from "@/lib/dates";
+import { Card, PageHeader, buttonClass, cx, inputClass } from "@/components/ui";
+import { formatDateShort, formatMonth, isMonth, rondaDate, shiftMonth } from "@/lib/dates";
 import { formatAmountShort, formatRupiah } from "@/lib/format";
-import { houseLabel } from "@/lib/houses";
+import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
 import { summarizeMonth } from "@/lib/month-summary";
 import { buildRecapCsv } from "@/lib/recap-csv";
+import { buildRecapSheets } from "@/lib/recap-xlsx";
 import type { MonthRecap } from "@/lib/types";
 import { recapQuery } from "./queries";
 
-function downloadCsv(month: string, recap: MonthRecap) {
-  const url = URL.createObjectURL(new Blob([buildRecapCsv(recap)], { type: "text/csv;charset=utf-8" }));
-  const link = Object.assign(document.createElement("a"), { href: url, download: `jimpitan-${month}.csv` });
+type Filter = "semua" | "kosong" | "tidak-dicek";
+type Sort = "rumah" | "total" | "kosong";
+
+function saveFile(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const link = Object.assign(document.createElement("a"), { href: url, download: fileName });
   link.click();
   URL.revokeObjectURL(url);
 }
 
+function downloadCsv(month: string, recap: MonthRecap) {
+  saveFile(new Blob([buildRecapCsv(recap)], { type: "text/csv;charset=utf-8" }), `jimpitan-${month}.csv`);
+}
+
+async function downloadXlsx(month: string, recap: MonthRecap, communityName: string) {
+  // Pustakanya hanya diunduh saat tombol ditekan.
+  const { default: writeXlsxFile } = await import("write-excel-file/browser");
+  saveFile(await writeXlsxFile(buildRecapSheets(recap, communityName)).toBlob(), `jimpitan-${month}.xlsx`);
+}
+
 export function RekapPage() {
   const [params] = useSearchParams();
+  const thisMonth = rondaDate(new Date()).slice(0, 7);
   const bulan = params.get("bulan") ?? "";
-  const month = isMonth(bulan) ? bulan : rondaDate(new Date()).slice(0, 7);
+  const month = isMonth(bulan) && bulan <= thisMonth ? bulan : thisMonth;
   const query = useQuery({ ...recapQuery(month), placeholderData: (previous) => previous });
+  const [exporting, setExporting] = useState(false);
+  const ready = query.data && query.data.month === month;
+
+  async function exportXlsx() {
+    if (!query.data) return;
+    setExporting(true);
+    try {
+      await downloadXlsx(month, query.data, query.data.communityName);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <>
       <PageHeader
         title="Rekap bulanan"
-        subtitle={formatMonth(month)}
+        subtitle="Jimpitan per rumah per malam ronda"
         action={
-          <button
-            type="button"
-            disabled={!query.data || query.data.month !== month}
-            onClick={() => query.data && downloadCsv(month, query.data)}
-            className={buttonClass("secondary", "sm")}
-          >
-            <Download className="size-4" /> CSV
-          </button>
+          <div className="flex shrink-0 gap-2">
+            <button type="button" disabled={!ready || exporting} onClick={exportXlsx} className={buttonClass("secondary", "sm")}>
+              <FileSpreadsheet className="size-4" /> {exporting ? "Menyiapkan…" : "Excel"}
+            </button>
+            <button
+              type="button"
+              disabled={!ready}
+              onClick={() => query.data && downloadCsv(month, query.data)}
+              className={buttonClass("secondary", "sm")}
+            >
+              <FileText className="size-4" /> CSV
+            </button>
+          </div>
         }
       />
 
-      <div className="mb-4 flex items-center justify-between text-sm">
-        <Link to={`/admin/rekap?bulan=${shiftMonth(month, -1)}`} className="flex items-center gap-1 text-muted">
-          <ChevronLeft className="size-4" /> {formatMonth(shiftMonth(month, -1))}
+      <nav aria-label="Pilih bulan" className="mb-4 inline-flex items-center rounded-xl border border-line bg-card p-0.5">
+        <Link
+          to={`/admin/rekap?bulan=${shiftMonth(month, -1)}`}
+          className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-idle-soft"
+          aria-label={`Bulan sebelumnya (${formatMonth(shiftMonth(month, -1))})`}
+        >
+          <ChevronLeft className="size-5" />
         </Link>
-        <Link to={`/admin/rekap?bulan=${shiftMonth(month, 1)}`} className="flex items-center gap-1 text-muted">
-          {formatMonth(shiftMonth(month, 1))} <ChevronRight className="size-4" />
-        </Link>
-      </div>
+        <span className="min-w-36 px-2 text-center font-semibold">{formatMonth(month)}</span>
+        {month < thisMonth ? (
+          <Link
+            to={`/admin/rekap?bulan=${shiftMonth(month, 1)}`}
+            className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-idle-soft"
+            aria-label={`Bulan berikutnya (${formatMonth(shiftMonth(month, 1))})`}
+          >
+            <ChevronRight className="size-5" />
+          </Link>
+        ) : (
+          <span aria-hidden className="flex size-9 items-center justify-center text-muted/40">
+            <ChevronRight className="size-5" />
+          </span>
+        )}
+      </nav>
 
       <QueryState query={query}>
-        {(data) => {
-          const { rows, dateTotals, grandTotal } = summarizeMonth(data);
-          return (
-            <div className={cx(query.isPlaceholderData && "opacity-60")}>
-              <div className="grid grid-cols-3 gap-2">
-                <Card className="p-3 text-center">
-                  <p className="whitespace-nowrap text-base font-bold sm:text-lg">{formatRupiah(grandTotal)}</p>
-                  <p className="text-xs text-muted">Total</p>
-                </Card>
-                <Card className="p-3 text-center">
-                  <p className="whitespace-nowrap text-base font-bold sm:text-lg">{data.dates.length}</p>
-                  <p className="text-xs text-muted">Malam ronda</p>
-                </Card>
-                <Card className="p-3 text-center">
-                  <p className="whitespace-nowrap text-base font-bold sm:text-lg">
-                    {formatRupiah(data.dates.length ? Math.round(grandTotal / data.dates.length) : 0)}
-                  </p>
-                  <p className="text-xs text-muted">Rata-rata/malam</p>
-                </Card>
-              </div>
-
-              {data.dates.length === 0 || rows.length === 0 ? (
-                <Card className="mt-4 text-center text-muted">Belum ada catatan di bulan ini.</Card>
-              ) : (
-                <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-card">
-                  <table className="w-max min-w-full border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-line text-xs text-muted">
-                        <th className="sticky left-0 z-10 bg-card px-3 py-2 text-left">Rumah</th>
-                        {data.dates.map((d) => (
-                          <th key={d} className="px-1 py-2 font-medium">
-                            <Link
-                              to={`/admin/riwayat/${d}`}
-                              className="block min-w-6 underline-offset-2 hover:underline"
-                            >
-                              {Number(d.slice(8))}
-                            </Link>
-                          </th>
-                        ))}
-                        <th className="px-3 py-2 text-right">Ada</th>
-                        <th className="px-3 py-2 text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map(({ house, cells, filledCount, total }) => (
-                        <tr key={house.id} className="border-b border-line last:border-0">
-                          <th scope="row" className="sticky left-0 z-10 bg-card px-3 py-1.5 text-left font-semibold">
-                            {houseLabel(house)}
-                          </th>
-                          {cells.map((cell, i) => (
-                            <td key={data.dates[i]} className="px-1 py-1.5 text-center">
-                              <span
-                                className={cx(
-                                  "inline-block size-5 rounded",
-                                  cell?.status === "filled" && "bg-filled",
-                                  cell?.status === "empty" && "bg-empty",
-                                  !cell && "bg-idle-soft",
-                                )}
-                                title={
-                                  cell?.status === "filled"
-                                    ? formatRupiah(cell.amount)
-                                    : cell?.status === "empty"
-                                      ? "Kosong"
-                                      : "Belum dicek"
-                                }
-                              />
-                            </td>
-                          ))}
-                          <td className="px-3 py-1.5 text-right">{filledCount}</td>
-                          <td className="whitespace-nowrap px-3 py-1.5 text-right font-semibold">
-                            {formatRupiah(total)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t border-line font-semibold">
-                        <th scope="row" className="sticky left-0 z-10 bg-card px-3 py-2 text-left">
-                          Total
-                        </th>
-                        {dateTotals.map((t, i) => (
-                          <td key={data.dates[i]} className="px-1 py-2 text-center text-[10px] text-muted">
-                            {t > 0 ? formatAmountShort(t) : "-"}
-                          </td>
-                        ))}
-                        <td />
-                        <td className="whitespace-nowrap px-3 py-2 text-right">{formatRupiah(grandTotal)}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              )}
-            </div>
-          );
-        }}
+        {(data) => (
+          <div className={cx(query.isPlaceholderData && "opacity-60")}>
+            <RecapBody data={data} />
+          </div>
+        )}
       </QueryState>
-      <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-        <span className="flex items-center gap-1">
-          <span className="inline-block size-3 rounded bg-filled" /> Ada
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block size-3 rounded bg-empty" /> Kosong
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block size-3 rounded bg-idle-soft" /> Belum dicek
-        </span>
-      </p>
     </>
+  );
+}
+
+function RecapBody({ data }: { data: MonthRecap }) {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<Filter>("semua");
+  const [sort, setSort] = useState<Sort>("rumah");
+  const { rows, dateTotals, grandTotal } = summarizeMonth(data);
+  const nights = data.dates.length;
+
+  const stats = rows.map((r) => ({
+    ...r,
+    empty: r.cells.filter((c) => c?.status === "empty").length,
+    // Rumah kosong/mudik tidak dihitung "tidak dicek".
+    unchecked: r.house.status === "active" ? r.cells.filter((c) => !c).length : 0,
+  }));
+  const filledCells = stats.reduce((s, r) => s + r.filledCount, 0);
+  const emptyCells = stats.reduce((s, r) => s + r.empty, 0);
+  const uncheckedCells = stats.reduce((s, r) => s + r.unchecked, 0);
+  const checkedCells = filledCells + emptyCells;
+
+  if (nights === 0 || rows.length === 0) {
+    return <Card className="py-10 text-center text-muted">Belum ada catatan ronda di bulan ini.</Card>;
+  }
+
+  const matched = search.trim() ? new Set(searchHouses(stats.map((s) => s.house), search, stats.length).map((h) => h.id)) : null;
+  const filters: { value: Filter; label: string; match: (r: (typeof stats)[number]) => boolean }[] = [
+    { value: "semua", label: "Semua", match: () => true },
+    { value: "kosong", label: "Pernah kosong", match: (r) => r.empty > 0 },
+    { value: "tidak-dicek", label: "Ada yang tidak dicek", match: (r) => r.unchecked > 0 },
+  ];
+  const visible = stats
+    .filter((r) => !matched || matched.has(r.house.id))
+    .filter(filters.find((f) => f.value === filter)!.match)
+    .sort((a, b) => (sort === "total" ? b.total - a.total : sort === "kosong" ? b.empty - a.empty || a.filledCount - b.filledCount : 0));
+  // Diurutkan per rumah: dikelompokkan per blok. Urutan lain: satu daftar.
+  const groups: [string | null, typeof visible][] =
+    sort === "rumah" ? groupByBlock(visible.map((r) => ({ ...r, block: r.house.block, number: r.house.number }))) : [[null, visible]];
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <Stat label="Terkumpul" value={formatRupiah(grandTotal)} />
+        <Stat label="Malam ronda" value={String(nights)} />
+        <Stat label="Rata-rata per malam" value={formatRupiah(Math.round(grandTotal / nights))} />
+        <Stat
+          label="Wadah ada isinya"
+          value={checkedCells ? `${Math.round((filledCells / checkedCells) * 100)}%` : "–"}
+          hint={`${emptyCells} kosong · ${uncheckedCells} tidak dicek`}
+        />
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center">
+        <label className="relative block lg:w-64">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari rumah atau nama…"
+            aria-label="Cari rumah"
+            className={cx(inputClass, "h-10 pl-10")}
+          />
+        </label>
+        <div role="tablist" aria-label="Saring rumah" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 lg:mx-0 lg:px-0">
+          {filters.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              role="tab"
+              aria-selected={filter === f.value}
+              onClick={() => setFilter(f.value)}
+              className={cx(
+                "shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium",
+                filter === f.value ? "border-primary bg-primary text-primary-fg" : "border-line bg-card",
+              )}
+            >
+              {f.label} {stats.filter(f.match).length}
+            </button>
+          ))}
+        </div>
+        <label className="flex items-center gap-2 text-sm lg:ml-auto">
+          <span className="text-muted">Urutkan</span>
+          <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className={cx(inputClass, "h-10 w-auto")}>
+            <option value="rumah">Blok & nomor</option>
+            <option value="total">Total terbesar</option>
+            <option value="kosong">Paling sering kosong</option>
+          </select>
+        </label>
+      </div>
+
+      <Legend />
+
+      {visible.length === 0 ? (
+        <Card className="mt-3 text-center text-muted">Tidak ada rumah yang cocok.</Card>
+      ) : (
+        <div className="mt-3 overflow-x-auto rounded-2xl border border-line bg-card">
+          <table className="min-w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-line text-xs text-muted">
+                <th className="sticky left-0 z-10 w-full min-w-40 bg-card px-3 py-2 text-left font-semibold">Rumah</th>
+                {data.dates.map((d) => (
+                  <th key={d} className="px-0.5 py-1.5 font-medium">
+                    <Link
+                      to={`/admin/riwayat/${d}`}
+                      title={`Buka riwayat ${formatDateShort(d)}`}
+                      className="flex min-w-7 flex-col items-center rounded-md py-0.5 leading-tight hover:bg-idle-soft hover:text-fg"
+                    >
+                      <span className="text-[10px]">{formatDateShort(d).split(",")[0]}</span>
+                      <span className="font-semibold">{Number(d.slice(8))}</span>
+                    </Link>
+                  </th>
+                ))}
+                <th className="whitespace-nowrap px-3 py-2 text-right font-semibold">Ada</th>
+                <th className="whitespace-nowrap px-3 py-2 text-right font-semibold">Total</th>
+              </tr>
+            </thead>
+            {groups.map(([block, list]) => (
+              <tbody key={block ?? "semua"}>
+                {block && (
+                  <tr className="border-b border-line bg-bg/60">
+                    <th colSpan={nights + 3} className="sticky left-0 px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                      Blok {block} · {list.length} rumah · {formatRupiah(list.reduce((s, r) => s + r.total, 0))}
+                    </th>
+                  </tr>
+                )}
+                {list.map((r) => (
+                  <tr key={r.house.id} className={cx("border-b border-line last:border-0 hover:bg-idle-soft/50", r.house.status === "vacant" && "text-muted")}>
+                    <th scope="row" className="sticky left-0 z-10 bg-card px-3 py-1.5 text-left font-normal">
+                      <span className="flex items-baseline gap-2">
+                        <span className="font-semibold">{houseLabel(r.house)}</span>
+                        <span className="min-w-0 truncate text-xs text-muted">{r.house.ownerName ?? ""}</span>
+                        {r.house.status === "vacant" && (
+                          <span className="shrink-0 rounded-full bg-warn-soft px-1.5 text-[10px] font-semibold text-warn">mudik</span>
+                        )}
+                      </span>
+                    </th>
+                    {r.cells.map((cell, i) => (
+                      <td key={data.dates[i]} className="px-0.5 py-1 text-center">
+                        <Cell cell={cell} vacant={r.house.status === "vacant"} date={data.dates[i]} />
+                      </td>
+                    ))}
+                    <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
+                      {r.filledCount}
+                      <span className="text-muted">/{r.filledCount + r.empty}</span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-1.5 text-right font-semibold tabular-nums">{formatRupiah(r.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            ))}
+            <tfoot>
+              <tr className="border-t-2 border-line font-semibold">
+                <th scope="row" className="sticky left-0 z-10 bg-card px-3 py-2 text-left">
+                  Total
+                </th>
+                {dateTotals.map((t, i) => (
+                  <td key={data.dates[i]} className="px-0.5 py-2 text-center text-[10px] text-muted">
+                    {t > 0 ? formatAmountShort(t) : "–"}
+                  </td>
+                ))}
+                <td />
+                <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">{formatRupiah(grandTotal)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}
+
+function Cell({ cell, vacant, date }: { cell: MonthRecap["cells"][string] | undefined; vacant: boolean; date: string }) {
+  const day = formatDateShort(date);
+  if (cell?.status === "filled") {
+    return (
+      <span
+        title={`${day}: ${formatRupiah(cell.amount)}`}
+        className="inline-flex size-7 items-center justify-center rounded-md bg-filled-soft align-middle text-[10px] font-semibold text-filled"
+      >
+        {formatAmountShort(cell.amount)}
+      </span>
+    );
+  }
+  if (cell?.status === "empty") {
+    return (
+      <span
+        title={`${day}: kosong`}
+        className="inline-flex size-7 items-center justify-center rounded-md bg-empty-soft align-middle text-sm font-bold text-empty"
+      >
+        ×
+      </span>
+    );
+  }
+  return (
+    <span
+      title={`${day}: ${vacant ? "mudik" : "tidak dicek"}`}
+      className={cx("inline-flex size-7 rounded-md border border-dashed align-middle", vacant ? "border-line/60" : "border-muted/50")}
+    />
+  );
+}
+
+function Legend() {
+  return (
+    <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+      <span className="flex items-center gap-1.5">
+        <span className="inline-flex size-5 items-center justify-center rounded bg-filled-soft text-[9px] font-semibold text-filled">500</span>
+        Ada isinya
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="inline-flex size-5 items-center justify-center rounded bg-empty-soft text-xs font-bold text-empty">×</span>
+        Kosong
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="inline-block size-5 rounded border border-dashed border-muted/50" />
+        Tidak dicek
+      </span>
+      <span>Ketuk tanggal untuk membuka riwayat malam itu.</span>
+    </p>
+  );
+}
+
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <Card className="p-3">
+      <p className="text-xs text-muted">{label}</p>
+      <p className="whitespace-nowrap text-xl font-bold leading-tight">{value}</p>
+      {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
+    </Card>
   );
 }
