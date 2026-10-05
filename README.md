@@ -79,7 +79,7 @@ cp .env.example .env.local
 bun run dev
 ```
 
-Buka http://localhost:5173/admin/ dan buat admin pertama. Database lokalnya [PGlite](https://pglite.dev) (Postgres di dalam proses) di folder `.data/`, dimigrasi otomatis, jadi tidak perlu memasang apa pun. Untuk seed awal, matikan `bun run dev` dulu (PGlite hanya boleh dibuka satu proses), jalankan `bun run seed`, lalu nyalakan lagi.
+Buka http://localhost:5173/admin/, buat admin pertama, lalu jalankan `bun run seed` di terminal lain. Database lokalnya [PGlite](https://pglite.dev) (Postgres di dalam proses) di folder `.data/`, dimigrasi otomatis, jadi tidak perlu memasang apa pun. PGlite hanya boleh dibuka satu proses, jadi selama `bun run dev` jalan, seed dititipkan ke server dev itu; kalau server dev mati, seed membuka databasenya sendiri.
 
 Mau memakai Postgres lokal (mis. supaya bisa dibuka di DBeaver sambil `bun run dev` jalan)? Isi `DATABASE_URL` di `.env.local`, mis. `postgres://postgres:postgres@localhost:5432/natura`, lalu jalankan `bun run db:migrate` sekali.
 

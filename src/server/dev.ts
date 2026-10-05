@@ -9,7 +9,8 @@ import { openLocalDb, type LocalDb } from "./db-local";
  */
 const store = globalThis as typeof globalThis & { __naturaDevDb?: Promise<LocalDb> };
 
-export async function handleApi(req: IncomingMessage, res: ServerResponse, vars: Record<string, string>) {
+/** Database `bun run dev`: DATABASE_URL, atau PGlite lokal. Juga dipakai seed lewat server dev. */
+export function devDb(vars: Record<string, string>): Promise<LocalDb> {
   store.__naturaDevDb ??= openLocalDb(vars.DATABASE_URL || undefined).then(
     (local) => {
       console.log(`[api] database: ${local.label}`);
@@ -20,7 +21,11 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, vars:
       throw err;
     },
   );
-  const { db } = await store.__naturaDevDb;
+  return store.__naturaDevDb;
+}
+
+export async function handleApi(req: IncomingMessage, res: ServerResponse, vars: Record<string, string>) {
+  const { db } = await devDb(vars);
   const listener = getRequestListener((request) => app.fetch(request, { db, AUTH_SECRET: vars.AUTH_SECRET, APP_URL: vars.APP_URL, DEV: "1" }), {
     overrideGlobalObjects: false,
   });
