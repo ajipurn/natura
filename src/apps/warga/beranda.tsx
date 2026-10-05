@@ -4,11 +4,13 @@ import {
   ChevronRight,
   Home,
   KeyRound,
+  LayoutDashboard,
   LogIn,
   Megaphone,
   MessageCircle,
   Phone,
   Pin,
+  ScanLine,
   Search,
   ShieldCheck,
   Star,
@@ -17,6 +19,7 @@ import {
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import { api, call, errorMessage } from "@/client/api";
+import { useAuth } from "@/client/auth";
 import { invalidate } from "@/client/query";
 import { BarChart } from "@/components/bar-chart";
 import { GuardChip } from "@/components/guard-chip";
@@ -25,7 +28,7 @@ import { ThemeButton } from "@/components/theme-toggle";
 import { SegmentedControl } from "@/components/toggle-group";
 import { Alert, Button, Card, Input, PageTitle, SectionTitle, buttonClass, cx } from "@/components/ui";
 import { addDays, daysInMonth, formatDateLong, formatDateShort, formatMonth, shiftMonth } from "@/lib/dates";
-import { formatRupiah } from "@/lib/format";
+import { formatRupiah, phoneDigits, whatsappNumber } from "@/lib/format";
 import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
 import { DAY_NAMES, NIGHT_OF, slotHouseLabel } from "@/lib/schedule";
 import { HouseHistoryDialog } from "./house-history";
@@ -49,15 +52,7 @@ export function BerandaPage() {
         </div>
         <div className="mt-1 flex shrink-0 gap-2">
           <ThemeButton />
-          {/* Untuk petugas dan pengurus; warga cukup memakai kode. */}
-          <a
-            href="/petugas/"
-            aria-label="Masuk petugas / pengurus"
-            title="Masuk petugas / pengurus"
-            className={buttonClass("secondary", "sm")}
-          >
-            <LogIn className="size-4" /> Masuk
-          </a>
+          <AppLink />
         </div>
       </header>
       <div className="mt-5">
@@ -78,6 +73,27 @@ export function BerandaPage() {
         )}
       </div>
     </main>
+  );
+}
+
+/**
+ * Untuk petugas dan pengurus (warga cukup memakai kode). Yang sudah masuk langsung dibawa ke
+ * app-nya, bukan ke layar masuk lagi.
+ */
+function AppLink() {
+  const user = useAuth().data?.user;
+  if (!user) {
+    return (
+      <a href="/petugas/" aria-label="Masuk petugas / pengurus" title="Masuk petugas / pengurus" className={buttonClass("secondary", "sm")}>
+        <LogIn className="size-4" /> Masuk
+      </a>
+    );
+  }
+  const admin = user.role === "admin";
+  return (
+    <a href={admin ? "/admin/" : "/petugas/"} title={`Masuk sebagai ${user.name}`} className={buttonClass("secondary", "sm")}>
+      {admin ? <LayoutDashboard className="size-4" /> : <ScanLine className="size-4" />} {admin ? "Dashboard" : "App petugas"}
+    </a>
   );
 }
 
@@ -510,17 +526,6 @@ function Stat({ label, value }: { label: string; value: string }) {
       <p className="text-xs text-muted">{label}</p>
     </div>
   );
-}
-
-/** "0812-3456 7890" → "081234567890" */
-function phoneDigits(phone: string) {
-  return phone.replace(/[^\d+]/g, "");
-}
-
-/** Nomor untuk wa.me: tanpa + dan 0 di depan diganti 62. */
-function whatsappNumber(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  return digits.startsWith("0") ? `62${digits.slice(1)}` : digits;
 }
 
 function toLocalDate(at: string | Date) {
