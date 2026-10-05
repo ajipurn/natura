@@ -1,6 +1,6 @@
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { MutationCache, QueryCache, QueryClient, defaultShouldDehydrateQuery, type QueryKey } from "@tanstack/react-query";
-import type { PersistQueryClientOptions, Persister } from "@tanstack/react-query-persist-client";
+import type { PersistQueryClientOptions } from "@tanstack/react-query-persist-client";
 import { del, get, set } from "idb-keyval";
 import { ApiError } from "./api";
 
@@ -47,16 +47,17 @@ const idbStorage = {
   removeItem: (key: string) => withTimeout(del(key), undefined),
 };
 
-let persister: Persister | undefined;
+export type AppName = "warga" | "petugas" | "admin";
+const APPS: readonly AppName[] = ["warga", "petugas", "admin"];
+const cacheKey = (app: AppName) => `jimpitan:query:${app}`;
 
 /**
  * Salinan cache di HP, per app: app yang dibuka lagi langsung menampilkan data terakhir (juga saat
- * offline), lalu diperbarui dari server.
+ * offline), lalu diperbarui dari server (lihat `refreshRestored`).
  */
-export function persistOptions(app: string): Omit<PersistQueryClientOptions, "queryClient"> {
-  persister = createAsyncStoragePersister({ storage: idbStorage, key: `jimpitan:query:${app}` });
+export function persistOptions(app: AppName): Omit<PersistQueryClientOptions, "queryClient"> {
   return {
-    persister,
+    persister: createAsyncStoragePersister({ storage: idbStorage, key: cacheKey(app) }),
     maxAge: 7 * DAY,
     // Versi app baru bisa mengubah bentuk data: salinan dari versi lama tidak dipakai.
     buster: __BUILD_ID__,
@@ -68,8 +69,19 @@ export function persistOptions(app: string): Omit<PersistQueryClientOptions, "qu
   };
 }
 
-/** Hapus semua data di memori dan salinannya di HP, mis. saat masuk atau keluar akun. */
+/**
+ * Data dari salinan di HP selalu diminta ulang begitu app dibuka, walau umurnya belum lewat
+ * `staleTime`: bisa jadi status login berubah di app lain sejak salinan itu dibuat.
+ */
+export function refreshRestored() {
+  void queryClient.invalidateQueries();
+}
+
+/**
+ * Hapus semua data di memori dan salinannya di HP saat masuk atau keluar akun. Salinan ketiga app
+ * ikut dihapus, karena status login berlaku di semuanya.
+ */
 export function clearCache() {
   queryClient.clear();
-  void persister?.removeClient();
+  for (const app of APPS) void idbStorage.removeItem(cacheKey(app));
 }
