@@ -9,10 +9,11 @@ describe("rondaDate", () => {
   it("menghitung lewat tengah malam sebagai malam sebelumnya", () => {
     // 01:30 WIB tanggal 5 Oktober = 18:30 UTC tanggal 4
     expect(rondaDate(new Date("2026-10-04T18:30:00Z"))).toBe("2026-10-04");
-    // 11:59 WIB tanggal 5 masih malam tanggal 4
-    expect(rondaDate(new Date("2026-10-05T04:59:00Z"))).toBe("2026-10-04");
-    // 12:00 WIB tanggal 5 sudah masuk tanggal 5
-    expect(rondaDate(new Date("2026-10-05T05:00:00Z"))).toBe("2026-10-05");
+    // 05:59 WIB tanggal 5 masih malam tanggal 4
+    expect(rondaDate(new Date("2026-10-04T22:59:00Z"))).toBe("2026-10-04");
+    // 06:00 WIB tanggal 5 sudah malam tanggal 5 (pagi ini "malam ini" = nanti malam)
+    expect(rondaDate(new Date("2026-10-04T23:00:00Z"))).toBe("2026-10-05");
+    expect(rondaDate(new Date("2026-10-05T03:17:00Z"))).toBe("2026-10-05");
     // 21:00 WIB tanggal 4
     expect(rondaDate(new Date("2026-10-04T14:00:00Z"))).toBe("2026-10-04");
   });

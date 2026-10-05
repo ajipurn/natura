@@ -1,8 +1,11 @@
 /** Zona waktu untuk menentukan tanggal ronda. WITA: "Asia/Makassar", WIT: "Asia/Jayapura". */
 export const APP_TIMEZONE = "Asia/Jakarta";
 
-/** Jam 00:00–11:59 masih dihitung ronda malam sebelumnya. */
-const CUTOFF_HOURS = 12;
+/**
+ * Ronda lewat tengah malam tetap dihitung malam sebelumnya: jam 00:00–05:59 WIB masih malam kemarin.
+ * Mulai jam 06:00 (selepas subuh), "malam ini" sudah malam hari itu.
+ */
+const CUTOFF_HOURS = 6;
 
 /** Tanggal lokal (YYYY-MM-DD) dari sebuah waktu di zona waktu tertentu. */
 export function localDate(at: Date, timeZone = APP_TIMEZONE): string {
