@@ -13,18 +13,35 @@ import { recapQuery } from "../queries";
  * Denah + panel samping. Di layar lebar panel menempel di kanan; di layar sempit panel ada di
  * bawah denah dan digulir ke layar saat rumah dipilih.
  */
-export function MapWithPanel({ map, panel, selectedId }: { map: ReactNode; panel: ReactNode; selectedId: number | null }) {
+export function MapWithPanel({
+  map,
+  panel,
+  selectedId,
+}: {
+  map: ReactNode;
+  panel: ReactNode;
+  selectedId: number | null;
+}) {
   const panelRef = useRef<HTMLElement>(null);
   useEffect(() => {
-    if (selectedId === null || window.matchMedia("(min-width: 80rem)").matches) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    panelRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "nearest" });
+    if (selectedId === null || window.matchMedia("(min-width: 80rem)").matches)
+      return;
+    const reduce = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    panelRef.current?.scrollIntoView({
+      behavior: reduce ? "auto" : "smooth",
+      block: "nearest",
+    });
   }, [selectedId]);
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_19rem] xl:items-start">
       <div className="min-w-0 space-y-3">{map}</div>
-      <aside ref={panelRef} className="scroll-mt-20 xl:sticky xl:top-6 xl:max-h-[calc(100dvh-3rem)] xl:overflow-y-auto">
+      <aside
+        ref={panelRef}
+        className="scroll-mt-20 xl:sticky xl:top-6 xl:max-h-[calc(100dvh-3rem)] xl:overflow-y-auto"
+      >
         {panel}
       </aside>
     </div>
@@ -86,26 +103,45 @@ export function HousePanel({
   onClose: () => void;
 }) {
   // Mode malam ini: ikut diperbarui seperti denahnya, supaya kotak malam ini tidak tertinggal.
-  const recap = useQuery({ ...recapQuery(month), refetchInterval: tonight ? 30_000 : false });
+  const recap = useQuery({
+    ...recapQuery(month),
+    refetchInterval: tonight ? 30_000 : false,
+  });
   const nights = recap.data
-    ? recap.data.dates.map((date) => ({ date, cell: recap.data.cells[`${house.id}:${date}`] ?? null }))
+    ? recap.data.dates.map((date) => ({
+        date,
+        cell: recap.data.cells[`${house.id}:${date}`] ?? null,
+      }))
     : null;
   const filled = nights?.filter((n) => n.cell?.status === "filled").length ?? 0;
   const empty = nights?.filter((n) => n.cell?.status === "empty").length ?? 0;
   const unchecked = (nights?.length ?? 0) - filled - empty;
-  const total = nights?.reduce((sum, n) => sum + (n.cell?.status === "filled" ? n.cell.amount : 0), 0) ?? 0;
+  const total =
+    nights?.reduce(
+      (sum, n) => sum + (n.cell?.status === "filled" ? n.cell.amount : 0),
+      0,
+    ) ?? 0;
 
   return (
     <Card className="space-y-4">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-2">
-            <span className="text-xl font-bold tabular-nums">{houseLabel(house)}</span>
+            <span className="text-xl font-bold tabular-nums">
+              {houseLabel(house)}
+            </span>
             {house.status === "vacant" && (
-              <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-medium text-warn">mudik</span>
+              <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-medium text-warn">
+                mudik
+              </span>
             )}
           </p>
-          <p className={cx("truncate text-sm", house.ownerName ? "text-fg/80" : "italic text-muted")}>
+          <p
+            className={cx(
+              "truncate text-sm",
+              house.ownerName ? "text-fg/80" : "italic text-muted",
+            )}
+          >
             {house.ownerName ?? "Belum ada nama"}
           </p>
         </div>
@@ -129,9 +165,13 @@ export function HousePanel({
       <section>
         <PanelHeading>{formatMonth(month)}</PanelHeading>
         {!nights ? (
-          <p className="text-sm text-muted">{recap.isError ? "Rekap tidak bisa dimuat." : "Memuat…"}</p>
+          <p className="text-sm text-muted">
+            {recap.isError ? "Rekap tidak bisa dimuat." : "Memuat…"}
+          </p>
         ) : nights.length === 0 ? (
-          <p className="text-sm text-muted">Belum ada malam ronda di bulan ini.</p>
+          <p className="text-sm text-muted">
+            Belum ada malam ronda di bulan ini.
+          </p>
         ) : (
           <>
             <div className="grid grid-cols-3 gap-2 text-center">
@@ -139,9 +179,16 @@ export function HousePanel({
               <MiniStat value={empty} label="Kosong" className="text-empty" />
               <MiniStat value={unchecked} label="Tidak dicek" />
             </div>
-            <ul className="mt-3 flex flex-wrap gap-1" aria-label="Catatan per malam">
+            <ul
+              className="mt-3 flex flex-wrap gap-1"
+              aria-label="Catatan per malam"
+            >
               {nights.map(({ date, cell }) => {
-                const text = cell ? (cell.status === "filled" ? `ada ${formatRupiah(cell.amount)}` : "kosong") : "tidak dicek";
+                const text = cell
+                  ? cell.status === "filled"
+                    ? `ada ${formatRupiah(cell.amount)}`
+                    : "kosong"
+                  : "tidak dicek";
                 return (
                   <li key={date}>
                     <Link
@@ -169,10 +216,16 @@ export function HousePanel({
       </section>
 
       <div className="flex flex-wrap gap-2 border-t border-line pt-3">
-        <Link to={`/admin/rumah?ubah=${house.id}`} className={buttonClass("secondary", "sm")}>
+        <Link
+          to={`/admin/rumah?ubah=${house.id}`}
+          className={buttonClass("secondary", "sm")}
+        >
           <Pencil className="size-4" /> Ubah data rumah
         </Link>
-        <Link to={`/admin/rekap?bulan=${month}`} className={buttonClass("ghost", "sm")}>
+        <Link
+          to={`/admin/rekap?bulan=${month}`}
+          className={buttonClass("ghost", "sm")}
+        >
           <Table2 className="size-4" /> Rekap
         </Link>
       </div>
@@ -180,11 +233,19 @@ export function HousePanel({
   );
 }
 
-function TonightStatus({ house, collection }: { house: HouseDTO; collection: CollectionDTO | null }) {
+function TonightStatus({
+  house,
+  collection,
+}: {
+  house: HouseDTO;
+  collection: CollectionDTO | null;
+}) {
   if (!collection) {
     return (
       <p className="text-sm text-muted">
-        {house.status === "vacant" ? "Rumah kosong/mudik, tidak dihitung bolong." : "Belum dicek petugas."}
+        {house.status === "vacant"
+          ? "Rumah kosong/mudik, tidak dihitung."
+          : "Belum dicek petugas."}
       </p>
     );
   }
@@ -201,7 +262,11 @@ function TonightStatus({ house, collection }: { house: HouseDTO; collection: Col
       </span>
       <span className="flex min-w-0 items-center gap-1 text-xs text-muted">
         {collection.method === "scan" ? (
-          <ScanLine className="size-3.5 shrink-0" role="img" aria-label="scan QR" />
+          <ScanLine
+            className="size-3.5 shrink-0"
+            role="img"
+            aria-label="scan QR"
+          />
         ) : (
           <Hand className="size-3.5 shrink-0" role="img" aria-label="manual" />
         )}
@@ -215,13 +280,27 @@ function TonightStatus({ house, collection }: { house: HouseDTO; collection: Col
 }
 
 function PanelHeading({ children }: { children: ReactNode }) {
-  return <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">{children}</h3>;
+  return (
+    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+      {children}
+    </h3>
+  );
 }
 
-function MiniStat({ value, label, className }: { value: number; label: string; className?: string }) {
+function MiniStat({
+  value,
+  label,
+  className,
+}: {
+  value: number;
+  label: string;
+  className?: string;
+}) {
   return (
     <div className="rounded-lg bg-idle-soft/50 py-1.5">
-      <p className={cx("text-lg font-bold leading-tight", className)}>{value}</p>
+      <p className={cx("text-lg font-bold leading-tight", className)}>
+        {value}
+      </p>
       <p className="text-[11px] text-muted">{label}</p>
     </div>
   );
