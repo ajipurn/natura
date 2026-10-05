@@ -1,14 +1,12 @@
-import type { D1, Db } from "./db";
+import type { Db } from "./db";
 import type { SessionUser } from "./auth";
 
-/** Binding Cloudflare (lihat wrangler.jsonc). */
+/** Diberikan ke `app.fetch` oleh `vercel.ts` (production), plugin dev di vite.config.ts, atau tes. */
 export type Bindings = {
-  DB: D1;
-  /** File hasil build Vite (Workers Static Assets). */
-  ASSETS: { fetch: (request: Request) => Promise<Response> };
-  /** Secret: kunci acak ≥ 32 karakter untuk menandatangani sesi login. */
+  db: Db;
+  /** Kunci acak ≥ 32 karakter untuk menandatangani sesi login. */
   AUTH_SECRET?: string;
-  /** Alamat publik aplikasi untuk QR yang dicetak, mis. https://jimpitan.example.workers.dev */
+  /** Alamat publik aplikasi untuk QR yang dicetak, mis. https://jimpitan-natura.vercel.app */
   APP_URL?: string;
   /** "1" saat `bun run dev`: cookie tanpa Secure dan secret bawaan boleh dipakai. */
   DEV?: string;

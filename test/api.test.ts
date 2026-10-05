@@ -5,7 +5,7 @@ import { scheduleDay, slotHouseLabel } from "@/lib/schedule";
 import { houses } from "@/server/schema";
 import type { Db } from "@/server/db";
 import type { Bindings } from "@/server/env";
-import { apiClient, createTestEnv } from "./helpers/d1";
+import { apiClient, createTestEnv } from "./helpers/db";
 
 type Slot = {
   id: number;
@@ -96,7 +96,7 @@ describe("setup & login", () => {
 });
 
 describe("rumah, ronda, riwayat", () => {
-  it("mendaftarkan rumah dari denah (lebih dari batas parameter D1)", async () => {
+  it("mendaftarkan semua rumah dari denah sekaligus", async () => {
     const res = await admin.post("/api/admin/rumah/dari-denah");
     expect(res.data.success).toMatch(/^76 rumah didaftarkan/);
     const list = await admin.get("/api/admin/rumah");
@@ -161,7 +161,7 @@ describe("rumah, ronda, riwayat", () => {
 });
 
 describe("jadwal", () => {
-  it("impor tabel jadwal (lebih dari batas parameter D1) dan isi nama KK", async () => {
+  it("impor tabel jadwal lengkap dan isi nama KK", async () => {
     const days = ["AHAD", "SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU"];
     const lots = ["AA-7", "AA-8", "AA-9", "AA-10", "AA-11", "AA-12", "AA-13", "AA-14", "AA-15", "AA-16", "AA-17", "AA-18"];
     const header = ["", ...days].join("\t");

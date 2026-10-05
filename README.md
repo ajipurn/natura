@@ -41,7 +41,7 @@ Semua waktu memakai WIB. Ronda yang lewat tengah malam tetap dihitung malam sebe
 ## Cara pakai
 
 1. Buka `/admin/` pertama kali, lalu isi nama lingkungan, nominal jimpitan, dan akun admin.
-2. Jalankan seed awal (`bun run seed`, atau `bun run seed:remote` untuk Cloudflare). Lihat [Seed awal](#seed-awal). Setelah itu rumah, jadwal, nama KK, dan akun petugas sudah terisi; sisanya tinggal mengikuti daftar **Yang perlu disiapkan** di Ringkasan. Tanpa seed, semuanya juga bisa diisi lewat dashboard:
+2. Jalankan seed awal (`bun run seed`, atau `bun run seed:remote` untuk Supabase). Lihat [Seed awal](#seed-awal). Setelah itu rumah, jadwal, nama KK, dan akun petugas sudah terisi; sisanya tinggal mengikuti daftar **Yang perlu disiapkan** di Ringkasan. Tanpa seed, semuanya juga bisa diisi lewat dashboard:
    - **Denah → Daftarkan rumah dari denah.** Semua kavling berpenghuni langsung jadi data rumah. Nama KK bisa diisi di **Rumah & QR**.
    - **Petugas:** buat akun tiap petugas, pilih rumah dan malam jaganya.
    - **Jadwal ronda:** impor tabel jadwal (judul hari seperti "AHAD (MALAM SENIN)", isi "NAMA (BLOK-NO)"), lalu rapikan langsung di halaman Jadwal.
@@ -63,7 +63,7 @@ Semua waktu memakai WIB. Ronda yang lewat tengah malam tetap dihitung malam sebe
 
 Jadwal menunjuk akun petugas (rumahnya dari akun) atau rumah tanpa akun; nama dan rumah tidak disalin ke jadwal.
 
-Jalankan setelah admin pertama dibuat di `/admin/setup`. PIN akun baru disimpan di `petugas-pin.csv` (atau `petugas-pin-remote.csv` untuk Cloudflare). File itu tidak ikut di-commit; bagikan PIN lewat chat pribadi lalu hapus filenya. Seed aman dijalankan ulang: rumah, nama KK, akun (termasuk yang sudah diganti namanya), dan jadwal yang sudah ada tidak diubah, supaya jadwal yang sudah diatur di dashboard tidak tertimpa. Warna yang masih kosong di jadwal yang sudah ada tetap diisi dari file warna. Untuk mengganti jadwal dengan isi file: `bun run seed --jadwal`.
+Jalankan setelah admin pertama dibuat di `/admin/setup`. PIN akun baru disimpan di `petugas-pin.csv` (atau `petugas-pin-remote.csv` untuk Supabase). File itu tidak ikut di-commit; bagikan PIN lewat chat pribadi lalu hapus filenya. Seed aman dijalankan ulang: rumah, nama KK, akun (termasuk yang sudah diganti namanya), dan jadwal yang sudah ada tidak diubah, supaya jadwal yang sudah diatur di dashboard tidak tertimpa. Warna yang masih kosong di jadwal yang sudah ada tetap diisi dari file warna. Untuk mengganti jadwal dengan isi file: `bun run seed --jadwal`.
 
 ### Mengubah denah
 
@@ -71,53 +71,59 @@ Denah ada di `src/site-plan/natura.ts`. Koordinatnya piksel pada foto denah ceta
 
 ## Menjalankan di komputer
 
-Butuh [Bun](https://bun.sh) dan Node.js 22.22 atau lebih baru (Vite dan Wrangler berjalan di Node).
+Butuh [Bun](https://bun.sh) dan Node.js 22.22 atau lebih baru (Vite berjalan di Node).
 
 ```bash
 bun install
-cp .dev.vars.example .dev.vars
+cp .env.example .env.local
 bun run dev
 ```
 
-Buka http://localhost:5173/admin/, buat admin pertama, lalu jalankan `bun run seed` di terminal lain. `bun run dev` menjalankan migrasi ke database D1 lokal (di folder `.wrangler/`) lalu menyalakan Vite. API berjalan di runtime Workers yang sama dengan production (workerd), jadi tidak perlu memasang database apa pun.
+Buka http://localhost:5173/admin/ dan buat admin pertama. Database lokalnya [PGlite](https://pglite.dev) (Postgres di dalam proses) di folder `.data/`, dimigrasi otomatis, jadi tidak perlu memasang apa pun. Untuk seed awal, matikan `bun run dev` dulu (PGlite hanya boleh dibuka satu proses), jalankan `bun run seed`, lalu nyalakan lagi.
+
+Mau memakai Postgres lokal (mis. supaya bisa dibuka di DBeaver sambil `bun run dev` jalan)? Isi `DATABASE_URL` di `.env.local`, mis. `postgres://postgres:postgres@localhost:5432/natura`, lalu jalankan `bun run db:migrate` sekali.
 
 Untuk mencoba scan dari HP di jaringan yang sama, kamera butuh HTTPS. Pakai tunnel, misalnya `bunx cloudflared tunnel --url http://localhost:5173`.
 
-## Deploy ke Cloudflare (gratis)
+## Deploy ke Vercel + Supabase
 
-Aplikasi berjalan sebagai satu Cloudflare Worker: file app (hasil build Vite) dilayani sebagai static assets, API di `/api/*`, dan datanya di Cloudflare D1.
+Ketiga app (hasil build Vite) dilayani sebagai file statis, API di `/api/*` berjalan sebagai satu Vercel Function (Node), dan datanya di Postgres Supabase. `bun run build` menyusun semuanya di `.vercel/output` (Build Output API); `vercel.json` membuat Vercel memakai Bun dan perintah build itu.
 
-1. Masuk ke akun Cloudflare: `bunx wrangler login`
-2. Buat database di Asia Pasifik (dekat Indonesia):
-   ```bash
-   bunx wrangler d1 create jimpitan-natura --location apac
-   ```
-   Salin `database_id` yang muncul ke `wrangler.jsonc`.
-3. Jalankan migrasi (sekali di awal, dan setiap ada migrasi baru):
+1. **Supabase:** buat project (region Singapore, `ap-southeast-1`) atau pakai yang sudah ada. Di **Connect** ada dua connection string:
+   - **Transaction pooler** (port 6543) untuk aplikasi di Vercel,
+   - **Session pooler** (port 5432) untuk skrip di komputer dan DBeaver.
+2. **Migrasi** dari komputer: isi `REMOTE_DATABASE_URL` di `.env.local` dengan Session pooler, lalu
    ```bash
    bun run db:migrate:remote
    ```
-4. Simpan kunci sesi (acak, minimal 32 karakter):
-   ```bash
-   openssl rand -base64 32 | bunx wrangler secret put AUTH_SECRET
-   ```
-5. Deploy: `bun run deploy`. Alamatnya mis. `https://jimpitan-natura.<akun>.workers.dev`.
-6. Buka `/admin/setup` di alamat itu untuk membuat admin, lalu isi data awal: `bun run seed:remote`.
-7. Isi `APP_URL` di `wrangler.jsonc` dengan alamat tetap aplikasi (atau domain sendiri), deploy ulang, baru cetak stiker QR.
+   Jalankan lagi setiap ada migrasi baru. Migrasi berhenti tanpa mengubah apa pun kalau database sudah berisi tabel dari skema lain.
+3. **Vercel:** import repo ini (Framework Preset: Other; sisanya diatur `vercel.json`). Di **Settings → Environment Variables** isi:
+   - `DATABASE_URL`: Transaction pooler dari Supabase,
+   - `AUTH_SECRET`: kunci acak minimal 32 karakter (`openssl rand -base64 32`),
+   - `APP_URL` (opsional): alamat tetap aplikasi. Kosong = domain production Vercel.
+4. Deploy (push ke `main`, atau `bunx vercel --prod`). Function berjalan di Singapura (`sin1`) supaya dekat database; ganti lewat `FUNCTION_REGION` saat build kalau database di region lain.
+5. Buka `/admin/setup` di alamat production untuk membuat admin, lalu isi data awal dari komputer: `bun run seed:remote`.
+6. Pastikan alamat production sudah final (isi `APP_URL` kalau pakai domain sendiri, lalu deploy ulang), baru cetak stiker QR.
 
-Paket gratis Workers dan D1 cukup untuk satu perumahan. Worker memakai Smart Placement supaya berjalan dekat database.
+Paket gratis Vercel (Hobby) dan Supabase cukup untuk satu perumahan. Project Supabase gratis di-pause kalau 7 hari tidak dipakai; karena app dipakai tiap malam, ini tidak terjadi.
+
+### Membuka database di DBeaver
+
+Buat koneksi PostgreSQL baru dengan isi dari Supabase → **Connect → Session pooler**: host `aws-…pooler.supabase.com`, port `5432`, database `postgres`, user `postgres.<project-ref>`, dan password database. Di tab SSL, nyalakan SSL (mode `require`). Tabelnya ada di skema `public`.
+
+Untuk melihat-lihat, centang **Read-only connection** (di pengaturan koneksi, bagian General → Security): mengubah data langsung di tabel melewati aturan aplikasi (jadwal jaga, jejak audit, nama satu sumber). Cadangan bisa dibuat dari DBeaver (klik kanan database → **Tools → Backup**) atau `pg_dump` dengan connection string yang sama.
 
 ## Teknologi
 
 - [Vite](https://vite.dev) + React 19 + [React Router](https://reactrouter.com) + [TanStack Query](https://tanstack.com/query) + Tailwind CSS 4: tiga SPA dalam satu build
-- [Hono](https://hono.dev) di [Cloudflare Workers](https://developers.cloudflare.com/workers/) untuk API; klien memanggilnya lewat `hono/client` sehingga ikut dicek TypeScript
-- [Cloudflare D1](https://developers.cloudflare.com/d1/) (SQLite) + [Drizzle ORM](https://orm.drizzle.team)
+- [Hono](https://hono.dev) sebagai Vercel Function untuk API; klien memanggilnya lewat `hono/client` sehingga ikut dicek TypeScript
+- Postgres ([Supabase](https://supabase.com) di production, [PGlite](https://pglite.dev) saat development dan tes) + [Drizzle ORM](https://orm.drizzle.team)
 - Pemindai QR: `BarcodeDetector` bawaan browser bila ada, [jsQR](https://github.com/cozmo/jsQR) sebagai cadangan (iPhone)
 - Tampilan 3D: [three.js](https://threejs.org) (dimuat terpisah saat dibutuhkan)
 - Login: PIN di-hash dengan PBKDF2 (WebCrypto), sesi berupa JWT di cookie httpOnly ([jose](https://github.com/panva/jose))
 - Offline: service worker (`public/sw.js`) + antrean di `localStorage`
 
-Catatan D1: maksimal 100 parameter per query (insert banyak baris dipecah otomatis) dan tidak ada transaksi interaktif (pakai `db.batch`).
+Semua tabel memakai Row Level Security tanpa policy: aplikasi konek sebagai pemilik tabel, jadi Data API Supabase (kunci `anon`) tidak bisa membaca isinya.
 
 ### Struktur
 
@@ -130,26 +136,25 @@ src/
   features/         Bagian yang dipakai beberapa app: masuk, riwayat, jadwal
   components/       Komponen UI, pemindai QR, denah 2D & 3D
   client/           Klien API, cache data, status login
-  server/           Worker + API Hono (routes/), skema & query D1, login
+  server/           API Hono (routes/), skema & query Postgres, login; vercel.ts = function production, dev.ts = untuk `bun run dev`
   site-plan/        Denah Cluster Natura sebagai kode
   lib/              Logika bersama (tanggal ronda, rekap, jadwal, format, QR, geometri denah)
-drizzle/            Migrasi SQL (dijalankan wrangler)
-scripts/            Seed awal dan data jadwal ronda
-test/               Tes Vitest; tes API memakai D1 lokal (Miniflare)
+drizzle/            Migrasi SQL (`bun run db:migrate:remote`)
+scripts/            Seed awal, data jadwal ronda, migrasi, build untuk Vercel
+test/               Tes Vitest; tes API memakai PGlite (atau Postgres lewat TEST_DATABASE_URL)
 ```
 
 ### Perintah
 
 | Perintah | Fungsi |
 | --- | --- |
-| `bun run dev` | Server development (Vite + Worker + D1 lokal) |
-| `bun run build` / `bun run preview` | Build production / jalankan hasil build secara lokal |
-| `bun run deploy` | Build lalu deploy ke Cloudflare |
-| `bun run test` | Tes (Vitest). Bukan `bun test`, itu test runner bawaan Bun. |
+| `bun run dev` | Server development (Vite + API + PGlite lokal atau `DATABASE_URL`) |
+| `bun run build` / `bun run preview` | Build untuk Vercel (`.vercel/output`) / jalankan hasil build secara lokal (butuh `DATABASE_URL` ke Postgres) |
+| `bun run test` | Tes (Vitest). Bukan `bun test`, itu test runner bawaan Bun. `TEST_DATABASE_URL=postgres://…/postgres` menjalankannya di Postgres sungguhan. |
 | `bun run lint` / `bun run typecheck` | ESLint / TypeScript |
 | `bun run db:generate` | Buat migrasi baru setelah mengubah `src/server/schema.ts` |
-| `bun run db:migrate:local` / `db:migrate:remote` | Jalankan migrasi ke D1 lokal / Cloudflare |
-| `bun run seed` / `seed:remote` | Isi rumah, jadwal, nama KK, dan akun petugas ke D1 lokal / Cloudflare |
+| `bun run db:migrate` / `db:migrate:remote` | Jalankan migrasi ke `DATABASE_URL` / Supabase (`REMOTE_DATABASE_URL`) |
+| `bun run seed` / `seed:remote` | Isi rumah, jadwal, nama KK, dan akun petugas ke database lokal / Supabase |
 
 ## Ide pengembangan berikutnya
 

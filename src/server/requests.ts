@@ -1,5 +1,5 @@
 import { and, desc, eq, sql } from "drizzle-orm";
-import { runBatch, type Db } from "./db";
+import { runBatch, type Db, type Executor } from "./db";
 import { guardDaysByUser } from "./schedule";
 import { houses, rondaSchedule, scheduleRequests, users } from "./schema";
 
@@ -108,12 +108,13 @@ export async function decideRequest(
   if (!request) return "Permintaan tidak ditemukan.";
   if (request.status !== "pending") return "Permintaan ini sudah diproses atau dibatalkan.";
 
-  const mark = db
-    .update(scheduleRequests)
-    .set({ status: decision, response, decidedBy: adminId, decidedAt: new Date() })
-    .where(and(eq(scheduleRequests.id, id), eq(scheduleRequests.status, "pending")));
+  const mark = (tx: Executor) =>
+    tx
+      .update(scheduleRequests)
+      .set({ status: decision, response, decidedBy: adminId, decidedAt: new Date() })
+      .where(and(eq(scheduleRequests.id, id), eq(scheduleRequests.status, "pending")));
   if (decision === "rejected") {
-    await mark;
+    await mark(db);
     return null;
   }
 
@@ -127,15 +128,15 @@ export async function decideRequest(
 
   if (alreadyThere) {
     // Sudah jaga di malam tujuan (mis. diatur admin lewat editor): cukup lepas malam lamanya.
-    await runBatch(db, [mark, ...(from ? [db.delete(rondaSchedule).where(eq(rondaSchedule.id, from.id))] : [])]);
+    await runBatch(db, (tx) => [mark(tx), ...(from ? [tx.delete(rondaSchedule).where(eq(rondaSchedule.id, from.id))] : [])]);
   } else if (from) {
-    await runBatch(db, [
-      mark,
-      db.update(rondaSchedule).set({ dayOfWeek: request.toDay, position: lastPosition }).where(eq(rondaSchedule.id, from.id)),
+    await runBatch(db, (tx) => [
+      mark(tx),
+      tx.update(rondaSchedule).set({ dayOfWeek: request.toDay, position: lastPosition }).where(eq(rondaSchedule.id, from.id)),
     ]);
   } else {
     // Rumahnya ikut dari akun petugas.
-    await runBatch(db, [mark, db.insert(rondaSchedule).values({ dayOfWeek: request.toDay, position: lastPosition, userId: request.userId })]);
+    await runBatch(db, (tx) => [mark(tx), tx.insert(rondaSchedule).values({ dayOfWeek: request.toDay, position: lastPosition, userId: request.userId })]);
   }
   return null;
 }

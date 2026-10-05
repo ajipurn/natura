@@ -38,7 +38,7 @@ export async function listLoginUsers(db: Db) {
     .from(users)
     .leftJoin(houses, eq(houses.id, users.houseId))
     .where(eq(users.active, true))
-    .orderBy(asc(users.name));
+    .orderBy(asc(users.name), asc(users.id));
   return rows.map(({ block, number, ...u }) => ({ ...u, house: block && number ? `${block}-${number}` : null }));
 }
 
@@ -57,7 +57,7 @@ export async function listUsers(db: Db) {
       })
       .from(users)
       .leftJoin(houses, eq(houses.id, users.houseId))
-      .orderBy(asc(users.name)),
+      .orderBy(asc(users.name), asc(users.id)),
     guardDaysByUser(db),
   ]);
   return rows.map(({ block, number, ...u }) => ({
@@ -160,8 +160,8 @@ export async function listPatrols(db: Db, limit = 90): Promise<PatrolSummary[]> 
       filled: sql<number>`count(${collections.id}) filter (where ${collections.status} = 'filled')`.mapWith(Number),
       empty: sql<number>`count(${collections.id}) filter (where ${collections.status} = 'empty' and ${houses.status} = 'active')`.mapWith(Number),
       total: sql<number>`coalesce(sum(${collections.amount}) filter (where ${collections.status} = 'filled'), 0)`.mapWith(Number),
-      // JSON supaya nama yang mengandung koma tetap utuh.
-      collectors: sql<string>`json_group_array(distinct ${users.name}) filter (where ${users.name} is not null)`,
+      // Array JSON supaya nama yang mengandung koma tetap utuh.
+      collectors: sql<string[] | null>`json_agg(distinct ${users.name}) filter (where ${users.name} is not null)`,
     })
     .from(patrols)
     .leftJoin(collections, eq(collections.patrolId, patrols.id))
@@ -171,7 +171,7 @@ export async function listPatrols(db: Db, limit = 90): Promise<PatrolSummary[]> 
     .orderBy(desc(patrols.date))
     .limit(limit);
   return rows.map((r) => {
-    const names = (JSON.parse(r.collectors ?? "[]") as string[]).sort((a, b) => a.localeCompare(b, "id"));
+    const names = [...(r.collectors ?? [])].sort((a, b) => a.localeCompare(b, "id"));
     return { ...r, collectors: names.length ? names.join(", ") : null };
   });
 }

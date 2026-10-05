@@ -1,4 +1,4 @@
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import { compareHouses } from "@/lib/houses";
 import { scheduleDay, slotHouseLabel } from "@/lib/schedule";
 import type { Db } from "./db";
@@ -110,6 +110,6 @@ export async function countOffDuty(db: Db, date: string): Promise<number> {
   const [row] = await db
     .select({ n: count() })
     .from(collectionLogs)
-    .where(and(eq(collectionLogs.date, date), sql`${collectionLogs.onDuty} = 0`));
+    .where(and(eq(collectionLogs.date, date), eq(collectionLogs.onDuty, false)));
   return row?.n ?? 0;
 }

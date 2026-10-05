@@ -6,4 +6,4 @@ import { sql } from "drizzle-orm";
  * Ditulis dengan nama tabel lengkap: Drizzle menulis kolom tanpa nama tabel di query satu tabel,
  * dan di subquery `id` akan terbaca sebagai id akun.
  */
-export const houseName = sql<string | null>`coalesce((select group_concat(u."name", ', ') from "users" u where u."house_id" = "houses"."id"), "houses"."owner_name")`;
+export const houseName = sql<string | null>`coalesce((select string_agg(u."name", ', ' order by u."id") from "users" u where u."house_id" = "houses"."id"), "houses"."owner_name")`;

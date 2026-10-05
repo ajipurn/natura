@@ -1,27 +1,49 @@
-import { migrate } from "drizzle-orm/d1/migrator";
-import { convertV4MiniflareOptions, Miniflare } from "miniflare";
+import { randomUUID } from "node:crypto";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
+import postgres from "postgres";
 import { afterAll } from "vitest";
 import { app } from "@/server/app";
-import { createDb } from "@/server/db";
+import { createDb, type Db } from "@/server/db";
+import { createPgliteDb } from "@/server/db-local";
 import type { Bindings } from "@/server/env";
 
+// Didaftarkan saat file tes dimuat: afterAll yang dipanggil dari dalam beforeAll tidak dijalankan.
+const cleanups: (() => Promise<void>)[] = [];
+afterAll(async () => {
+  for (const cleanup of cleanups.splice(0)) await cleanup();
+});
+
 /**
- * D1 sungguhan (Miniflare, di memori) yang sudah dimigrasi, satu per file tes.
- * Ditutup otomatis setelah tes di file itu selesai.
+ * Database kosong yang sudah dimigrasi, satu per file tes, dan ditutup setelah tes di file itu selesai:
+ * PGlite di memori, atau database baru di Postgres sungguhan kalau TEST_DATABASE_URL diisi
+ * (mis. `TEST_DATABASE_URL=postgres://postgres@localhost:5432/postgres bun run test`).
  */
-export async function createTestEnv() {
-  const mf = new Miniflare(
-    convertV4MiniflareOptions({
-      workers: [{ name: "test", modules: true, script: "export default {}", d1Databases: { DB: "test-db" } }],
-    }),
-  );
-  afterAll(() => mf.dispose());
-  const d1 = await mf.getD1Database("DB");
-  const db = createDb(d1);
+async function createTestDb(): Promise<Db> {
+  const server = process.env.TEST_DATABASE_URL;
+  if (!server) {
+    const local = await createPgliteDb("memory");
+    cleanups.push(local.close);
+    return local.db;
+  }
+  const name = `natura_test_${randomUUID().replaceAll("-", "")}`;
+  const admin = postgres(server, { onnotice: () => {} });
+  await admin.unsafe(`create database ${name}`);
+  const url = new URL(server);
+  url.pathname = `/${name}`;
+  const db = createDb(url.href);
   await migrate(db, { migrationsFolder: "drizzle" });
+  cleanups.push(async () => {
+    await db.$client.end();
+    await admin.unsafe(`drop database ${name} with (force)`);
+    await admin.end();
+  });
+  return db;
+}
+
+export async function createTestEnv() {
+  const db = await createTestDb();
   const env: Bindings = {
-    DB: d1,
-    ASSETS: { fetch: async () => new Response("shell") },
+    db,
     AUTH_SECRET: "test-secret-test-secret-test-secret-test",
     DEV: "1",
   };

@@ -1,7 +1,7 @@
 /**
- * Hash PIN dengan PBKDF2 (WebCrypto, tersedia di Cloudflare Workers).
- * Iterasinya sengaja tidak besar: PIN 4–6 angka dilindungi oleh batas percobaan login,
- * dan paket gratis Workers hanya memberi ~10 ms CPU per permintaan.
+ * Hash PIN dengan PBKDF2 (WebCrypto, tersedia di Node dan browser).
+ * Iterasinya sengaja tidak besar: PIN 4–6 angka dilindungi oleh batas percobaan login.
+ * Mengubahnya membuat PIN yang sudah tersimpan tidak cocok lagi.
  */
 const ITERATIONS = 10_000;
 const KEY_BITS = 256;

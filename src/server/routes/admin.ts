@@ -12,7 +12,7 @@ import { matchPlan } from "@/lib/site-plan";
 import { SITE_PLAN } from "@/site-plan";
 import { requireAdmin } from "../auth";
 import { MAX_AMOUNT, writeCollection } from "../collections";
-import { chunk, rowsPerInsert, runBatch } from "../db";
+import { runBatch, type Executor } from "../db";
 import type { AppEnv } from "../env";
 import { body, idParam, pinField, trimmed } from "../http";
 import { hashPin } from "../pin";
@@ -128,15 +128,13 @@ export const adminRoutes = new Hono<AppEnv>()
     const db = c.var.db;
     // Nama KK hanya dipakai kalau menambah satu rumah.
     const name = numbers.length === 1 ? c.req.valid("json").ownerName : null;
-    let inserted = 0;
-    for (const part of chunk(numbers, rowsPerInsert(6))) {
-      const rows = await db
+    const inserted = (
+      await db
         .insert(houses)
-        .values(part.map((number) => ({ block, number, ownerName: name, token: newToken() })))
+        .values(numbers.map((number) => ({ block, number, ownerName: name, token: newToken() })))
         .onConflictDoNothing({ target: [houses.block, houses.number] })
-        .returning({ id: houses.id });
-      inserted += rows.length;
-    }
+        .returning({ id: houses.id })
+    ).length;
     if (inserted === 0) return c.json({ error: `Semua nomor di blok ${block} sudah terdaftar.` }, 409);
     const skipped = numbers.length - inserted;
     return c.json({ success: `${inserted} rumah ditambahkan ke blok ${block}.${skipped ? ` ${skipped} sudah ada, dilewati.` : ""}` });
@@ -158,9 +156,9 @@ export const adminRoutes = new Hono<AppEnv>()
       const parsed = userName.safeParse(name ?? "");
       if (!parsed.success) return c.json({ error: "Isi nama penghuni (maks. 40 karakter)." }, 400);
       if (await nameTaken(db, parsed.data, id, residents[0].id)) return c.json({ error: nameTakenError(parsed.data) }, 409);
-      await runBatch(db, [
-        db.update(houses).set({ block, number, status }).where(eq(houses.id, id)),
-        db.update(users).set({ name: parsed.data }).where(eq(users.id, residents[0].id)),
+      await runBatch(db, (tx) => [
+        tx.update(houses).set({ block, number, status }).where(eq(houses.id, id)),
+        tx.update(users).set({ name: parsed.data }).where(eq(users.id, residents[0].id)),
       ]);
     } else {
       await db
@@ -196,15 +194,13 @@ export const adminRoutes = new Hono<AppEnv>()
     const db = c.var.db;
     const { missing } = matchPlan(SITE_PLAN, await listHouses(db));
     if (missing.length === 0) return c.json({ success: "Semua rumah di denah sudah terdaftar." });
-    let inserted = 0;
-    for (const part of chunk(missing, rowsPerInsert(6))) {
-      const rows = await db
+    const inserted = (
+      await db
         .insert(houses)
-        .values(part.map((lot) => ({ block: lot.block, number: lot.number!, token: newToken() })))
+        .values(missing.map((lot) => ({ block: lot.block, number: lot.number!, token: newToken() })))
         .onConflictDoNothing({ target: [houses.block, houses.number] })
-        .returning({ id: houses.id });
-      inserted += rows.length;
-    }
+        .returning({ id: houses.id })
+    ).length;
     return c.json({ success: `${inserted} rumah didaftarkan dari denah. Jangan lupa cetak stiker QR-nya.` });
   })
 
@@ -259,7 +255,8 @@ export const adminRoutes = new Hono<AppEnv>()
       .insert(users)
       .values({ name, pinHash: await hashPin(pin), role: newRole, houseId })
       .returning({ id: users.id });
-    await runBatch(db, [...moveIntoHouse(db, houseId), ...userDaysStatements(db, user.id, days, [], await houseSlots(db, houseId))]);
+    const slotsOfHouse = await houseSlots(db, houseId);
+    await runBatch(db, (tx) => [...moveIntoHouse(tx, houseId), ...userDaysStatements(tx, user.id, days, [], slotsOfHouse)]);
     return c.json({ success: `${name} ditambahkan. Beri tahu PIN-nya secara langsung.`, id: user.id });
   })
 
@@ -280,10 +277,10 @@ export const adminRoutes = new Hono<AppEnv>()
         db.selectDistinct({ day: rondaSchedule.dayOfWeek }).from(rondaSchedule).where(eq(rondaSchedule.userId, id)),
         houseSlots(db, houseId),
       ]);
-      await runBatch(db, [
-        db.update(users).set({ name, role: newRole, active, houseId }).where(eq(users.id, id)),
-        ...moveIntoHouse(db, houseId),
-        ...userDaysStatements(db, id, days, current.map((r) => r.day), slotsOfHouse),
+      await runBatch(db, (tx) => [
+        tx.update(users).set({ name, role: newRole, active, houseId }).where(eq(users.id, id)),
+        ...moveIntoHouse(tx, houseId),
+        ...userDaysStatements(tx, id, days, current.map((r) => r.day), slotsOfHouse),
       ]);
       return c.json({ success: "Tersimpan." });
     },
@@ -476,11 +473,9 @@ export const adminRoutes = new Hono<AppEnv>()
   .put("/kontak", body(contactsSchema), async (c) => {
     const db = c.var.db;
     const list = c.req.valid("json").contacts;
-    await runBatch(db, [
-      db.delete(contacts),
-      ...chunk(list, rowsPerInsert(4)).map((part, p) =>
-        db.insert(contacts).values(part.map((ct, i) => ({ ...ct, position: p * rowsPerInsert(4) + i }))),
-      ),
+    await runBatch(db, (tx) => [
+      tx.delete(contacts),
+      ...(list.length ? [tx.insert(contacts).values(list.map((ct, i) => ({ ...ct, position: i })))] : []),
     ]);
     return c.json({ success: "Kontak disimpan." });
   });
@@ -494,7 +489,7 @@ async function houseExists(db: Db, id: number | null) {
 }
 
 /** Rumah yang mulai dihuni petugas memakai nama akunnya; nama KK lamanya tidak disimpan lagi. */
-function moveIntoHouse(db: Db, houseId: number | null) {
+function moveIntoHouse(db: Executor, houseId: number | null) {
   return houseId ? [db.update(houses).set({ ownerName: null }).where(eq(houses.id, houseId))] : [];
 }
 

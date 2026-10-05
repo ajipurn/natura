@@ -1,12 +1,11 @@
 import { and, eq, inArray, lte, sql, type SQL } from "drizzle-orm";
-import type { BatchItem } from "drizzle-orm/batch";
 import { z } from "zod";
 import { formatTime, rondaDate } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { dayLabel, scheduleDay } from "@/lib/schedule";
 import type { EntryInput, EntryResult } from "@/lib/types";
 import type { SessionUser } from "./auth";
-import { chunk, rowsPerInsert, runBatch, type Db } from "./db";
+import { runBatch, type Db, type Executor, type Statement } from "./db";
 import { getHouseIds } from "./queries";
 import { collectionLogs, collections, patrols, rondaSchedule, users } from "./schema";
 
@@ -45,12 +44,13 @@ type LogWrite = Omit<CollectionWrite, "method"> & {
   onDuty: boolean | null;
 };
 
-function logStatements(db: Db, logs: LogWrite[]): BatchItem<"sqlite">[] {
-  return chunk(logs, rowsPerInsert(10)).map((part) =>
+function logStatements(db: Executor, logs: LogWrite[]): Statement[] {
+  if (logs.length === 0) return [];
+  return [
     db
       .insert(collectionLogs)
       .values(
-        part.map((l) => ({
+        logs.map((l) => ({
           clientId: l.clientId,
           date: l.date,
           houseId: l.houseId,
@@ -64,7 +64,7 @@ function logStatements(db: Db, logs: LogWrite[]): BatchItem<"sqlite">[] {
       )
       // Kiriman ulang dari antrean offline tidak dicatat dua kali.
       .onConflictDoNothing({ target: collectionLogs.clientId }),
-  );
+  ];
 }
 
 /** Malam-malam jaga (0 = Ahad) seorang petugas menurut jadwal sekarang. */
@@ -114,23 +114,19 @@ function overwritesOthersFilled(stored: Stored | undefined, write: CollectionWri
 /**
  * Pernyataan SQL untuk menyimpan (atau menghapus) catatan beberapa rumah. Catatan yang lebih baru
  * menang, jadi sinkron yang telat dari HP lain tidak menimpa koreksi terbaru. Semua dijalankan
- * dalam satu batch D1 (satu perjalanan ke database).
+ * dalam satu transaksi.
  * `guard` (catatan dari HP petugas): "Ada" milik orang lain tidak ditimpa "Kosong" atau dihapus,
  * juga kalau dua HP sinkron bersamaan (lihat `overwritesOthersFilled`).
  */
-function writeStatements(db: Db, writes: CollectionWrite[], now: Date, guard: boolean): BatchItem<"sqlite">[] {
+function writeStatements(db: Executor, writes: CollectionWrite[], now: Date, guard: boolean): Statement[] {
   if (writes.length === 0) return [];
-  const statements: BatchItem<"sqlite">[] = [];
-
   const dates = [...new Set(writes.map((w) => w.date))];
-  for (const part of chunk(dates, rowsPerInsert(2))) {
-    statements.push(
-      db
-        .insert(patrols)
-        .values(part.map((date) => ({ date })))
-        .onConflictDoNothing({ target: patrols.date }),
-    );
-  }
+  const statements: Statement[] = [
+    db
+      .insert(patrols)
+      .values(dates.map((date) => ({ date })))
+      .onConflictDoNothing({ target: patrols.date }),
+  ];
 
   for (const w of writes.filter((w) => w.status === "none")) {
     statements.push(
@@ -141,19 +137,19 @@ function writeStatements(db: Db, writes: CollectionWrite[], now: Date, guard: bo
             eq(collections.patrolId, patrolIdFor(w.date)),
             eq(collections.houseId, w.houseId),
             lte(collections.recordedAt, w.recordedAt),
-            guard ? sql`not (${collections.status} = 'filled' and ${collections.collectedBy} is not ${w.userId})` : undefined,
+            guard ? sql`not (${collections.status} = 'filled' and ${collections.collectedBy} is distinct from ${w.userId})` : undefined,
           ),
         ),
     );
   }
 
   const upserts = writes.filter((w) => w.status !== "none");
-  for (const part of chunk(upserts, rowsPerInsert(8))) {
+  if (upserts.length) {
     statements.push(
       db
         .insert(collections)
         .values(
-          part.map((w) => ({
+          upserts.map((w) => ({
             patrolId: patrolIdFor(w.date),
             houseId: w.houseId,
             status: w.status as "filled" | "empty",
@@ -175,7 +171,7 @@ function writeStatements(db: Db, writes: CollectionWrite[], now: Date, guard: bo
             syncedAt: sql`excluded.synced_at`,
           },
           setWhere: guard
-            ? sql`${collections.recordedAt} <= excluded.recorded_at and not (${collections.status} = 'filled' and excluded.status = 'empty' and ${collections.collectedBy} is not excluded.collected_by)`
+            ? sql`${collections.recordedAt} <= excluded.recorded_at and not (${collections.status} = 'filled' and excluded.status = 'empty' and ${collections.collectedBy} is distinct from excluded.collected_by)`
             : sql`${collections.recordedAt} <= excluded.recorded_at`,
         }),
     );
@@ -185,9 +181,9 @@ function writeStatements(db: Db, writes: CollectionWrite[], now: Date, guard: bo
 
 /** Koreksi admin: simpan (atau hapus) catatan satu rumah untuk satu malam, dan catat di jejak audit. */
 export async function writeCollection(db: Db, input: CollectionWrite, now = new Date()) {
-  await runBatch(db, [
-    ...writeStatements(db, [input], now, false),
-    ...logStatements(db, [{ ...input, clientId: null, method: "koreksi", onDuty: null }]),
+  await runBatch(db, (tx) => [
+    ...writeStatements(tx, [input], now, false),
+    ...logStatements(tx, [{ ...input, clientId: null, method: "koreksi", onDuty: null }]),
   ]);
 }
 
@@ -270,6 +266,6 @@ export async function applyEntries(
     return error ? { clientId: r.clientId, ok: false, error } : r;
   });
 
-  await runBatch(db, [...writeStatements(db, [...latest.values()], now, true), ...logStatements(db, logs)]);
+  await runBatch(db, (tx) => [...writeStatements(tx, [...latest.values()], now, true), ...logStatements(tx, logs)]);
   return final;
 }

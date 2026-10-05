@@ -114,16 +114,17 @@ export const authRoutes = new Hono<AppEnv>()
     if (await hasAnyUser(db)) return c.json({ error: "Aplikasi sudah disiapkan. Silakan masuk." }, 409);
     const { communityName, defaultAmount, name, pin } = c.req.valid("json");
     const pinHash = await hashPin(pin);
-    const [, [user]] = await db.batch([
-      db
+    const user = await db.transaction(async (tx) => {
+      await tx
         .insert(settings)
         .values({ id: 1, communityName, defaultAmount })
-        .onConflictDoUpdate({ target: settings.id, set: { communityName, defaultAmount, updatedAt: new Date() } }),
-      db
+        .onConflictDoUpdate({ target: settings.id, set: { communityName, defaultAmount, updatedAt: new Date() } });
+      const [created] = await tx
         .insert(users)
         .values({ name, pinHash, role: "admin" })
-        .returning({ id: users.id, name: users.name, role: users.role, sessionVersion: users.sessionVersion }),
-    ]);
+        .returning({ id: users.id, name: users.name, role: users.role, sessionVersion: users.sessionVersion });
+      return created;
+    });
     await startSession(c, user);
     return c.json({ user: { id: user.id, name: user.name, role: user.role } });
   })

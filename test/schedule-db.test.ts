@@ -3,7 +3,7 @@ import type { Db } from "@/server/db";
 import { listSchedule, saveSchedule } from "@/server/schedule";
 import { houses, users } from "@/server/schema";
 import { slotHouseLabel, type ScheduleEntry } from "@/lib/schedule";
-import { createTestEnv } from "./helpers/d1";
+import { createTestEnv } from "./helpers/db";
 
 let db: Db;
 beforeAll(async () => {

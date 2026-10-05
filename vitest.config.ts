@@ -5,7 +5,7 @@ export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   test: {
     environment: "node",
-    // D1 lokal (Miniflare) butuh beberapa detik saat pertama dinyalakan.
+    // PGlite (Postgres di memori) butuh beberapa detik untuk dinyalakan dan dimigrasi.
     hookTimeout: 30_000,
   },
 });

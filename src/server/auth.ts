@@ -26,7 +26,7 @@ function isDev(c: Ctx) {
 function getSecret(c: Ctx): Uint8Array {
   const secret = c.env.AUTH_SECRET;
   if (secret && secret.length >= 32) return new TextEncoder().encode(secret);
-  if (!isDev(c)) throw new Error("AUTH_SECRET wajib diisi (minimal 32 karakter): wrangler secret put AUTH_SECRET");
+  if (!isDev(c)) throw new Error("AUTH_SECRET wajib diisi (minimal 32 karakter) di Environment Variables Vercel.");
   return new TextEncoder().encode("dev-only-secret-jangan-dipakai-di-production!");
 }
 

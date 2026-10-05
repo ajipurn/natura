@@ -3,17 +3,15 @@
  * tinggal di rumah yang tertulis di jadwal), dan jadwal ronda (scripts/jadwal-natura.tsv) beserta
  * warna selnya (scripts/jadwal-natura-warna.tsv).
  *
- *   bun run seed           → D1 lokal (untuk `bun run dev`)
- *   bun run seed:remote    → D1 di Cloudflare
+ *   bun run seed           → database lokal (seperti `bun run dev`; matikan dulu kalau pakai PGlite)
+ *   bun run seed:remote    → Supabase (REMOTE_DATABASE_URL di .env.local)
  *
  * Jalankan setelah admin pertama dibuat di /admin/setup. Aman diulang: rumah, akun, dan jadwal yang
  * sudah ada tidak ditimpa. `--jadwal` mengganti jadwal yang ada dengan isi file jadwal.
- * Argumen lain diteruskan ke wrangler, mis. `bun run seed --persist-to <folder>`.
  */
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { and, count, eq, isNull, sql, type SQL } from "drizzle-orm";
 import { houseLabel } from "../src/lib/houses";
 import { newToken } from "../src/lib/qr";
 import { randomPin } from "../src/lib/random-pin";
@@ -29,84 +27,58 @@ import {
   type SlotSource,
 } from "../src/lib/schedule";
 import { houseKey } from "../src/lib/site-plan";
+import type { Db, Executor, Statement } from "../src/server/db";
 import { hashPin } from "../src/server/pin";
+import { houses, rondaSchedule, users } from "../src/server/schema";
 import { SITE_PLAN } from "../src/site-plan";
+import { openTarget } from "./db-target";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const remote = process.argv.includes("--remote");
 const replaceSchedule = process.argv.includes("--jadwal");
-const wranglerArgs = [
-  remote ? "--remote" : "--local",
-  ...process.argv.slice(2).filter((a) => a !== "--remote" && a !== "--jadwal"),
-];
 const pinFile = path.join(ROOT, remote ? "petugas-pin-remote.csv" : "petugas-pin.csv");
 const MAX_NAME = 40;
 const COLOR_CODES: Record<string, GuardColor> = { H: "green", K: "yellow", O: "orange" };
 
-function wrangler(args: string[]): string {
-  return execFileSync(path.join(ROOT, "node_modules/.bin/wrangler"), ["d1", "execute", "DB", ...wranglerArgs, ...args], {
-    cwd: ROOT,
-    encoding: "utf8",
-    stdio: ["inherit", "pipe", "inherit"],
-  });
-}
-
-function query<T>(sql: string): T[] {
-  const [result] = JSON.parse(wrangler(["--json", "--command", sql])) as { results: T[] }[];
-  return result.results;
-}
-
-function str(value: string | null): string {
-  return value === null ? "NULL" : `'${value.replace(/'/g, "''")}'`;
-}
-
-/** Jalankan banyak perintah SQL sekaligus lewat file (lebih cepat dari satu per satu). */
-function run(statements: string[]) {
-  if (statements.length === 0) return;
-  const dir = mkdtempSync(path.join(tmpdir(), "jimpitan-seed-"));
-  const file = path.join(dir, "seed.sql");
-  writeFileSync(file, statements.join("\n") + "\n");
-  try {
-    wrangler(["--file", file]);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-}
-
 async function main() {
-  console.log(`Seed ke D1 ${remote ? "Cloudflare (remote)" : "lokal"}…`);
-
-  if (query<{ id: number }>("select id from users limit 1").length === 0) {
-    console.error("✗ Belum ada admin. Buka /admin/setup dulu untuk membuat admin pertama, lalu jalankan seed lagi.");
-    process.exit(1);
+  const target = await openTarget(remote);
+  try {
+    await seed(target.db, target.label);
+  } finally {
+    await target.close();
   }
-  const [{ n: scheduled }] = query<{ n: number }>("select count(*) as n from ronda_schedule");
+}
+
+async function seed(db: Db, label: string) {
+  console.log(`Seed ke ${label}…`);
+
+  if ((await db.select({ id: users.id }).from(users).limit(1)).length === 0) {
+    throw new Error("Belum ada admin. Buka /admin/setup dulu untuk membuat admin pertama, lalu jalankan seed lagi.");
+  }
+  const [{ n: scheduled }] = await db.select({ n: count() }).from(rondaSchedule);
   const writeSchedule = scheduled === 0 || replaceSchedule;
-  const now = Date.now();
 
   // 1. Rumah: semua kavling berpenghuni di denah yang belum terdaftar.
-  const existingHouses = new Set(query<{ block: string; number: string }>("select block, number from houses").map(houseKey));
+  const existingHouses = new Set((await db.select({ block: houses.block, number: houses.number }).from(houses)).map(houseKey));
   const newLots = SITE_PLAN.lots.filter((lot) => lot.built && lot.number && !existingHouses.has(houseKey({ block: lot.block, number: lot.number })));
-  run(
-    newLots.map(
-      (lot) =>
-        `insert into houses (block, number, owner_name, token, status, created_at) values (${str(lot.block)}, ${str(lot.number!)}, NULL, ${str(newToken())}, 'active', ${now}) on conflict do nothing;`,
-    ),
-  );
-  const houses = query<{ id: number; block: string; number: string; owner_name: string | null }>(
-    "select id, block, number, owner_name from houses",
-  );
-  const byKey = new Map(houses.map((h) => [houseKey(h), h]));
+  if (newLots.length) {
+    await db
+      .insert(houses)
+      .values(newLots.map((lot) => ({ block: lot.block, number: lot.number!, token: newToken() })))
+      .onConflictDoNothing();
+  }
+  const houseRows = await db.select({ id: houses.id, block: houses.block, number: houses.number, ownerName: houses.ownerName }).from(houses);
+  const byKey = new Map(houseRows.map((h) => [houseKey(h), h]));
 
   const { entries, warnings } = parseSchedule(readFileSync(path.join(ROOT, "scripts/jadwal-natura.tsv"), "utf8"));
   if (warnings.length) console.warn(warnings.join("\n"));
 
   // 2. Akun petugas untuk setiap nama di jadwal, tinggal di rumahnya. Nama kembar dibedakan rumahnya.
   //    Rumah yang dihuni petugas memakai nama akunnya, jadi nama KK rumah itu dikosongkan.
-  const accounts = query<GuardAccount>("select id, name, house_id as houseId from users");
+  const accounts: GuardAccount[] = await db.select({ id: users.id, name: users.name, houseId: users.houseId }).from(users);
   const created: { name: string; house: string; night: string; pin: string }[] = [];
   const skipped: string[] = [];
-  const accountSql: string[] = [];
+  const newUsers: (typeof users.$inferInsert)[] = [];
   for (const e of entries) {
     if (!e.name) continue;
     const houseId = byKey.get(houseKey(e))?.id ?? null;
@@ -125,13 +97,16 @@ async function main() {
     accounts.push({ id: -accounts.length - 1, name, houseId });
     const pin = randomPin();
     created.push({ name, house: houseLabel(e), night: dayLabel(e.day), pin });
-    accountSql.push(
-      `insert into users (name, pin_hash, role, active, failed_attempts, session_version, house_id, created_at) values (${str(name)}, ${str(await hashPin(pin))}, 'petugas', 1, 0, 1, ${houseId ?? "NULL"}, ${now});`,
-    );
+    newUsers.push({ name, pinHash: await hashPin(pin), role: "petugas", houseId });
   }
-  accountSql.push("update houses set owner_name = null where id in (select house_id from users where house_id is not null);");
-  run(accountSql);
-  const residents = query<GuardAccount>("select id, name, house_id as houseId from users");
+  await db.transaction(async (tx) => {
+    if (newUsers.length) await tx.insert(users).values(newUsers);
+    await tx
+      .update(houses)
+      .set({ ownerName: null })
+      .where(sql`${houses.id} in (select ${users.houseId} from ${users} where ${users.houseId} is not null)`);
+  });
+  const residents: GuardAccount[] = await db.select({ id: users.id, name: users.name, houseId: users.houseId }).from(users);
 
   // 3. Jadwal ronda dari file, kalau jadwal masih kosong (atau diminta diganti dengan --jadwal).
   //    Baris jadwal menunjuk akun petugas atau rumah, beserta warna selnya.
@@ -140,25 +115,28 @@ async function main() {
     .map((line) => line.split("\t"));
   const colorOf = (e: ScheduleEntry) => COLOR_CODES[colorGrid[e.cell?.row ?? -1]?.[e.cell?.col ?? -1]?.trim()] ?? null;
   const resolved = entries.map((e) => ({ e, slot: resolveEntry(e, byKey, residents), color: colorOf(e) }));
-  const scheduleSql: string[] = [];
+  const statements: ((tx: Executor) => Statement)[] = [];
   if (writeSchedule) {
-    scheduleSql.push("delete from ronda_schedule;");
-    for (const { e, slot, color } of resolved) {
-      scheduleSql.push(
-        `insert into ronda_schedule (day_of_week, position, user_id, house_id, name, color) values (${e.day}, ${e.position}, ${slot.userId ?? "NULL"}, ${slot.houseId ?? "NULL"}, ${str(slot.name)}, ${str(color)});`,
+    statements.push((tx) => tx.delete(rondaSchedule));
+    if (resolved.length) {
+      statements.push((tx) =>
+        tx.insert(rondaSchedule).values(
+          resolved.map(({ e, slot, color }) => ({ dayOfWeek: e.day, position: e.position, userId: slot.userId, houseId: slot.houseId, name: slot.name, color })),
+        ),
       );
     }
   } else {
     // Jadwal sudah ada (mungkin sudah diatur di dashboard): hanya isi warna yang masih kosong.
     // Petugas/rumah yang muncul sekali dicocokkan tanpa malamnya, jadi tetap kena walau sudah dipindah malam.
-    const source = (slot: SlotSource) =>
-      slot.userId ? `user_id = ${slot.userId}` : slot.houseId ? `house_id = ${slot.houseId}` : `name = ${str(slot.name)}`;
+    const sourceKey = (slot: SlotSource) => (slot.userId ? `u${slot.userId}` : slot.houseId ? `h${slot.houseId}` : `n${slot.name}`);
+    const source = (slot: SlotSource): SQL =>
+      slot.userId ? eq(rondaSchedule.userId, slot.userId) : slot.houseId ? eq(rondaSchedule.houseId, slot.houseId) : eq(rondaSchedule.name, slot.name ?? "");
     const perSource = new Map<string, number>();
-    for (const { slot } of resolved) perSource.set(source(slot), (perSource.get(source(slot)) ?? 0) + 1);
+    for (const { slot } of resolved) perSource.set(sourceKey(slot), (perSource.get(sourceKey(slot)) ?? 0) + 1);
     for (const { e, slot, color } of resolved) {
       if (!color) continue;
-      const sameDay = perSource.get(source(slot))! > 1 ? ` and day_of_week = ${e.day}` : "";
-      scheduleSql.push(`update ronda_schedule set color = ${str(color)} where ${source(slot)}${sameDay} and color is null;`);
+      const sameDay = perSource.get(sourceKey(slot))! > 1 ? eq(rondaSchedule.dayOfWeek, e.day) : undefined;
+      statements.push((tx) => tx.update(rondaSchedule).set({ color }).where(and(source(slot), sameDay, isNull(rondaSchedule.color))));
     }
   }
 
@@ -168,13 +146,15 @@ async function main() {
   let namesFilled = 0;
   for (const [key, name] of uniqueNames) {
     const house = byKey.get(key);
-    if (!house || house.owner_name !== null || withAccount.has(house.id)) continue;
-    scheduleSql.push(`update houses set owner_name = ${str(name)} where id = ${house.id} and owner_name is null;`);
+    if (!house || house.ownerName !== null || withAccount.has(house.id)) continue;
+    statements.push((tx) => tx.update(houses).set({ ownerName: name }).where(and(eq(houses.id, house.id), isNull(houses.ownerName))));
     namesFilled++;
   }
-  run(scheduleSql);
+  await db.transaction(async (tx) => {
+    for (const statement of statements) await statement(tx);
+  });
 
-  console.log(`\n✓ ${newLots.length} rumah baru dari denah (${houses.length} rumah terdaftar).`);
+  console.log(`\n✓ ${newLots.length} rumah baru dari denah (${houseRows.length} rumah terdaftar).`);
   console.log(
     writeSchedule
       ? `✓ ${entries.length} baris jadwal untuk ${new Set(entries.map((e) => e.day)).size} malam.`

@@ -7,7 +7,7 @@ import { getCollectionsForDate, getMonthRecap, listPatrols } from "@/server/quer
 import { collectionLogs, houses, rondaSchedule, users } from "@/server/schema";
 import type { SessionUser } from "@/server/auth";
 import type { EntryInput } from "@/lib/types";
-import { createTestEnv } from "./helpers/d1";
+import { createTestEnv } from "./helpers/db";
 
 let db: Db;
 let petugas: SessionUser;
@@ -108,7 +108,7 @@ describe("applyEntries", () => {
 });
 
 describe("applyEntries dengan banyak catatan sekaligus", () => {
-  it("antrean panjang dari HP (lebih dari batas 100 parameter D1) tersimpan semua", async () => {
+  it("antrean panjang dari HP (ratusan catatan) tersimpan semua", async () => {
     const rows = [];
     for (let i = 0; i < 40; i++) {
       const [row] = await db

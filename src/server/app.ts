@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { csrf } from "hono/csrf";
-import { createDb } from "./db";
 import type { AppEnv } from "./env";
 import { adminRoutes } from "./routes/admin";
 import { authRoutes } from "./routes/auth";
@@ -13,7 +12,7 @@ export const app = new Hono<AppEnv>()
   .basePath("/api")
   .use(csrf())
   .use(async (c, next) => {
-    c.set("db", createDb(c.env.DB));
+    c.set("db", c.env.db);
     await next();
     // Data pribadi: jangan disimpan cache bersama/CDN.
     if (!c.res.headers.has("Cache-Control")) c.header("Cache-Control", "private, no-cache");

@@ -1,33 +1,44 @@
-import type { BatchItem } from "drizzle-orm/batch";
-import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
+import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import * as schema from "./schema";
 
-export type Db = DrizzleD1Database<typeof schema>;
+export type Db = PostgresJsDatabase<typeof schema>;
+/** Transaksi dari `db.transaction`; query builder-nya sama dengan `Db`. */
+export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+/** `Db` atau transaksi yang sedang berjalan. */
+export type Executor = Db | Tx;
 
-/** Binding D1 (`env.DB`), atau D1 dari Miniflare saat tes. */
-export type D1 = Parameters<typeof drizzle>[0];
+/** Query yang belum dijalankan (query builder Drizzle baru jalan saat di-await). */
+export type Statement = PromiseLike<unknown>;
 
-/** Drizzle di atas binding D1. Murah dibuat, jadi dibuat per permintaan. */
-export function createDb(d1: D1): Db {
-  return drizzle(d1, { schema });
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
+/**
+ * Drizzle di atas Postgres sungguhan, mis. Supabase lewat "Transaction pooler" (port 6543).
+ * Dibuat sekali per proses; koneksi dipakai bergantian oleh permintaan yang masuk.
+ */
+export function createDb(url: string): Db & { $client: postgres.Sql } {
+  const local = LOCAL_HOSTS.has(new URL(url).hostname);
+  const client = postgres(url, {
+    // Connection pooler (Supabase/PgBouncer mode transaksi) tidak mendukung prepared statement.
+    prepare: false,
+    max: 5,
+    // Tutup koneksi yang menganggur supaya function yang sedang tidur tidak memegang koneksi.
+    idle_timeout: 20,
+    connect_timeout: 10,
+    // NOTICE dari Postgres (mis. "already exists, skipping" saat migrasi) tidak perlu dicetak.
+    onnotice: () => {},
+    ssl: local ? false : "require",
+  });
+  return drizzle(client, { schema });
 }
 
-/** D1 membatasi 100 parameter per query, jadi insert banyak baris dipecah per sekian baris. */
-export const MAX_PARAMS = 100;
-
-export function chunk<T>(items: T[], size: number): T[][] {
-  const result: T[][] = [];
-  for (let i = 0; i < items.length; i += size) result.push(items.slice(i, i + size));
-  return result;
-}
-
-/** Ukuran potongan untuk insert banyak baris dengan `columns` kolom per baris. */
-export function rowsPerInsert(columns: number): number {
-  return Math.max(1, Math.floor(MAX_PARAMS / columns));
-}
-
-/** Jalankan beberapa query dalam satu batch D1: satu perjalanan ke database, semua berhasil atau semua batal. */
-export async function runBatch(db: Db, statements: BatchItem<"sqlite">[]) {
-  if (statements.length === 0) return;
-  await db.batch(statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
+/**
+ * Jalankan beberapa query dalam satu transaksi: semua berhasil atau semua batal. Query dibuat dari
+ * `tx` supaya ikut transaksinya, lalu dijalankan berurutan.
+ */
+export async function runBatch(db: Db, build: (tx: Tx) => Statement[]) {
+  await db.transaction(async (tx) => {
+    for (const statement of build(tx)) await statement;
+  });
 }
