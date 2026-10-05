@@ -4,7 +4,7 @@ import { z } from "zod";
 import { rondaDate } from "@/lib/dates";
 import type { EntryInput, EntryResult } from "@/lib/types";
 import type { SessionUser } from "./auth";
-import { chunk, rowsPerInsert, type Db } from "./db";
+import { chunk, rowsPerInsert, runBatch, type Db } from "./db";
 import { getHouseIds } from "./queries";
 import { collections, patrols } from "./schema";
 
@@ -103,11 +103,6 @@ function writeStatements(db: Db, writes: CollectionWrite[], now: Date): BatchIte
     );
   }
   return statements;
-}
-
-async function runBatch(db: Db, statements: BatchItem<"sqlite">[]) {
-  if (statements.length === 0) return;
-  await db.batch(statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
 }
 
 /** Simpan (atau hapus) catatan satu rumah untuk satu malam (koreksi admin, catat dari halaman rumah). */

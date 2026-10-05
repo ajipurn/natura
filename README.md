@@ -20,7 +20,10 @@ Stiker QR berisi alamat `/r/<kode>`: dibuka pakai kamera HP biasa, warga melihat
 - **Tetap jalan tanpa sinyal.** Catatan disimpan di HP dulu, lalu terkirim otomatis begitu online. App petugas bisa dibuka ulang saat offline (service worker).
 - **Denah Cluster Natura (SVG)** digambar sebagai kode dari denah cetak (95 kavling, jalan, taman, saluran). Kavling diwarnai sesuai status dan bisa diketuk untuk mencatat. **Tampilan 3D** (three.js) hanya diunduh saat dibuka.
 - **Rekap ke WhatsApp** sekali tekan.
-- **Jadwal ronda:** admin menempel tabel jadwal dari Excel/Google Sheets. Nama KK ikut terisi otomatis, dan app petugas menampilkan siapa yang **jaga malam ini**.
+- **Jadwal ronda yang bisa diubah:** tempel tabel jadwal dari Excel/Google Sheets, lalu atur langsung di dashboard. Tambah orang, hapus, urutkan, atau pindahkan ke malam lain lewat drag & drop atau menu ⋯, lalu simpan sekaligus. App petugas menampilkan siapa yang **jaga malam ini** dan menandai "Kamu jaga malam ini".
+- **Warna jadwal seperti tabel aslinya** (hijau, kuning, oranye, putih) di semua chip petugas jaga. Warna ikut terbaca saat tabel ditempel dari Excel/Google Sheets, dan bisa diubah per baris di editor jadwal.
+- **Permintaan ubah jadwal:** petugas meminta pindah atau tambah malam jaga dari app petugas (menu Akun atau Jadwal) beserta alasannya. Admin melihatnya di halaman Jadwal (ada penanda jumlah di menu dan Ringkasan), lalu menyetujui (jadwal langsung berubah) atau menolak dengan catatan.
+- **Petugas terhubung ke rumah dan jadwal:** halaman Petugas punya pencarian, filter (admin, nonaktif, belum dijadwalkan), dan dialog untuk mengatur rumah serta malam jaga tiap petugas. PIN petugas baru dibuat acak dan bisa langsung dikirim lewat WhatsApp.
 - **Dashboard admin:** ringkasan malam ini, total bulan ini, grafik 30 malam terakhir, rumah yang sering kosong, dan daftar hal yang belum disiapkan.
 - **Riwayat per malam** (jam, petugas, scan/manual) dan koreksi oleh admin.
 - **Rekap bulanan** berupa tabel rumah × tanggal, bisa diunduh sebagai CSV.
@@ -29,15 +32,15 @@ Stiker QR berisi alamat `/r/<kode>`: dibuka pakai kamera HP biasa, warga melihat
 - **Login nama + PIN.** Akun terkunci 15 menit setelah 5 kali PIN salah. Login bertahan lama supaya petugas tidak perlu login tiap malam.
 - **Bisa dipasang di layar utama HP** (PWA). Mode gelap mengikuti pengaturan HP.
 
-Ronda yang lewat tengah malam tetap dihitung malam sebelumnya: jam 00.00–11.59 masuk tanggal kemarin.
+Semua waktu memakai WIB. Ronda yang lewat tengah malam tetap dihitung malam sebelumnya: jam 00.00–05.59 masuk tanggal kemarin; mulai jam 06.00 sudah malam hari itu.
 
 ## Cara pakai
 
 1. Buka `/admin/` pertama kali, lalu isi nama lingkungan, nominal jimpitan, dan akun admin.
 2. Jalankan seed awal (`bun run seed`, atau `bun run seed:remote` untuk Cloudflare). Lihat [Seed awal](#seed-awal). Setelah itu rumah, jadwal, nama KK, dan akun petugas sudah terisi; sisanya tinggal mengikuti daftar **Yang perlu disiapkan** di Ringkasan. Tanpa seed, semuanya juga bisa diisi lewat dashboard:
    - **Denah → Daftarkan rumah dari denah.** Semua kavling berpenghuni langsung jadi data rumah. Nama KK bisa diisi di **Rumah & QR**.
-   - **Petugas:** buat akun tiap petugas beserta PIN-nya.
-   - **Jadwal ronda:** tempel tabel jadwal (judul hari seperti "AHAD (MALAM SENIN)", isi "NAMA (BLOK-NO)").
+   - **Petugas:** buat akun tiap petugas, pilih rumah dan malam jaganya.
+   - **Jadwal ronda:** impor tabel jadwal (judul hari seperti "AHAD (MALAM SENIN)", isi "NAMA (BLOK-NO)"), lalu rapikan langsung di halaman Jadwal.
    - **Info warga:** buat kode warga, lalu kirim link-nya ke grup WA. Tambahkan pengumuman dan kontak pengurus.
 3. **Rumah & QR → Cetak QR**, cetak di kertas stiker (sebaiknya vinyl atau dilaminasi), lalu tempel dekat wadah jimpitan.
 4. Petugas membuka `/petugas/` sekali saat ada sinyal (supaya tersimpan untuk offline), lalu tekan **Scan QR** saat keliling.
@@ -50,11 +53,13 @@ Ronda yang lewat tengah malam tetap dihitung malam sebelumnya: jam 00.00–11.59
 `bun run seed` mengisi database dengan data Cluster Natura:
 
 - semua kavling berpenghuni di denah menjadi data rumah (76 rumah),
-- jadwal ronda dari `scripts/jadwal-natura.tsv` (salinan tabel jadwal; ubah file ini kalau jadwal berganti),
+- jadwal ronda dari `scripts/jadwal-natura.tsv` (salinan tabel jadwal; ubah file ini kalau jadwal berganti) beserta warna selnya dari `scripts/jadwal-natura-warna.tsv`,
 - nama KK dari jadwal, hanya untuk rumah yang nama KK-nya masih kosong,
 - akun petugas untuk setiap nama di jadwal, dengan PIN 4 angka acak. Nama kembar dibedakan rumahnya, mis. "Wawan (AD-5)".
 
-Jalankan setelah admin pertama dibuat di `/admin/setup`. PIN akun baru disimpan di `petugas-pin.csv` (atau `petugas-pin-remote.csv` untuk Cloudflare). File itu tidak ikut di-commit; bagikan PIN lewat chat pribadi lalu hapus filenya. Seed aman dijalankan ulang: rumah, nama KK, dan akun yang sudah ada tidak diubah, hanya jadwal yang diganti dengan isi file.
+Akun petugas langsung terhubung dengan rumah dan malam jaganya di jadwal.
+
+Jalankan setelah admin pertama dibuat di `/admin/setup`. PIN akun baru disimpan di `petugas-pin.csv` (atau `petugas-pin-remote.csv` untuk Cloudflare). File itu tidak ikut di-commit; bagikan PIN lewat chat pribadi lalu hapus filenya. Seed aman dijalankan ulang: rumah, nama KK, akun, dan jadwal yang sudah ada tidak diubah, supaya jadwal yang sudah diatur di dashboard tidak tertimpa. Warna yang masih kosong di jadwal yang sudah ada tetap diisi dari file warna. Untuk mengganti jadwal dengan isi file: `bun run seed --jadwal`.
 
 ### Mengubah denah
 

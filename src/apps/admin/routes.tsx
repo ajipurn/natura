@@ -6,7 +6,7 @@ import { PatrolDetail } from "@/features/riwayat/patrol-detail";
 import { PatrolList } from "@/features/riwayat/patrol-list";
 import { DenahPage } from "./denah/denah-page";
 import { InfoPage } from "./info-page";
-import { JadwalPage } from "./jadwal-page";
+import { JadwalPage } from "./jadwal/jadwal-page";
 import { AdminLayout } from "./layout";
 import { PengaturanPage } from "./pengaturan/pengaturan-page";
 import { PetugasPage } from "./petugas/petugas-page";

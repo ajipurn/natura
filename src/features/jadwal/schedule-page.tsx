@@ -1,19 +1,26 @@
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays } from "lucide-react";
 import type { ReactNode } from "react";
+import { CalendarDays } from "lucide-react";
+import { guardColorClass } from "@/components/guard-color-class";
 import { QueryState } from "@/components/query-state";
 import { Card, PageHeader, cx } from "@/components/ui";
 import { rondaDate } from "@/lib/dates";
-import { houseLabel } from "@/lib/houses";
-import { DAY_NAMES, dayLabel, scheduleDay } from "@/lib/schedule";
+import { DAY_NAMES, dayLabel, scheduleDay, slotHouseLabel } from "@/lib/schedule";
 import type { ScheduleDTO } from "@/lib/types";
 import { scheduleQuery } from "./queries";
 
-/**
- * Jadwal ronda mingguan, mulai dari malam ini. `admin` = bagian impor (hanya di app admin);
- * `emptyHint` = petunjuk kalau jadwal masih kosong.
- */
-export function SchedulePage({ admin, emptyHint }: { admin?: (hasSchedule: boolean) => ReactNode; emptyHint: string }) {
+/** Jadwal ronda mingguan (hanya baca), mulai dari malam ini. `emptyHint` = petunjuk kalau jadwal masih kosong. */
+export function SchedulePage({
+  emptyHint,
+  currentUserId,
+  intro,
+}: {
+  emptyHint: string;
+  /** Tampil di bawah judul, sebelum jadwal. */
+  intro?: ReactNode;
+  /** Tandai baris jadwal milik petugas yang sedang masuk. */
+  currentUserId?: number;
+}) {
   const query = useQuery(scheduleQuery);
   const tonight = scheduleDay(rondaDate(new Date()));
   // Mulai dari malam ini, lalu malam-malam berikutnya.
@@ -22,10 +29,10 @@ export function SchedulePage({ admin, emptyHint }: { admin?: (hasSchedule: boole
   return (
     <>
       <PageHeader title="Jadwal ronda" subtitle={`Malam ini: ${dayLabel(tonight)}`} />
+      {intro}
       <QueryState query={query}>
         {({ schedule }) => (
           <>
-            {admin?.(schedule.length > 0)}
             {schedule.length === 0 ? (
               <Card className="text-center">
                 <CalendarDays className="mx-auto size-10 text-muted" />
@@ -35,7 +42,13 @@ export function SchedulePage({ admin, emptyHint }: { admin?: (hasSchedule: boole
             ) : (
               <div className="grid gap-3 lg:grid-cols-2">
                 {days.map((day) => (
-                  <DayCard key={day} day={day} tonight={day === tonight} entries={schedule.filter((e) => e.day === day)} />
+                  <DayCard
+                    key={day}
+                    day={day}
+                    tonight={day === tonight}
+                    entries={schedule.filter((e) => e.day === day)}
+                    currentUserId={currentUserId}
+                  />
                 ))}
               </div>
             )}
@@ -46,7 +59,17 @@ export function SchedulePage({ admin, emptyHint }: { admin?: (hasSchedule: boole
   );
 }
 
-function DayCard({ day, tonight, entries }: { day: number; tonight: boolean; entries: ScheduleDTO[] }) {
+function DayCard({
+  day,
+  tonight,
+  entries,
+  currentUserId,
+}: {
+  day: number;
+  tonight: boolean;
+  entries: ScheduleDTO[];
+  currentUserId?: number;
+}) {
   return (
     <section
       aria-label={dayLabel(day)}
@@ -67,15 +90,20 @@ function DayCard({ day, tonight, entries }: { day: number; tonight: boolean; ent
         <p className="mt-2 text-sm text-muted">Tidak ada jadwal.</p>
       ) : (
         <ol className="mt-2 divide-y divide-line">
-          {entries.map((e) => (
-            <li key={e.position} className="flex items-center gap-3 py-1.5">
-              <span className="w-14 shrink-0 font-bold">{houseLabel(e)}</span>
-              <span className="min-w-0 flex-1 truncate">{e.name ?? e.ownerName ?? <span className="text-muted">—</span>}</span>
-              {e.houseId === null && (
-                <span className="shrink-0 rounded-full bg-warn-soft px-2 py-0.5 text-xs text-warn">belum terdaftar</span>
-              )}
-            </li>
-          ))}
+          {entries.map((e) => {
+            const me = currentUserId !== undefined && e.userId === currentUserId;
+            return (
+              <li key={e.id} className={cx("flex items-center gap-3 py-1.5", me && "-mx-2 rounded-lg bg-primary/10 px-2")}>
+                <span aria-hidden className={cx("size-3 shrink-0 rounded-full", guardColorClass(e.color))} />
+                <span className="w-14 shrink-0 font-bold">{slotHouseLabel(e) || "—"}</span>
+                <span className="min-w-0 flex-1 truncate">{e.name ?? e.ownerName ?? <span className="text-muted">—</span>}</span>
+                {me && <span className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-fg">Kamu</span>}
+                {e.block && e.houseId === null && (
+                  <span className="shrink-0 rounded-full bg-warn-soft px-2 py-0.5 text-xs text-warn">belum terdaftar</span>
+                )}
+              </li>
+            );
+          })}
         </ol>
       )}
     </section>

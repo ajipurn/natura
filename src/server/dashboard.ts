@@ -3,11 +3,12 @@ import { rondaDate } from "@/lib/dates";
 import { houseLabel } from "@/lib/houses";
 import { monthStats } from "@/lib/month-stats";
 import { summarize } from "@/lib/recap";
-import { scheduleDay } from "@/lib/schedule";
+import { scheduleDay, slotHouseLabel } from "@/lib/schedule";
 import { matchPlan } from "@/lib/site-plan";
 import { SITE_PLAN } from "@/site-plan";
 import type { Db } from "./db";
 import { getCollectionsForDate, getMonthRecap, getSettings, listHouses, listPatrols } from "./queries";
+import { countPendingRequests } from "./requests";
 import { listSchedule } from "./schedule";
 import { announcements, settings, users } from "./schema";
 
@@ -15,7 +16,7 @@ import { announcements, settings, users } from "./schema";
 export async function getDashboard(db: Db, now: Date) {
   const date = rondaDate(now);
   const month = date.slice(0, 7);
-  const [settingsRow, houseRows, tonightRows, recap, recent, schedule, [userCounts], [announcementCount], [codeRow]] =
+  const [settingsRow, houseRows, tonightRows, recap, recent, schedule, [userCounts], [announcementCount], [codeRow], pendingRequests] =
     await Promise.all([
       getSettings(db),
       listHouses(db),
@@ -31,6 +32,7 @@ export async function getDashboard(db: Db, now: Date) {
         .from(users),
       db.select({ value: count() }).from(announcements),
       db.select({ wargaCode: settings.wargaCode }).from(settings).where(eq(settings.id, 1)).limit(1),
+      countPendingRequests(db),
     ]);
 
   const tonight = summarize(houseRows, tonightRows);
@@ -58,7 +60,9 @@ export async function getDashboard(db: Db, now: Date) {
       vacant: tonight.vacant.length,
       total: tonight.total,
       collectors: tonight.collectors,
-      guards: schedule.filter((s) => s.day === day).map((s) => ({ label: houseLabel(s), name: s.name ?? s.ownerName })),
+      guards: schedule
+        .filter((s) => s.day === day)
+        .map((s) => ({ id: s.id, label: slotHouseLabel(s), name: s.name ?? s.ownerName, color: s.color })),
     },
     monthSummary: { nights: stats.nights, total: stats.total, average: stats.average },
     /** 30 malam terakhir, urut dari yang terlama. */
@@ -78,6 +82,8 @@ export async function getDashboard(db: Db, now: Date) {
       noSchedule: schedule.length === 0,
       noWargaCode: !codeRow?.wargaCode,
       onlyOneUser: (userCounts?.active ?? 0) <= 1,
+      /** Permintaan ubah jadwal yang menunggu keputusan admin. */
+      pendingRequests,
     },
   };
 }

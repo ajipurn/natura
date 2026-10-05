@@ -33,3 +33,10 @@ export const recapQuery = (month: string) =>
     queryKey: ["rekap", month],
     queryFn: () => call(api.rekap.$get({ query: { bulan: month } })),
   });
+
+/** Permintaan ubah jadwal dari petugas (yang menunggu dulu). */
+export const requestsQuery = queryOptions({
+  queryKey: ["admin", "permintaan"],
+  queryFn: () => call(api.admin.permintaan.$get()),
+  refetchInterval: 60_000,
+});

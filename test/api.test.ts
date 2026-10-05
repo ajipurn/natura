@@ -142,6 +142,191 @@ describe("jadwal", () => {
   });
 });
 
+describe("petugas & jadwal yang bisa diubah", () => {
+  async function userId(name: string) {
+    const { data } = await admin.get("/api/admin/petugas");
+    return (data.users as { id: number; name: string }[]).find((u) => u.name === name)!.id;
+  }
+  async function houseId(label: string) {
+    const { data } = await admin.get("/api/admin/rumah");
+    return (data.houses as { id: number; block: string; number: string }[]).find((h) => `${h.block}-${h.number}` === label)!.id;
+  }
+  type Slot = { id: number; day: number; position: number; name: string | null; block: string; number: string; userId: number | null };
+  const schedule = async () => (await admin.get("/api/jadwal")).data.schedule as Slot[];
+
+  it("impor jadwal menghubungkan nama ke akun petugas, termasuk nama kembar", async () => {
+    await admin.post("/api/admin/petugas", { name: "Nino", pin: "1357", role: "petugas" });
+    await admin.post("/api/admin/petugas", { name: "Wawan (AD-5)", pin: "2468", role: "petugas" });
+    const res = await admin.put("/api/admin/jadwal", {
+      text: "Senin: Nino (AB-3), Sahrul (AF-19)\nSabtu: Wawan (AD-5), Wawan (AF-7)",
+      fillNames: false,
+      overwriteNames: false,
+    });
+    expect(res.data.success).toMatch(/2 terhubung ke akun petugas/);
+    const rows = await schedule();
+    expect(rows.map((r) => [r.day, r.name, `${r.block}-${r.number}`, r.userId !== null])).toEqual([
+      [1, "Nino", "AB-3", true],
+      [1, "Sahrul", "AF-19", false],
+      [6, "Wawan", "AD-5", true],
+      [6, "Wawan", "AF-7", false],
+    ]);
+  });
+
+  it("malam jaga dan rumah petugas diatur dari halaman petugas", async () => {
+    const nino = await userId("Nino");
+    const ab3 = await houseId("AB-3");
+    const res = await admin.patch(`/api/admin/petugas/${nino}`, { name: "Nino", role: "petugas", active: true, houseId: ab3, days: [1, 3] });
+    expect(res.data.success).toBe("Tersimpan.");
+    let rows = await schedule();
+    expect(rows.filter((r) => r.userId === nino).map((r) => [r.day, r.position, `${r.block}-${r.number}`])).toEqual([
+      [1, 0, "AB-3"],
+      [3, 0, "AB-3"],
+    ]);
+    const list = (await admin.get("/api/admin/petugas")).data.users as { id: number; house: string | null; days: number[] }[];
+    expect(list.find((u) => u.id === nino)).toMatchObject({ house: "AB-3", days: [1, 3] });
+
+    // Ganti nama akun: jadwal ikut berubah. Hapus Senin: barisnya hilang, urutan lain tetap.
+    await admin.patch(`/api/admin/petugas/${nino}`, { name: "Nino Saputra", role: "petugas", active: true, houseId: ab3, days: [3] });
+    rows = await schedule();
+    expect(rows.filter((r) => r.day === 1).map((r) => r.name)).toEqual(["Sahrul"]);
+    expect(rows.find((r) => r.userId === nino)).toMatchObject({ day: 3, name: "Nino Saputra" });
+
+    // Petugas baru langsung dijadwalkan di urutan terakhir.
+    const created = await admin.post("/api/admin/petugas", { name: "Tehe", pin: "8642", role: "petugas", houseId: await houseId("AB-9"), days: [1] });
+    expect(created.status).toBe(200);
+    rows = await schedule();
+    expect(rows.filter((r) => r.day === 1).map((r) => r.name)).toEqual(["Sahrul", "Tehe"]);
+  });
+
+  it("jadwal hasil edit disimpan sekaligus, urutan mengikuti daftar", async () => {
+    const rows = await schedule();
+    const tehe = rows.find((r) => r.name === "Tehe")!;
+    const slots = [
+      { ...tehe, day: 0 },
+      ...rows.filter((r) => r.id !== tehe.id),
+      { day: 0, name: null, block: "AA", number: "8", userId: null },
+      { day: 2, name: "Satpam", block: "", number: "", userId: null },
+    ].map(({ day, name, block, number, userId }) => ({ day, name, block, number, userId }));
+    const res = await admin.put("/api/admin/jadwal/slot", { slots });
+    expect(res.data.success).toBe(`Jadwal disimpan (${slots.length} baris).`);
+    const saved = await schedule();
+    expect(saved.filter((r) => r.day === 0).map((r) => [r.position, r.name, `${r.block}-${r.number}`])).toEqual([
+      [0, "Tehe", "AB-9"],
+      [1, null, "AA-8"],
+    ]);
+    expect(saved.find((r) => r.name === "Satpam")).toMatchObject({ day: 2, block: "", houseId: null });
+
+    const bad = await admin.put("/api/admin/jadwal/slot", { slots: [{ day: 0, name: "X", block: "", number: "", userId: 99999 }] });
+    expect(bad.status).toBe(409);
+    expect((await admin.put("/api/admin/jadwal/slot", { slots: [{ day: 0, name: null, block: "", number: "", userId: null }] })).status).toBe(400);
+    // Jadwal lama tetap utuh setelah permintaan yang ditolak.
+    expect(await schedule()).toHaveLength(saved.length);
+  });
+
+  it("menghapus rumah tidak menghapus petugasnya, hanya melepas rumahnya", async () => {
+    await admin.post("/api/admin/rumah", { block: "ZZ", numbers: "1" });
+    const zz1 = await houseId("ZZ-1");
+    await admin.post("/api/admin/petugas", { name: "Penghuni ZZ", pin: "9753", role: "petugas", houseId: zz1 });
+    expect((await admin.delete(`/api/admin/rumah/${zz1}`)).status).toBe(200);
+    const list = (await admin.get("/api/admin/petugas")).data.users as { name: string; houseId: number | null }[];
+    expect(list.find((u) => u.name === "Penghuni ZZ")).toMatchObject({ houseId: null });
+  });
+});
+
+describe("warna jadwal & permintaan ubah jadwal", () => {
+  type Slot = { id: number; day: number; position: number; name: string | null; userId: number | null; color: string | null; block: string };
+  const schedule = async () => (await admin.get("/api/jadwal")).data.schedule as Slot[];
+  let rudi: ReturnType<typeof apiClient>;
+  let rudiId: number;
+
+  it("warna ikut tersimpan dari editor dan dari impor tabel", async () => {
+    const res = await admin.put("/api/admin/jadwal", {
+      text: "Senin: Nino (AB-3), Sahrul (AF-19), (AB-5)",
+      fillNames: false,
+      overwriteNames: false,
+      colors: ["green", null, "orange"],
+    });
+    expect(res.status).toBe(200);
+    expect((await schedule()).map((s) => s.color)).toEqual(["green", null, "orange"]);
+    // Jumlah warna tidak cocok dengan jadwal yang terbaca: warnanya diabaikan.
+    await admin.put("/api/admin/jadwal", { text: "Senin: Nino (AB-3)", fillNames: false, overwriteNames: false, colors: ["green", "yellow"] });
+    expect((await schedule()).map((s) => s.color)).toEqual([null]);
+
+    const slots = (await schedule()).map(({ day, name, block, userId }) => ({ day, name, block, number: "3", userId, color: "yellow" }));
+    await admin.put("/api/admin/jadwal/slot", { slots });
+    expect((await schedule())[0].color).toBe("yellow");
+  });
+
+  it("petugas meminta pindah malam; admin menyetujui dan jadwal ikut berubah", async () => {
+    const houses = (await admin.get("/api/admin/rumah")).data.houses as { id: number; block: string; number: string }[];
+    const ab5 = houses.find((h) => h.block === "AB" && h.number === "5")!.id;
+    await admin.post("/api/admin/petugas", { name: "Rudi", pin: "1470", role: "petugas", houseId: ab5, days: [2] });
+    rudi = apiClient(env);
+    const users = (await rudi.get("/api/auth/users")).data.users as { id: number; name: string }[];
+    rudiId = users.find((u) => u.name === "Rudi")!.id;
+    await rudi.post("/api/auth/login", { userId: rudiId, pin: "1470" });
+    // Beri warna ke baris Rudi supaya terlihat ikut pindah.
+    const rows = await schedule();
+    await admin.put("/api/admin/jadwal/slot", {
+      slots: rows.map(({ day, name, block, userId, color }) => ({
+        day,
+        name,
+        block,
+        number: block === "AB" && userId === rudiId ? "5" : "3",
+        userId,
+        color: userId === rudiId ? "orange" : color,
+      })),
+    });
+
+    expect((await rudi.post("/api/jadwal/permintaan", { fromDay: 4, toDay: 5, note: "" })).data.error).toBe("Kamu tidak dijadwalkan di malam itu.");
+    expect((await rudi.post("/api/jadwal/permintaan", { fromDay: 2, toDay: 2, note: "" })).status).toBe(400);
+    const sent = await rudi.post("/api/jadwal/permintaan", { fromDay: 2, toDay: 5, note: "Shift malam di hari Selasa" });
+    expect(sent.data.success).toMatch(/terkirim/);
+    expect((await rudi.post("/api/jadwal/permintaan", { fromDay: 2, toDay: 6, note: "" })).data.error).toMatch(/Masih ada permintaan/);
+    expect((await rudi.get("/api/admin/permintaan")).status).toBe(403);
+
+    const list = await admin.get("/api/admin/permintaan");
+    expect(list.data.pending).toBe(1);
+    const request = (list.data.requests as { id: number; userName: string; house: string; days: number[] }[])[0];
+    expect(request).toMatchObject({ userName: "Rudi", house: "AB-5", days: [2] });
+    const dashboard = (await admin.get("/api/admin/ringkasan")).data as { todo: { pendingRequests: number } };
+    expect(dashboard.todo.pendingRequests).toBe(1);
+
+    const ok = await admin.post(`/api/admin/permintaan/${request.id}/setujui`, { response: "" });
+    expect(ok.data.success).toMatch(/Disetujui/);
+    const mine = (await schedule()).filter((s) => s.userId === rudiId);
+    expect(mine.map((s) => [s.day, s.color])).toEqual([[5, "orange"]]);
+    expect((await admin.post(`/api/admin/permintaan/${request.id}/tolak`, { response: "" })).status).toBe(409);
+    const own = (await rudi.get("/api/jadwal/permintaan")).data.requests as { status: string }[];
+    expect(own[0].status).toBe("approved");
+  });
+
+  it("permintaan bisa ditolak dengan alasan, atau dibatalkan petugas", async () => {
+    await rudi.post("/api/jadwal/permintaan", { fromDay: 5, toDay: 0, note: "" });
+    let pending = ((await admin.get("/api/admin/permintaan")).data.requests as { id: number; status: string }[]).find((r) => r.status === "pending")!;
+    await admin.post(`/api/admin/permintaan/${pending.id}/tolak`, { response: "Ahad sudah penuh" });
+    let own = (await rudi.get("/api/jadwal/permintaan")).data.requests as { status: string; response: string | null }[];
+    expect(own[0]).toMatchObject({ status: "rejected", response: "Ahad sudah penuh" });
+    expect((await schedule()).filter((s) => s.userId === rudiId).map((s) => s.day)).toEqual([5]);
+
+    // Tambah malam tanpa melepas yang lama.
+    await rudi.post("/api/jadwal/permintaan", { fromDay: null, toDay: 1, note: "" });
+    pending = ((await admin.get("/api/admin/permintaan")).data.requests as { id: number; status: string }[]).find((r) => r.status === "pending")!;
+    await admin.post(`/api/admin/permintaan/${pending.id}/setujui`, { response: "" });
+    expect((await schedule()).filter((s) => s.userId === rudiId).map((s) => [s.day, s.block])).toEqual([
+      [1, "AB"],
+      [5, "AB"],
+    ]);
+
+    await rudi.post("/api/jadwal/permintaan", { fromDay: 1, toDay: 3, note: "" });
+    own = (await rudi.get("/api/jadwal/permintaan")).data.requests as { id: number; status: string; response: string | null }[];
+    const id = (own[0] as unknown as { id: number }).id;
+    expect((await rudi.post(`/api/jadwal/permintaan/${id}/batal`)).data.success).toBe("Permintaan dibatalkan.");
+    expect((await rudi.post(`/api/jadwal/permintaan/${id}/batal`)).status).toBe(409);
+    expect((await admin.get("/api/admin/permintaan")).data.pending).toBe(0);
+  });
+});
+
 describe("halaman warga", () => {
   it("tertutup sampai admin membuat kode, lalu terbuka dengan kode itu", async () => {
     const warga = apiClient(env);

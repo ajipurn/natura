@@ -5,18 +5,20 @@ import { z } from "zod";
 import { isIsoDate, rondaDate } from "@/lib/dates";
 import { normalizeHouseField, parseNumberList } from "@/lib/houses";
 import { newToken } from "@/lib/qr";
+import { GUARD_COLORS } from "@/lib/guard-color";
 import { parseSchedule } from "@/lib/schedule";
 import { matchPlan } from "@/lib/site-plan";
 import { SITE_PLAN } from "@/site-plan";
 import { requireAdmin } from "../auth";
 import { MAX_AMOUNT, writeCollection } from "../collections";
-import { chunk, rowsPerInsert } from "../db";
+import { chunk, rowsPerInsert, runBatch } from "../db";
 import type { AppEnv } from "../env";
 import { body, idParam, pinField, trimmed } from "../http";
 import { hashPin } from "../pin";
 import { getHouseIds, getSettings, listHouses, listHousesWithUsage, listUsers } from "../queries";
-import { clearSchedule, saveSchedule } from "../schedule";
-import { announcements, collections, contacts, houses, settings, users } from "../schema";
+import { countPendingRequests, decideRequest, listRequestsForAdmin } from "../requests";
+import { clearSchedule, replaceSlots, saveSchedule, userDaysStatements } from "../schedule";
+import { announcements, collections, contacts, houses, rondaSchedule, settings, users } from "../schema";
 import { getDashboard } from "../dashboard";
 
 const BLOCK_PATTERN = /^[0-9A-Z][0-9A-Z .\-/]{0,9}$/;
@@ -44,6 +46,23 @@ const updateHouseSchema = z.object({
 
 const userName = trimmed(40, "Isi nama (maks. 40 karakter).").min(1, "Isi nama (maks. 40 karakter).");
 const role = z.enum(["admin", "petugas"]).catch("petugas");
+const day = z.number().int().min(0).max(6);
+/** Rumah dan malam jaga petugas. */
+const guardFields = {
+  houseId: z.number().int().positive().nullable().default(null),
+  days: z.array(day).max(7).default([]),
+};
+
+const guardColor = z.enum(GUARD_COLORS).nullable();
+
+const slotSchema = z.object({
+  day,
+  color: guardColor.default(null),
+  name: z.string().trim().max(60).nullable().transform((v) => v || null),
+  block: z.string().transform(normalizeHouseField).pipe(z.string().regex(/^$|^[0-9A-Z][0-9A-Z .\-/]{0,9}$/, "Blok tidak valid.")),
+  number: z.string().transform(normalizeHouseField).pipe(z.string().regex(/^$|^[0-9A-Z][0-9A-Z\-/]{0,9}$/, "Nomor rumah tidak valid.")),
+  userId: z.number().int().positive().nullable(),
+});
 
 const settingsSchema = z.object({
   communityName: trimmed(80, "Isi nama lingkungan (maks. 80 karakter).").min(1, "Isi nama lingkungan (maks. 80 karakter)."),
@@ -174,25 +193,45 @@ export const adminRoutes = new Hono<AppEnv>()
 
   .get("/petugas", async (c) => c.json({ users: await listUsers(c.var.db), me: c.var.user }))
 
-  .post("/petugas", body(z.object({ name: userName, pin: pinField(), role })), async (c) => {
-    const { name, pin, role: newRole } = c.req.valid("json");
+  .post("/petugas", body(z.object({ name: userName, pin: pinField(), role, ...guardFields })), async (c) => {
+    const { name, pin, role: newRole, houseId, days } = c.req.valid("json");
     const db = c.var.db;
     if (await nameTaken(db, name)) return c.json({ error: `Nama "${name}" sudah dipakai.` }, 409);
-    await db.insert(users).values({ name, pinHash: await hashPin(pin), role: newRole });
-    return c.json({ success: `${name} ditambahkan. Beri tahu PIN-nya secara langsung.` });
+    const house = await houseById(db, houseId);
+    if (houseId && !house) return c.json({ error: "Rumah tidak ditemukan." }, 404);
+    const [user] = await db
+      .insert(users)
+      .values({ name, pinHash: await hashPin(pin), role: newRole, houseId })
+      .returning({ id: users.id });
+    await runBatch(db, userDaysStatements(db, user.id, days, house, []));
+    return c.json({ success: `${name} ditambahkan. Beri tahu PIN-nya secara langsung.`, id: user.id });
   })
 
-  .patch("/petugas/:id", idParam(), body(z.object({ name: userName, role, active: z.boolean() })), async (c) => {
-    const { id } = c.req.valid("param");
-    const { name, role: newRole, active } = c.req.valid("json");
-    const db = c.var.db;
-    if (await nameTaken(db, name, id)) return c.json({ error: `Nama "${name}" sudah dipakai.` }, 409);
-    if (id === c.var.user.id && (!active || newRole !== "admin")) {
-      return c.json({ error: "Tidak bisa menonaktifkan atau menurunkan peran akunmu sendiri." }, 400);
-    }
-    await db.update(users).set({ name, role: newRole, active }).where(eq(users.id, id));
-    return c.json({ success: "Tersimpan." });
-  })
+  .patch(
+    "/petugas/:id",
+    idParam(),
+    body(z.object({ name: userName, role, active: z.boolean(), ...guardFields })),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const { name, role: newRole, active, houseId, days } = c.req.valid("json");
+      const db = c.var.db;
+      if (await nameTaken(db, name, id)) return c.json({ error: `Nama "${name}" sudah dipakai.` }, 409);
+      if (id === c.var.user.id && (!active || newRole !== "admin")) {
+        return c.json({ error: "Tidak bisa menonaktifkan atau menurunkan peran akunmu sendiri." }, 400);
+      }
+      const house = await houseById(db, houseId);
+      if (houseId && !house) return c.json({ error: "Rumah tidak ditemukan." }, 404);
+      const current = await db
+        .selectDistinct({ day: rondaSchedule.dayOfWeek })
+        .from(rondaSchedule)
+        .where(eq(rondaSchedule.userId, id));
+      await runBatch(db, [
+        db.update(users).set({ name, role: newRole, active, houseId }).where(eq(users.id, id)),
+        ...userDaysStatements(db, id, days, house, current.map((r) => r.day)),
+      ]);
+      return c.json({ success: "Tersimpan." });
+    },
+  )
 
   .post("/petugas/:id/pin", idParam(), body(z.object({ pin: pinField() })), async (c) => {
     await c.var.db
@@ -243,9 +282,17 @@ export const adminRoutes = new Hono<AppEnv>()
   .put(
     "/jadwal",
     // Teks tidak dipangkas: sel kosong di awal baris judul tabel menentukan posisi kolom hari.
-    body(z.object({ text: z.string().max(MAX_SCHEDULE_TEXT, "Teks jadwal terlalu panjang."), fillNames: z.boolean(), overwriteNames: z.boolean() })),
+    body(
+      z.object({
+        text: z.string().max(MAX_SCHEDULE_TEXT, "Teks jadwal terlalu panjang."),
+        fillNames: z.boolean(),
+        overwriteNames: z.boolean(),
+        /** Warna sel tiap baris jadwal (urutan sama dengan hasil baca teks), dari tabel yang ditempel. */
+        colors: z.array(guardColor).max(MAX_SCHEDULE_ENTRIES).optional(),
+      }),
+    ),
     async (c) => {
-      const { text, fillNames, overwriteNames } = c.req.valid("json");
+      const { text, fillNames, overwriteNames, colors } = c.req.valid("json");
       if (!text.trim()) return c.json({ error: "Tempel jadwalnya dulu." }, 400);
       const { entries } = parseSchedule(text);
       if (entries.length === 0) {
@@ -253,12 +300,52 @@ export const adminRoutes = new Hono<AppEnv>()
       }
       if (entries.length > MAX_SCHEDULE_ENTRIES) return c.json({ error: "Jadwal terlalu banyak barisnya." }, 400);
 
-      const summary = await saveSchedule(c.var.db, entries, { fillNames, overwriteNames });
+      // Warna hanya dipakai kalau jumlahnya cocok dengan jadwal yang terbaca.
+      const withColors = colors?.length === entries.length ? entries.map((e, i) => ({ ...e, color: colors[i] })) : entries;
+      const summary = await saveSchedule(c.var.db, withColors, { fillNames, overwriteNames });
       const parts = [`${summary.saved} baris jadwal tersimpan untuk ${summary.days} malam.`];
+      if (summary.linked) parts.push(`${summary.linked} terhubung ke akun petugas.`);
       if (fillNames) parts.push(`${summary.namesFilled} nama KK diisi.`);
       if (summary.unknown.length) parts.push(`Belum ada di data rumah: ${summary.unknown.join(", ")}.`);
       if (summary.conflicting.length) parts.push(`Nama ganda, tidak diisi: ${summary.conflicting.join("; ")}.`);
       return c.json({ success: parts.join(" ") });
+    },
+  )
+
+  /** Simpan seluruh jadwal hasil edit (urutan per malam mengikuti urutan daftar). */
+  .put("/jadwal/slot", body(z.object({ slots: z.array(slotSchema).max(MAX_SCHEDULE_ENTRIES, "Jadwal terlalu banyak barisnya.") })), async (c) => {
+    const slots = c.req.valid("json").slots;
+    if (slots.some((s) => !s.userId && !s.name && !s.block)) return c.json({ error: "Ada baris jadwal tanpa nama dan rumah." }, 400);
+    const unknown = await replaceSlots(c.var.db, slots);
+    if (unknown.length) return c.json({ error: "Ada petugas yang sudah tidak ada. Muat ulang halaman lalu coba lagi." }, 409);
+    return c.json({ success: `Jadwal disimpan (${slots.length} baris).` });
+  })
+
+  /* ---------- Permintaan ubah jadwal dari petugas ---------- */
+
+  .get("/permintaan", async (c) => {
+    const db = c.var.db;
+    const [requests, pending] = await Promise.all([listRequestsForAdmin(db), countPendingRequests(db)]);
+    return c.json({ requests, pending });
+  })
+
+  .post(
+    "/permintaan/:id/:keputusan",
+    validator("param", (value: Record<string, string>, c) => {
+      const id = Number(value.id);
+      const keputusan = value.keputusan;
+      if (!Number.isSafeInteger(id) || id <= 0 || (keputusan !== "setujui" && keputusan !== "tolak")) {
+        return c.json({ error: "Data tidak valid." }, 400);
+      }
+      return { id: value.id, keputusan: keputusan as "setujui" | "tolak" };
+    }),
+    body(z.object({ response: z.string().trim().max(300, "Catatan maks. 300 karakter.").transform((v) => v || null) })),
+    async (c) => {
+      const { id, keputusan } = c.req.valid("param");
+      const decision = keputusan === "setujui" ? "approved" : "rejected";
+      const error = await decideRequest(c.var.db, Number(id), c.var.user.id, decision, c.req.valid("json").response);
+      if (error) return c.json({ error }, 409);
+      return c.json({ success: decision === "approved" ? "Disetujui; jadwal sudah diubah." : "Permintaan ditolak." });
     },
   )
 
@@ -321,7 +408,7 @@ export const adminRoutes = new Hono<AppEnv>()
   .put("/kontak", body(contactsSchema), async (c) => {
     const db = c.var.db;
     const list = c.req.valid("json").contacts;
-    await db.batch([
+    await runBatch(db, [
       db.delete(contacts),
       ...chunk(list, rowsPerInsert(4)).map((part, p) =>
         db.insert(contacts).values(part.map((ct, i) => ({ ...ct, position: p * rowsPerInsert(4) + i }))),
@@ -329,6 +416,12 @@ export const adminRoutes = new Hono<AppEnv>()
     ]);
     return c.json({ success: "Kontak disimpan." });
   });
+
+async function houseById(db: AppEnv["Variables"]["db"], id: number | null) {
+  if (!id) return null;
+  const [house] = await db.select({ block: houses.block, number: houses.number }).from(houses).where(eq(houses.id, id)).limit(1);
+  return house ?? null;
+}
 
 async function nameTaken(db: AppEnv["Variables"]["db"], name: string, exceptId?: number) {
   const rows = await db

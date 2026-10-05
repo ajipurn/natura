@@ -32,6 +32,7 @@ describe("saveSchedule", () => {
       saved: 6,
       days: 4,
       namesFilled: 1,
+      linked: 0,
       unknown: ["C-1"],
       conflicting: ["AB-1 (Kantor, Eko)"],
     });

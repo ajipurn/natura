@@ -59,7 +59,15 @@ export const wargaRoutes = new Hono<AppEnv>()
       communityName: settingsRow.communityName,
       date,
       tonight: scheduleDay(date),
-      schedule: schedule.map((s) => ({ day: s.day, position: s.position, block: s.block, number: s.number, name: s.name ?? s.ownerName })),
+      schedule: schedule.map((s) => ({
+        id: s.id,
+        day: s.day,
+        position: s.position,
+        block: s.block,
+        number: s.number,
+        name: s.name ?? s.ownerName,
+        color: s.color,
+      })),
       announcements: announcementRows,
       contacts: contactRows,
     });

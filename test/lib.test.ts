@@ -163,3 +163,14 @@ describe("searchHouses", () => {
     expect(labels("zz")).toEqual([]);
   });
 });
+
+describe("randomPin", () => {
+  it("4 angka dan bukan PIN yang mudah ditebak", async () => {
+    const { randomPin } = await import("@/lib/random-pin");
+    for (let i = 0; i < 500; i++) {
+      const pin = randomPin();
+      expect(pin).toMatch(/^\d{4}$/);
+      expect(["0000", "1111", "1234", "4321", "9876"]).not.toContain(pin);
+    }
+  });
+});

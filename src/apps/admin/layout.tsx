@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   CalendarDays,
   History,
@@ -21,6 +21,7 @@ import { api, call } from "@/client/api";
 import { queryClient } from "@/client/query";
 import { cx } from "@/components/ui";
 import type { SessionUser } from "@/server/auth";
+import { requestsQuery } from "./queries";
 
 const NAV: { group: string; items: { to: string; label: string; icon: LucideIcon; end?: boolean }[] }[] = [
   {
@@ -113,6 +114,8 @@ export function AdminLayout({ user, children }: { user: SessionUser; children: R
 
 function Sidebar({ user }: { user: SessionUser }) {
   const navigate = useNavigate();
+  // Jumlah permintaan ubah jadwal yang menunggu, tampil di menu Jadwal ronda.
+  const pendingRequests = useQuery(requestsQuery).data?.pending ?? 0;
   const logout = useMutation({
     mutationFn: () => call(api.auth.logout.$post()),
     onSuccess: () => {
@@ -148,6 +151,14 @@ function Sidebar({ user }: { user: SessionUser }) {
                     }
                   >
                     <Icon className="size-5" /> {label}
+                    {to === "/admin/jadwal" && pendingRequests > 0 && (
+                      <span
+                        className="ml-auto rounded-full bg-warn px-2 py-0.5 text-xs font-bold text-card"
+                        aria-label={`${pendingRequests} permintaan ubah jadwal`}
+                      >
+                        {pendingRequests}
+                      </span>
+                    )}
                   </NavLink>
                 </li>
               ))}

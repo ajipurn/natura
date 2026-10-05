@@ -1,6 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
   KeyRound,
@@ -17,13 +16,15 @@ import { useSearchParams } from "react-router";
 import { api, call, errorMessage } from "@/client/api";
 import { invalidate } from "@/client/query";
 import { BarChart } from "@/components/bar-chart";
+import { GuardChip } from "@/components/guard-chip";
 import { Collapsible } from "@/components/collapsible";
 import { ErrorCard, LoadingCards, QueryState } from "@/components/query-state";
 import { Alert, Card, PageTitle, SectionTitle, buttonClass, cx, inputClass } from "@/components/ui";
-import { formatDateLong, formatDateShort, formatMonth, shiftMonth } from "@/lib/dates";
+import { addDays, formatDateLong, formatDateShort, formatMonth, shiftMonth } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { groupByBlock, houseLabel } from "@/lib/houses";
-import { dayLabel } from "@/lib/schedule";
+import type { GuardColor } from "@/lib/guard-color";
+import { DAY_NAMES, dayLabel, slotHouseLabel } from "@/lib/schedule";
 
 const accessQuery = { queryKey: ["warga", "akses"], queryFn: () => call(api.warga.akses.$get()) };
 
@@ -121,7 +122,6 @@ function WargaContent() {
   return (
     <QueryState query={info}>
       {({ announcements, schedule, tonight, date, contacts }) => {
-        const guards = schedule.filter((s) => s.day === tonight);
         return (
           <div className="space-y-2">
             {announcements.length > 0 && (
@@ -148,52 +148,10 @@ function WargaContent() {
 
             <SectionTitle>
               <span className="inline-flex items-center gap-1.5">
-                <ShieldCheck className="size-4" /> Jaga malam ini
+                <ShieldCheck className="size-4" /> Jadwal jaga
               </span>
             </SectionTitle>
-            <Card>
-              <p className="text-sm text-muted">
-                {dayLabel(tonight)} · {formatDateShort(date)}
-              </p>
-              {guards.length === 0 ? (
-                <p className="mt-2 text-muted">Belum ada jadwal untuk malam ini.</p>
-              ) : (
-                <ul className="mt-2 flex flex-wrap gap-1.5">
-                  {guards.map((g) => (
-                    <li key={g.position} className="rounded-full bg-idle-soft px-2.5 py-1 text-sm">
-                      {g.name && <span className="font-medium">{g.name} </span>}
-                      <span className={g.name ? "text-muted" : "font-medium"}>{houseLabel(g)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-            {schedule.length > 0 && (
-              <Collapsible
-                title={
-                  <span className="inline-flex items-center gap-2">
-                    <CalendarDays className="size-5 text-primary" /> Jadwal seminggu
-                  </span>
-                }
-              >
-                <div className="mt-3 space-y-3">
-                  {[0, 1, 2, 3, 4, 5, 6].map((offset) => {
-                    const day = (tonight + offset) % 7;
-                    const list = schedule.filter((s) => s.day === day);
-                    return (
-                      <div key={day}>
-                        <p className={cx("text-sm font-semibold", day === tonight && "text-primary")}>
-                          {dayLabel(day)} {day === tonight && "· malam ini"}
-                        </p>
-                        <p className="text-sm text-muted">
-                          {list.length ? list.map((s) => (s.name ? `${s.name} (${houseLabel(s)})` : houseLabel(s))).join(", ") : "—"}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </Collapsible>
-            )}
+            <GuardSchedule schedule={schedule} tonight={tonight} date={date} />
 
             <MonthRecap today={date} />
 
@@ -232,6 +190,57 @@ function WargaContent() {
         );
       }}
     </QueryState>
+  );
+}
+
+type Guard = { id: number; day: number; position: number; name: string | null; block: string; number: string; color: GuardColor | null };
+
+/** Jadwal jaga per malam: pilih malamnya, mulai dari malam ini; warna chip sama dengan tabel jadwal. */
+function GuardSchedule({ schedule, tonight, date }: { schedule: Guard[]; tonight: number; date: string }) {
+  const [offset, setOffset] = useState(0);
+  const day = (tonight + offset) % 7;
+  const guards = schedule.filter((s) => s.day === day).sort((a, b) => a.position - b.position);
+
+  return (
+    <Card className="p-0">
+      <div role="tablist" aria-label="Pilih malam" className="flex gap-1 overflow-x-auto border-b border-line p-2">
+        {[0, 1, 2, 3, 4, 5, 6].map((i) => {
+          const d = (tonight + i) % 7;
+          const count = schedule.filter((s) => s.day === d).length;
+          return (
+            <button
+              key={d}
+              type="button"
+              role="tab"
+              aria-selected={offset === i}
+              onClick={() => setOffset(i)}
+              className={cx(
+                "flex min-w-14 shrink-0 flex-col items-center rounded-xl px-2.5 py-1.5 leading-tight",
+                offset === i ? "bg-primary text-primary-fg" : "text-fg hover:bg-idle-soft",
+              )}
+            >
+              <span className="text-[11px] font-medium opacity-80">{i === 0 ? "Malam ini" : formatDateShort(addDays(date, i)).split(", ")[1]}</span>
+              <span className="text-sm font-semibold">{DAY_NAMES[d]}</span>
+              <span className={cx("text-[11px]", offset === i ? "opacity-80" : "text-muted")}>{count} org</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="p-4">
+        <p className="text-sm text-muted">
+          <span className="font-semibold text-fg">{dayLabel(day)}</span> · {formatDateShort(addDays(date, offset))}
+        </p>
+        {guards.length === 0 ? (
+          <p className="mt-3 text-muted">Belum ada jadwal untuk malam ini.</p>
+        ) : (
+          <ul className="mt-3 flex flex-wrap gap-1.5">
+            {guards.map((g) => (
+              <GuardChip key={g.id} name={g.name} house={slotHouseLabel(g)} color={g.color} />
+            ))}
+          </ul>
+        )}
+      </div>
+    </Card>
   );
 }
 

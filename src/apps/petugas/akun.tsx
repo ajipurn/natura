@@ -5,6 +5,7 @@ import { api, call } from "@/client/api";
 import { useAuth } from "@/client/auth";
 import { queryClient } from "@/client/query";
 import { ChangePinForm } from "@/features/auth/change-pin-form";
+import { MySchedule } from "./my-schedule";
 import { Card, PageHeader, SectionTitle, buttonClass, cx } from "@/components/ui";
 
 export function AkunPage() {
@@ -35,6 +36,9 @@ export function AkunPage() {
           <span className="flex-1">Buka dashboard admin</span>
         </a>
       )}
+
+      <SectionTitle>Jadwal jagamu</SectionTitle>
+      <MySchedule />
 
       <SectionTitle>Pasang di layar utama</SectionTitle>
       <Card className="flex gap-3 text-sm">

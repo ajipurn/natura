@@ -18,6 +18,11 @@
   --park: #dcebd3;
   --park-dot: #8fb27e;
   --water: #93c5e8;
+  /* Warna sel tabel jadwal ronda asli. */
+  --guard-green: #74aa4e;
+  --guard-yellow: #fdfc5e;
+  --guard-orange: #f4b407;
+  --guard-ink: #141a10;
   color-scheme: light;
 }
 
@@ -41,6 +46,9 @@
     --park: #1b3022;
     --park-dot: #3d6b45;
     --water: #1f4d70;
+    --guard-green: #6a9c47;
+    --guard-yellow: #e6e152;
+    --guard-orange: #e0a40a;
     color-scheme: dark;
   }
 }
@@ -63,6 +71,10 @@
   --color-park: var(--park);
   --color-park-dot: var(--park-dot);
   --color-water: var(--water);
+  --color-guard-green: var(--guard-green);
+  --color-guard-yellow: var(--guard-yellow);
+  --color-guard-orange: var(--guard-orange);
+  --color-guard-ink: var(--guard-ink);
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 

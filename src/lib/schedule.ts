@@ -13,6 +13,8 @@ export type ScheduleEntry = {
   name: string | null;
   block: string;
   number: string;
+  /** Asal sel di tabel (baris, kolom) untuk tabel tempelan, dipakai untuk mencocokkan warna sel. */
+  cell?: { row: number; col: number };
 };
 
 /** Nama malamnya, mengikuti kebiasaan jadwal: Sabtu = "malam Minggu". */
@@ -134,8 +136,8 @@ export function parseSchedule(text: string): { entries: ScheduleEntry[]; warning
   const entries: ScheduleEntry[] = [];
   const warnings: string[] = [];
   const counts = new Array(7).fill(0);
-  const add = (day: number, items: Omit<ScheduleEntry, "day" | "position">[]) => {
-    for (const item of items) entries.push({ ...item, day, position: counts[day]++ });
+  const add = (day: number, items: Omit<ScheduleEntry, "day" | "position">[], cell?: ScheduleEntry["cell"]) => {
+    for (const item of items) entries.push({ ...item, day, position: counts[day]++, ...(cell && { cell }) });
   };
 
   if (text.includes("\t")) {
@@ -143,12 +145,13 @@ export function parseSchedule(text: string): { entries: ScheduleEntry[]; warning
     const headerIndex = rows.findIndex((r) => r.filter((c) => parseDayHeading(c) !== null).length >= 2);
     if (headerIndex !== -1) {
       const columnDays = rows[headerIndex].map(parseDayHeading);
-      for (const row of rows.slice(headerIndex + 1)) {
+      rows.forEach((row, rowIndex) => {
+        if (rowIndex <= headerIndex) return;
         row.forEach((cell, col) => {
           const day = columnDays[col];
-          if (day != null) add(day, parseEntries(cell));
+          if (day != null) add(day, parseEntries(cell), { row: rowIndex, col });
         });
-      }
+      });
       return { entries, warnings };
     }
   }
@@ -197,4 +200,30 @@ export function analyzeSchedule(entries: ScheduleEntry[], knownKeys: Set<string>
     [...names].filter(([, set]) => set.size === 1).map(([key, set]) => [key, [...set.values()][0]]),
   );
   return { unknown, conflicting, uniqueNames };
+}
+
+/** Kode rumah di jadwal ("AD-3"), atau "" untuk petugas tanpa rumah. */
+export function slotHouseLabel(slot: { block: string; number: string }): string {
+  return slot.block ? lotKey(slot.block, slot.number) : "";
+}
+
+/**
+ * Nama tampilan petugas di jadwal. Akun dengan nama kembar dibedakan rumahnya ("Wawan (AD-5)");
+ * di jadwal rumahnya sudah tertulis, jadi akhiran itu dibuang.
+ */
+export function guardName(name: string | null, slot: { block: string; number: string }): string | null {
+  if (!name) return null;
+  const suffix = ` (${slotHouseLabel(slot)})`;
+  return slot.block && name.endsWith(suffix) ? name.slice(0, -suffix.length) : name;
+}
+
+/** Akun petugas untuk nama di jadwal: nama sama persis, atau "Nama (BLOK-NO)" untuk nama kembar. */
+export function matchGuardAccount<U extends { id: number; name: string }>(
+  accounts: U[],
+  slot: { name: string | null; block: string; number: string },
+): U | undefined {
+  if (!slot.name) return undefined;
+  const plain = slot.name.toLowerCase();
+  const withHouse = `${plain} (${slotHouseLabel(slot).toLowerCase()})`;
+  return accounts.find((a) => a.name.toLowerCase() === withHouse) ?? accounts.find((a) => a.name.toLowerCase() === plain);
 }

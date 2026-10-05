@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 
 /**
  * Skema Cloudflare D1 (SQLite).
@@ -41,6 +41,8 @@ export const users = sqliteTable("users", {
   sessionVersion: integer("session_version")
     .notNull()
     .$defaultFn(() => 1),
+  /** Rumah tempat petugas tinggal (dipakai saat menjadwalkan). */
+  houseId: integer("house_id").references((): AnySQLiteColumn => houses.id, { onDelete: "set null" }),
   createdAt: createdAt(),
 });
 
@@ -62,7 +64,7 @@ export const houses = sqliteTable(
   (t) => [uniqueIndex("houses_block_number_idx").on(t.block, t.number)],
 );
 
-/** Satu malam ronda (YYYY-MM-DD). Jam 00:00–11:59 masih dihitung malam sebelumnya. */
+/** Satu malam ronda (YYYY-MM-DD). Jam 00:00–05:59 masih dihitung malam sebelumnya. */
 export const patrols = sqliteTable("patrols", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   date: text("date").notNull().unique(),
@@ -95,7 +97,8 @@ export const collections = sqliteTable(
 
 /**
  * Jadwal ronda mingguan. `dayOfWeek` = hari malamnya (0 = Ahad/malam Senin … 6 = Sabtu/malam Minggu).
- * Rumah dicatat lewat blok + nomor (bukan id) supaya jadwal tetap tersimpan walau rumahnya belum terdaftar.
+ * Rumah dicatat lewat blok + nomor (bukan id) supaya jadwal tetap tersimpan walau rumahnya belum terdaftar;
+ * blok kosong = tanpa rumah. `userId` = akun petugas yang jaga (kalau ada).
  */
 export const rondaSchedule = sqliteTable(
   "ronda_schedule",
@@ -106,8 +109,37 @@ export const rondaSchedule = sqliteTable(
     name: text("name"),
     block: text("block").notNull(),
     number: text("number").notNull(),
+    userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+    /** Warna sel di tabel jadwal asli; null = putih. */
+    color: text("color", { enum: ["green", "yellow", "orange"] }),
   },
   (t) => [index("ronda_schedule_day_idx").on(t.dayOfWeek, t.position)],
+);
+
+/** Permintaan petugas untuk mengubah malam jaganya; admin menyetujui atau menolak. */
+export const scheduleRequests = sqliteTable(
+  "schedule_requests",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Malam yang mau dilepas (null = belum punya jadwal, minta ditambah). */
+    fromDay: integer("from_day"),
+    /** Malam yang diinginkan. */
+    toDay: integer("to_day").notNull(),
+    /** Alasan dari petugas. */
+    note: text("note"),
+    status: text("status", { enum: ["pending", "approved", "rejected", "cancelled"] })
+      .notNull()
+      .$defaultFn(() => "pending"),
+    /** Catatan admin saat menyetujui/menolak. */
+    response: text("response"),
+    decidedBy: integer("decided_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    decidedAt: integer("decided_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [index("schedule_requests_status_idx").on(t.status, t.createdAt)],
 );
 
 /** Pengumuman untuk warga. */

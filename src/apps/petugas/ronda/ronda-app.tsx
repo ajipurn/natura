@@ -160,7 +160,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
 
       <StatusNotice status={store.status} />
       {/* Data lama di HP (sebelum ada jadwal) belum punya `schedule`. */}
-      <TonightGuards schedule={snapshot.schedule ?? []} date={store.date} />
+      <TonightGuards schedule={snapshot.schedule ?? []} date={store.date} userId={snapshot.user.id} />
       {store.rejections.length > 0 && (
         <div className="mb-4">
           <Alert>

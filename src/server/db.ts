@@ -1,3 +1,4 @@
+import type { BatchItem } from "drizzle-orm/batch";
 import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
 import * as schema from "./schema";
 
@@ -23,4 +24,10 @@ export function chunk<T>(items: T[], size: number): T[][] {
 /** Ukuran potongan untuk insert banyak baris dengan `columns` kolom per baris. */
 export function rowsPerInsert(columns: number): number {
   return Math.max(1, Math.floor(MAX_PARAMS / columns));
+}
+
+/** Jalankan beberapa query dalam satu batch D1: satu perjalanan ke database, semua berhasil atau semua batal. */
+export async function runBatch(db: Db, statements: BatchItem<"sqlite">[]) {
+  if (statements.length === 0) return;
+  await db.batch(statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
 }

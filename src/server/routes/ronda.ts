@@ -4,7 +4,8 @@ import { isIsoDate, isMonth, rondaDate } from "@/lib/dates";
 import { requireUser } from "../auth";
 import { applyEntries, entriesSchema } from "../collections";
 import type { AppEnv } from "../env";
-import { body } from "../http";
+import { body, idParam } from "../http";
+import { z } from "zod";
 import {
   getCollectionsForDate,
   getMonthRecap,
@@ -13,6 +14,7 @@ import {
   listHouses,
   listPatrols,
 } from "../queries";
+import { cancelRequest, createRequest, listOwnRequests } from "../requests";
 import { listSchedule } from "../schedule";
 
 /** ?bulan=YYYY-MM; kosong/salah = bulan malam ronda sekarang. */
@@ -39,6 +41,37 @@ export const rondaRoutes = new Hono<AppEnv>()
   })
 
   .get("/jadwal", requireUser, async (c) => c.json({ schedule: await listSchedule(c.var.db) }))
+
+  /** Permintaan ubah jadwal milik petugas yang sedang masuk. */
+  .get("/jadwal/permintaan", requireUser, async (c) => c.json({ requests: await listOwnRequests(c.var.db, c.var.user.id) }))
+
+  .post(
+    "/jadwal/permintaan",
+    requireUser,
+    body(
+      z.object({
+        fromDay: z.number().int().min(0).max(6).nullable(),
+        toDay: z.number("Pilih malam yang diinginkan.").int().min(0).max(6),
+        note: z
+          .string()
+          .trim()
+          .max(300, "Alasan maks. 300 karakter.")
+          .transform((v) => v || null),
+      }),
+    ),
+    async (c) => {
+      const error = await createRequest(c.var.db, c.var.user.id, c.req.valid("json"));
+      if (error) return c.json({ error }, 400);
+      return c.json({ success: "Permintaan terkirim. Admin akan meninjaunya." });
+    },
+  )
+
+  .post("/jadwal/permintaan/:id/batal", requireUser, idParam(), async (c) => {
+    if (!(await cancelRequest(c.var.db, c.var.user.id, c.req.valid("param").id))) {
+      return c.json({ error: "Permintaan tidak bisa dibatalkan (mungkin sudah diproses)." }, 409);
+    }
+    return c.json({ success: "Permintaan dibatalkan." });
+  })
 
   .get("/riwayat", requireUser, async (c) => c.json({ patrols: await listPatrols(c.var.db, 90) }))
 

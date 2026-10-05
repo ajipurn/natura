@@ -4,7 +4,7 @@ import { compareHouses } from "@/lib/houses";
 import type { CollectionDTO, HouseDTO, MonthCell, MonthRecap, RondaSnapshot } from "@/lib/types";
 import type { SessionUser } from "./auth";
 import type { Db } from "./db";
-import { listSchedule } from "./schedule";
+import { guardDaysByUser, listSchedule } from "./schedule";
 import { collections, houses, patrols, settings, users } from "./schema";
 
 export const DEFAULT_SETTINGS = { communityName: "Lingkungan Kita", defaultAmount: 500 };
@@ -32,17 +32,32 @@ export async function listLoginUsers(db: Db) {
 }
 
 export async function listUsers(db: Db) {
-  const rows = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      role: users.role,
-      active: users.active,
-      lockedUntil: users.lockedUntil,
-    })
-    .from(users)
-    .orderBy(asc(users.name));
-  return rows.map((u) => ({ ...u, lockedUntil: u.lockedUntil?.toISOString() ?? null }));
+  const [rows, days] = await Promise.all([
+    db
+      .select({
+        id: users.id,
+        name: users.name,
+        role: users.role,
+        active: users.active,
+        lockedUntil: users.lockedUntil,
+        houseId: users.houseId,
+        block: houses.block,
+        number: houses.number,
+      })
+      .from(users)
+      .leftJoin(houses, eq(houses.id, users.houseId))
+      .orderBy(asc(users.name)),
+    guardDaysByUser(db),
+  ]);
+  return rows.map(({ block, number, ...u }) => ({
+    ...u,
+    lockedUntil: u.lockedUntil?.toISOString() ?? null,
+    /** Sedang terkunci karena terlalu banyak PIN salah. */
+    locked: u.lockedUntil ? u.lockedUntil.getTime() > Date.now() : false,
+    house: block && number ? `${block}-${number}` : null,
+    /** Malam jaga di jadwal ronda (0 = Ahad). */
+    days: days.get(u.id) ?? [],
+  }));
 }
 
 const houseColumns = {

@@ -1,3 +1,5 @@
+import type { GuardColor } from "./guard-color";
+
 export type Role = "admin" | "petugas";
 export type HouseStatus = "active" | "vacant";
 export type CollectionStatus = "filled" | "empty";
@@ -21,15 +23,23 @@ export type CollectionDTO = {
   collectorName: string | null;
 };
 
-/** Satu baris jadwal ronda, sudah dicocokkan dengan data rumah (kalau ada). */
+/** Satu baris jadwal ronda, sudah dicocokkan dengan data rumah dan akun petugas (kalau ada). */
 export type ScheduleDTO = {
+  id: number;
   day: number;
   position: number;
+  /** Nama petugas: dari akunnya kalau terhubung, selain itu nama yang tertulis di jadwal. */
   name: string | null;
+  /** "" = petugas tanpa rumah. */
   block: string;
   number: string;
   houseId: number | null;
   ownerName: string | null;
+  userId: number | null;
+  /** Akun petugasnya masih aktif (null kalau tidak terhubung ke akun). */
+  userActive: boolean | null;
+  /** Warna di tabel jadwal; null = putih. */
+  color: GuardColor | null;
 };
 
 export type RondaSnapshot = {

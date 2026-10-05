@@ -3,13 +3,17 @@ import { api, call } from "@/client/api";
 import { checked, runForm, type FormState } from "@/client/form";
 import { SubmitButton } from "@/components/submit-button";
 import { Alert, buttonClass, cx, inputClass } from "@/components/ui";
+import { guardColorClass } from "@/components/guard-color-class";
+import { GUARD_COLOR_LABEL, GUARD_COLORS, type GuardColor } from "@/lib/guard-color";
 import { analyzeSchedule, DAY_NAMES, parseSchedule } from "@/lib/schedule";
+import { tableFromHtml, type PastedTable } from "@/lib/table-paste";
 
 const REFRESH = [["jadwal"], ["admin"], ["ronda"]];
 
 function importScheduleAction(_prev: FormState, formData: FormData) {
   // Teks tidak dipangkas: sel kosong di awal baris judul tabel menentukan posisi kolom hari.
   const text = formData.get("text");
+  const colors = formData.get("colors");
   return runForm(
     () =>
       call(
@@ -18,6 +22,7 @@ function importScheduleAction(_prev: FormState, formData: FormData) {
             text: typeof text === "string" ? text : "",
             fillNames: checked(formData, "fillNames"),
             overwriteNames: checked(formData, "overwriteNames"),
+            ...(typeof colors === "string" && colors && { colors: JSON.parse(colors) as (GuardColor | null)[] }),
           },
         }),
       ),
@@ -35,18 +40,40 @@ Widi (AA-12)
 
 Senin: Nino (AB-3), Sahrul (AF-19), (AB-5)`;
 
-export function ScheduleImportForm({ houseKeys, hasSchedule }: { houseKeys: string[]; hasSchedule: boolean }) {
+export function ScheduleImportForm({
+  houseKeys,
+  hasSchedule,
+  onChanged,
+}: {
+  houseKeys: string[];
+  hasSchedule: boolean;
+  /** Dipanggil setelah jadwal berhasil diganti atau dihapus. */
+  onChanged?: () => void;
+}) {
   const [text, setText] = useState("");
-  const [state, formAction, pending] = useActionState(importScheduleAction, undefined);
-  const [clearState, clearAction] = useActionState(clearScheduleAction, undefined);
+  // Tabel yang ditempel dari Excel/Sheets beserta warna selnya (berlaku selama teksnya belum diubah).
+  const [pasted, setPasted] = useState<PastedTable | null>(null);
+  const [state, formAction, pending] = useActionState(async (prev: FormState, formData: FormData) => {
+    const result = await importScheduleAction(prev, formData);
+    if (result?.success) onChanged?.();
+    return result;
+  }, undefined);
+  const [clearState, clearAction] = useActionState(async () => {
+    const result = await clearScheduleAction();
+    if (result?.success) onChanged?.();
+    return result;
+  }, undefined);
 
   const preview = useMemo(() => parseSchedule(text), [text]);
   const known = useMemo(() => new Set(houseKeys), [houseKeys]);
   const analysis = useMemo(() => analyzeSchedule(preview.entries, known), [preview, known]);
   const perDay = DAY_NAMES.map((_, day) => preview.entries.filter((e) => e.day === day).length);
+  const colors =
+    pasted && pasted.text === text ? preview.entries.map((e) => (e.cell ? (pasted.colors[e.cell.row]?.[e.cell.col] ?? null) : null)) : null;
+  const colorCounts = colors && GUARD_COLORS.map((c) => [c, colors.filter((x) => x === c).length] as const).filter(([, n]) => n > 0);
 
   return (
-    <div className="mt-3 space-y-3">
+    <div className="space-y-3">
       <form
         className="space-y-3"
         onSubmit={(e) => {
@@ -58,13 +85,21 @@ export function ScheduleImportForm({ houseKeys, hasSchedule }: { houseKeys: stri
         }}
       >
         <p className="text-sm text-muted">
-          Salin tabel jadwal dari Excel / Google Sheets (judul hari + isinya), lalu tempel di sini. Bisa juga diketik per
-          hari, seperti contoh.
+          Salin tabel jadwal dari Excel / Google Sheets (judul hari + isinya), lalu tempel di sini; warna selnya ikut
+          terbawa. Bisa juga diketik per hari, seperti contoh.
         </p>
         <textarea
           name="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onPaste={(e) => {
+            // Tabel dari spreadsheet: pakai versi HTML-nya supaya warna sel ikut terbaca.
+            const table = tableFromHtml(e.clipboardData.getData("text/html"));
+            if (!table) return;
+            e.preventDefault();
+            setText(table.text);
+            setPasted(table);
+          }}
           rows={8}
           placeholder={EXAMPLE}
           className={cx(inputClass, "h-auto py-2 font-mono text-sm")}
@@ -93,6 +128,17 @@ export function ScheduleImportForm({ houseKeys, hasSchedule }: { houseKeys: stri
                 ))}
               </ul>
             )}
+            {colorCounts && colorCounts.length > 0 && (
+              <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span>Warna sel ikut terbaca:</span>
+                {colorCounts.map(([color, n]) => (
+                  <span key={color} className="inline-flex items-center gap-1">
+                    <span aria-hidden className={cx("size-3 rounded-full", guardColorClass(color))} />
+                    {GUARD_COLOR_LABEL[color]} {n}
+                  </span>
+                ))}
+              </p>
+            )}
             {analysis.unknown.length > 0 && (
               <p className="text-warn">Belum ada di data rumah: {analysis.unknown.join(", ")}</p>
             )}
@@ -107,6 +153,7 @@ export function ScheduleImportForm({ houseKeys, hasSchedule }: { houseKeys: stri
           </div>
         )}
 
+        <input type="hidden" name="colors" value={colors ? JSON.stringify(colors) : ""} />
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" name="fillNames" defaultChecked className="mt-0.5 size-4 accent-[var(--primary)]" />
           <span>Isi nama KK dari jadwal (hanya rumah yang nama KK-nya masih kosong)</span>

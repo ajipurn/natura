@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  CalendarClock,
   CalendarDays,
   Home,
   KeyRound,
@@ -13,6 +14,7 @@ import {
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { BarChart } from "@/components/bar-chart";
+import { GuardChip } from "@/components/guard-chip";
 import { QueryState } from "@/components/query-state";
 import { Card, PageHeader, SectionTitle, cx } from "@/components/ui";
 import { formatDateLong, formatDateShort, formatMonth } from "@/lib/dates";
@@ -36,7 +38,7 @@ export function RingkasanPage() {
             {todo.length > 0 && (
               <Card className="mb-4 border-warn/40">
                 <p className="flex items-center gap-2 font-semibold">
-                  <TriangleAlert className="size-5 text-warn" /> Yang perlu disiapkan
+                  <TriangleAlert className="size-5 text-warn" /> Perlu perhatian
                 </p>
                 <ul className="mt-2 space-y-1.5">
                   {todo.map((item) => (
@@ -104,10 +106,7 @@ export function RingkasanPage() {
                 ) : (
                   <ul className="mt-2 flex flex-wrap gap-1.5">
                     {t.guards.map((g) => (
-                      <li key={g.label} className="rounded-full bg-idle-soft px-2.5 py-1 text-sm">
-                        {g.name && <span className="font-medium">{g.name} </span>}
-                        <span className={g.name ? "text-muted" : "font-medium"}>{g.label}</span>
-                      </li>
+                      <GuardChip key={g.id} name={g.name} house={g.label} color={g.color} />
                     ))}
                   </ul>
                 )}
@@ -172,12 +171,16 @@ export function RingkasanPage() {
 }
 
 function todoItems(todo: {
+  pendingRequests: number;
   planMissing: number;
   noSchedule: boolean;
   noWargaCode: boolean;
   onlyOneUser: boolean;
 }): { to: string; text: string; icon: LucideIcon }[] {
   const items: { to: string; text: string; icon: LucideIcon }[] = [];
+  if (todo.pendingRequests > 0) {
+    items.push({ to: "/admin/jadwal", icon: CalendarClock, text: `${todo.pendingRequests} permintaan ubah jadwal menunggu keputusan` });
+  }
   if (todo.planMissing > 0) {
     items.push({ to: "/admin/denah", icon: MapIcon, text: `Daftarkan ${todo.planMissing} rumah dari denah` });
   }
