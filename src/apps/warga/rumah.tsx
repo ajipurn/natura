@@ -7,6 +7,7 @@ import { Card, PageTitle, buttonClass, cx } from "@/components/ui";
 import { formatDateShort, formatMonth } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { houseLabelLong } from "@/lib/houses";
+import { dayLabel, scheduleDay } from "@/lib/schedule";
 import { QuickRecord } from "./quick-record";
 
 /** Halaman yang terbuka saat QR rumah di-scan pakai kamera HP biasa. */
@@ -20,7 +21,7 @@ export function HousePage() {
   return (
     <main className="mx-auto w-full max-w-md px-4 py-8">
       <QueryState query={query}>
-        {({ communityName, defaultAmount, tonight, house, history, user }) => {
+        {({ communityName, defaultAmount, tonight, canRecord, house, history, user }) => {
           const month = tonight.slice(0, 7);
           const thisMonth = history.filter((h) => h.date.startsWith(month));
           const monthFilled = thisMonth.filter((h) => h.status === "filled");
@@ -44,7 +45,17 @@ export function HousePage() {
                   <p className="flex items-center gap-2 font-semibold">
                     <ScanLine className="size-5 text-primary" /> Catat malam ini
                   </p>
-                  <QuickRecord token={house.token} defaultAmount={defaultAmount} current={current} />
+                  {canRecord ? (
+                    <QuickRecord token={house.token} defaultAmount={defaultAmount} current={current} />
+                  ) : (
+                    <p className="mt-3 rounded-xl bg-warn-soft px-3 py-2.5 text-sm text-warn">
+                      Bukan jadwal jagamu malam ini ({dayLabel(scheduleDay(tonight))}). Catatan hanya bisa diisi petugas
+                      yang jaga.{" "}
+                      <a href="/petugas/jadwal" className="font-semibold underline">
+                        Lihat jadwal
+                      </a>
+                    </p>
+                  )}
                 </Card>
               )}
 

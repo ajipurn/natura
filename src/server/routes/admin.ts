@@ -1,10 +1,11 @@
-import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { z } from "zod";
 import { isIsoDate, rondaDate } from "@/lib/dates";
 import { normalizeHouseField, parseNumberList } from "@/lib/houses";
 import { newToken } from "@/lib/qr";
+import { fitGeoTransform, MAX_ANCHORS, MIN_ANCHORS } from "@/lib/geo";
 import { GUARD_COLORS } from "@/lib/guard-color";
 import { parseSchedule } from "@/lib/schedule";
 import { matchPlan } from "@/lib/site-plan";
@@ -15,10 +16,11 @@ import { chunk, rowsPerInsert, runBatch } from "../db";
 import type { AppEnv } from "../env";
 import { body, idParam, pinField, trimmed } from "../http";
 import { hashPin } from "../pin";
-import { getHouseIds, getSettings, listHouses, listHousesWithUsage, listUsers } from "../queries";
+import { DEFAULT_SETTINGS, getHouseIds, getPlanAnchors, getSettings, listHouses, listHousesWithUsage, listUsers } from "../queries";
 import { countPendingRequests, decideRequest, listRequestsForAdmin } from "../requests";
-import { clearSchedule, replaceSlots, saveSchedule, userDaysStatements } from "../schedule";
+import { clearSchedule, houseSlots, replaceSlots, saveSchedule, userDaysStatements } from "../schedule";
 import { announcements, collections, contacts, houses, rondaSchedule, settings, users } from "../schema";
+import { getAudit } from "../audit";
 import { getDashboard } from "../dashboard";
 
 const BLOCK_PATTERN = /^[0-9A-Z][0-9A-Z .\-/]{0,9}$/;
@@ -55,14 +57,16 @@ const guardFields = {
 
 const guardColor = z.enum(GUARD_COLORS).nullable();
 
-const slotSchema = z.object({
-  day,
-  color: guardColor.default(null),
-  name: z.string().trim().max(60).nullable().transform((v) => v || null),
-  block: z.string().transform(normalizeHouseField).pipe(z.string().regex(/^$|^[0-9A-Z][0-9A-Z .\-/]{0,9}$/, "Blok tidak valid.")),
-  number: z.string().transform(normalizeHouseField).pipe(z.string().regex(/^$|^[0-9A-Z][0-9A-Z\-/]{0,9}$/, "Nomor rumah tidak valid.")),
-  userId: z.number().int().positive().nullable(),
-});
+/** Satu baris jadwal: akun petugas, rumah tanpa akun, atau nama bebas (tepat salah satunya). */
+const slotSchema = z
+  .object({
+    day,
+    color: guardColor.default(null),
+    userId: z.number().int().positive().nullable().default(null),
+    houseId: z.number().int().positive().nullable().default(null),
+    name: z.string().trim().max(60).nullable().default(null).transform((v) => v || null),
+  })
+  .refine((s) => [s.userId, s.houseId, s.name].filter((v) => v !== null).length === 1, "Ada baris jadwal tanpa petugas atau rumah.");
 
 const settingsSchema = z.object({
   communityName: trimmed(80, "Isi nama lingkungan (maks. 80 karakter).").min(1, "Isi nama lingkungan (maks. 80 karakter)."),
@@ -148,7 +152,22 @@ export const adminRoutes = new Hono<AppEnv>()
       .where(and(eq(houses.block, block), eq(houses.number, number), ne(houses.id, id)))
       .limit(1);
     if (duplicate) return c.json({ error: `Rumah ${block}-${number} sudah ada.` }, 409);
-    await db.update(houses).set({ block, number, ownerName: name, status }).where(eq(houses.id, id));
+    // Rumah yang dihuni petugas memakai nama akunnya: nama yang diubah di sini mengganti nama akun itu.
+    const residents = await db.select({ id: users.id }).from(users).where(eq(users.houseId, id));
+    if (residents.length === 1) {
+      const parsed = userName.safeParse(name ?? "");
+      if (!parsed.success) return c.json({ error: "Isi nama penghuni (maks. 40 karakter)." }, 400);
+      if (await nameTaken(db, parsed.data, id, residents[0].id)) return c.json({ error: nameTakenError(parsed.data) }, 409);
+      await runBatch(db, [
+        db.update(houses).set({ block, number, status }).where(eq(houses.id, id)),
+        db.update(users).set({ name: parsed.data }).where(eq(users.id, residents[0].id)),
+      ]);
+    } else {
+      await db
+        .update(houses)
+        .set({ block, number, status, ...(residents.length === 0 && { ownerName: name }) })
+        .where(eq(houses.id, id));
+    }
     return c.json({ success: "Tersimpan." });
   })
 
@@ -189,6 +208,44 @@ export const adminRoutes = new Hono<AppEnv>()
     return c.json({ success: `${inserted} rumah didaftarkan dari denah. Jangan lupa cetak stiker QR-nya.` });
   })
 
+  /* ---------- Kalibrasi lokasi denah ---------- */
+
+  .get("/denah/lokasi", async (c) => c.json({ anchors: await getPlanAnchors(c.var.db) }))
+
+  /** Simpan titik acuan denah ↔ GPS. Kosong = matikan "Lokasi saya". */
+  .put(
+    "/denah/lokasi",
+    body(
+      z.object({
+        anchors: z
+          .array(
+            z.object({
+              x: z.number().finite(),
+              y: z.number().finite(),
+              lat: z.number().min(-90).max(90),
+              lng: z.number().min(-180).max(180),
+            }),
+          )
+          .max(MAX_ANCHORS, `Maksimal ${MAX_ANCHORS} titik acuan.`),
+      }),
+    ),
+    async (c) => {
+      const { anchors } = c.req.valid("json");
+      const [vx, vy, vw, vh] = SITE_PLAN.viewBox;
+      if (anchors.some((a) => a.x < vx || a.x > vx + vw || a.y < vy || a.y > vy + vh)) {
+        return c.json({ error: "Titik acuan harus berada di dalam denah." }, 400);
+      }
+      if (anchors.length >= MIN_ANCHORS && !fitGeoTransform(anchors)) {
+        return c.json({ error: "Titik acuan terlalu berdekatan atau segaris. Pilih titik yang berjauhan di pojok-pojok cluster." }, 400);
+      }
+      await c.var.db
+        .insert(settings)
+        .values({ id: 1, ...DEFAULT_SETTINGS, planAnchors: anchors })
+        .onConflictDoUpdate({ target: settings.id, set: { planAnchors: anchors, updatedAt: new Date() } });
+      return c.json({ success: "Titik acuan disimpan." });
+    },
+  )
+
   /* ---------- Petugas ---------- */
 
   .get("/petugas", async (c) => c.json({ users: await listUsers(c.var.db), me: c.var.user }))
@@ -196,14 +253,13 @@ export const adminRoutes = new Hono<AppEnv>()
   .post("/petugas", body(z.object({ name: userName, pin: pinField(), role, ...guardFields })), async (c) => {
     const { name, pin, role: newRole, houseId, days } = c.req.valid("json");
     const db = c.var.db;
-    if (await nameTaken(db, name)) return c.json({ error: `Nama "${name}" sudah dipakai.` }, 409);
-    const house = await houseById(db, houseId);
-    if (houseId && !house) return c.json({ error: "Rumah tidak ditemukan." }, 404);
+    if (await nameTaken(db, name, houseId)) return c.json({ error: nameTakenError(name) }, 409);
+    if (!(await houseExists(db, houseId))) return c.json({ error: "Rumah tidak ditemukan." }, 404);
     const [user] = await db
       .insert(users)
       .values({ name, pinHash: await hashPin(pin), role: newRole, houseId })
       .returning({ id: users.id });
-    await runBatch(db, userDaysStatements(db, user.id, days, house, []));
+    await runBatch(db, [...moveIntoHouse(db, houseId), ...userDaysStatements(db, user.id, days, [], await houseSlots(db, houseId))]);
     return c.json({ success: `${name} ditambahkan. Beri tahu PIN-nya secara langsung.`, id: user.id });
   })
 
@@ -215,19 +271,19 @@ export const adminRoutes = new Hono<AppEnv>()
       const { id } = c.req.valid("param");
       const { name, role: newRole, active, houseId, days } = c.req.valid("json");
       const db = c.var.db;
-      if (await nameTaken(db, name, id)) return c.json({ error: `Nama "${name}" sudah dipakai.` }, 409);
+      if (await nameTaken(db, name, houseId, id)) return c.json({ error: nameTakenError(name) }, 409);
       if (id === c.var.user.id && (!active || newRole !== "admin")) {
         return c.json({ error: "Tidak bisa menonaktifkan atau menurunkan peran akunmu sendiri." }, 400);
       }
-      const house = await houseById(db, houseId);
-      if (houseId && !house) return c.json({ error: "Rumah tidak ditemukan." }, 404);
-      const current = await db
-        .selectDistinct({ day: rondaSchedule.dayOfWeek })
-        .from(rondaSchedule)
-        .where(eq(rondaSchedule.userId, id));
+      if (!(await houseExists(db, houseId))) return c.json({ error: "Rumah tidak ditemukan." }, 404);
+      const [current, slotsOfHouse] = await Promise.all([
+        db.selectDistinct({ day: rondaSchedule.dayOfWeek }).from(rondaSchedule).where(eq(rondaSchedule.userId, id)),
+        houseSlots(db, houseId),
+      ]);
       await runBatch(db, [
         db.update(users).set({ name, role: newRole, active, houseId }).where(eq(users.id, id)),
-        ...userDaysStatements(db, id, days, house, current.map((r) => r.day)),
+        ...moveIntoHouse(db, houseId),
+        ...userDaysStatements(db, id, days, current.map((r) => r.day), slotsOfHouse),
       ]);
       return c.json({ success: "Tersimpan." });
     },
@@ -305,6 +361,7 @@ export const adminRoutes = new Hono<AppEnv>()
       const summary = await saveSchedule(c.var.db, withColors, { fillNames, overwriteNames });
       const parts = [`${summary.saved} baris jadwal tersimpan untuk ${summary.days} malam.`];
       if (summary.linked) parts.push(`${summary.linked} terhubung ke akun petugas.`);
+      if (summary.housesLinked) parts.push(`${summary.housesLinked} petugas diisi rumahnya.`);
       if (fillNames) parts.push(`${summary.namesFilled} nama KK diisi.`);
       if (summary.unknown.length) parts.push(`Belum ada di data rumah: ${summary.unknown.join(", ")}.`);
       if (summary.conflicting.length) parts.push(`Nama ganda, tidak diisi: ${summary.conflicting.join("; ")}.`);
@@ -315,9 +372,8 @@ export const adminRoutes = new Hono<AppEnv>()
   /** Simpan seluruh jadwal hasil edit (urutan per malam mengikuti urutan daftar). */
   .put("/jadwal/slot", body(z.object({ slots: z.array(slotSchema).max(MAX_SCHEDULE_ENTRIES, "Jadwal terlalu banyak barisnya.") })), async (c) => {
     const slots = c.req.valid("json").slots;
-    if (slots.some((s) => !s.userId && !s.name && !s.block)) return c.json({ error: "Ada baris jadwal tanpa nama dan rumah." }, 400);
-    const unknown = await replaceSlots(c.var.db, slots);
-    if (unknown.length) return c.json({ error: "Ada petugas yang sudah tidak ada. Muat ulang halaman lalu coba lagi." }, 409);
+    const error = await replaceSlots(c.var.db, slots);
+    if (error) return c.json({ error }, 409);
     return c.json({ success: `Jadwal disimpan (${slots.length} baris).` });
   })
 
@@ -353,6 +409,18 @@ export const adminRoutes = new Hono<AppEnv>()
     await clearSchedule(c.var.db);
     return c.json({ success: "Jadwal dihapus." });
   })
+
+  /* ---------- Audit catatan ---------- */
+
+  /** ?tanggal=YYYY-MM-DD (malam ronda); kosong/salah = malam ini. */
+  .get(
+    "/audit",
+    validator("query", (value: Record<string, string | string[]>) => {
+      const tanggal = typeof value.tanggal === "string" && isIsoDate(value.tanggal) ? value.tanggal : undefined;
+      return { tanggal };
+    }),
+    async (c) => c.json(await getAudit(c.var.db, c.req.valid("query").tanggal ?? rondaDate(new Date()))),
+  )
 
   /* ---------- Koreksi catatan ---------- */
 
@@ -417,18 +485,36 @@ export const adminRoutes = new Hono<AppEnv>()
     return c.json({ success: "Kontak disimpan." });
   });
 
-async function houseById(db: AppEnv["Variables"]["db"], id: number | null) {
-  if (!id) return null;
-  const [house] = await db.select({ block: houses.block, number: houses.number }).from(houses).where(eq(houses.id, id)).limit(1);
-  return house ?? null;
+type Db = AppEnv["Variables"]["db"];
+
+async function houseExists(db: Db, id: number | null) {
+  if (!id) return true;
+  const rows = await db.select({ id: houses.id }).from(houses).where(eq(houses.id, id)).limit(1);
+  return rows.length > 0;
 }
 
-async function nameTaken(db: AppEnv["Variables"]["db"], name: string, exceptId?: number) {
+/** Rumah yang mulai dihuni petugas memakai nama akunnya; nama KK lamanya tidak disimpan lagi. */
+function moveIntoHouse(db: Db, houseId: number | null) {
+  return houseId ? [db.update(houses).set({ ownerName: null }).where(eq(houses.id, houseId))] : [];
+}
+
+/** Nama boleh kembar asal rumahnya beda (dan keduanya punya rumah), supaya tetap bisa dibedakan. */
+async function nameTaken(db: Db, name: string, houseId: number | null, exceptId?: number) {
   const rows = await db
     .select({ id: users.id })
     .from(users)
-    .where(exceptId ? and(sql`lower(${users.name}) = lower(${name})`, ne(users.id, exceptId)) : sql`lower(${users.name}) = lower(${name})`)
+    .where(
+      and(
+        sql`lower(${users.name}) = lower(${name})`,
+        houseId ? or(eq(users.houseId, houseId), isNull(users.houseId)) : undefined,
+        exceptId ? ne(users.id, exceptId) : undefined,
+      ),
+    )
     .limit(1);
   return rows.length > 0;
+}
+
+function nameTakenError(name: string) {
+  return `Nama "${name}" sudah dipakai. Nama kembar boleh asal rumahnya diisi dan berbeda.`;
 }
 

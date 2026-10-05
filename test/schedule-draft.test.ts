@@ -36,10 +36,14 @@ describe("draf jadwal", () => {
     expect(shiftSlot(draft, "slot-3", -1)).toBe(draft);
   });
 
-  it("nama dari akun tidak disimpan ulang; tanpa perubahan = sama", () => {
-    const draft = toDraft(schedule);
-    expect(toSlots(draft)[0]).toEqual({ day: 0, name: null, block: "A", number: "1", userId: 10, color: "green" });
-    expect(sameSchedule(draft, toDraft(schedule))).toBe(true);
+  it("yang disimpan hanya rujukan akun, rumah, atau nama; tanpa perubahan = sama", () => {
+    const withName = [...schedule, { ...slot(5, 3, 0, "Satpam"), houseId: null, block: "", number: "" }];
+    const draft = toDraft(withName);
+    const slots = toSlots(draft);
+    expect(slots[0]).toEqual({ day: 0, userId: 10, houseId: null, name: null, color: "green" });
+    expect(slots[1]).toEqual({ day: 0, userId: null, houseId: 2, name: null, color: null });
+    expect(slots.at(-1)).toEqual({ day: 3, userId: null, houseId: null, name: "Satpam", color: null });
+    expect(sameSchedule(draft, toDraft(withName))).toBe(true);
     expect(sameSchedule(draft, shiftSlot(draft, "slot-2", -1))).toBe(false);
   });
 });

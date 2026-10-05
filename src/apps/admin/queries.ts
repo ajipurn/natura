@@ -40,3 +40,17 @@ export const requestsQuery = queryOptions({
   queryFn: () => call(api.admin.permintaan.$get()),
   refetchInterval: 60_000,
 });
+
+/** Jejak audit catatan satu malam ronda. */
+export const auditQuery = (date: string) =>
+  queryOptions({
+    queryKey: ["admin", "audit", date],
+    queryFn: () => call(api.admin.audit.$get({ query: { tanggal: date } })),
+    refetchInterval: 60_000,
+  });
+
+/** Titik acuan kalibrasi denah ↔ GPS. */
+export const planAnchorsQuery = queryOptions({
+  queryKey: ["admin", "denah-lokasi"],
+  queryFn: () => call(api.admin.denah.lokasi.$get()),
+});

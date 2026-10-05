@@ -1,0 +1,1 @@
+ALTER TABLE `settings` ADD `plan_anchors` text;

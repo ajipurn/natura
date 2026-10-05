@@ -145,7 +145,6 @@ function ScheduleEditor({
   const stats = {
     total: draft.length,
     linked: draft.filter((s) => s.userId).length,
-    unknownHouses: [...new Set(draft.filter((s) => s.block && !s.houseId).map(slotHouseLabel))],
     inactive: draft.filter((s) => s.userActive === false).length,
   };
 
@@ -200,13 +199,10 @@ function ScheduleEditor({
         </span>
         <span className="sm:hidden">Pakai menu ⋯ untuk mengurutkan atau memindah ke malam lain.</span>
       </p>
-      {(stats.unknownHouses.length > 0 || stats.inactive > 0) && (
+      {stats.inactive > 0 && (
         <p className="mb-3 flex gap-2 rounded-xl bg-warn-soft px-3 py-2 text-sm text-warn">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-          <span>
-            {stats.unknownHouses.length > 0 && `Rumah belum terdaftar: ${stats.unknownHouses.join(", ")}. `}
-            {stats.inactive > 0 && `${stats.inactive} petugas di jadwal sudah nonaktif.`}
-          </span>
+          <span>{stats.inactive} petugas di jadwal sudah nonaktif.</span>
         </p>
       )}
 
@@ -437,19 +433,8 @@ function SlotRow({
       <span className="min-w-0 flex-1">
         <span className={cx("block truncate font-medium", slot.userActive === false && "line-through")}>{title}</span>
         <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
-          {slot.name ? (
-            !house ? (
-              "tanpa rumah"
-            ) : slot.houseId ? (
-              house
-            ) : (
-              <span className="text-warn">{house} (belum terdaftar)</span>
-            )
-          ) : (
-            <span>{slot.ownerName ? `KK: ${slot.ownerName}` : "belum ada nama petugas"}</span>
-          )}
-          {!slot.name && slot.block && !slot.houseId && <span className="text-warn">· belum terdaftar</span>}
-          {slot.name && !slot.userId && <span title="Nama ini belum punya akun petugas">· tanpa akun</span>}
+          {slot.name ? house || "tanpa rumah" : <span>{slot.ownerName ? `KK: ${slot.ownerName}` : "belum ada nama KK"}</span>}
+          {!slot.userId && <span title="Belum punya akun petugas">· tanpa akun</span>}
           {slot.userActive === false && <span className="text-warn">· nonaktif</span>}
         </span>
       </span>

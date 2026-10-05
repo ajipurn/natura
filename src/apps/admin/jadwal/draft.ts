@@ -17,13 +17,12 @@ export function toSlots(draft: DraftSlot[]) {
   return [...draft]
     .map((s, index) => ({ s, index }))
     .sort((a, b) => a.s.day - b.s.day || a.index - b.index)
+    // Jadwal hanya menyimpan rujukan: akun petugas, rumah tanpa akun, atau nama bebas.
     .map(({ s }) => ({
       day: s.day,
-      // Nama dari akun petugas tidak perlu disimpan di jadwal.
-      name: s.userId ? null : s.name,
-      block: s.block,
-      number: s.number,
       userId: s.userId,
+      houseId: s.userId ? null : s.houseId,
+      name: s.userId || s.houseId ? null : s.name,
       color: s.color,
     }));
 }

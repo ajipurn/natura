@@ -2,8 +2,9 @@ import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { z } from "zod";
 import { rondaDate } from "@/lib/dates";
+import { scheduleDay } from "@/lib/schedule";
 import { getSessionUser, requireUser } from "../auth";
-import { applyEntries, MAX_AMOUNT } from "../collections";
+import { applyEntries, dutyDays, MAX_AMOUNT } from "../collections";
 import type { AppEnv } from "../env";
 import { body } from "../http";
 import { getHouseByToken, getHouseHistory, getSettings } from "../queries";
@@ -24,10 +25,14 @@ export const houseRoutes = new Hono<AppEnv>()
     const house = await getHouseByToken(db, c.req.valid("param").token);
     if (!house) return c.json({ error: "Rumah tidak ditemukan." }, 404);
     const [user, settings, history] = await Promise.all([getSessionUser(c), getSettings(db), getHouseHistory(db, house, 30)]);
+    const tonight = rondaDate(new Date());
+    // Hanya yang dijadwalkan jaga malam ini yang bisa mencatat (admin juga; koreksi lewat dashboard).
+    const canRecord = user ? (await dutyDays(db, user.id)).has(scheduleDay(tonight)) : false;
     return c.json({
       communityName: settings.communityName,
       defaultAmount: settings.defaultAmount,
-      tonight: rondaDate(new Date()),
+      tonight,
+      canRecord,
       house: {
         block: house.block,
         number: house.number,

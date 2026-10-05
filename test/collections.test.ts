@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { applyEntries } from "@/server/collections";
 import type { Db } from "@/server/db";
 import { getCollectionsForDate, getMonthRecap, listPatrols } from "@/server/queries";
-import { houses, users } from "@/server/schema";
+import { houses, rondaSchedule, users } from "@/server/schema";
 import type { SessionUser } from "@/server/auth";
 import type { EntryInput } from "@/lib/types";
 import { createTestEnv } from "./helpers/d1";
@@ -33,6 +33,8 @@ beforeAll(async () => {
     .values({ name: "Budi", pinHash: "x", role: "petugas" })
     .returning();
   petugas = { id: u.id, name: u.name, role: u.role };
+  // Budi jaga setiap malam, supaya tes di bawah hanya soal cara menyimpan catatan.
+  await db.insert(rondaSchedule).values([0, 1, 2, 3, 4, 5, 6].map((day) => ({ dayOfWeek: day, position: 0, userId: u.id })));
   const rows = await db
     .insert(houses)
     .values([
@@ -124,5 +126,37 @@ describe("applyEntries dengan banyak catatan sekaligus", () => {
     const saved = await getCollectionsForDate(db, "2026-10-03");
     expect(saved).toHaveLength(20);
     expect(saved.every((c) => c.status === "filled" && c.amount === 700)).toBe(true);
+  });
+});
+
+describe("hanya petugas yang jaga malam itu yang bisa mencatat", () => {
+  it("di luar malam jaganya ditolak, admin juga", async () => {
+    const [rina, admin] = await db
+      .insert(users)
+      .values([
+        { name: "Rina", pinHash: "x", role: "petugas" },
+        { name: "Pak RT", pinHash: "x", role: "admin" },
+      ])
+      .returning();
+    // Rina hanya jaga Sabtu (malam Minggu).
+    await db.insert(rondaSchedule).values({ dayOfWeek: 6, position: 1, userId: rina.id });
+    const asRina = { id: rina.id, name: rina.name, role: rina.role };
+    const saturday = "2026-10-03T14:30:00Z"; // 21:30 WIB Sabtu 3 Oktober
+    const results = await applyEntries(
+      db,
+      asRina,
+      [entry({ houseId: houseA1, recordedAt: saturday }), entry({ houseId: houseA2 })],
+      NOW,
+    );
+    expect(results.map((r) => r.ok)).toEqual([true, false]);
+    expect(results[1]).toMatchObject({ error: "Bukan jadwal jagamu: Ahad (malam Senin)." });
+    const sunday = await getCollectionsForDate(db, "2026-10-04");
+    expect(sunday.find((c) => c.houseId === houseA2)?.collectorName).not.toBe("Rina");
+
+    const asAdmin = { id: admin.id, name: admin.name, role: admin.role };
+    expect((await applyEntries(db, asAdmin, [entry({ houseId: houseA2 })], NOW))[0].ok).toBe(false);
+    // Begitu dijadwalkan malam itu, admin bisa mencatat.
+    await db.insert(rondaSchedule).values({ dayOfWeek: 0, position: 1, userId: admin.id });
+    expect((await applyEntries(db, asAdmin, [entry({ houseId: houseA2 })], NOW))[0].ok).toBe(true);
   });
 });

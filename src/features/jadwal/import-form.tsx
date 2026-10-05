@@ -156,7 +156,7 @@ export function ScheduleImportForm({
         <input type="hidden" name="colors" value={colors ? JSON.stringify(colors) : ""} />
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" name="fillNames" defaultChecked className="mt-0.5 size-4 accent-[var(--primary)]" />
-          <span>Isi nama KK dari jadwal (hanya rumah yang nama KK-nya masih kosong)</span>
+          <span>Isi nama KK dari jadwal untuk rumah tanpa akun petugas yang nama KK-nya masih kosong</span>
         </label>
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" name="overwriteNames" className="mt-0.5 size-4 accent-[var(--primary)]" />

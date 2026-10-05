@@ -23,7 +23,7 @@ export function GuardChip({
       )}
     >
       {name && <span className="font-semibold">{me ? "Kamu" : name}</span>}
-      {house && <span className={cx(name ? "opacity-70" : "font-semibold")}>{house}</span>}
+      {house && <span className={cx(name ? "opacity-85" : "font-semibold")}>{house}</span>}
     </li>
   );
 }

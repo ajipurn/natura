@@ -1,4 +1,4 @@
-import { useId, useMemo, type KeyboardEvent } from "react";
+import { useId, useMemo, type KeyboardEvent, type MouseEvent } from "react";
 import { houseLabelLong } from "@/lib/houses";
 import {
   lotFontSize,
@@ -7,12 +7,19 @@ import {
   polygonCentroid,
   shrinkPolygon,
   type PlanLot,
+  type PlanPoint,
   type SitePlan,
 } from "@/lib/site-plan";
 import type { HouseDTO } from "@/lib/types";
 import { STATE_TEXT, type MarkerState } from "@/lib/house-state";
 import { cx } from "./ui";
-import { ZoomPane } from "./zoom-pane";
+import { ZoomPane, type ZoomFocus } from "./zoom-pane";
+
+/** Posisi pengguna di denah (dari GPS) beserta jari-jari akurasinya dalam satuan denah. */
+export type PlanYou = { point: PlanPoint; radius: number };
+
+/** Warna khusus satu rumah (mis. heatmap): kelas bentuk & teks, plus keterangan untuk pembaca layar. */
+export type LotPaint = { shape: string; text: string; note?: string };
 
 const LOT_STYLES: Record<MarkerState, { shape: string; text: string }> = {
   filled: { shape: "fill-filled-soft stroke-filled", text: "fill-filled" },
@@ -30,33 +37,70 @@ export function SitePlanMap({
   plan,
   houses,
   markers,
+  paint,
+  selectedId,
   pending,
   onHouseClick,
   highlightMissing = false,
+  onMissingClick,
+  highlight,
+  you,
+  focus,
+  anchorMarks,
+  pick,
+  onPlanClick,
   className,
 }: {
   plan: SitePlan;
   houses: HouseDTO[];
   /** Status tiap rumah (id → status). */
   markers?: Record<number, MarkerState>;
+  /** Warna khusus per rumah (id → warna); menimpa `markers` untuk rumah itu. */
+  paint?: Record<number, LotPaint>;
+  /** Rumah yang sedang dipilih, diberi garis tebal. */
+  selectedId?: number | null;
   /** Rumah yang catatannya belum terkirim. */
   pending?: Set<number>;
   onHouseClick?: (house: HouseDTO) => void;
   /** Tandai kavling berpenghuni yang belum ada data rumahnya (untuk admin). */
   highlightMissing?: boolean;
+  /** Ketuk kavling berpenghuni yang belum ada data rumahnya (untuk admin). */
+  onMissingClick?: (lot: PlanLot) => void;
+  /** Kalau diisi, rumah lain dan kavling tanpa data diredupkan (mis. hasil pencarian). */
+  highlight?: ReadonlySet<number> | null;
+  /** "Kamu di sini" dari GPS. */
+  you?: PlanYou | null;
+  /** Geser tampilan ke titik ini (ganti `key` untuk mengulang). */
+  focus?: { point: PlanPoint; key: number } | null;
+  /** Titik acuan kalibrasi GPS (bernomor), untuk admin. */
+  anchorMarks?: readonly PlanPoint[];
+  /** Titik yang sedang dipilih admin (belum disimpan). */
+  pick?: PlanPoint | null;
+  /** Ketuk di mana saja pada denah (kavling tidak bisa diketuk selama ini dipasang). */
+  onPlanClick?: (point: PlanPoint) => void;
   className?: string;
 }) {
   const id = useId().replace(/:/g, "");
   const { lotHouse } = useMemo(() => matchPlan(plan, houses), [plan, houses]);
   const [x, y, w, h] = plan.viewBox;
+  const zoomFocus: ZoomFocus | null = focus ? { fx: (focus.point[0] - x) / w, fy: (focus.point[1] - y) / h, key: focus.key } : null;
+
+  function handleClick(e: MouseEvent<SVGSVGElement>) {
+    const svg = e.currentTarget;
+    const matrix = svg.getScreenCTM();
+    if (!onPlanClick || !matrix) return;
+    const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(matrix.inverse());
+    onPlanClick([Math.round(p.x), Math.round(p.y)]);
+  }
 
   return (
-    <ZoomPane className={className} readableWidth={680}>
+    <ZoomPane className={className} readableWidth={680} focus={zoomFocus}>
       <svg
         viewBox={`${x} ${y} ${w} ${h}`}
-        className="block h-auto w-full select-none"
+        className={cx("block h-auto w-full select-none", onPlanClick && "cursor-crosshair")}
         role="group"
         aria-label={`Denah ${plan.name}`}
+        onClick={onPlanClick ? handleClick : undefined}
       >
         <defs>
           <pattern id={`${id}-park`} width="12" height="12" patternUnits="userSpaceOnUse">
@@ -86,18 +130,25 @@ export function SitePlanMap({
           />
         ))}
 
-        {plan.lots.map((lot, i) => (
-          <Lot
-            key={i}
-            lot={lot}
-            house={lotHouse.get(lot)}
-            state={markersFor(lotHouse.get(lot), markers)}
-            pending={pending}
-            hatchId={`${id}-hatch`}
-            highlightMissing={highlightMissing}
-            onHouseClick={onHouseClick}
-          />
-        ))}
+        {plan.lots.map((lot, i) => {
+          const house = lotHouse.get(lot);
+          return (
+            <Lot
+              key={i}
+              lot={lot}
+              house={house}
+              state={markersFor(house, markers)}
+              paint={house && paint?.[house.id]}
+              selected={house !== undefined && house.id === selectedId}
+              pending={pending}
+              hatchId={`${id}-hatch`}
+              highlightMissing={highlightMissing}
+              dimmed={Boolean(highlight) && !(house && highlight?.has(house.id))}
+              onHouseClick={onPlanClick ? undefined : onHouseClick}
+              onMissingClick={onPlanClick ? undefined : onMissingClick}
+            />
+          );
+        })}
 
         {plan.labels.map((label, i) => (
           <text
@@ -113,6 +164,31 @@ export function SitePlanMap({
             {label.text}
           </text>
         ))}
+
+        {anchorMarks?.map(([ax, ay], i) => (
+          <g key={`anchor-${i}`} className="pointer-events-none" aria-label={`Titik acuan ${i + 1}`}>
+            <circle cx={ax} cy={ay} r={13} className="fill-primary stroke-card" strokeWidth={3} />
+            <text x={ax} y={ay} dy="0.35em" textAnchor="middle" fontSize={15} fontWeight={800} className="fill-primary-fg">
+              {i + 1}
+            </text>
+          </g>
+        ))}
+        {pick && (
+          <g className="pointer-events-none" aria-label="Titik yang dipilih">
+            <circle cx={pick[0]} cy={pick[1]} r={16} className="fill-none stroke-warn" strokeWidth={4} strokeDasharray="6 4" />
+            <circle cx={pick[0]} cy={pick[1]} r={4} className="fill-warn" />
+          </g>
+        )}
+        {you && (
+          <g className="pointer-events-none" role="img" aria-label="Lokasimu sekarang">
+            <circle cx={you.point[0]} cy={you.point[1]} r={Math.max(you.radius, 14)} className="fill-you/15 stroke-you/40" strokeWidth={2} />
+            <circle cx={you.point[0]} cy={you.point[1]} r={12} className="fill-you/30">
+              <animate attributeName="r" values="12;26;12" dur="2s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.8;0;0.8" dur="2s" repeatCount="indefinite" />
+            </circle>
+            <circle cx={you.point[0]} cy={you.point[1]} r={10} className="fill-you stroke-white" strokeWidth={4} />
+          </g>
+        )}
       </svg>
     </ZoomPane>
   );
@@ -127,18 +203,26 @@ function Lot({
   lot,
   house,
   state,
+  paint,
+  selected,
   pending,
   hatchId,
   highlightMissing,
+  dimmed,
   onHouseClick,
+  onMissingClick,
 }: {
   lot: PlanLot;
   house: HouseDTO | undefined;
   state: MarkerState;
+  paint?: LotPaint;
+  selected: boolean;
   pending?: Set<number>;
   hatchId: string;
   highlightMissing: boolean;
+  dimmed: boolean;
   onHouseClick?: (house: HouseDTO) => void;
+  onMissingClick?: (lot: PlanLot) => void;
 }) {
   const [cx0, cy0] = polygonCentroid(lot.points);
   const text = lot.label ?? lot.number ?? "";
@@ -148,8 +232,15 @@ function Lot({
 
   if (!house) {
     const missing = lot.built && lot.number !== null;
+    const add = missing && onMissingClick ? () => onMissingClick(lot) : undefined;
+    const label = add ? `${houseLabelLong({ block: lot.block, number: lot.number! })}, belum terdaftar` : undefined;
     return (
-      <g className="pointer-events-none">
+      <g
+        {...pressable(add)}
+        aria-label={label}
+        className={cx(add ? PRESSABLE_CLASS : "pointer-events-none", dimmed && "opacity-25")}
+      >
+        {label && <title>{label}</title>}
         <polygon
           points={points}
           fill={missing ? undefined : `url(#${hatchId})`}
@@ -177,31 +268,17 @@ function Lot({
     );
   }
 
-  const style = LOT_STYLES[state];
+  const style = paint ?? LOT_STYLES[state];
+  const note = paint ? paint.note : STATE_TEXT[state];
   const isPending = pending?.has(house.id);
-  const label = `${houseLabelLong(house)}${STATE_TEXT[state] ? `, ${STATE_TEXT[state]}` : ""}${isPending ? ", belum terkirim" : ""}`;
+  const label = `${houseLabelLong(house)}${note ? `, ${note}` : ""}${isPending ? ", belum terkirim" : ""}`;
   const activate = onHouseClick ? () => onHouseClick(house) : undefined;
 
   return (
-    <g
-      role={activate ? "button" : undefined}
-      tabIndex={activate ? 0 : undefined}
-      aria-label={label}
-      onClick={activate}
-      onKeyDown={
-        activate
-          ? (e: KeyboardEvent) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                activate();
-              }
-            }
-          : undefined
-      }
-      className={cx(activate && "cursor-pointer outline-none focus-visible:[&>polygon]:stroke-primary")}
-    >
+    <g {...pressable(activate)} aria-label={label} className={cx(activate && PRESSABLE_CLASS, dimmed && "opacity-25")}>
       <title>{label}</title>
       <polygon points={points} className={style.shape} strokeWidth="2.5" strokeLinejoin="round" />
+      {selected && <polygon points={points} className="pointer-events-none fill-none stroke-primary" strokeWidth="6" strokeLinejoin="round" />}
       <text
         x={cx0}
         y={cy0}
@@ -216,4 +293,22 @@ function Lot({
       {isPending && <circle cx={cx0 + fontSize} cy={cy0 - fontSize} r={5} className="fill-warn stroke-card" strokeWidth="1.5" />}
     </g>
   );
+}
+
+const PRESSABLE_CLASS = "cursor-pointer outline-none hover:[&>polygon]:stroke-primary focus-visible:[&>polygon]:stroke-primary";
+
+/** Kavling yang bisa diketuk: tombol yang bisa difokus dan ditekan dengan Enter/Spasi. */
+function pressable(activate: (() => void) | undefined) {
+  if (!activate) return {};
+  return {
+    role: "button",
+    tabIndex: 0,
+    onClick: activate,
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        activate();
+      }
+    },
+  };
 }

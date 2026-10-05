@@ -14,7 +14,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { QrScanner } from "@/components/qr-scanner";
 import { ShareRecap } from "@/components/share-recap";
-import { SitePlanMap } from "@/components/site-plan-map";
+import { PlanWithLocation } from "@/components/plan-with-location";
 import { Alert, Card, buttonClass, cx } from "@/components/ui";
 import { formatDateLong } from "@/lib/dates";
 import { formatAmountShort, formatRupiah } from "@/lib/format";
@@ -22,6 +22,7 @@ import type { MarkerState } from "@/lib/house-state";
 import { groupByBlock, houseLabel, houseLabelLong } from "@/lib/houses";
 import { parseQrToken } from "@/lib/qr";
 import { buildRecapText, summarize } from "@/lib/recap";
+import { DAY_NAMES, dayLabel, scheduleDay } from "@/lib/schedule";
 import { matchPlan } from "@/lib/site-plan";
 import { SITE_PLAN } from "@/site-plan";
 import type { CollectionMethod, CollectionStatus, HouseDTO } from "@/lib/types";
@@ -99,6 +100,16 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
     toastTimer.current = setTimeout(() => setToast(null), 2500);
   }
 
+  // Hanya yang dijadwalkan jaga malam ini yang bisa scan/catat, admin juga (server juga memeriksa).
+  const mySchedule = (snapshot?.schedule ?? []).filter((e) => e.userId === snapshot?.user.id);
+  const onDuty = mySchedule.some((e) => e.day === scheduleDay(store.date));
+  const canRecord = onDuty;
+
+  function openHouse(house: HouseDTO) {
+    if (canRecord) setActive({ house, method: "manual" });
+    else showToast("Bukan jadwal jagamu malam ini.", "error");
+  }
+
   function handleDetect(text: string) {
     const token = parseQrToken(text);
     const house = token ? byToken.get(token) : undefined;
@@ -161,6 +172,27 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
       <StatusNotice status={store.status} />
       {/* Data lama di HP (sebelum ada jadwal) belum punya `schedule`. */}
       <TonightGuards schedule={snapshot.schedule ?? []} date={store.date} userId={snapshot.user.id} />
+      {!canRecord && (
+        <div className="mb-4 flex gap-3 rounded-2xl border border-warn/40 bg-warn-soft p-3 text-sm text-warn" role="note">
+          <ShieldAlert className="size-5 shrink-0" aria-hidden />
+          <div>
+            <p className="font-semibold">Bukan jadwal jagamu malam ini</p>
+            <p className="mt-0.5">
+              Scan dan catat jimpitan hanya untuk petugas yang jaga {dayLabel(scheduleDay(store.date))}.
+              {mySchedule.length > 0
+                ? ` Jadwalmu: ${[...new Set(mySchedule.map((e) => e.day))]
+                    .sort()
+                    .map((d) => DAY_NAMES[d])
+                    .join(", ")}.`
+                : " Kamu belum dijadwalkan."}
+              {isAdmin && " Sebagai admin, catatan malam ini tetap bisa dikoreksi lewat Riwayat di dashboard."}
+            </p>
+            <Link to="/petugas/jadwal" className="mt-1 inline-block font-semibold underline">
+              Lihat jadwal atau minta ubah jadwal
+            </Link>
+          </div>
+        </div>
+      )}
       {store.rejections.length > 0 && (
         <div className="mb-4">
           <Alert>
@@ -281,12 +313,22 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
               ) : (
                 <>
                   {view === "map" ? (
-                    <SitePlanMap
+                    <PlanWithLocation
                       plan={SITE_PLAN}
                       houses={houses}
                       markers={markers}
                       pending={pendingIds}
-                      onHouseClick={(h) => setActive({ house: h, method: "manual" })}
+                      onHouseClick={openHouse}
+                      anchors={snapshot.planAnchors ?? []}
+                      calibrateHint={
+                        isAdmin ? (
+                          <a href="/admin/denah" className="font-semibold underline">
+                            Atur di Admin → Denah
+                          </a>
+                        ) : (
+                          "Minta admin mengaturnya."
+                        )
+                      }
                     />
                   ) : (
                     <Suspense fallback={<Loading3D />}>
@@ -294,7 +336,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                         houses={houses}
                         plan={SITE_PLAN}
                         markers={markers}
-                        onHouseClick={(h) => setActive({ house: h, method: "manual" })}
+                        onHouseClick={openHouse}
                       />
                     </Suspense>
                   )}
@@ -328,7 +370,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                           key={h.id}
                           house={h}
                           collection={store.collections.get(h.id)}
-                          onClick={() => setActive({ house: h, method: "manual" })}
+                          onClick={() => openHouse(h)}
                         />
                       ))}
                     </div>
@@ -341,28 +383,30 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
             </div>
           )}
           {/* Ruang supaya baris terakhir tidak tertutup tombol Manual / Scan QR. */}
-          <div className="h-20" aria-hidden />
+          {canRecord && <div className="h-20" aria-hidden />}
 
-          <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+76px)] left-1/2 z-20 flex -translate-x-1/2 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setSearchOpen(true)}
-              className="flex h-14 items-center gap-1.5 rounded-full border border-line bg-card px-4 font-semibold text-fg shadow-lg shadow-black/20 active:scale-[0.97]"
-            >
-              <Keyboard className="size-5" /> Manual
-            </button>
-            <button
-              type="button"
-              onClick={() => setScannerOpen(true)}
-              className="flex h-14 items-center gap-2 whitespace-nowrap rounded-full bg-primary px-7 text-lg font-bold text-primary-fg shadow-lg shadow-black/20 active:scale-[0.97]"
-            >
-              <ScanLine className="size-6" /> Scan QR
-            </button>
-          </div>
+          {canRecord && (
+            <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+76px)] left-1/2 z-20 flex -translate-x-1/2 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                className="flex h-14 items-center gap-1.5 rounded-full border border-line bg-card px-4 font-semibold text-fg shadow-lg shadow-black/20 active:scale-[0.97]"
+              >
+                <Keyboard className="size-5" /> Manual
+              </button>
+              <button
+                type="button"
+                onClick={() => setScannerOpen(true)}
+                className="flex h-14 items-center gap-2 whitespace-nowrap rounded-full bg-primary px-7 text-lg font-bold text-primary-fg shadow-lg shadow-black/20 active:scale-[0.97]"
+              >
+                <ScanLine className="size-6" /> Scan QR
+              </button>
+            </div>
+          )}
         </>
       )}
 
-      {scannerOpen && (
+      {scannerOpen && canRecord && (
         <QrScanner
           paused={active !== null || searchOpen}
           onDetect={handleDetect}
@@ -371,7 +415,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
         />
       )}
 
-      {searchOpen && (
+      {searchOpen && canRecord && (
         <HouseSearch
           houses={houses}
           collections={store.collections}
@@ -383,7 +427,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
         />
       )}
 
-      {active && (
+      {active && canRecord && (
         <HouseSheet
           key={`${active.house.id}-${active.method}`}
           house={active.house}

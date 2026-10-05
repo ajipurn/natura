@@ -1,3 +1,4 @@
+import type { GeoAnchor } from "./geo";
 import type { GuardColor } from "./guard-color";
 
 export type Role = "admin" | "petugas";
@@ -9,6 +10,7 @@ export type HouseDTO = {
   id: number;
   block: string;
   number: string;
+  /** Nama warga: nama akun petugas yang tinggal di sana, atau nama KK untuk rumah tanpa akun. */
   ownerName: string | null;
   token: string;
   status: HouseStatus;
@@ -23,17 +25,18 @@ export type CollectionDTO = {
   collectorName: string | null;
 };
 
-/** Satu baris jadwal ronda, sudah dicocokkan dengan data rumah dan akun petugas (kalau ada). */
+/** Satu baris jadwal ronda, dengan nama dan rumah dari akun petugas atau data rumah. */
 export type ScheduleDTO = {
   id: number;
   day: number;
   position: number;
-  /** Nama petugas: dari akunnya kalau terhubung, selain itu nama yang tertulis di jadwal. */
+  /** Nama akun petugas, atau nama bebas untuk baris tanpa akun dan rumah. Null = baris rumah tanpa akun. */
   name: string | null;
-  /** "" = petugas tanpa rumah. */
+  /** Rumah petugas (dari akunnya) atau rumah di baris itu; "" = tanpa rumah. */
   block: string;
   number: string;
   houseId: number | null;
+  /** Nama warga rumah itu. */
   ownerName: string | null;
   userId: number | null;
   /** Akun petugasnya masih aktif (null kalau tidak terhubung ke akun). */
@@ -50,6 +53,8 @@ export type RondaSnapshot = {
   houses: HouseDTO[];
   collections: CollectionDTO[];
   schedule: ScheduleDTO[];
+  /** Kalibrasi denah ↔ GPS untuk "Lokasi saya" (salinan lama di HP belum punya). */
+  planAnchors?: GeoAnchor[];
 };
 
 /** Satu catatan dari HP petugas. `none` = hapus catatan rumah itu untuk malam tersebut. */

@@ -5,12 +5,13 @@ import { api, call } from "@/client/api";
 import { invalidate } from "@/client/query";
 import { Dialog } from "@/components/dialog";
 import { Alert, Field, buttonClass, cx, inputClass } from "@/components/ui";
+import { scheduleQuery } from "@/features/jadwal/queries";
 import { formatTime } from "@/lib/dates";
 import { groupByBlock, houseLabel } from "@/lib/houses";
 import { randomPin } from "@/lib/random-pin";
 import { DAY_NAMES, dayLabel } from "@/lib/schedule";
 import type { Role } from "@/lib/types";
-import { housesQuery } from "../queries";
+import { housesQuery, usersQuery } from "../queries";
 
 export type Petugas = {
   id: number;
@@ -24,7 +25,7 @@ export type Petugas = {
   days: number[];
 };
 
-/** Data petugas ikut tampil di jadwal, ronda, dan ringkasan. */
+/** Data petugas ikut tampil di jadwal, ronda, ringkasan, dan data rumah (nama warga). */
 const REFRESH = [["admin"], ["jadwal"], ["ronda"], ["auth", "users"]];
 
 /** Tambah petugas (`petugas` kosong) atau ubah petugas. */
@@ -102,7 +103,17 @@ function CreateForm({ onDone }: { onDone: () => void }) {
           </button>
         </div>
       </Field>
-      <GuardFields houseId={houseId} onHouse={setHouseId} days={days} onDays={setDays} />
+      <GuardFields
+        name={name}
+        houseId={houseId}
+        onHouse={(id, ownerName) => {
+          setHouseId(id);
+          // Rumah tanpa akun yang sudah punya nama KK: namanya dipakai untuk akun baru.
+          if (ownerName && !name.trim()) setName(ownerName);
+        }}
+        days={days}
+        onDays={setDays}
+      />
       <RoleField role={role} onRole={setRole} />
       {create.isError && <Alert>{create.error.message}</Alert>}
       <div className="flex justify-end gap-2 pt-1">
@@ -183,7 +194,14 @@ function EditForm({ petugas, isSelf, onDone }: { petugas: Petugas; isSelf: boole
         <Field label="Nama">
           <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={40} className={inputClass} />
         </Field>
-        <GuardFields houseId={houseId} onHouse={setHouseId} days={days} onDays={setDays} />
+        <GuardFields
+          name={name}
+          userId={petugas.id}
+          houseId={houseId}
+          onHouse={(id) => setHouseId(id)}
+          days={days}
+          onDays={setDays}
+        />
         <RoleField role={role} onRole={setRole} disabled={isSelf} />
         <label className={cx("flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5", isSelf && "opacity-60")}>
           <span>
@@ -263,29 +281,45 @@ function ResetPin({ petugas, locked }: { petugas: Petugas; locked: string | null
   );
 }
 
-/** Rumah petugas dan malam jaganya. */
+/**
+ * Rumah petugas dan malam jaganya. Rumah yang dipilih memakai nama akun ini sebagai nama warganya,
+ * dan jadwal rumah itu (kalau sudah ada) jadi jadwal petugas ini.
+ */
 function GuardFields({
+  name,
+  userId,
   houseId,
   onHouse,
   days,
   onDays,
 }: {
+  name: string;
+  userId?: number;
   houseId: number | null;
-  onHouse: (id: number | null) => void;
+  onHouse: (id: number | null, ownerName: string | null) => void;
   days: number[];
   onDays: (days: number[]) => void;
 }) {
   const houses = useQuery(housesQuery).data?.houses ?? [];
+  const users = useQuery(usersQuery).data?.users ?? [];
+  const schedule = useQuery(scheduleQuery).data?.schedule ?? [];
   const toggle = (day: number) => onDays(days.includes(day) ? days.filter((d) => d !== day) : [...days, day].sort());
+  const houseDays = (id: number) => schedule.filter((s) => s.userId === null && s.houseId === id).map((s) => s.day);
+  const house = houses.find((h) => h.id === houseId);
+  const others = users.filter((u) => u.houseId === houseId && u.id !== userId);
+  const scheduled = houseId ? [...new Set(houseDays(houseId))].sort() : [];
+
+  function pick(id: number | null) {
+    const picked = houses.find((h) => h.id === id);
+    const hasAccount = users.some((u) => u.houseId === id && u.id !== userId);
+    onHouse(id, picked && !hasAccount ? picked.ownerName : null);
+    if (id) onDays([...new Set([...days, ...houseDays(id)])].sort());
+  }
 
   return (
     <>
       <Field label="Rumah">
-        <select
-          value={houseId ?? ""}
-          onChange={(e) => onHouse(e.target.value ? Number(e.target.value) : null)}
-          className={inputClass}
-        >
+        <select value={houseId ?? ""} onChange={(e) => pick(e.target.value ? Number(e.target.value) : null)} className={inputClass}>
           <option value="">Tanpa rumah</option>
           {groupByBlock(houses).map(([block, list]) => (
             <optgroup key={block} label={`Blok ${block}`}>
@@ -298,6 +332,16 @@ function GuardFields({
             </optgroup>
           ))}
         </select>
+        {house && (
+          <span className="mt-1 block text-xs text-muted">
+            {others.length > 0
+              ? `Rumah ini juga dihuni ${others.map((u) => u.name).join(", ")}.`
+              : house.ownerName && house.ownerName !== name.trim() && !users.some((u) => u.id === userId && u.houseId === house.id)
+                ? `Nama KK rumah ini (${house.ownerName}) diganti nama akun ini.`
+                : "Nama warga rumah ini ikut nama akun ini."}
+            {scheduled.length > 0 && ` Jadwal rumah ini (${scheduled.map((d) => DAY_NAMES[d]).join(", ")}) jadi jadwal petugas ini.`}
+          </span>
+        )}
       </Field>
       <fieldset>
         <legend className="mb-1 block text-sm font-medium">Jaga malam</legend>

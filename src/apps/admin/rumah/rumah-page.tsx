@@ -1,20 +1,24 @@
 import { useQuery } from "@tanstack/react-query";
-import { Printer, Search } from "lucide-react";
+import { Printer, Search, UserRound } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { QueryState } from "@/components/query-state";
 import { Card, PageHeader, SectionTitle, buttonClass, cx, inputClass } from "@/components/ui";
 import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
-import { housesQuery } from "../queries";
+import { housesQuery, usersQuery } from "../queries";
 import { AddHousesForm, EditHouseForm } from "./house-forms";
 
 export function RumahPage() {
   const query = useQuery(housesQuery);
+  const users = useQuery(usersQuery).data?.users ?? [];
   const [search, setSearch] = useState("");
 
   return (
     <QueryState query={query}>
       {({ houses }) => {
+        // Akun petugas per rumah: nama warga rumah itu diambil dari akunnya.
+        const accounts = new Map<number, string[]>();
+        for (const u of users) if (u.houseId) accounts.set(u.houseId, [...(accounts.get(u.houseId) ?? []), u.name]);
         const shown = search.trim() ? searchHouses(houses, search, houses.length) : houses;
         const groups = groupByBlock(shown);
         return (
@@ -63,14 +67,23 @@ export function RumahPage() {
                           <details className="group px-4 py-3">
                             <summary className="flex cursor-pointer list-none items-center gap-3">
                               <span className="w-14 shrink-0 font-bold">{houseLabel(h)}</span>
-                              <span className="min-w-0 flex-1 truncate text-sm text-muted">{h.ownerName ?? "—"}</span>
+                              <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-muted">
+                                <span className="truncate">{h.ownerName ?? "—"}</span>
+                                {accounts.has(h.id) && (
+                                  <UserRound className="size-4 shrink-0 text-primary" aria-label="Punya akun petugas" />
+                                )}
+                              </span>
                               {h.status === "vacant" && (
                                 <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs text-warn">mudik</span>
                               )}
                               <span className="text-sm font-semibold text-muted group-open:hidden">Ubah</span>
                               <span className="hidden text-sm font-semibold text-muted group-open:inline">Tutup</span>
                             </summary>
-                            <EditHouseForm house={h} canDelete={h.collectionCount === 0} />
+                            <EditHouseForm
+                              house={h}
+                              accounts={accounts.get(h.id) ?? []}
+                              canDelete={h.collectionCount === 0}
+                            />
                           </details>
                         </li>
                       ))}

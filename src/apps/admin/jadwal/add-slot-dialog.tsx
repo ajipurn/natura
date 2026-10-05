@@ -52,7 +52,9 @@ function Picker({
     .filter((u) => !q || u.name.toLowerCase().includes(q) || u.house?.toLowerCase().replace("-", "").includes(q.replace(/[-\s]/g, "")))
     .sort((a, b) => Number(taken.has(a.id)) - Number(taken.has(b.id)) || a.name.localeCompare(b.name, "id"))
     .slice(0, q ? 20 : 8);
-  const matchedHouses = q ? searchHouses(houses, query, 8) : [];
+  // Rumah yang dihuni petugas ditambahkan lewat akunnya.
+  const withAccount = new Set(users.map((u) => u.houseId));
+  const matchedHouses = q ? searchHouses(houses.filter((h) => !withAccount.has(h.id)), query, 8) : [];
   const exactAccount = users.some((u) => u.name.toLowerCase() === q);
 
   function addUser(u: Petugas) {

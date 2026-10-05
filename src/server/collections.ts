@@ -2,11 +2,12 @@ import { and, eq, lte, sql, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { z } from "zod";
 import { rondaDate } from "@/lib/dates";
+import { dayLabel, scheduleDay } from "@/lib/schedule";
 import type { EntryInput, EntryResult } from "@/lib/types";
 import type { SessionUser } from "./auth";
 import { chunk, rowsPerInsert, runBatch, type Db } from "./db";
 import { getHouseIds } from "./queries";
-import { collections, patrols } from "./schema";
+import { collectionLogs, collections, patrols, rondaSchedule } from "./schema";
 
 const MAX_CLOCK_SKEW_MS = 10 * 60 * 1000;
 /** Petugas hanya bisa menyinkronkan catatan sampai 3 hari ke belakang; selebihnya lewat admin. */
@@ -35,6 +36,41 @@ export type CollectionWrite = {
   userId: number;
   recordedAt: Date;
 };
+
+/** Satu baris jejak audit (lihat `collectionLogs`). */
+type LogWrite = Omit<CollectionWrite, "method"> & {
+  clientId: string | null;
+  method: EntryInput["method"] | "koreksi";
+  onDuty: boolean | null;
+};
+
+function logStatements(db: Db, logs: LogWrite[]): BatchItem<"sqlite">[] {
+  return chunk(logs, rowsPerInsert(10)).map((part) =>
+    db
+      .insert(collectionLogs)
+      .values(
+        part.map((l) => ({
+          clientId: l.clientId,
+          date: l.date,
+          houseId: l.houseId,
+          userId: l.userId,
+          status: l.status,
+          amount: l.status === "filled" ? l.amount : 0,
+          method: l.method,
+          onDuty: l.onDuty,
+          recordedAt: l.recordedAt,
+        })),
+      )
+      // Kiriman ulang dari antrean offline tidak dicatat dua kali.
+      .onConflictDoNothing({ target: collectionLogs.clientId }),
+  );
+}
+
+/** Malam-malam jaga (0 = Ahad) seorang petugas menurut jadwal sekarang. */
+export async function dutyDays(db: Db, userId: number): Promise<Set<number>> {
+  const rows = await db.selectDistinct({ day: rondaSchedule.dayOfWeek }).from(rondaSchedule).where(eq(rondaSchedule.userId, userId));
+  return new Set(rows.map((r) => r.day));
+}
 
 const patrolIdFor = (date: string): SQL<number> => sql`(select ${patrols.id} from ${patrols} where ${patrols.date} = ${date})`;
 
@@ -105,9 +141,12 @@ function writeStatements(db: Db, writes: CollectionWrite[], now: Date): BatchIte
   return statements;
 }
 
-/** Simpan (atau hapus) catatan satu rumah untuk satu malam (koreksi admin, catat dari halaman rumah). */
+/** Koreksi admin: simpan (atau hapus) catatan satu rumah untuk satu malam, dan catat di jejak audit. */
 export async function writeCollection(db: Db, input: CollectionWrite, now = new Date()) {
-  await runBatch(db, writeStatements(db, [input], now));
+  await runBatch(db, [
+    ...writeStatements(db, [input], now),
+    ...logStatements(db, [{ ...input, clientId: null, method: "koreksi", onDuty: null }]),
+  ]);
 }
 
 /** Terapkan catatan yang dikirim HP petugas (bisa dari antrean offline). */
@@ -117,8 +156,9 @@ export async function applyEntries(
   entries: EntryInput[],
   now = new Date(),
 ): Promise<EntryResult[]> {
-  const known = await getHouseIds(db);
+  const [known, duty] = await Promise.all([getHouseIds(db), dutyDays(db, user.id)]);
   const results: EntryResult[] = [];
+  const logs: LogWrite[] = [];
   // Per malam + rumah cukup simpan catatan terbaru; yang lebih lama toh akan kalah.
   const latest = new Map<string, CollectionWrite>();
 
@@ -134,8 +174,23 @@ export async function applyEntries(
       fail("Catatan sudah lebih dari 3 hari. Minta admin untuk mengoreksi.");
     } else if (!known.has(entry.houseId)) {
       fail("Rumah tidak ditemukan (mungkin sudah dihapus).");
+    } else if (!duty.has(scheduleDay(rondaDate(at)))) {
+      // Hanya yang dijadwalkan jaga malam itu yang boleh scan/catat, admin juga. Admin tetap bisa
+      // mengoreksi lewat Riwayat di dashboard (`writeCollection`).
+      fail(`Bukan jadwal jagamu: ${dayLabel(scheduleDay(rondaDate(at)))}.`);
     } else {
       const date = rondaDate(at);
+      logs.push({
+        clientId: entry.clientId,
+        date,
+        houseId: entry.houseId,
+        status: entry.status,
+        amount: entry.amount,
+        method: entry.method,
+        userId: user.id,
+        recordedAt: at,
+        onDuty: duty.has(scheduleDay(date)),
+      });
       const key = `${date}:${entry.houseId}`;
       const previous = latest.get(key);
       if (!previous || previous.recordedAt.getTime() <= at.getTime()) {
@@ -153,6 +208,6 @@ export async function applyEntries(
     }
   }
 
-  await runBatch(db, writeStatements(db, [...latest.values()], now));
+  await runBatch(db, [...writeStatements(db, [...latest.values()], now), ...logStatements(db, logs)]);
   return results;
 }

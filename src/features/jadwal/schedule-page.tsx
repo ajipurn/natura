@@ -98,9 +98,6 @@ function DayCard({
                 <span className="w-14 shrink-0 font-bold">{slotHouseLabel(e) || "—"}</span>
                 <span className="min-w-0 flex-1 truncate">{e.name ?? e.ownerName ?? <span className="text-muted">—</span>}</span>
                 {me && <span className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-fg">Kamu</span>}
-                {e.block && e.houseId === null && (
-                  <span className="shrink-0 rounded-full bg-warn-soft px-2 py-0.5 text-xs text-warn">belum terdaftar</span>
-                )}
               </li>
             );
           })}

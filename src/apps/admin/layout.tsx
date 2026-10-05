@@ -10,6 +10,7 @@ import {
   Menu,
   ScanLine,
   Settings,
+  ShieldCheck,
   Table2,
   Users,
   X,
@@ -29,6 +30,7 @@ const NAV: { group: string; items: { to: string; label: string; icon: LucideIcon
     items: [
       { to: "/admin", label: "Ringkasan", icon: LayoutDashboard, end: true },
       { to: "/admin/riwayat", label: "Riwayat", icon: History },
+      { to: "/admin/audit", label: "Audit catatan", icon: ShieldCheck },
       { to: "/admin/rekap", label: "Rekap bulanan", icon: Table2 },
       { to: "/admin/jadwal", label: "Jadwal ronda", icon: CalendarDays },
     ],

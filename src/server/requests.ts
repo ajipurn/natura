@@ -91,7 +91,7 @@ export async function cancelRequest(db: Db, userId: number, id: number): Promise
 
 /**
  * Admin memutuskan permintaan. Kalau disetujui, baris jadwal petugas dipindah dari malam lama ke
- * malam baru (urutan terakhir; rumah dan warnanya ikut), atau ditambahkan kalau belum punya jadwal.
+ * malam baru (urutan terakhir; warnanya ikut), atau ditambahkan kalau belum punya jadwal.
  */
 export async function decideRequest(
   db: Db,
@@ -134,23 +134,8 @@ export async function decideRequest(
       db.update(rondaSchedule).set({ dayOfWeek: request.toDay, position: lastPosition }).where(eq(rondaSchedule.id, from.id)),
     ]);
   } else {
-    const [house] = await db
-      .select({ block: houses.block, number: houses.number })
-      .from(users)
-      .innerJoin(houses, eq(houses.id, users.houseId))
-      .where(eq(users.id, request.userId))
-      .limit(1);
-    await runBatch(db, [
-      mark,
-      db.insert(rondaSchedule).values({
-        dayOfWeek: request.toDay,
-        position: lastPosition,
-        name: null,
-        block: house?.block ?? "",
-        number: house?.number ?? "",
-        userId: request.userId,
-      }),
-    ]);
+    // Rumahnya ikut dari akun petugas.
+    await runBatch(db, [mark, db.insert(rondaSchedule).values({ dayOfWeek: request.toDay, position: lastPosition, userId: request.userId })]);
   }
   return null;
 }

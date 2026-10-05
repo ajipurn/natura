@@ -4,6 +4,7 @@ import { LoginPage } from "@/features/auth/login-page";
 import { RequireAuth } from "@/features/auth/require-auth";
 import { PatrolDetail } from "@/features/riwayat/patrol-detail";
 import { PatrolList } from "@/features/riwayat/patrol-list";
+import { AuditPage } from "./audit-page";
 import { DenahPage } from "./denah/denah-page";
 import { InfoPage } from "./info-page";
 import { JadwalPage } from "./jadwal/jadwal-page";
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
       { index: true, element: <RingkasanPage /> },
       { path: "riwayat", element: <PatrolList basePath="/admin/riwayat" /> },
       { path: "riwayat/:tanggal", element: <PatrolDetail basePath="/admin/riwayat" canCorrect /> },
+      { path: "audit", element: <AuditPage /> },
       { path: "rekap", element: <RekapPage /> },
       { path: "jadwal", element: <JadwalPage /> },
       { path: "rumah", element: <RumahPage /> },

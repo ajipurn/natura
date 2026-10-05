@@ -1,9 +1,11 @@
 import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { daysInMonth, rondaDate } from "@/lib/dates";
+import type { GeoAnchor } from "@/lib/geo";
 import { compareHouses } from "@/lib/houses";
 import type { CollectionDTO, HouseDTO, MonthCell, MonthRecap, RondaSnapshot } from "@/lib/types";
 import type { SessionUser } from "./auth";
 import type { Db } from "./db";
+import { houseName } from "./house-name";
 import { guardDaysByUser, listSchedule } from "./schedule";
 import { collections, houses, patrols, settings, users } from "./schema";
 
@@ -18,17 +20,26 @@ export async function getSettings(db: Db) {
   return row ?? DEFAULT_SETTINGS;
 }
 
+/** Titik acuan kalibrasi denah ↔ GPS (kosong = belum dikalibrasi). */
+export async function getPlanAnchors(db: Db): Promise<GeoAnchor[]> {
+  const [row] = await db.select({ anchors: settings.planAnchors }).from(settings).where(eq(settings.id, 1)).limit(1);
+  return row?.anchors ?? [];
+}
+
 export async function hasAnyUser(db: Db): Promise<boolean> {
   const rows = await db.select({ id: users.id }).from(users).limit(1);
   return rows.length > 0;
 }
 
+/** Akun untuk pilihan nama di halaman masuk; rumahnya ikut supaya nama kembar bisa dibedakan. */
 export async function listLoginUsers(db: Db) {
-  return db
-    .select({ id: users.id, name: users.name })
+  const rows = await db
+    .select({ id: users.id, name: users.name, block: houses.block, number: houses.number })
     .from(users)
+    .leftJoin(houses, eq(houses.id, users.houseId))
     .where(eq(users.active, true))
     .orderBy(asc(users.name));
+  return rows.map(({ block, number, ...u }) => ({ ...u, house: block && number ? `${block}-${number}` : null }));
 }
 
 export async function listUsers(db: Db) {
@@ -64,7 +75,7 @@ const houseColumns = {
   id: houses.id,
   block: houses.block,
   number: houses.number,
-  ownerName: houses.ownerName,
+  ownerName: houseName,
   token: houses.token,
   status: houses.status,
 };
@@ -115,11 +126,12 @@ export async function getCollectionsForDate(db: Db, date: string): Promise<Colle
 
 export async function getRondaSnapshot(db: Db, user: SessionUser, now = new Date()): Promise<RondaSnapshot> {
   const date = rondaDate(now);
-  const [settingsRow, houseRows, collectionRows, schedule] = await Promise.all([
+  const [settingsRow, houseRows, collectionRows, schedule, planAnchors] = await Promise.all([
     getSettings(db),
     listHouses(db),
     getCollectionsForDate(db, date),
     listSchedule(db),
+    getPlanAnchors(db),
   ]);
   return {
     date,
@@ -129,6 +141,7 @@ export async function getRondaSnapshot(db: Db, user: SessionUser, now = new Date
     houses: houseRows,
     collections: collectionRows,
     schedule,
+    planAnchors,
   };
 }
 

@@ -5,6 +5,7 @@ import {
   Home,
   KeyRound,
   Map as MapIcon,
+  ShieldAlert,
   ShieldCheck,
   TrendingUp,
   TriangleAlert,
@@ -172,12 +173,16 @@ export function RingkasanPage() {
 
 function todoItems(todo: {
   pendingRequests: number;
+  offDuty: number;
   planMissing: number;
   noSchedule: boolean;
   noWargaCode: boolean;
   onlyOneUser: boolean;
 }): { to: string; text: string; icon: LucideIcon }[] {
   const items: { to: string; text: string; icon: LucideIcon }[] = [];
+  if (todo.offDuty > 0) {
+    items.push({ to: "/admin/audit", icon: ShieldAlert, text: `${todo.offDuty} catatan malam ini oleh petugas yang tidak dijadwalkan` });
+  }
   if (todo.pendingRequests > 0) {
     items.push({ to: "/admin/jadwal", icon: CalendarClock, text: `${todo.pendingRequests} permintaan ubah jadwal menunggu keputusan` });
   }

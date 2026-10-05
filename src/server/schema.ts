@@ -1,4 +1,6 @@
-import { index, integer, sqliteTable, text, uniqueIndex, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
+import type { GeoAnchor } from "@/lib/geo";
+import { check, index, integer, sqliteTable, text, uniqueIndex, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 
 /**
  * Skema Cloudflare D1 (SQLite).
@@ -18,14 +20,20 @@ export const settings = sqliteTable("settings", {
   wargaCode: text("warga_code"),
   /** Dinaikkan saat kode warga diganti supaya akses lama tidak berlaku lagi. */
   wargaCodeVersion: integer("warga_code_version").notNull().$defaultFn(() => 1),
+  /** Titik acuan kalibrasi denah ↔ GPS, untuk fitur "Lokasi saya" di denah. */
+  planAnchors: text("plan_anchors", { mode: "json" }).$type<GeoAnchor[]>(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
 });
 
+/**
+ * Akun petugas/admin. Nama akun juga nama warga di rumahnya (`houseId`): rumah yang dihuni petugas
+ * tidak menyimpan nama sendiri. Nama boleh kembar asal rumahnya beda.
+ */
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull().unique(),
+  name: text("name").notNull(),
   pinHash: text("pin_hash").notNull(),
   role: text("role", { enum: ["admin", "petugas"] })
     .notNull()
@@ -41,7 +49,7 @@ export const users = sqliteTable("users", {
   sessionVersion: integer("session_version")
     .notNull()
     .$defaultFn(() => 1),
-  /** Rumah tempat petugas tinggal (dipakai saat menjadwalkan). */
+  /** Rumah tempat petugas tinggal; jadwal jaganya ikut memakai rumah ini. */
   houseId: integer("house_id").references((): AnySQLiteColumn => houses.id, { onDelete: "set null" }),
   createdAt: createdAt(),
 });
@@ -52,6 +60,7 @@ export const houses = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     block: text("block").notNull(),
     number: text("number").notNull(),
+    /** Nama KK untuk rumah tanpa akun petugas. Rumah yang dihuni petugas memakai nama akunnya (lihat `houseName`). */
     ownerName: text("owner_name"),
     /** Kode acak yang dicetak di QR. */
     token: text("token").notNull().unique(),
@@ -96,9 +105,40 @@ export const collections = sqliteTable(
 );
 
 /**
+ * Jejak audit setiap catatan jimpitan: siapa yang scan/mencatat, kapan, dan apakah dia dijadwalkan
+ * jaga malam itu (dicek saat catatan diterima, jadi tetap benar walau jadwal berubah kemudian).
+ * `collections` hanya menyimpan catatan terakhir per rumah; tabel ini menyimpan semuanya.
+ */
+export const collectionLogs = sqliteTable(
+  "collection_logs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    /** Id catatan dari HP (untuk mengabaikan kiriman ulang dari antrean offline). */
+    clientId: text("client_id"),
+    /** Tanggal malam ronda (YYYY-MM-DD). */
+    date: text("date").notNull(),
+    houseId: integer("house_id")
+      .notNull()
+      .references(() => houses.id, { onDelete: "cascade" }),
+    userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+    /** `none` = catatan rumah itu dihapus. */
+    status: text("status", { enum: ["filled", "empty", "none"] }).notNull(),
+    amount: integer("amount").notNull(),
+    /** `koreksi` = diubah admin dari halaman riwayat. */
+    method: text("method", { enum: ["scan", "manual", "koreksi"] }).notNull(),
+    /** Pencatat dijadwalkan jaga malam itu; null untuk koreksi admin. */
+    onDuty: integer("on_duty", { mode: "boolean" }),
+    /** Waktu dicatat di HP. */
+    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("collection_logs_date_idx").on(t.date, t.recordedAt), uniqueIndex("collection_logs_client_idx").on(t.clientId)],
+);
+
+/**
  * Jadwal ronda mingguan. `dayOfWeek` = hari malamnya (0 = Ahad/malam Senin … 6 = Sabtu/malam Minggu).
- * Rumah dicatat lewat blok + nomor (bukan id) supaya jadwal tetap tersimpan walau rumahnya belum terdaftar;
- * blok kosong = tanpa rumah. `userId` = akun petugas yang jaga (kalau ada).
+ * Tiap baris menunjuk tepat satu: akun petugas (rumah dan namanya dari akun), rumah tanpa akun
+ * (nama dari data rumah), atau nama bebas tanpa akun dan rumah. Tidak ada salinan nama atau blok/nomor.
  */
 export const rondaSchedule = sqliteTable(
   "ronda_schedule",
@@ -106,14 +146,16 @@ export const rondaSchedule = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     dayOfWeek: integer("day_of_week").notNull(),
     position: integer("position").notNull(),
+    userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+    houseId: integer("house_id").references(() => houses.id, { onDelete: "cascade" }),
     name: text("name"),
-    block: text("block").notNull(),
-    number: text("number").notNull(),
-    userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
     /** Warna sel di tabel jadwal asli; null = putih. */
     color: text("color", { enum: ["green", "yellow", "orange"] }),
   },
-  (t) => [index("ronda_schedule_day_idx").on(t.dayOfWeek, t.position)],
+  (t) => [
+    index("ronda_schedule_day_idx").on(t.dayOfWeek, t.position),
+    check("ronda_schedule_one_source", sql`(user_id is not null) + (house_id is not null) + (name is not null) = 1`),
+  ],
 );
 
 /** Permintaan petugas untuk mengubah malam jaganya; admin menyetujui atau menolak. */

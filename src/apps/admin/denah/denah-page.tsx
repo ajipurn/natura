@@ -3,12 +3,12 @@ import { Box, Map as MapIcon } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
 import { Link } from "react-router";
 import { QueryState } from "@/components/query-state";
-import { SitePlanMap } from "@/components/site-plan-map";
 import { Card, PageHeader, SectionTitle, cx } from "@/components/ui";
 import { houseLabel } from "@/lib/houses";
 import { matchPlan } from "@/lib/site-plan";
 import { SITE_PLAN } from "@/site-plan";
 import { housesQuery } from "../queries";
+import { PlanCalibration } from "./plan-calibration";
 import { RegisterPlanHouses } from "./register-plan-houses";
 
 const SiteMap3D = lazy(() => import("@/components/site-map-3d"));
@@ -83,7 +83,7 @@ export function DenahPage() {
                 </div>
               </div>
               {view === "2d" ? (
-                <SitePlanMap plan={SITE_PLAN} houses={houses} highlightMissing />
+                <PlanCalibration houses={houses} />
               ) : (
                 <Suspense fallback={<p className="py-20 text-center text-muted">Memuat tampilan 3D…</p>}>
                   <SiteMap3D plan={SITE_PLAN} houses={houses} markers={{}} />

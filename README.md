@@ -7,7 +7,7 @@ Satu aplikasi, tiga bagian:
 | Alamat | Untuk | Isi |
 | --- | --- | --- |
 | `/petugas/` | Petugas ronda (HP) | Scan QR, catat manual, denah 2D/3D, jaga malam ini, riwayat, jadwal. Tetap jalan tanpa sinyal. |
-| `/admin/` | Pengurus (laptop/HP) | Dashboard ringkasan, data rumah & cetak QR, petugas, jadwal, rekap bulanan, riwayat & koreksi, denah, info warga, pengaturan. |
+| `/admin/` | Pengurus (laptop/HP) | Dashboard ringkasan, audit catatan, data rumah & cetak QR, petugas, jadwal, rekap bulanan, riwayat & koreksi, denah, info warga, pengaturan. |
 | `/` | Warga | Pengumuman, jaga malam ini & jadwal seminggu, rekap jimpitan per bulan, status per rumah, kontak pengurus. Dibuka dengan **kode warga**. |
 
 Stiker QR berisi alamat `/r/<kode>`: dibuka pakai kamera HP biasa, warga melihat riwayat jimpitan rumah itu, dan petugas yang sudah masuk bisa langsung mencatat.
@@ -24,6 +24,10 @@ Stiker QR berisi alamat `/r/<kode>`: dibuka pakai kamera HP biasa, warga melihat
 - **Warna jadwal seperti tabel aslinya** (hijau, kuning, oranye, putih) di semua chip petugas jaga. Warna ikut terbaca saat tabel ditempel dari Excel/Google Sheets, dan bisa diubah per baris di editor jadwal.
 - **Permintaan ubah jadwal:** petugas meminta pindah atau tambah malam jaga dari app petugas (menu Akun atau Jadwal) beserta alasannya. Admin melihatnya di halaman Jadwal (ada penanda jumlah di menu dan Ringkasan), lalu menyetujui (jadwal langsung berubah) atau menolak dengan catatan.
 - **Petugas terhubung ke rumah dan jadwal:** halaman Petugas punya pencarian, filter (admin, nonaktif, belum dijadwalkan), dan dialog untuk mengatur rumah serta malam jaga tiap petugas. PIN petugas baru dibuat acak dan bisa langsung dikirim lewat WhatsApp.
+- **Hanya yang jaga malam itu yang bisa mencatat:** scan QR dan catat manual ditolak kalau malam itu bukan jadwal jaganya, termasuk untuk admin. Server yang memeriksa, juga untuk catatan dari antrean offline dan dari halaman QR rumah. App petugas menyembunyikan tombol Scan/Manual dan menunjukkan jadwalnya sendiri. Admin tetap bisa mengoreksi catatan lewat Riwayat di dashboard.
+- **Lokasi saya di denah:** petugas bisa menyalakan lokasi di tampilan Denah untuk melihat posisinya dan sedang di kavling/blok mana, lalu mematikannya lagi. Sebelumnya admin mengkalibrasi denah sekali di **Admin → Denah** dengan minimal 3 titik acuan yang berjauhan: ketuk titiknya di denah, lalu isi koordinat dari Google Maps atau "Pakai lokasi saya". Selisih tiap titik ditampilkan supaya titik yang salah kelihatan. Lokasi hanya dipakai di HP, tidak dikirim ke server, dan butuh alamat https.
+- **Audit catatan:** setiap scan QR, catat manual, dan koreksi admin tercatat lengkap (siapa, rumah mana, jam berapa, jam terkirim kalau HP sempat offline), lalu dicocokkan dengan jadwal jaga malam itu. Halaman **Audit catatan** menandai tiap catatan "Jaga" atau "Tidak dijadwalkan", menampilkan petugas jaga yang belum mencatat, dan Ringkasan memberi peringatan kalau ada catatan dari petugas di luar jadwal.
+- **Data petugas dan rumah satu sumber:** nama warga di rumah yang dihuni petugas adalah nama akunnya, dan jadwal hanya menyimpan rujukan ke akun atau rumah. Nama yang diubah di **Petugas** atau di **Rumah & QR** langsung berubah di jadwal, denah, app petugas, dan halaman warga; petugas yang pindah rumah membawa jadwalnya. Nama boleh kembar asal rumahnya beda; di halaman masuk rumahnya ikut ditampilkan.
 - **Dashboard admin:** ringkasan malam ini, total bulan ini, grafik 30 malam terakhir, rumah yang sering kosong, dan daftar hal yang belum disiapkan.
 - **Riwayat per malam** (jam, petugas, scan/manual) dan koreksi oleh admin.
 - **Rekap bulanan** berupa tabel rumah × tanggal, bisa diunduh sebagai CSV.
@@ -54,12 +58,12 @@ Semua waktu memakai WIB. Ronda yang lewat tengah malam tetap dihitung malam sebe
 
 - semua kavling berpenghuni di denah menjadi data rumah (76 rumah),
 - jadwal ronda dari `scripts/jadwal-natura.tsv` (salinan tabel jadwal; ubah file ini kalau jadwal berganti) beserta warna selnya dari `scripts/jadwal-natura-warna.tsv`,
-- nama KK dari jadwal, hanya untuk rumah yang nama KK-nya masih kosong,
-- akun petugas untuk setiap nama di jadwal, dengan PIN 4 angka acak. Nama kembar dibedakan rumahnya, mis. "Wawan (AD-5)".
+- akun petugas untuk setiap nama di jadwal, tinggal di rumah yang tertulis di jadwal, dengan PIN 4 angka acak. Nama kembar ("Wawan" di AD-5 dan AF-7) jadi dua akun bernama sama di rumah berbeda,
+- nama KK dari jadwal untuk rumah tanpa akun petugas yang nama KK-nya masih kosong.
 
-Akun petugas langsung terhubung dengan rumah dan malam jaganya di jadwal.
+Jadwal menunjuk akun petugas (rumahnya dari akun) atau rumah tanpa akun; nama dan rumah tidak disalin ke jadwal.
 
-Jalankan setelah admin pertama dibuat di `/admin/setup`. PIN akun baru disimpan di `petugas-pin.csv` (atau `petugas-pin-remote.csv` untuk Cloudflare). File itu tidak ikut di-commit; bagikan PIN lewat chat pribadi lalu hapus filenya. Seed aman dijalankan ulang: rumah, nama KK, akun, dan jadwal yang sudah ada tidak diubah, supaya jadwal yang sudah diatur di dashboard tidak tertimpa. Warna yang masih kosong di jadwal yang sudah ada tetap diisi dari file warna. Untuk mengganti jadwal dengan isi file: `bun run seed --jadwal`.
+Jalankan setelah admin pertama dibuat di `/admin/setup`. PIN akun baru disimpan di `petugas-pin.csv` (atau `petugas-pin-remote.csv` untuk Cloudflare). File itu tidak ikut di-commit; bagikan PIN lewat chat pribadi lalu hapus filenya. Seed aman dijalankan ulang: rumah, nama KK, akun (termasuk yang sudah diganti namanya), dan jadwal yang sudah ada tidak diubah, supaya jadwal yang sudah diatur di dashboard tidak tertimpa. Warna yang masih kosong di jadwal yang sudah ada tetap diisi dari file warna. Untuk mengganti jadwal dengan isi file: `bun run seed --jadwal`.
 
 ### Mengubah denah
 

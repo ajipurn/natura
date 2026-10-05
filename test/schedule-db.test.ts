@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Db } from "@/server/db";
 import { listSchedule, saveSchedule } from "@/server/schedule";
-import { houses } from "@/server/schema";
-import type { ScheduleEntry } from "@/lib/schedule";
+import { houses, users } from "@/server/schema";
+import { slotHouseLabel, type ScheduleEntry } from "@/lib/schedule";
 import { createTestEnv } from "./helpers/d1";
 
 let db: Db;
@@ -33,21 +33,21 @@ describe("saveSchedule", () => {
       days: 4,
       namesFilled: 1,
       linked: 0,
+      housesLinked: 0,
       unknown: ["C-1"],
       conflicting: ["AB-1 (Kantor, Eko)"],
     });
 
+    // Tanpa akun: baris menunjuk rumahnya (namanya dari data rumah); kode rumah tak terdaftar jadi nama.
     const rows = await listSchedule(db);
-    expect(rows.map((r) => [r.day, r.position, r.name, `${r.block}-${r.number}`, r.houseId !== null])).toEqual([
-      [0, 0, "Yusuf", "AD-3", true],
-      [1, 0, "Bu Ros", "AB-8", true],
-      [1, 1, "Kantor", "AB-1", true],
-      [2, 0, "Apri", "C-1", false],
-      [2, 1, null, "AD-3", true],
-      [5, 0, "Eko", "AB-1", true],
+    expect(rows.map((r) => [r.day, r.position, r.name, slotHouseLabel(r), r.ownerName])).toEqual([
+      [0, 0, null, "AD-3", "Yusuf"],
+      [1, 0, null, "AB-8", "Lama"],
+      [1, 1, null, "AB-1", null],
+      [2, 0, "Apri (C-1)", "", null],
+      [2, 1, null, "AD-3", "Yusuf"],
+      [5, 0, null, "AB-1", null],
     ]);
-    const byKey = Object.fromEntries(rows.map((r) => [`${r.block}-${r.number}`, r.ownerName]));
-    expect(byKey).toMatchObject({ "AD-3": "Yusuf", "AB-8": "Lama", "AB-1": null });
   });
 
   it("impor ulang mengganti jadwal; opsi timpa mengganti nama yang sudah ada", async () => {
@@ -66,5 +66,41 @@ describe("saveSchedule", () => {
     });
     expect(summary.namesFilled).toBe(0);
     expect((await listSchedule(db))[0].ownerName).toBe("Yusuf");
+  });
+});
+
+describe("satu sumber: akun petugas dan rumah", () => {
+  it("baris rumah yang dihuni petugas jadi baris petugas itu; nama kembar dibedakan rumahnya", async () => {
+    const [ad5, af7] = await db
+      .insert(houses)
+      .values([
+        { block: "AD", number: "5", token: "SCHEDAD5XX" },
+        { block: "AF", number: "7", token: "SCHEDAF7XX" },
+      ])
+      .returning({ id: houses.id });
+    await db.insert(users).values([
+      { name: "Wawan", pinHash: "x", houseId: ad5.id },
+      { name: "Wawan", pinHash: "x", houseId: af7.id },
+      { name: "Nino", pinHash: "x" },
+    ]);
+    const summary = await saveSchedule(
+      db,
+      [
+        { day: 6, position: 0, name: "Wawan", block: "AF", number: "7" },
+        { day: 6, position: 1, name: null, block: "AD", number: "5" },
+        { day: 1, position: 0, name: "Nino", block: "AB", number: "8" },
+      ],
+      { fillNames: true, overwriteNames: true },
+    );
+    expect(summary).toMatchObject({ linked: 3, housesLinked: 1, namesFilled: 0 });
+
+    const rows = await listSchedule(db);
+    expect(rows.map((r) => [r.day, r.name, slotHouseLabel(r), r.userId !== null])).toEqual([
+      [1, "Nino", "AB-8", true],
+      [6, "Wawan", "AF-7", true],
+      [6, "Wawan", "AD-5", true],
+    ]);
+    // Nino belum punya rumah: diisi AB-8 dari jadwal, dan nama KK lama rumah itu diganti nama akunnya.
+    expect(rows.map((r) => r.ownerName)).toEqual(["Nino", "Wawan", "Wawan"]);
   });
 });

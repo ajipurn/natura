@@ -8,6 +8,7 @@ import { matchPlan } from "@/lib/site-plan";
 import { SITE_PLAN } from "@/site-plan";
 import type { Db } from "./db";
 import { getCollectionsForDate, getMonthRecap, getSettings, listHouses, listPatrols } from "./queries";
+import { countOffDuty } from "./audit";
 import { countPendingRequests } from "./requests";
 import { listSchedule } from "./schedule";
 import { announcements, settings, users } from "./schema";
@@ -16,7 +17,7 @@ import { announcements, settings, users } from "./schema";
 export async function getDashboard(db: Db, now: Date) {
   const date = rondaDate(now);
   const month = date.slice(0, 7);
-  const [settingsRow, houseRows, tonightRows, recap, recent, schedule, [userCounts], [announcementCount], [codeRow], pendingRequests] =
+  const [settingsRow, houseRows, tonightRows, recap, recent, schedule, [userCounts], [announcementCount], [codeRow], pendingRequests, offDuty] =
     await Promise.all([
       getSettings(db),
       listHouses(db),
@@ -33,6 +34,7 @@ export async function getDashboard(db: Db, now: Date) {
       db.select({ value: count() }).from(announcements),
       db.select({ wargaCode: settings.wargaCode }).from(settings).where(eq(settings.id, 1)).limit(1),
       countPendingRequests(db),
+      countOffDuty(db, date),
     ]);
 
   const tonight = summarize(houseRows, tonightRows);
@@ -84,6 +86,8 @@ export async function getDashboard(db: Db, now: Date) {
       onlyOneUser: (userCounts?.active ?? 0) <= 1,
       /** Permintaan ubah jadwal yang menunggu keputusan admin. */
       pendingRequests,
+      /** Catatan malam ini oleh petugas yang tidak dijadwalkan jaga. */
+      offDuty,
     },
   };
 }

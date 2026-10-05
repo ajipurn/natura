@@ -3,6 +3,11 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cx } from "./ui";
 
 const ZOOM_LEVELS = [1, 1.5, 2, 3, 4];
+/** Zoom minimum saat menuju sebuah titik (mis. lokasi petugas), supaya kavling di sekitarnya terbaca. */
+const FOCUS_ZOOM_INDEX = 3;
+
+/** Titik yang dituju, sebagai pecahan lebar/tinggi isi (0–1). Ganti `key` untuk menuju lagi. */
+export type ZoomFocus = { fx: number; fy: number; key: number };
 
 /**
  * Bingkai denah yang bisa di-zoom dan digeser. Tombol zoom ada di bawah, di luar denah,
@@ -11,9 +16,11 @@ const ZOOM_LEVELS = [1, 1.5, 2, 3, 4];
 export function ZoomPane({
   children,
   readableWidth,
+  focus,
   className,
 }: {
   children: ReactNode;
+  focus?: ZoomFocus | null;
   /** Lebar minimum (px) agar isi terbaca; zoom awal dinaikkan di layar sempit lalu ditengahkan. */
   readableWidth?: number;
   className?: string;
@@ -23,6 +30,13 @@ export function ZoomPane({
   const zoom = ZOOM_LEVELS[zoomIndex];
   const prevZoom = useRef(zoom);
   const centerNext = useRef(false);
+  // Menuju titik tertentu (key baru): perbesar dulu kalau perlu; penggeserannya di efek di bawah.
+  const [focusKey, setFocusKey] = useState<number | undefined>(undefined);
+  if (focus && focus.key !== focusKey) {
+    setFocusKey(focus.key);
+    if (zoomIndex < FOCUS_ZOOM_INDEX) setZoomIndex(FOCUS_ZOOM_INDEX);
+  }
+  const handledFocus = useRef<number | undefined>(undefined);
 
   // Zoom berubah: pertahankan titik tengah tampilan (atau ke tengah untuk zoom awal).
   useLayoutEffect(() => {
@@ -41,6 +55,16 @@ export function ZoomPane({
     }
     prevZoom.current = zoom;
   }, [zoom]);
+
+  // Dijalankan setelah efek zoom di atas, jadi titik tujuan yang menang. Hanya sekali per key,
+  // bukan setiap posisi bergeser.
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !focus || handledFocus.current === focus.key) return;
+    handledFocus.current = focus.key;
+    el.scrollLeft = focus.fx * el.scrollWidth - el.clientWidth / 2;
+    el.scrollTop = focus.fy * el.scrollHeight - el.clientHeight / 2;
+  }, [focus, zoom]);
 
   useLayoutEffect(() => {
     const el = scrollRef.current;

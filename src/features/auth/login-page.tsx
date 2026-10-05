@@ -90,6 +90,7 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
               {list.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
+                  {u.house && list.some((o) => o.id !== u.id && o.name.toLowerCase() === u.name.toLowerCase()) && ` (${u.house})`}
                 </option>
               ))}
             </select>

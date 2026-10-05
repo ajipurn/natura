@@ -1,12 +1,13 @@
 import { useActionState } from "react";
+import { Link } from "react-router";
 import { api, call } from "@/client/api";
 import { runForm, str, type FormState } from "@/client/form";
 import { SubmitButton } from "@/components/submit-button";
 import { Alert, Field, cx, inputClass } from "@/components/ui";
 import type { HouseDTO } from "@/lib/types";
 
-/** Data rumah dipakai di banyak layar (ronda, jadwal, ringkasan): segarkan semuanya. */
-const REFRESH = [["admin"], ["ronda"], ["jadwal"]];
+/** Data rumah dipakai di banyak layar (ronda, jadwal, ringkasan, petugas): segarkan semuanya. */
+const REFRESH = [["admin"], ["ronda"], ["jadwal"], ["auth", "users"]];
 
 function addHousesAction(_prev: FormState, formData: FormData) {
   return runForm(
@@ -66,7 +67,8 @@ export function AddHousesForm() {
   );
 }
 
-export function EditHouseForm({ house, canDelete }: { house: HouseDTO; canDelete: boolean }) {
+/** `accounts` = nama akun petugas yang tinggal di rumah ini; nama warganya diambil dari akun itu. */
+export function EditHouseForm({ house, accounts, canDelete }: { house: HouseDTO; accounts: string[]; canDelete: boolean }) {
   const actions = houseActions(house.id);
   const [state, formAction] = useActionState(actions.update, undefined);
   const [tokenState, tokenAction] = useActionState(actions.regenerate, undefined);
@@ -84,9 +86,32 @@ export function EditHouseForm({ house, canDelete }: { house: HouseDTO; canDelete
             <input name="number" required maxLength={10} defaultValue={house.number} className={inputClass} />
           </Field>
         </div>
-        <Field label="Nama KK">
-          <input name="ownerName" maxLength={80} defaultValue={house.ownerName ?? ""} className={inputClass} />
-        </Field>
+        {accounts.length > 1 ? (
+          <div className="text-sm">
+            <p className="font-medium">Penghuni</p>
+            <p>{accounts.join(", ")}</p>
+            <p className="text-xs text-muted">
+              Nama dari akun petugas; ubah di{" "}
+              <Link to="/admin/petugas" className="font-semibold text-primary underline">
+                Petugas
+              </Link>
+              .
+            </p>
+          </div>
+        ) : (
+          <Field
+            label="Nama KK"
+            hint={accounts.length ? "Sama dengan nama akun petugasnya: mengubah di sini ikut mengubah nama akun itu." : undefined}
+          >
+            <input
+              name="ownerName"
+              required={accounts.length > 0}
+              maxLength={accounts.length ? 40 : 80}
+              defaultValue={house.ownerName ?? ""}
+              className={inputClass}
+            />
+          </Field>
+        )}
         <Field label="Status">
           <select name="status" defaultValue={house.status} className={inputClass}>
             <option value="active">Dihuni (dihitung)</option>

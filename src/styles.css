@@ -18,6 +18,8 @@
   --park: #dcebd3;
   --park-dot: #8fb27e;
   --water: #93c5e8;
+  /* Penanda "lokasimu" di denah. */
+  --you: #2563eb;
   /* Warna sel tabel jadwal ronda asli. */
   --guard-green: #74aa4e;
   --guard-yellow: #fdfc5e;
@@ -46,6 +48,7 @@
     --park: #1b3022;
     --park-dot: #3d6b45;
     --water: #1f4d70;
+    --you: #60a5fa;
     --guard-green: #6a9c47;
     --guard-yellow: #e6e152;
     --guard-orange: #e0a40a;
@@ -71,6 +74,7 @@
   --color-park: var(--park);
   --color-park-dot: var(--park-dot);
   --color-water: var(--water);
+  --color-you: var(--you);
   --color-guard-green: var(--guard-green);
   --color-guard-yellow: var(--guard-yellow);
   --color-guard-orange: var(--guard-orange);

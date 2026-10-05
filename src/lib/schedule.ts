@@ -207,23 +207,41 @@ export function slotHouseLabel(slot: { block: string; number: string }): string 
   return slot.block ? lotKey(slot.block, slot.number) : "";
 }
 
+/** Akun petugas: nama dan rumah tempat tinggalnya. */
+export type GuardAccount = { id: number; name: string; houseId: number | null };
+
 /**
- * Nama tampilan petugas di jadwal. Akun dengan nama kembar dibedakan rumahnya ("Wawan (AD-5)");
- * di jadwal rumahnya sudah tertulis, jadi akhiran itu dibuang.
+ * Akun untuk nama di jadwal: nama sama dan rumahnya sama. Kalau salah satu tidak punya rumah (mis.
+ * kode rumah di jadwal tidak terdaftar), cukup namanya asal tidak kembar. Nama sama di rumah lain
+ * dianggap orang lain.
  */
-export function guardName(name: string | null, slot: { block: string; number: string }): string | null {
-  if (!name) return null;
-  const suffix = ` (${slotHouseLabel(slot)})`;
-  return slot.block && name.endsWith(suffix) ? name.slice(0, -suffix.length) : name;
+export function matchGuardAccount<U extends GuardAccount>(accounts: U[], name: string | null, houseId: number | null): U | undefined {
+  if (!name) return undefined;
+  const same = accounts.filter((a) => a.name.toLowerCase() === name.toLowerCase());
+  const atHouse = houseId === null ? undefined : same.find((a) => a.houseId === houseId);
+  return atHouse ?? (same.length === 1 && (houseId === null || same[0].houseId === null) ? same[0] : undefined);
 }
 
-/** Akun petugas untuk nama di jadwal: nama sama persis, atau "Nama (BLOK-NO)" untuk nama kembar. */
-export function matchGuardAccount<U extends { id: number; name: string }>(
-  accounts: U[],
-  slot: { name: string | null; block: string; number: string },
-): U | undefined {
-  if (!slot.name) return undefined;
-  const plain = slot.name.toLowerCase();
-  const withHouse = `${plain} (${slotHouseLabel(slot).toLowerCase()})`;
-  return accounts.find((a) => a.name.toLowerCase() === withHouse) ?? accounts.find((a) => a.name.toLowerCase() === plain);
+/** Isi satu baris jadwal yang disimpan: tepat satu dari akun petugas, rumah tanpa akun, atau nama bebas. */
+export type SlotSource = { userId: number | null; houseId: number | null; name: string | null };
+
+/**
+ * Baris jadwal hasil impor ("Nama (BLOK-NO)") menjadi rujukan ke akun atau rumah, supaya nama dan
+ * rumahnya tidak disalin ke jadwal. Rumah yang dihuni satu petugas dihitung sebagai petugas itu.
+ * Kode rumah yang tidak terdaftar disimpan sebagai nama, mis. "Apri (C-1)".
+ */
+export function resolveEntry(
+  entry: { name: string | null; block: string; number: string },
+  houses: Map<string, { id: number }>,
+  accounts: GuardAccount[],
+): SlotSource {
+  const house = entry.block ? houses.get(lotKey(entry.block, entry.number)) : undefined;
+  const account = matchGuardAccount(accounts, entry.name, house?.id ?? null);
+  if (account) return { userId: account.id, houseId: null, name: null };
+  if (house) {
+    const residents = accounts.filter((a) => a.houseId === house.id);
+    return residents.length === 1 ? { userId: residents[0].id, houseId: null, name: null } : { userId: null, houseId: house.id, name: null };
+  }
+  const label = slotHouseLabel(entry);
+  return { userId: null, houseId: null, name: entry.name ? (label ? `${entry.name} (${label})` : entry.name) : label };
 }
