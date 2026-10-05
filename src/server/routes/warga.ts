@@ -6,11 +6,14 @@ import { monthStats } from "@/lib/month-stats";
 import { scheduleDay } from "@/lib/schedule";
 import { endWargaAccess, hasWargaAccess, requireWarga, startWargaAccess } from "../auth";
 import type { AppEnv } from "../env";
-import { body } from "../http";
-import { getMonthRecap, getSettings } from "../queries";
+import { body, idParam } from "../http";
+import { getHouseHistory, getMonthRecap, getSettings } from "../queries";
 import { listSchedule } from "../schedule";
-import { announcements, contacts, settings } from "../schema";
+import { announcements, contacts, houses, settings } from "../schema";
 import { monthQuery } from "./ronda";
+
+/** Banyaknya malam ronda terakhir di riwayat per rumah (± 3 bulan). */
+const HISTORY_NIGHTS = 100;
 
 /** Halaman informasi untuk warga, dibuka dengan kode bersama dari pengurus. */
 export const wargaRoutes = new Hono<AppEnv>()
@@ -71,6 +74,23 @@ export const wargaRoutes = new Hono<AppEnv>()
       announcements: announcementRows,
       contacts: contactRows,
     });
+  })
+
+  /**
+   * Riwayat jimpitan satu rumah (tanpa nama warga): malam-malam ronda sekitar 3 bulan terakhir sejak
+   * rumah itu terdaftar. `status` null = malam itu rumahnya tidak dicek petugas.
+   */
+  .get("/rumah/:id", requireWarga, idParam(), async (c) => {
+    const db = c.var.db;
+    const [house] = await db
+      .select({ id: houses.id, block: houses.block, number: houses.number, status: houses.status, createdAt: houses.createdAt })
+      .from(houses)
+      .where(eq(houses.id, c.req.valid("param").id))
+      .limit(1);
+    if (!house) return c.json({ error: "Rumah tidak ditemukan." }, 404);
+    const history = await getHouseHistory(db, house, HISTORY_NIGHTS);
+    const { createdAt: _createdAt, ...rest } = house;
+    return c.json({ house: rest, today: rondaDate(new Date()), history });
   })
 
   /** Rekap bulanan tanpa nama: total per malam dan per rumah. */

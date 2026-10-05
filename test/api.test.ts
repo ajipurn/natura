@@ -454,9 +454,17 @@ describe("halaman warga", () => {
     // Rekap warga tanpa nama KK.
     expect(JSON.stringify(rekap.data)).not.toMatch(/ownerName|Nino/);
 
+    // Riwayat satu rumah: malam-malam ronda beserta hasilnya, juga tanpa nama.
+    const checked = (rekap.data.perHouse as { id: number; filled: number }[]).find((h) => h.filled > 0)!;
+    const history = await warga.get(`/api/warga/rumah/${checked.id}`);
+    expect(history.data).toMatchObject({ house: { id: checked.id }, history: [{ date: rekap.data.today, status: "filled" }] });
+    expect(JSON.stringify(history.data)).not.toMatch(/ownerName|token/);
+    expect((await warga.get("/api/warga/rumah/99999")).status).toBe(404);
+
     // Kode diganti: akses lama tidak berlaku.
     await admin.post("/api/admin/pengaturan/kode-warga", { enabled: true });
     expect((await warga.get("/api/warga")).status).toBe(401);
+    expect((await warga.get(`/api/warga/rumah/${checked.id}`)).status).toBe(401);
   });
 });
 

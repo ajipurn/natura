@@ -14,7 +14,10 @@ export function BarChart({ bars, caption, className }: { bars: Bar[]; caption: s
         {bars.map((b) => (
           <div key={b.key} className="group relative flex h-full min-w-0 flex-1 flex-col justify-end" title={b.title}>
             <div
-              className={cx("w-full rounded-t", b.highlight ? "bg-primary" : "bg-primary/45 group-hover:bg-primary/70")}
+              className={cx(
+                "mx-auto w-full max-w-8 rounded-t",
+                b.highlight ? "bg-primary" : b.value === 0 ? "bg-line" : "bg-primary/45 group-hover:bg-primary/70",
+              )}
               style={{ height: `${Math.max(2, (b.value / max) * 100)}%` }}
             />
           </div>

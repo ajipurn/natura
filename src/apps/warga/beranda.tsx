@@ -2,13 +2,16 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ChevronLeft,
   ChevronRight,
+  Home,
   KeyRound,
   LogIn,
   Megaphone,
   MessageCircle,
   Phone,
   Pin,
+  Search,
   ShieldCheck,
+  Star,
   Wallet,
 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
@@ -17,14 +20,15 @@ import { api, call, errorMessage } from "@/client/api";
 import { invalidate } from "@/client/query";
 import { BarChart } from "@/components/bar-chart";
 import { GuardChip } from "@/components/guard-chip";
-import { Collapsible } from "@/components/collapsible";
 import { ErrorCard, LoadingCards, QueryState } from "@/components/query-state";
 import { Alert, Card, PageTitle, SectionTitle, buttonClass, cx, inputClass } from "@/components/ui";
-import { addDays, formatDateLong, formatDateShort, formatMonth, shiftMonth } from "@/lib/dates";
+import { addDays, daysInMonth, formatDateLong, formatDateShort, formatMonth, shiftMonth } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
-import { groupByBlock, houseLabel } from "@/lib/houses";
+import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
 import type { GuardColor } from "@/lib/guard-color";
 import { DAY_NAMES, dayLabel, slotHouseLabel } from "@/lib/schedule";
+import { HouseHistoryDialog } from "./house-history";
+import { houseMonthText, useMyHouse } from "./my-house";
 
 const accessQuery = { queryKey: ["warga", "akses"], queryFn: () => call(api.warga.akses.$get()) };
 
@@ -35,10 +39,23 @@ export function BerandaPage() {
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-16 pt-6">
       <PageTitle title="Info warga" />
-      <p className="text-sm font-medium text-primary">
-        Jimpitan{access.data?.communityName ? ` ${access.data.communityName}` : ""}
-      </p>
-      <h1 className="text-3xl font-bold tracking-tight">Info warga</h1>
+      <header className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-primary">
+            Jimpitan{access.data?.communityName ? ` ${access.data.communityName}` : ""}
+          </p>
+          <h1 className="text-3xl font-bold tracking-tight">Info warga</h1>
+        </div>
+        {/* Untuk petugas dan pengurus; warga cukup memakai kode. */}
+        <a
+          href="/petugas/"
+          aria-label="Masuk petugas / pengurus"
+          title="Masuk petugas / pengurus"
+          className={cx(buttonClass("secondary", "sm"), "mt-1 shrink-0")}
+        >
+          <LogIn className="size-4" /> Masuk
+        </a>
+      </header>
       <div className="mt-5">
         {access.isError ? (
           <ErrorCard message={errorMessage(access.error)} onRetry={() => void access.refetch()} />
@@ -56,11 +73,6 @@ export function BerandaPage() {
           </Card>
         )}
       </div>
-      <p className="mt-10 text-center">
-        <a href="/petugas/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted">
-          <LogIn className="size-4" /> Masuk petugas / pengurus
-        </a>
-      </p>
     </main>
   );
 }
@@ -203,7 +215,7 @@ function GuardSchedule({ schedule, tonight, date }: { schedule: Guard[]; tonight
 
   return (
     <Card className="p-0">
-      <div role="tablist" aria-label="Pilih malam" className="flex gap-1 overflow-x-auto border-b border-line p-2">
+      <div role="tablist" aria-label="Pilih malam" className="flex gap-1 overflow-x-auto border-b border-line p-2 sm:grid sm:grid-cols-7">
         {[0, 1, 2, 3, 4, 5, 6].map((i) => {
           const d = (tonight + i) % 7;
           const count = schedule.filter((s) => s.day === d).length;
@@ -215,7 +227,7 @@ function GuardSchedule({ schedule, tonight, date }: { schedule: Guard[]; tonight
               aria-selected={offset === i}
               onClick={() => setOffset(i)}
               className={cx(
-                "flex min-w-14 shrink-0 flex-col items-center rounded-xl px-2.5 py-1.5 leading-tight",
+                "flex min-w-14 shrink-0 flex-col items-center rounded-xl px-2.5 py-1.5 leading-tight sm:min-w-0",
                 offset === i ? "bg-primary text-primary-fg" : "text-fg hover:bg-idle-soft",
               )}
             >
@@ -293,76 +305,134 @@ function MonthRecap({ today }: { today: string }) {
                   <Stat label="Rata-rata/malam" value={formatRupiah(data.average)} />
                 </div>
                 <BarChart
-                  className="mt-4"
+                  className="mt-5"
                   caption={`Jimpitan per malam, ${formatMonth(month)}`}
-                  bars={data.perNight.map((n) => ({
-                    key: n.date,
-                    label: String(Number(n.date.slice(8))),
-                    value: n.total,
-                    title: `${formatDateShort(n.date)}: ${formatRupiah(n.total)} dari ${n.filled} rumah`,
-                  }))}
+                  bars={daysInMonth(month)
+                    .filter((date) => date <= data.today)
+                    .map((date) => {
+                      const night = data.perNight.find((n) => n.date === date);
+                      return {
+                        key: date,
+                        label: String(Number(date.slice(8))),
+                        value: night?.total ?? 0,
+                        highlight: date === data.today,
+                        title: night
+                          ? `${formatDateShort(date)}: ${formatRupiah(night.total)} dari ${night.filled} rumah`
+                          : `${formatDateShort(date)}: tidak ada catatan ronda`,
+                      };
+                    })}
                 />
+                <p className="mt-1 text-center text-xs text-muted">Jimpitan per malam (tanggal)</p>
               </>
             )
           }
         </QueryState>
       </Card>
-      {recap.data && recap.data.nights > 0 && <HouseStatus perHouse={recap.data.perHouse} />}
+      {recap.data && recap.data.nights > 0 && <HouseStatus perHouse={recap.data.perHouse} month={recap.data.month} />}
     </>
   );
 }
 
-function HouseStatus({
-  perHouse,
-}: {
-  perHouse: { id: number; block: string; number: string; status: "active" | "vacant"; filled: number; empty: number }[];
-}) {
+type HouseRow = { id: number; block: string; number: string; status: "active" | "vacant"; filled: number; empty: number };
+
+/** Status tiap rumah bulan ini, tanpa nama warga. Ketuk rumah untuk melihat riwayatnya. */
+function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState<HouseRow | null>(null);
+  const [myHouse, setMyHouse] = useMyHouse();
+  const mine = perHouse.find((h) => h.id === myHouse);
+  const shown = query.trim() ? searchHouses(perHouse, query, perHouse.length) : perHouse;
+
   return (
-    <Collapsible className="mt-3" title={<span>Status per rumah</span>}>
-      <p className="mt-2 text-sm text-muted">
-        Berapa malam wadah jimpitan ada isinya, dari malam-malam rumah itu dicek petugas.
-      </p>
-      <div className="mt-3 space-y-4">
-        {groupByBlock(perHouse).map(([block, list]) => (
-          <section key={block}>
-            <h3 className="mb-1.5 text-sm font-semibold">Blok {block}</h3>
-            <ul className="grid grid-cols-4 gap-1.5 sm:grid-cols-8">
-              {list.map((h) => {
-                // Malam yang rumah ini tidak dicek tidak dihitung, supaya tidak terlihat seperti kosong.
-                const checked = h.filled + h.empty;
-                const ratio = checked ? h.filled / checked : null;
-                const text =
-                  h.status === "vacant" ? "mudik" : checked ? `${h.filled}/${checked}` : "–";
-                return (
-                  <li
-                    key={h.id}
-                    className={cx(
-                      "rounded-lg border px-1 py-1.5 text-center",
-                      h.status === "vacant" || ratio === null
-                        ? "border-dashed border-line text-muted"
-                        : ratio >= 0.8
-                          ? "border-filled/40 bg-filled-soft text-filled"
-                          : ratio >= 0.5
-                            ? "border-warn/40 bg-warn-soft text-warn"
-                            : "border-empty/40 bg-empty-soft text-empty",
-                    )}
-                    title={
-                      checked
-                        ? `${houseLabel(h)}: ada isinya ${h.filled} dari ${checked} malam dicek`
-                        : `${houseLabel(h)}: belum dicek bulan ini`
-                    }
-                  >
-                    <span className="block text-sm font-bold">{h.number}</span>
-                    <span className="block text-[11px]">{text}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        ))}
-      </div>
-      <Legend />
-    </Collapsible>
+    <>
+      <SectionTitle>
+        <span className="inline-flex items-center gap-1.5">
+          <Home className="size-4" /> Status per rumah
+        </span>
+      </SectionTitle>
+      <Card className="space-y-4">
+        <p className="text-sm text-muted">
+          Berapa malam wadah jimpitan ada isinya di {formatMonth(month)}, dari malam-malam rumah itu dicek petugas. Ketuk
+          rumah untuk melihat riwayatnya.
+        </p>
+        {mine && (
+          <button
+            type="button"
+            onClick={() => setOpen(mine)}
+            className="flex w-full items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2.5 text-left"
+          >
+            <Star className="size-5 shrink-0 fill-current text-primary" aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold">Rumah saya · {houseLabel(mine)}</span>
+              <span className="block text-sm text-muted">{houseMonthText(mine)}</span>
+            </span>
+            <span className="shrink-0 text-sm font-semibold text-primary">Riwayat</span>
+          </button>
+        )}
+        <label className="relative block">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Cari rumah, mis. AD3"
+            aria-label="Cari rumah"
+            className={cx(inputClass, "pl-10")}
+          />
+        </label>
+        {shown.length === 0 ? (
+          <p className="py-4 text-center text-sm text-muted">Tidak ada rumah yang cocok.</p>
+        ) : (
+          <div className="space-y-4">
+            {groupByBlock(shown).map(([block, list]) => (
+              <section key={block} aria-label={`Blok ${block}`}>
+                <h3 className="mb-1.5 text-sm font-semibold">Blok {block}</h3>
+                <ul className="grid grid-cols-4 gap-1.5 sm:grid-cols-8">
+                  {list.map((h) => {
+                    // Malam yang rumah ini tidak dicek tidak dihitung, supaya tidak terlihat seperti kosong.
+                    const checked = h.filled + h.empty;
+                    const ratio = checked ? h.filled / checked : null;
+                    return (
+                      <li key={h.id}>
+                        <button
+                          type="button"
+                          onClick={() => setOpen(h)}
+                          aria-label={`${houseLabel(h)}: ${houseMonthText(h)}. Lihat riwayat`}
+                          className={cx(
+                            "relative w-full rounded-lg border px-1 py-1.5 text-center transition active:scale-95",
+                            h.status === "vacant" || ratio === null
+                              ? "border-dashed border-line text-muted hover:border-muted"
+                              : ratio >= 0.8
+                                ? "border-filled/40 bg-filled-soft text-filled hover:border-filled"
+                                : ratio >= 0.5
+                                  ? "border-warn/40 bg-warn-soft text-warn hover:border-warn"
+                                  : "border-empty/40 bg-empty-soft text-empty hover:border-empty",
+                            h.id === myHouse && "ring-2 ring-primary ring-offset-1 ring-offset-card",
+                          )}
+                        >
+                          <span className="block text-sm font-bold">{h.number}</span>
+                          <span className="block text-[11px]">
+                            {h.status === "vacant" ? "mudik" : checked ? `${h.filled}/${checked}` : "–"}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+          </div>
+        )}
+        <Legend />
+      </Card>
+      <HouseHistoryDialog
+        houseId={open?.id ?? null}
+        label={open ? houseLabel(open) : ""}
+        onClose={() => setOpen(null)}
+        myHouse={myHouse}
+        onMyHouse={setMyHouse}
+      />
+    </>
   );
 }
 
@@ -374,7 +444,7 @@ function Legend() {
     ["border-dashed border-line", "belum dicek"],
   ];
   return (
-    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
       {items.map(([cls, label]) => (
         <span key={cls} className="flex items-center gap-1.5">
           <span className={cx("inline-block size-3 rounded border", cls)} />
