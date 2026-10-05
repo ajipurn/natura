@@ -1,7 +1,9 @@
 import { and, count, desc, eq, sql } from "drizzle-orm";
+import { compareHouses } from "@/lib/houses";
 import { scheduleDay, slotHouseLabel } from "@/lib/schedule";
 import type { Db } from "./db";
 import { houseName } from "./house-name";
+import { getCollectionsForDate } from "./queries";
 import { listSchedule } from "./schedule";
 import { collectionLogs, houses, users } from "./schema";
 
@@ -11,7 +13,7 @@ import { collectionLogs, houses, users } from "./schema";
  */
 export async function getAudit(db: Db, date: string) {
   const day = scheduleDay(date);
-  const [logs, schedule] = await Promise.all([
+  const [logs, schedule, current] = await Promise.all([
     db
       .select({
         id: collectionLogs.id,
@@ -34,6 +36,7 @@ export async function getAudit(db: Db, date: string) {
       .where(eq(collectionLogs.date, date))
       .orderBy(desc(collectionLogs.recordedAt), desc(collectionLogs.id)),
     listSchedule(db),
+    getCollectionsForDate(db, date),
   ]);
 
   const byPetugas = logs.filter((l) => l.method !== "koreksi");
@@ -56,6 +59,31 @@ export async function getAudit(db: Db, date: string) {
       count: recorders.get(s.userId!)?.count ?? 0,
     }));
 
+  // Rumah yang dicatat lebih dari satu petugas (mis. dua petugas scan rumah yang sama), urut waktu,
+  // beserta catatan yang berlaku sekarang.
+  const perHouse = new Map<number, typeof byPetugas>();
+  for (const l of [...byPetugas].reverse()) perHouse.set(l.houseId, [...(perHouse.get(l.houseId) ?? []), l]);
+  const currentByHouse = new Map(current.map((c) => [c.houseId, c]));
+  const conflicts = [...perHouse.values()]
+    .filter((list) => new Set(list.map((l) => l.userId)).size > 1)
+    .map((list) => {
+      const c = currentByHouse.get(list[0].houseId);
+      return {
+        houseId: list[0].houseId,
+        block: list[0].block,
+        number: list[0].number,
+        entries: list.map((l) => ({
+          id: l.id,
+          userName: l.userName,
+          status: l.status,
+          amount: l.amount,
+          recordedAt: l.recordedAt.toISOString(),
+        })),
+        current: c ? { status: c.status, amount: c.amount, collectorName: c.collectorName } : null,
+      };
+    })
+    .sort(compareHouses);
+
   return {
     date,
     logs: logs.map(({ recordedAt, createdAt, ...l }) => ({
@@ -64,6 +92,7 @@ export async function getAudit(db: Db, date: string) {
       /** Diterima server; bisa jauh lebih lambat dari waktu catat kalau HP sedang offline. */
       syncedAt: createdAt.toISOString(),
     })),
+    conflicts,
     /** Pencatat yang tidak dijadwalkan malam itu. */
     offDuty: [...recorders.values()].filter((r) => !r.onDuty),
     /** Petugas yang dijadwalkan malam itu (menurut jadwal sekarang) dan jumlah catatannya. */

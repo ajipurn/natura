@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ChevronLeft, ChevronRight, CloudOff, QrCode, ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { AlertTriangle, ChevronLeft, ChevronRight, CloudOff, QrCode, ShieldCheck, Users } from "lucide-react";
+import { Fragment, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { guardColorClass } from "@/components/guard-color-class";
 import { QueryState } from "@/components/query-state";
@@ -60,6 +60,52 @@ export function AuditPage() {
                     {data.offDuty.map((r) => `${r.name} (${r.count} catatan)`).join(", ")}.
                   </span>
                 </p>
+              )}
+
+              {data.conflicts.length > 0 && (
+                <Card className="border-warn/40">
+                  <h2 className="flex items-center gap-2 font-semibold">
+                    <Users className="size-5 text-warn" /> Dicatat lebih dari satu petugas · {data.conflicts.length}
+                  </h2>
+                  <p className="mt-0.5 text-sm text-muted">
+                    "Kosong" atau hapus dari petugas lain tidak menimpa "Ada" (isinya mungkin sudah diambil petugas pertama). Periksa,
+                    lalu koreksi di Riwayat kalau perlu.
+                  </p>
+                  <ul className="mt-2 divide-y divide-line">
+                    {data.conflicts.map((c) => (
+                      <li key={c.houseId} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-sm">
+                        <strong className="w-14 shrink-0 tabular-nums">
+                          {c.block}-{c.number}
+                        </strong>
+                        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1">
+                          {c.entries.map((e, i) => (
+                            <Fragment key={e.id}>
+                              {i > 0 && <ChevronRight className="size-3.5 text-muted" aria-label="lalu" />}
+                              <span className="whitespace-nowrap">
+                                {e.userName ?? "—"} <StatusText status={e.status} amount={e.amount} />{" "}
+                                <span className="text-xs text-muted">{formatTime(e.recordedAt)}</span>
+                              </span>
+                            </Fragment>
+                          ))}
+                        </span>
+                        <span className="text-xs text-muted">
+                          Berlaku:{" "}
+                          {c.current ? (
+                            <>
+                              <StatusText status={c.current.status} amount={c.current.amount} />
+                              {c.current.collectorName && ` (${c.current.collectorName})`}
+                            </>
+                          ) : (
+                            "belum dicek"
+                          )}
+                        </span>
+                        <Link to={`/admin/riwayat/${data.date}`} className="text-xs font-semibold text-primary">
+                          Koreksi
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
               )}
 
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
@@ -129,14 +175,7 @@ export function AuditPage() {
                                   {l.block}-{l.number}
                                 </strong>
                                 {l.ownerName && <span className="text-muted"> · {l.ownerName}</span>}
-                                <span
-                                  className={cx(
-                                    "ml-2 text-sm font-semibold",
-                                    l.status === "filled" ? "text-filled" : l.status === "empty" ? "text-empty" : "text-muted",
-                                  )}
-                                >
-                                  {l.status === "filled" ? formatRupiah(l.amount) : l.status === "empty" ? "Kosong" : "Dihapus"}
-                                </span>
+                                <StatusText status={l.status} amount={l.amount} className="ml-2 text-sm" />
                               </span>
                               <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
                                 <span>oleh {l.userName ?? "—"}</span>
@@ -171,5 +210,13 @@ export function AuditPage() {
         }}
       </QueryState>
     </>
+  );
+}
+
+function StatusText({ status, amount, className }: { status: "filled" | "empty" | "none"; amount: number; className?: string }) {
+  return (
+    <span className={cx("font-semibold", status === "filled" ? "text-filled" : status === "empty" ? "text-empty" : "text-muted", className)}>
+      {status === "filled" ? formatRupiah(amount) : status === "empty" ? "Kosong" : "Dihapus"}
+    </span>
   );
 }

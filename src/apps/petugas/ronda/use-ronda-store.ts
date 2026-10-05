@@ -26,7 +26,8 @@ type StoredSnapshot = RondaSnapshot & {
   clockOffset: number;
 };
 
-export type MergedCollection = CollectionDTO & { pending: boolean };
+/** `mine` = dicatat dari akun ini (antrean di HP ini selalu milik sendiri). */
+export type MergedCollection = CollectionDTO & { pending: boolean; mine: boolean };
 
 export type SyncStatus = "idle" | "syncing" | "offline" | "auth";
 
@@ -234,7 +235,8 @@ export function useRondaStore() {
   const collections = useMemo(() => {
     const map = new Map<number, MergedCollection>();
     if (snapshot?.date === date) {
-      for (const c of snapshot.collections) map.set(c.houseId, { ...c, pending: false });
+      const me = snapshot.user.name;
+      for (const c of snapshot.collections) map.set(c.houseId, { ...c, pending: false, mine: c.collectorName === me });
     }
     for (const p of pending) {
       if (p.date !== date) continue;
@@ -249,6 +251,7 @@ export function useRondaStore() {
           recordedAt: p.recordedAt,
           collectorName: p.collectorName,
           pending: true,
+          mine: true,
         });
       }
     }

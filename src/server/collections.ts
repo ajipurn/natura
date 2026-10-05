@@ -1,13 +1,14 @@
-import { and, eq, lte, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, lte, sql, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { z } from "zod";
-import { rondaDate } from "@/lib/dates";
+import { formatTime, rondaDate } from "@/lib/dates";
+import { formatRupiah } from "@/lib/format";
 import { dayLabel, scheduleDay } from "@/lib/schedule";
 import type { EntryInput, EntryResult } from "@/lib/types";
 import type { SessionUser } from "./auth";
 import { chunk, rowsPerInsert, runBatch, type Db } from "./db";
 import { getHouseIds } from "./queries";
-import { collectionLogs, collections, patrols, rondaSchedule } from "./schema";
+import { collectionLogs, collections, patrols, rondaSchedule, users } from "./schema";
 
 const MAX_CLOCK_SKEW_MS = 10 * 60 * 1000;
 /** Petugas hanya bisa menyinkronkan catatan sampai 3 hari ke belakang; selebihnya lewat admin. */
@@ -74,12 +75,50 @@ export async function dutyDays(db: Db, userId: number): Promise<Set<number>> {
 
 const patrolIdFor = (date: string): SQL<number> => sql`(select ${patrols.id} from ${patrols} where ${patrols.date} = ${date})`;
 
+type Stored = { status: "filled" | "empty"; amount: number; collectedBy: number | null; collectorName: string | null; recordedAt: Date };
+
+/** Catatan yang sudah tersimpan untuk malam-malam ini, per `${date}:${houseId}`. */
+async function storedFor(db: Db, dates: string[]): Promise<Map<string, Stored>> {
+  if (dates.length === 0) return new Map();
+  const rows = await db
+    .select({
+      date: patrols.date,
+      houseId: collections.houseId,
+      status: collections.status,
+      amount: collections.amount,
+      collectedBy: collections.collectedBy,
+      collectorName: users.name,
+      recordedAt: collections.recordedAt,
+    })
+    .from(collections)
+    .innerJoin(patrols, eq(patrols.id, collections.patrolId))
+    .leftJoin(users, eq(users.id, collections.collectedBy))
+    .where(inArray(patrols.date, dates));
+  return new Map(rows.map(({ date, houseId, ...r }) => [`${date}:${houseId}`, r]));
+}
+
+/**
+ * "Ada" yang dicatat orang lain tidak boleh hilang karena petugas berikutnya menemukan wadah sudah
+ * kosong (isinya sudah diambil) lalu mencatat "Kosong" atau menghapus catatan. Catatan seperti itu
+ * hanya masuk jejak audit; koreksi admin lewat Riwayat tidak kena aturan ini.
+ */
+function overwritesOthersFilled(stored: Stored | undefined, write: CollectionWrite): stored is Stored {
+  return (
+    stored?.status === "filled" &&
+    stored.collectedBy !== write.userId &&
+    write.status !== "filled" &&
+    stored.recordedAt.getTime() <= write.recordedAt.getTime()
+  );
+}
+
 /**
  * Pernyataan SQL untuk menyimpan (atau menghapus) catatan beberapa rumah. Catatan yang lebih baru
  * menang, jadi sinkron yang telat dari HP lain tidak menimpa koreksi terbaru. Semua dijalankan
  * dalam satu batch D1 (satu perjalanan ke database).
+ * `guard` (catatan dari HP petugas): "Ada" milik orang lain tidak ditimpa "Kosong" atau dihapus,
+ * juga kalau dua HP sinkron bersamaan (lihat `overwritesOthersFilled`).
  */
-function writeStatements(db: Db, writes: CollectionWrite[], now: Date): BatchItem<"sqlite">[] {
+function writeStatements(db: Db, writes: CollectionWrite[], now: Date, guard: boolean): BatchItem<"sqlite">[] {
   if (writes.length === 0) return [];
   const statements: BatchItem<"sqlite">[] = [];
 
@@ -102,6 +141,7 @@ function writeStatements(db: Db, writes: CollectionWrite[], now: Date): BatchIte
             eq(collections.patrolId, patrolIdFor(w.date)),
             eq(collections.houseId, w.houseId),
             lte(collections.recordedAt, w.recordedAt),
+            guard ? sql`not (${collections.status} = 'filled' and ${collections.collectedBy} is not ${w.userId})` : undefined,
           ),
         ),
     );
@@ -134,7 +174,9 @@ function writeStatements(db: Db, writes: CollectionWrite[], now: Date): BatchIte
             recordedAt: sql`excluded.recorded_at`,
             syncedAt: sql`excluded.synced_at`,
           },
-          setWhere: sql`${collections.recordedAt} <= excluded.recorded_at`,
+          setWhere: guard
+            ? sql`${collections.recordedAt} <= excluded.recorded_at and not (${collections.status} = 'filled' and excluded.status = 'empty' and ${collections.collectedBy} is not excluded.collected_by)`
+            : sql`${collections.recordedAt} <= excluded.recorded_at`,
         }),
     );
   }
@@ -144,7 +186,7 @@ function writeStatements(db: Db, writes: CollectionWrite[], now: Date): BatchIte
 /** Koreksi admin: simpan (atau hapus) catatan satu rumah untuk satu malam, dan catat di jejak audit. */
 export async function writeCollection(db: Db, input: CollectionWrite, now = new Date()) {
   await runBatch(db, [
-    ...writeStatements(db, [input], now),
+    ...writeStatements(db, [input], now, false),
     ...logStatements(db, [{ ...input, clientId: null, method: "koreksi", onDuty: null }]),
   ]);
 }
@@ -161,6 +203,7 @@ export async function applyEntries(
   const logs: LogWrite[] = [];
   // Per malam + rumah cukup simpan catatan terbaru; yang lebih lama toh akan kalah.
   const latest = new Map<string, CollectionWrite>();
+  const keyOf = new Map<string, string>();
 
   for (const entry of entries) {
     const at = new Date(entry.recordedAt);
@@ -192,6 +235,7 @@ export async function applyEntries(
         onDuty: duty.has(scheduleDay(date)),
       });
       const key = `${date}:${entry.houseId}`;
+      keyOf.set(entry.clientId, key);
       const previous = latest.get(key);
       if (!previous || previous.recordedAt.getTime() <= at.getTime()) {
         latest.set(key, {
@@ -208,6 +252,24 @@ export async function applyEntries(
     }
   }
 
-  await runBatch(db, [...writeStatements(db, [...latest.values()], now), ...logStatements(db, logs)]);
-  return results;
+  // Catatan yang akan menghapus "Ada" milik petugas lain ditolak (tetap masuk jejak audit).
+  const stored = await storedFor(db, [...new Set([...latest.values()].map((w) => w.date))]);
+  const blocked = new Map<string, string>();
+  for (const [key, write] of latest) {
+    const s = stored.get(key);
+    if (!overwritesOthersFilled(s, write)) continue;
+    blocked.set(
+      key,
+      `Sudah dicatat Ada ${formatRupiah(s.amount)} oleh ${s.collectorName ?? "petugas lain"} pukul ${formatTime(s.recordedAt)}. ` +
+        "Catatanmu tidak dipakai; minta admin mengoreksi kalau memang salah.",
+    );
+    latest.delete(key);
+  }
+  const final = results.map((r): EntryResult => {
+    const error = r.ok ? blocked.get(keyOf.get(r.clientId)!) : undefined;
+    return error ? { clientId: r.clientId, ok: false, error } : r;
+  });
+
+  await runBatch(db, [...writeStatements(db, [...latest.values()], now, true), ...logStatements(db, logs)]);
+  return final;
 }

@@ -1,8 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { applyEntries } from "@/server/collections";
+import { eq } from "drizzle-orm";
+import { getAudit } from "@/server/audit";
+import { applyEntries, writeCollection } from "@/server/collections";
 import type { Db } from "@/server/db";
 import { getCollectionsForDate, getMonthRecap, listPatrols } from "@/server/queries";
-import { houses, rondaSchedule, users } from "@/server/schema";
+import { collectionLogs, houses, rondaSchedule, users } from "@/server/schema";
 import type { SessionUser } from "@/server/auth";
 import type { EntryInput } from "@/lib/types";
 import { createTestEnv } from "./helpers/d1";
@@ -158,5 +160,84 @@ describe("hanya petugas yang jaga malam itu yang bisa mencatat", () => {
     // Begitu dijadwalkan malam itu, admin bisa mencatat.
     await db.insert(rondaSchedule).values({ dayOfWeek: 0, position: 1, userId: admin.id });
     expect((await applyEntries(db, asAdmin, [entry({ houseId: houseA2 })], NOW))[0].ok).toBe(true);
+  });
+});
+
+describe("dua petugas mencatat rumah yang sama", () => {
+  let sari: SessionUser;
+  let house: number;
+  const at = (minutes: number) => new Date(NOW.getTime() + minutes * 60_000).toISOString();
+  const saved = async (houseId: number) => (await getCollectionsForDate(db, "2026-10-04")).find((c) => c.houseId === houseId);
+
+  beforeAll(async () => {
+    const [u] = await db.insert(users).values({ name: "Sari", pinHash: "x", role: "petugas" }).returning();
+    sari = { id: u.id, name: u.name, role: u.role };
+    await db.insert(rondaSchedule).values({ dayOfWeek: 0, position: 2, userId: u.id });
+    [{ id: house }] = await db.insert(houses).values({ block: "C", number: "1", token: "TOKENC1AAA" }).returning();
+  });
+
+  it("Kosong atau hapus dari petugas lain tidak menghilangkan Ada, tapi tetap masuk audit", async () => {
+    await applyEntries(db, petugas, [entry({ houseId: house, amount: 500, recordedAt: at(0) })], NOW);
+    // Sari lewat belakangan: wadah sudah diambil Budi, jadi tampak kosong.
+    const [empty] = await applyEntries(db, sari, [entry({ houseId: house, status: "empty", recordedAt: at(5) })], NOW);
+    const [removed] = await applyEntries(db, sari, [entry({ houseId: house, status: "none", recordedAt: at(6) })], NOW);
+
+    expect(empty).toMatchObject({ ok: false, error: expect.stringMatching(/^Sudah dicatat Ada Rp.500 oleh Budi pukul 22\.00\./) });
+    expect(removed.ok).toBe(false);
+    expect(await saved(house)).toMatchObject({ status: "filled", amount: 500, collectorName: "Budi" });
+    const logs = await db.select().from(collectionLogs).where(eq(collectionLogs.houseId, house));
+    expect(logs.map((l) => l.status)).toEqual(["filled", "empty", "none"]);
+  });
+
+  it("tetap aman kalau dua HP sinkron bersamaan", async () => {
+    const [{ id: other }] = await db.insert(houses).values({ block: "C", number: "2", token: "TOKENC2AAA" }).returning();
+    await Promise.all([
+      applyEntries(db, petugas, [entry({ houseId: other, amount: 500, recordedAt: at(0) })], NOW),
+      applyEntries(db, sari, [entry({ houseId: other, status: "empty", recordedAt: at(1) })], NOW),
+    ]);
+    expect(await saved(other)).toMatchObject({ status: "filled", amount: 500, collectorName: "Budi" });
+  });
+
+  it("Ada dari petugas lain tetap bisa mengganti Ada atau Kosong", async () => {
+    const [ok] = await applyEntries(db, sari, [entry({ houseId: house, amount: 1000, recordedAt: at(7) })], NOW);
+    expect(ok.ok).toBe(true);
+    expect(await saved(house)).toMatchObject({ status: "filled", amount: 1000, collectorName: "Sari" });
+  });
+
+  it("petugas boleh mengganti Ada miliknya sendiri jadi Kosong", async () => {
+    const [ok] = await applyEntries(db, sari, [entry({ houseId: house, status: "empty", recordedAt: at(8) })], NOW);
+    expect(ok.ok).toBe(true);
+    expect(await saved(house)).toMatchObject({ status: "empty", collectorName: "Sari" });
+  });
+
+  it("koreksi admin tidak kena aturan ini", async () => {
+    await applyEntries(db, petugas, [entry({ houseId: house, amount: 500, recordedAt: at(9) })], NOW);
+    await writeCollection(db, {
+      date: "2026-10-04",
+      houseId: house,
+      status: "empty",
+      amount: 0,
+      method: "manual",
+      userId: sari.id,
+      recordedAt: new Date(at(10)),
+    });
+    expect(await saved(house)).toMatchObject({ status: "empty", collectorName: "Sari" });
+  });
+
+  it("muncul di audit sebagai rumah yang dicatat lebih dari satu petugas", async () => {
+    const audit = await getAudit(db, "2026-10-04");
+    const conflict = audit.conflicts.find((c) => c.houseId === house);
+    // Urut waktu; koreksi admin tidak ikut dihitung.
+    expect(conflict?.entries.map((e) => [e.userName, e.status])).toEqual([
+      ["Budi", "filled"],
+      ["Sari", "empty"],
+      ["Sari", "none"],
+      ["Sari", "filled"],
+      ["Sari", "empty"],
+      ["Budi", "filled"],
+    ]);
+    expect(conflict?.current).toMatchObject({ status: "empty", collectorName: "Sari" });
+    // Rumah yang hanya dicatat satu petugas tidak ikut.
+    expect(audit.conflicts.find((c) => c.houseId === houseA1)).toBeUndefined();
   });
 });
