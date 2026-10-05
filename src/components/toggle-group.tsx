@@ -76,9 +76,10 @@ export function ChipGroup<T extends string>(props: {
     <SingleToggleGroup
       {...props}
       className={cx("flex gap-1.5", props.className)}
-      // Tanda fokus di dalam chip: cincin di luar membuat chip aktif tampak lebih besar dari yang
-      // lain, dan terpotong oleh baris chip yang bisa digulir.
-      itemClassName="inline-flex shrink-0 select-none items-center gap-1 whitespace-nowrap rounded-full border border-line bg-card px-3 py-1.5 text-sm font-medium text-muted transition -outline-offset-4 hover:text-fg focus-visible:outline-2 focus-visible:outline-primary data-disabled:opacity-40 data-pressed:border-primary data-pressed:bg-primary data-pressed:text-primary-fg data-pressed:outline-primary-fg data-pressed:hover:text-primary-fg"
+      // Semua chip bertepi sama tegas dan chip aktif hanya diwarnai tipis: chip aktif yang diisi
+      // warna penuh tampak lebih besar dari chip putih bertepi samar, walau ukurannya sama persis.
+      // Tanda fokus di dalam chip supaya tidak terpotong oleh baris chip yang bisa digulir.
+      itemClassName="inline-flex shrink-0 select-none items-center gap-1 whitespace-nowrap rounded-full border border-fg/15 bg-card px-3 py-1.5 text-sm font-medium text-muted transition -outline-offset-4 hover:border-fg/30 hover:text-fg focus-visible:outline-2 focus-visible:outline-primary data-disabled:opacity-40 data-pressed:border-primary data-pressed:bg-primary/10 data-pressed:text-primary data-pressed:hover:border-primary data-pressed:hover:text-primary"
     />
   );
 }
