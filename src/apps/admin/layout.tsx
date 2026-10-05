@@ -19,7 +19,7 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router";
 import { api, call } from "@/client/api";
-import { queryClient } from "@/client/query";
+import { clearCache } from "@/client/query";
 import { ScrollArea } from "@/components/scroll-area";
 import { Button, cx } from "@/components/ui";
 import type { SessionUser } from "@/server/auth";
@@ -112,7 +112,7 @@ function Sidebar({ user }: { user: SessionUser }) {
   const logout = useMutation({
     mutationFn: () => call(api.auth.logout.$post()),
     onSuccess: () => {
-      queryClient.clear();
+      clearCache();
       try {
         localStorage.removeItem("jimpitan:auth");
       } catch {}

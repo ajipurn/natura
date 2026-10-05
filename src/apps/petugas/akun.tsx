@@ -3,7 +3,7 @@ import { LayoutDashboard, LogOut, Smartphone } from "lucide-react";
 import { useNavigate } from "react-router";
 import { api, call } from "@/client/api";
 import { useAuth } from "@/client/auth";
-import { queryClient } from "@/client/query";
+import { clearCache } from "@/client/query";
 import { ChangePinForm } from "@/features/auth/change-pin-form";
 import { MySchedule } from "./my-schedule";
 import { Button, Card, PageHeader, SectionTitle } from "@/components/ui";
@@ -14,7 +14,7 @@ export function AkunPage() {
   const logout = useMutation({
     mutationFn: () => call(api.auth.logout.$post()),
     onSuccess: () => {
-      queryClient.clear();
+      clearCache();
       try {
         localStorage.removeItem("jimpitan:auth");
       } catch {}

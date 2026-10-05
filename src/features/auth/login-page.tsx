@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router";
 import { api, call, errorMessage } from "@/client/api";
 import { safeNext, useAuth } from "@/client/auth";
-import { queryClient } from "@/client/query";
+import { clearCache, queryClient } from "@/client/query";
 import { ErrorCard } from "@/components/query-state";
 import { Select } from "@/components/select";
 import { Alert, Button, Field, Input, PageTitle } from "@/components/ui";
@@ -54,7 +54,7 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
       try {
         localStorage.setItem(LAST_USER_KEY, userId);
       } catch {}
-      queryClient.clear();
+      clearCache();
       queryClient.setQueryData(["auth"], { setupNeeded: false, user });
       go(next);
     } catch (err) {

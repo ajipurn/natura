@@ -1,7 +1,7 @@
 import { mount } from "@/client/mount";
 import { router } from "./routes";
 
-mount(router);
+mount(router, "petugas");
 
 // Service worker hanya di build production supaya tidak mengganggu hot reload saat development.
 if (import.meta.env.PROD && "serviceWorker" in navigator) {

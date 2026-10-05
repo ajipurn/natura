@@ -126,6 +126,8 @@ function apiServer(): Plugin {
 export default defineConfig({
   plugins: [react(), tailwindcss(), apiServer()],
   resolve: { alias: { "@": src } },
+  // Penanda versi app untuk salinan cache di HP (src/client/query.ts); baru setiap build/server dev.
+  define: { __BUILD_ID__: JSON.stringify(Date.now().toString(36)) },
   build: {
     // three.js (tampilan 3D) memang besar, tapi hanya dimuat saat tab 3D dibuka.
     chunkSizeWarningLimit: 650,
