@@ -21,6 +21,7 @@ import { NavLink, useLocation, useNavigate } from "react-router";
 import { api, call } from "@/client/api";
 import { clearCache } from "@/client/query";
 import { ScrollArea } from "@/components/scroll-area";
+import { ThemeSwitch } from "@/components/theme-toggle";
 import { Button, cx } from "@/components/ui";
 import type { SessionUser } from "@/server/auth";
 import { requestsQuery } from "./queries";
@@ -162,6 +163,7 @@ function Sidebar({ user }: { user: SessionUser }) {
         </div>
       </ScrollArea>
       <div className="border-t border-line p-3">
+        <ThemeSwitch />
         <a href="/petugas/" className="flex items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium hover:bg-idle-soft">
           <ScanLine className="size-5 text-primary" /> Buka app petugas
         </a>

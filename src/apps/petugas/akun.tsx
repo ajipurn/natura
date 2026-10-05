@@ -4,12 +4,15 @@ import { useNavigate } from "react-router";
 import { api, call } from "@/client/api";
 import { useAuth } from "@/client/auth";
 import { clearCache } from "@/client/query";
+import { setTheme, useTheme } from "@/client/theme";
+import { SwitchField } from "@/components/choice";
 import { ChangePinForm } from "@/features/auth/change-pin-form";
 import { MySchedule } from "./my-schedule";
 import { Button, Card, PageHeader, SectionTitle } from "@/components/ui";
 
 export function AkunPage() {
   const user = useAuth().data?.user;
+  const dark = useTheme() === "dark";
   const navigate = useNavigate();
   const logout = useMutation({
     mutationFn: () => call(api.auth.logout.$post()),
@@ -39,6 +42,14 @@ export function AkunPage() {
 
       <SectionTitle>Jadwal jagamu</SectionTitle>
       <MySchedule />
+
+      <SectionTitle>Tampilan</SectionTitle>
+      <SwitchField
+        label="Mode gelap"
+        description="Lebih nyaman di mata saat ronda malam. Berlaku di HP ini."
+        checked={dark}
+        onCheckedChange={(on) => setTheme(on ? "dark" : "light")}
+      />
 
       <SectionTitle>Pasang di layar utama</SectionTitle>
       <Card className="flex gap-3 text-sm">

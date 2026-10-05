@@ -1,5 +1,6 @@
 import { RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTheme } from "@/client/theme";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DObject, CSS2DRenderer } from "three/addons/renderers/CSS2DRenderer.js";
@@ -78,6 +79,7 @@ export default function SiteMap3D({
   const markersRef = useRef(markers);
   const onHouseClickRef = useRef(onHouseClick);
   const [error, setError] = useState<string | null>(null);
+  const theme = useTheme();
 
   useEffect(() => {
     housesRef.current = houses;
@@ -274,8 +276,8 @@ export default function SiteMap3D({
       renderer.domElement.remove();
       labelRenderer.domElement.remove();
     };
-    // houses dibaca lewat ref; layoutKey mewakili perubahan rumah.
-  }, [layoutKey, plan]);
+    // houses dibaca lewat ref; layoutKey mewakili perubahan rumah. Warna adegan dibaca dari tema.
+  }, [layoutKey, plan, theme]);
 
   useEffect(() => {
     apiRef.current?.setMarkers(markers);

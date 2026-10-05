@@ -21,6 +21,7 @@ import { invalidate } from "@/client/query";
 import { BarChart } from "@/components/bar-chart";
 import { GuardChip } from "@/components/guard-chip";
 import { ErrorCard, LoadingCards, QueryState } from "@/components/query-state";
+import { ThemeButton } from "@/components/theme-toggle";
 import { SegmentedControl } from "@/components/toggle-group";
 import { Alert, Button, Card, Input, PageTitle, SectionTitle, buttonClass, cx } from "@/components/ui";
 import { addDays, daysInMonth, formatDateLong, formatDateShort, formatMonth, shiftMonth } from "@/lib/dates";
@@ -47,15 +48,18 @@ export function BerandaPage() {
           </p>
           <h1 className="text-3xl font-bold tracking-tight">Info warga</h1>
         </div>
-        {/* Untuk petugas dan pengurus; warga cukup memakai kode. */}
-        <a
-          href="/petugas/"
-          aria-label="Masuk petugas / pengurus"
-          title="Masuk petugas / pengurus"
-          className={cx(buttonClass("secondary", "sm"), "mt-1 shrink-0")}
-        >
-          <LogIn className="size-4" /> Masuk
-        </a>
+        <div className="mt-1 flex shrink-0 gap-2">
+          <ThemeButton />
+          {/* Untuk petugas dan pengurus; warga cukup memakai kode. */}
+          <a
+            href="/petugas/"
+            aria-label="Masuk petugas / pengurus"
+            title="Masuk petugas / pengurus"
+            className={buttonClass("secondary", "sm")}
+          >
+            <LogIn className="size-4" /> Masuk
+          </a>
+        </div>
       </header>
       <div className="mt-5">
         {access.isError ? (

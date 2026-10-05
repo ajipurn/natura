@@ -57,17 +57,29 @@ export function SwitchField({
         <Field.Label className="block text-sm font-medium">{label}</Field.Label>
         {description && <Field.Description className="block text-xs text-muted">{description}</Field.Description>}
       </div>
-      <Switch.Root
+      <SwitchControl
         key={resetKey}
         checked={checked}
         defaultChecked={defaultChecked}
         onCheckedChange={onCheckedChange}
         name={name}
-        className="relative flex h-6 w-10 shrink-0 items-center rounded-full bg-idle-soft p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 data-checked:bg-primary"
-      >
-        <Switch.Thumb className="size-5 rounded-full bg-white shadow-sm transition-transform data-checked:translate-x-4 motion-reduce:transition-none" />
-      </Switch.Root>
+      />
     </Field.Root>
+  );
+}
+
+/** Sakelarnya saja (tanpa kotak dan label), mis. di baris menu yang sudah punya teksnya sendiri. */
+export function SwitchControl({ className, ...props }: Omit<Switch.Root.Props, "className"> & { className?: string }) {
+  return (
+    <Switch.Root
+      {...props}
+      className={cx(
+        "relative flex h-6 w-10 shrink-0 items-center rounded-full bg-idle-soft p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 data-checked:bg-primary",
+        className,
+      )}
+    >
+      <Switch.Thumb className="size-5 rounded-full bg-white shadow-sm transition-transform data-checked:translate-x-4 motion-reduce:transition-none" />
+    </Switch.Root>
   );
 }
 

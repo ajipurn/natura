@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* `dark:` mengikuti pilihan tema di app (src/client/theme.ts), bukan setelan HP. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
   --bg: #f4f6f8;
   --card: #ffffff;
@@ -28,32 +31,30 @@
   color-scheme: light;
 }
 
-/* Dipakai malam hari di luar rumah, jadi mode gelap mengikuti HP. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b1220;
-    --card: #131c2e;
-    --fg: #e5e9f0;
-    --muted: #94a3b8;
-    --line: #243046;
-    --primary: #2dd4bf;
-    --primary-fg: #04201d;
-    --filled: #4ade80;
-    --filled-soft: #12361f;
-    --empty: #fb7185;
-    --empty-soft: #3d1420;
-    --idle-soft: #243046;
-    --warn: #fbbf24;
-    --warn-soft: #3a2a0a;
-    --park: #1b3022;
-    --park-dot: #3d6b45;
-    --water: #1f4d70;
-    --you: #60a5fa;
-    --guard-green: #6a9c47;
-    --guard-yellow: #e6e152;
-    --guard-orange: #e0a40a;
-    color-scheme: dark;
-  }
+/* Mode gelap dipilih di app (bawaannya terang), lihat src/client/theme.ts. */
+:root[data-theme="dark"] {
+  --bg: #0b1220;
+  --card: #131c2e;
+  --fg: #e5e9f0;
+  --muted: #94a3b8;
+  --line: #243046;
+  --primary: #2dd4bf;
+  --primary-fg: #04201d;
+  --filled: #4ade80;
+  --filled-soft: #12361f;
+  --empty: #fb7185;
+  --empty-soft: #3d1420;
+  --idle-soft: #243046;
+  --warn: #fbbf24;
+  --warn-soft: #3a2a0a;
+  --park: #1b3022;
+  --park-dot: #3d6b45;
+  --water: #1f4d70;
+  --you: #60a5fa;
+  --guard-green: #6a9c47;
+  --guard-yellow: #e6e152;
+  --guard-orange: #e0a40a;
+  color-scheme: dark;
 }
 
 @theme inline {

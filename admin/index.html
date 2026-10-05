@@ -3,8 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f6f8" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1220" />
+    <meta name="theme-color" content="#f4f6f8" />
+    <script>
+      // Mode gelap dipasang sebelum halaman tampil supaya tidak berkedip terang (lihat src/client/theme.ts).
+      try {
+        if (localStorage.getItem("jimpitan:theme") === "dark") {
+          document.documentElement.dataset.theme = "dark";
+          document.querySelector('meta[name="theme-color"]').content = "#0b1220";
+        }
+      } catch {}
+    </script>
     <meta name="description" content="Dashboard pengurus jimpitan." />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-icon.png" />
