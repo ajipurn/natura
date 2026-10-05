@@ -75,6 +75,11 @@ export function formatTime(at: Date | string, timeZone = APP_TIMEZONE): string {
   }).format(typeof at === "string" ? new Date(at) : at);
 }
 
+/** Selisih hari dari `from` ke `to` (YYYY-MM-DD); positif kalau `to` lebih belakang. */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((parseIsoDate(to).getTime() - parseIsoDate(from).getTime()) / 86_400_000);
+}
+
 export function addDays(isoDate: string, days: number): string {
   const d = parseIsoDate(isoDate);
   d.setUTCDate(d.getUTCDate() + days);

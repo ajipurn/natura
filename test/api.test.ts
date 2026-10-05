@@ -528,6 +528,10 @@ describe("audit catatan", () => {
     expect(audit.offDuty.map((r) => r.name)).not.toContain("Joko");
     expect(audit.guards.find((g) => g.name === "Sari")).toMatchObject({ count: 1 });
     expect(((await admin.get("/api/admin/ringkasan")).data as { todo: { offDuty: number } }).todo.offDuty).toBe(audit.counts.offDuty);
+    // Halaman Petugas: kapan terakhir mencatat (catatan yang ditolak tidak dihitung).
+    const petugas = (await admin.get("/api/admin/petugas")).data.users as { name: string; lastRecordedAt: string | null }[];
+    expect(petugas.find((u) => u.name === "Sari")!.lastRecordedAt).not.toBeNull();
+    expect(petugas.find((u) => u.name === "Joko")!.lastRecordedAt).toBeNull();
     // Petugas biasa tidak bisa membuka audit.
     expect((await sari.get("/api/admin/audit")).status).toBe(403);
   });

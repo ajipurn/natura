@@ -5,6 +5,8 @@ import { lotKey } from "./site-plan";
  * jadi "Ahad (malam Senin)" = jaga hari Minggu malam = hari 0.
  */
 export const DAY_NAMES = ["Ahad", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"] as const;
+/** Singkatan tiga huruf untuk tempat sempit, urutan sama dengan `DAY_NAMES`. */
+export const DAY_SHORT = ["Ahd", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"] as const;
 
 export type ScheduleEntry = {
   day: number;

@@ -3,8 +3,11 @@ import { Copy, Dices, KeyRound, LockOpen, Send } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { api, call } from "@/client/api";
 import { invalidate } from "@/client/query";
+import { RadioCards, SwitchField, type RadioCardOption } from "@/components/choice";
+import { Collapsible } from "@/components/collapsible";
 import { Dialog } from "@/components/dialog";
-import { Alert, Field, buttonClass, cx, inputClass } from "@/components/ui";
+import { Select } from "@/components/select";
+import { Alert, Button, Field, Input, buttonClass, cx } from "@/components/ui";
 import { scheduleQuery } from "@/features/jadwal/queries";
 import { formatTime } from "@/lib/dates";
 import { groupByBlock, houseLabel } from "@/lib/houses";
@@ -23,10 +26,17 @@ export type Petugas = {
   houseId: number | null;
   house: string | null;
   days: number[];
+  /** Terakhir mencatat jimpitan (scan/manual), ISO; null = belum pernah. */
+  lastRecordedAt: string | null;
 };
 
 /** Data petugas ikut tampil di jadwal, ronda, ringkasan, dan data rumah (nama warga). */
 const REFRESH = [["admin"], ["jadwal"], ["ronda"], ["auth", "users"]];
+
+const ROLES: RadioCardOption<Role>[] = [
+  { value: "petugas", label: "Petugas", hint: "Mencatat jimpitan" },
+  { value: "admin", label: "Admin", hint: "Juga mengelola data" },
+];
 
 /** Tambah petugas (`petugas` kosong) atau ubah petugas. */
 export function PetugasDialog({
@@ -76,31 +86,30 @@ function CreateForm({ onDone }: { onDone: () => void }) {
       }}
     >
       <Field label="Nama">
-        <input
+        <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
           maxLength={40}
-          autoFocus
+          data-autofocus
           placeholder="Pak Andi"
-          className={inputClass}
         />
       </Field>
       <Field label="PIN (4–6 angka)" hint="Sudah dibuatkan PIN acak. Petugas bisa menggantinya sendiri di menu Akun.">
         <div className="flex gap-2">
-          <input
+          <Input
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
             required
             inputMode="numeric"
             pattern="\d{4,6}"
             autoComplete="off"
-            className={cx(inputClass, "font-mono text-lg tracking-[0.3em]")}
+            className="font-mono text-lg tracking-[0.3em]"
           />
-          <button type="button" onClick={() => setPin(randomPin())} className={buttonClass("secondary")} title="PIN acak lain">
+          <Button onClick={() => setPin(randomPin())} variant="secondary" title="PIN acak lain">
             <Dices className="size-5" />
             <span className="sr-only">PIN acak lain</span>
-          </button>
+          </Button>
         </div>
       </Field>
       <GuardFields
@@ -117,12 +126,12 @@ function CreateForm({ onDone }: { onDone: () => void }) {
       <RoleField role={role} onRole={setRole} />
       {create.isError && <Alert>{create.error.message}</Alert>}
       <div className="flex justify-end gap-2 pt-1">
-        <button type="button" onClick={onDone} className={buttonClass("ghost")}>
+        <Button onClick={onDone} variant="ghost">
           Batal
-        </button>
-        <button type="submit" disabled={create.isPending} className={buttonClass("primary")}>
+        </Button>
+        <Button type="submit" disabled={create.isPending}>
           {create.isPending ? "Menyimpan…" : "Tambah petugas"}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -144,9 +153,8 @@ function SharePin({ name, pin, onDone }: { name: string; pin: string; onDone: ()
         <a href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener" className={buttonClass("primary")}>
           <Send className="size-5" /> Kirim lewat WhatsApp
         </a>
-        <button
-          type="button"
-          className={buttonClass("secondary")}
+        <Button
+          variant="secondary"
           onClick={async () => {
             try {
               await navigator.clipboard.writeText(message);
@@ -157,11 +165,11 @@ function SharePin({ name, pin, onDone }: { name: string; pin: string; onDone: ()
           }}
         >
           <Copy className="size-5" /> {copied ? "Tersalin" : "Salin pesan"}
-        </button>
+        </Button>
       </div>
-      <button type="button" onClick={onDone} className={cx(buttonClass("ghost"), "w-full")}>
+      <Button onClick={onDone} variant="ghost" className="w-full">
         Selesai
-      </button>
+      </Button>
     </div>
   );
 }
@@ -192,7 +200,7 @@ function EditForm({ petugas, isSelf, onDone }: { petugas: Petugas; isSelf: boole
         }}
       >
         <Field label="Nama">
-          <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={40} className={inputClass} />
+          <Input value={name} onChange={(e) => setName(e.target.value)} required maxLength={40} />
         </Field>
         <GuardFields
           name={name}
@@ -203,28 +211,22 @@ function EditForm({ petugas, isSelf, onDone }: { petugas: Petugas; isSelf: boole
           onDays={setDays}
         />
         <RoleField role={role} onRole={setRole} disabled={isSelf} />
-        <label className={cx("flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5", isSelf && "opacity-60")}>
-          <span>
-            <span className="block text-sm font-medium">Akun aktif</span>
-            <span className="block text-xs text-muted">Akun nonaktif tidak bisa masuk; namanya tetap ada di riwayat.</span>
-          </span>
-          <input
-            type="checkbox"
-            checked={active}
-            disabled={isSelf}
-            onChange={(e) => setActive(e.target.checked)}
-            className="size-5 shrink-0 accent-[var(--primary)]"
-          />
-        </label>
+        <SwitchField
+          label="Akun aktif"
+          description="Akun nonaktif tidak bisa masuk; namanya tetap ada di riwayat."
+          checked={active}
+          onCheckedChange={setActive}
+          disabled={isSelf}
+        />
         {isSelf && <p className="text-xs text-muted">Peran dan status akunmu sendiri tidak bisa diubah.</p>}
         {save.isError && <Alert>{save.error.message}</Alert>}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onDone} className={buttonClass("ghost")}>
+          <Button onClick={onDone} variant="ghost">
             Batal
-          </button>
-          <button type="submit" disabled={save.isPending} className={buttonClass("primary")}>
+          </Button>
+          <Button type="submit" disabled={save.isPending}>
             {save.isPending ? "Menyimpan…" : "Simpan"}
-          </button>
+          </Button>
         </div>
       </form>
 
@@ -248,13 +250,19 @@ function ResetPin({ petugas, locked }: { petugas: Petugas; locked: string | null
     );
   }
   return (
-    <details className="group border-t border-line pt-4" open={Boolean(locked)}>
-      <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold">
-        <LockOpen className="size-4 text-primary" /> Atur ulang PIN
-        {locked && (
-          <span className="rounded-full bg-empty-soft px-2 py-0.5 text-xs font-medium text-empty">terkunci s.d. {formatTime(locked)}</span>
-        )}
-      </summary>
+    <Collapsible
+      defaultOpen={Boolean(locked)}
+      className="border-t border-line pt-4"
+      triggerClassName="text-sm font-semibold"
+      title={
+        <span className="flex flex-wrap items-center gap-2">
+          <LockOpen className="size-4 text-primary" /> Atur ulang PIN
+          {locked && (
+            <span className="rounded-full bg-empty-soft px-2 py-0.5 text-xs font-medium text-empty">terkunci s.d. {formatTime(locked)}</span>
+          )}
+        </span>
+      }
+    >
       <form
         className="mt-3 flex gap-2"
         onSubmit={(e) => {
@@ -262,22 +270,22 @@ function ResetPin({ petugas, locked }: { petugas: Petugas; locked: string | null
           reset.mutate();
         }}
       >
-        <input
+        <Input
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
           required
           inputMode="numeric"
           pattern="\d{4,6}"
           aria-label="PIN baru"
-          className={cx(inputClass, "font-mono tracking-[0.3em]")}
+          className="font-mono tracking-[0.3em]"
         />
-        <button type="submit" disabled={reset.isPending} className={cx(buttonClass("secondary"), "shrink-0")}>
+        <Button type="submit" disabled={reset.isPending} variant="secondary" className="shrink-0">
           {reset.isPending ? "Menyimpan…" : "Atur ulang"}
-        </button>
+        </Button>
       </form>
       <p className="mt-1 text-xs text-muted">Untuk petugas yang lupa PIN atau terkunci. Sesi lamanya di HP lain akan keluar.</p>
       {reset.isError && <Alert>{reset.error.message}</Alert>}
-    </details>
+    </Collapsible>
   );
 }
 
@@ -318,20 +326,17 @@ function GuardFields({
 
   return (
     <>
-      <Field label="Rumah">
-        <select value={houseId ?? ""} onChange={(e) => pick(e.target.value ? Number(e.target.value) : null)} className={inputClass}>
-          <option value="">Tanpa rumah</option>
-          {groupByBlock(houses).map(([block, list]) => (
-            <optgroup key={block} label={`Blok ${block}`}>
-              {list.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {houseLabel(h)}
-                  {h.ownerName ? ` · ${h.ownerName}` : ""}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+      <div>
+        <Select
+          label="Rumah"
+          value={houseId ? String(houseId) : ""}
+          onValueChange={(v) => pick(v ? Number(v) : null)}
+          options={[{ value: "", label: "Tanpa rumah" }]}
+          groups={groupByBlock(houses).map(([block, list]) => ({
+            label: `Blok ${block}`,
+            options: list.map((h) => ({ value: String(h.id), label: houseLabel(h), hint: h.ownerName ?? undefined })),
+          }))}
+        />
         {house && (
           <span className="mt-1 block text-xs text-muted">
             {others.length > 0
@@ -342,16 +347,16 @@ function GuardFields({
             {scheduled.length > 0 && ` Jadwal rumah ini (${scheduled.map((d) => DAY_NAMES[d]).join(", ")}) jadi jadwal petugas ini.`}
           </span>
         )}
-      </Field>
+      </div>
       <fieldset>
         <legend className="mb-1 block text-sm font-medium">Jaga malam</legend>
         <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-7">
           {DAY_NAMES.map((label, day) => {
             const on = days.includes(day);
             return (
-              <button
+              <Button
                 key={day}
-                type="button"
+                variant="plain"
                 aria-pressed={on}
                 title={dayLabel(day)}
                 onClick={() => toggle(day)}
@@ -361,7 +366,7 @@ function GuardFields({
                 )}
               >
                 {label}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -376,31 +381,5 @@ function GuardFields({
 }
 
 function RoleField({ role, onRole, disabled }: { role: Role; onRole: (role: Role) => void; disabled?: boolean }) {
-  return (
-    <fieldset disabled={disabled}>
-      <legend className="mb-1 block text-sm font-medium">Peran</legend>
-      <div className="grid grid-cols-2 gap-1.5">
-        {(
-          [
-            ["petugas", "Petugas", "Mencatat jimpitan"],
-            ["admin", "Admin", "Juga mengelola data"],
-          ] as const
-        ).map(([value, label, hint]) => (
-          <button
-            key={value}
-            type="button"
-            aria-pressed={role === value}
-            onClick={() => onRole(value)}
-            className={cx(
-              "rounded-xl border px-3 py-2 text-left disabled:opacity-60",
-              role === value ? "border-primary bg-primary/10" : "border-line bg-card hover:border-primary/50",
-            )}
-          >
-            <span className="block text-sm font-semibold">{label}</span>
-            <span className="block text-xs text-muted">{hint}</span>
-          </button>
-        ))}
-      </div>
-    </fieldset>
-  );
+  return <RadioCards legend="Peran" value={role} onValueChange={onRole} options={ROLES} disabled={disabled} />;
 }

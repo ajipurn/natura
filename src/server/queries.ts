@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, lte, max, ne, sql } from "drizzle-orm";
 import { daysInMonth, rondaDate } from "@/lib/dates";
 import type { GeoAnchor } from "@/lib/geo";
 import { compareHouses } from "@/lib/houses";
@@ -7,7 +7,7 @@ import type { SessionUser } from "./auth";
 import type { Db } from "./db";
 import { houseName } from "./house-name";
 import { guardDaysByUser, listSchedule } from "./schedule";
-import { collections, houses, patrols, settings, users } from "./schema";
+import { collectionLogs, collections, houses, patrols, settings, users } from "./schema";
 
 export const DEFAULT_SETTINGS = { communityName: "Lingkungan Kita", defaultAmount: 500 };
 
@@ -42,8 +42,18 @@ export async function listLoginUsers(db: Db) {
   return rows.map(({ block, number, ...u }) => ({ ...u, house: block && number ? `${block}-${number}` : null }));
 }
 
+/** Waktu terakhir tiap petugas mencatat jimpitan (scan/manual; koreksi admin tidak dihitung). */
+async function lastRecordedByUser(db: Db): Promise<Map<number, Date>> {
+  const rows = await db
+    .select({ userId: collectionLogs.userId, last: max(collectionLogs.recordedAt) })
+    .from(collectionLogs)
+    .where(and(isNotNull(collectionLogs.userId), ne(collectionLogs.method, "koreksi")))
+    .groupBy(collectionLogs.userId);
+  return new Map(rows.flatMap((r) => (r.userId !== null && r.last ? [[r.userId, r.last] as const] : [])));
+}
+
 export async function listUsers(db: Db) {
-  const [rows, days] = await Promise.all([
+  const [rows, days, lastRecorded] = await Promise.all([
     db
       .select({
         id: users.id,
@@ -59,6 +69,7 @@ export async function listUsers(db: Db) {
       .leftJoin(houses, eq(houses.id, users.houseId))
       .orderBy(asc(users.name), asc(users.id)),
     guardDaysByUser(db),
+    lastRecordedByUser(db),
   ]);
   return rows.map(({ block, number, ...u }) => ({
     ...u,
@@ -68,6 +79,7 @@ export async function listUsers(db: Db) {
     house: block && number ? `${block}-${number}` : null,
     /** Malam jaga di jadwal ronda (0 = Ahad). */
     days: days.get(u.id) ?? [],
+    lastRecordedAt: lastRecorded.get(u.id)?.toISOString() ?? null,
   }));
 }
 
