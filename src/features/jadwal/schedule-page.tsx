@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { CalendarDays } from "lucide-react";
-import { guardColorClass } from "@/components/guard-color-class";
 import { QueryState } from "@/components/query-state";
 import { Card, PageHeader, cx } from "@/components/ui";
 import { rondaDate } from "@/lib/dates";
@@ -31,9 +30,10 @@ export function SchedulePage({
       <PageHeader title="Jadwal ronda" subtitle={`Malam ini: ${dayLabel(tonight)}`} />
       {intro}
       <QueryState query={query}>
-        {({ schedule }) => (
-          <>
-            {schedule.length === 0 ? (
+        {({ schedule: all }) => {
+          // Baris rumah yang belum ada nama warganya tidak ditampilkan dan tidak dihitung.
+          const schedule = all.filter((e) => e.name ?? e.ownerName);
+          return schedule.length === 0 ? (
               <Card className="text-center">
                 <CalendarDays className="mx-auto size-10 text-muted" />
                 <p className="mt-2 font-semibold">Belum ada jadwal ronda</p>
@@ -51,9 +51,8 @@ export function SchedulePage({
                   />
                 ))}
               </div>
-            )}
-          </>
-        )}
+            );
+        }}
       </QueryState>
     </>
   );
@@ -94,7 +93,6 @@ function DayCard({
             const me = currentUserId !== undefined && e.userId === currentUserId;
             return (
               <li key={e.id} className={cx("flex items-center gap-3 py-1.5", me && "-mx-2 rounded-lg bg-primary/10 px-2")}>
-                <span aria-hidden className={cx("size-3 shrink-0 rounded-full", guardColorClass(e.color))} />
                 <span className="w-14 shrink-0 font-bold">{slotHouseLabel(e) || "—"}</span>
                 <span className="min-w-0 flex-1 truncate">{e.name ?? e.ownerName ?? <span className="text-muted">—</span>}</span>
                 {me && <span className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-fg">Kamu</span>}

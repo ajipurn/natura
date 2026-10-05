@@ -12,11 +12,12 @@ import {
   Search,
   ShieldAlert,
 } from "lucide-react";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { QrScanner } from "@/components/qr-scanner";
 import { ShareRecap } from "@/components/share-recap";
 import { PlanWithLocation } from "@/components/plan-with-location";
+import { ThemeButton } from "@/components/theme-toggle";
 import { SegmentedControl } from "@/components/toggle-group";
 import { Alert, Button, Card, buttonClass, cx } from "@/components/ui";
 import { formatDateLong, formatTime } from "@/lib/dates";
@@ -202,7 +203,11 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                 <h1 className="text-base font-bold leading-tight">Ronda malam ini</h1>
                 <p className="truncate text-xs text-muted">{formatDateLong(store.date)}</p>
               </div>
-              <SyncChip status={store.status} pendingCount={store.pendingCount} onRetry={() => store.sync()} />
+              <div className="flex shrink-0 items-center gap-1.5">
+                <SyncChip status={store.status} pendingCount={store.pendingCount} onRetry={() => store.sync()} />
+                {/* Ronda di luar malam hari: mode gelap cukup sekali ketuk dari sini. */}
+                <ThemeButton />
+              </div>
             </div>
             {houses.length > 0 && (
               <>
@@ -223,9 +228,14 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                   <div className="h-full bg-filled transition-all" style={{ width: `${percent(summary.filled.length, summary.expected)}%` }} />
                   <div className="h-full bg-empty transition-all" style={{ width: `${percent(summary.empty.length, summary.expected)}%` }} />
                 </div>
-                <p className="mt-1.5 text-xs text-muted">
-                  Ada {summary.filled.length} · Kosong {summary.empty.length} · Belum {summary.unchecked.length}
-                  {summary.vacant.length > 0 && ` · Mudik ${summary.vacant.length}`}
+                {/* Titik warnanya sama dengan bilah progres dan kotak rumah. */}
+                <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted">
+                  <LegendItem swatch="bg-filled">Ada {summary.filled.length}</LegendItem>
+                  <LegendItem swatch="bg-empty">Kosong {summary.empty.length}</LegendItem>
+                  <LegendItem swatch="border border-line bg-idle-soft">Belum {summary.unchecked.length}</LegendItem>
+                  {summary.vacant.length > 0 && (
+                    <LegendItem swatch="border border-dashed border-muted/60">Mudik {summary.vacant.length}</LegendItem>
+                  )}
                 </p>
               </>
             )}
@@ -463,15 +473,13 @@ const percent = (part: number, whole: number) => (whole ? (part / whole) * 100 :
 function ActionButtons({ onSearch, onScan }: { onSearch: () => void; onScan: () => void }) {
   return (
     <>
-      <Button onClick={onSearch} variant="secondary" className="h-12 shrink-0 px-4">
+      {/* Ukuran teks, ikon, dan bayangannya sama; tepi Cari dipertegas supaya tidak tampak lebih kecil
+          di samping tombol yang berwarna penuh. */}
+      <Button onClick={onSearch} variant="secondary" className="h-12 shrink-0 border-fg/15 px-4 text-lg shadow-sm">
         <Search className="size-5" /> Cari
       </Button>
-      <Button
-        variant="plain"
-        onClick={onScan}
-        className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-lg font-bold text-primary-fg active:scale-[0.98]"
-      >
-        <ScanLine className="size-6" /> Scan QR
+      <Button onClick={onScan} variant="primary" className="h-12 flex-1 text-lg">
+        <ScanLine className="size-5" /> Scan QR
       </Button>
     </>
   );
@@ -563,5 +571,14 @@ function StatusNotice({ status }: { status: SyncStatus }) {
         </Link>
       </div>
     </div>
+  );
+}
+
+function LegendItem({ swatch, children }: { swatch: string; children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span aria-hidden className={cx("size-2 shrink-0 rounded-full", swatch)} />
+      {children}
+    </span>
   );
 }

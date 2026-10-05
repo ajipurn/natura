@@ -6,7 +6,6 @@ import { useAuth } from "@/client/auth";
 import { invalidate } from "@/client/query";
 import { RadioCards } from "@/components/choice";
 import { Dialog } from "@/components/dialog";
-import { guardColorClass } from "@/components/guard-color-class";
 import { Alert, Button, Card, Field, Textarea, buttonClass, cx } from "@/components/ui";
 import { myRequestsQuery, scheduleQuery } from "@/features/jadwal/queries";
 import { REQUEST_STATUS, requestChange } from "@/lib/request-text";
@@ -40,7 +39,6 @@ export function MySchedule() {
           <ul className="flex-1 space-y-1">
             {mySlots.map((s) => (
               <li key={s.id} className="flex items-center gap-2">
-                <span aria-hidden className={cx("size-3 shrink-0 rounded-full", guardColorClass(s.color))} />
                 <strong>{dayLabel(s.day)}</strong>
                 {s.block && <span className="text-muted">· {slotHouseLabel(s)}</span>}
               </li>

@@ -1,5 +1,6 @@
 import { CheckCircle2, ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { ScrollArea } from "@/components/scroll-area";
 import { Button, cx } from "@/components/ui";
 import { formatAmountShort, formatRupiah } from "@/lib/format";
 import { groupByBlock, houseLabelLong } from "@/lib/houses";
@@ -49,15 +50,20 @@ export function HouseList({
     return <p className="py-10 text-center text-muted">Belum ada rumah yang dicek malam ini.</p>;
   }
 
+  // Blok yang masih ada kotak rumahnya (yang sudah selesai dan terlipat tidak perlu dituju).
+  const jumpable = sections.filter((s) => !(filter === "belum" && s.open === 0) && s.visible.length > 0);
+
   return (
     <div className="space-y-4">
+      {jumpable.length >= 3 && <BlockJump sections={jumpable} filter={filter} />}
       {sections.map(({ block, list, done, total, open, visible }) => {
         // Di tab "Belum", blok yang sudah selesai dilipat (bisa dibuka untuk melihat/mengoreksi).
         const finished = filter === "belum" && open === 0;
         const isExpanded = expanded.has(block);
         const tiles = finished ? (isExpanded ? list : []) : visible;
         return (
-          <section key={block} aria-label={`Blok ${block}`}>
+          // Ruang di atas saat dituju dari BlockJump: di HP ringkasan ronda menempel di atas.
+          <section key={block} id={blockId(block)} aria-label={`Blok ${block}`} className="scroll-mt-44 lg:scroll-mt-6">
             {finished ? (
               <Button
                 variant="plain"
@@ -85,6 +91,37 @@ export function HouseList({
         );
       })}
     </div>
+  );
+}
+
+const blockId = (block: string) => `blok-${block}`;
+
+/**
+ * Deretan blok untuk langsung lompat ke bloknya, dengan jumlah kotak rumah yang tampil di tiap blok
+ * (di tab "Belum" = yang belum dicek). Daftar rumah di HP panjang digulir.
+ */
+function BlockJump({ sections, filter }: { sections: { block: string; visible: HouseDTO[] }[]; filter: ListFilter }) {
+  function jump(block: string) {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.getElementById(blockId(block))?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  }
+  return (
+    <ScrollArea element="nav" aria-label="Lompat ke blok" className="-mx-4 overflow-x-auto lg:mx-0">
+      <ul className="flex w-max gap-1.5 px-4 pb-1 lg:w-auto lg:flex-wrap lg:px-0">
+        {sections.map(({ block, visible }) => (
+          <li key={block}>
+            <Button
+              variant="plain"
+              onClick={() => jump(block)}
+              aria-label={`Blok ${block}, ${visible.length} ${filter === "belum" ? "belum dicek" : "rumah"}`}
+              className="inline-flex items-baseline gap-1 rounded-full border border-line bg-card px-2.5 py-1 text-sm font-semibold hover:border-primary/50 active:scale-95"
+            >
+              {block} <span className="text-xs font-normal text-muted">{visible.length}</span>
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </ScrollArea>
   );
 }
 
