@@ -89,7 +89,7 @@ Untuk mencoba scan dari HP di jaringan yang sama, kamera butuh HTTPS. Pakai tunn
 
 Ketiga app (hasil build Vite) dilayani sebagai file statis, API di `/api/*` berjalan sebagai satu Vercel Function (Node), dan datanya di Postgres Supabase. `bun run build` menyusun semuanya di `.vercel/output` (Build Output API); `vercel.json` membuat Vercel memakai Bun dan perintah build itu.
 
-1. **Supabase:** buat project (region Singapore, `ap-southeast-1`) atau pakai yang sudah ada. Di **Connect** ada dua connection string:
+1. **Supabase:** buat project (mis. region Singapore, `ap-southeast-1`) atau pakai yang sudah ada. Di **Connect** ada dua connection string:
    - **Transaction pooler** (port 6543) untuk aplikasi di Vercel,
    - **Session pooler** (port 5432) untuk skrip di komputer dan DBeaver.
 2. **Migrasi** dari komputer: isi `REMOTE_DATABASE_URL` di `.env.local` dengan Session pooler, lalu
@@ -101,7 +101,7 @@ Ketiga app (hasil build Vite) dilayani sebagai file statis, API di `/api/*` berj
    - `DATABASE_URL`: Transaction pooler dari Supabase,
    - `AUTH_SECRET`: kunci acak minimal 32 karakter (`openssl rand -base64 32`),
    - `APP_URL` (opsional): alamat tetap aplikasi. Kosong = domain production Vercel.
-4. Deploy (push ke `main`, atau `bunx vercel --prod`). Function berjalan di Singapura (`sin1`) supaya dekat database; ganti lewat `FUNCTION_REGION` saat build kalau database di region lain.
+4. Deploy (push ke `main`, atau `bunx vercel --prod`). Function otomatis berjalan di region Vercel yang terdekat dengan database, dibaca dari alamat pooler di `DATABASE_URL` (mis. `ap-south-1` → `bom1` Mumbai; kalau tidak terbaca: `sin1`). Bisa dipaksa lewat environment variable `FUNCTION_REGION`.
 5. Buka `/admin/setup` di alamat production untuk membuat admin, lalu isi data awal dari komputer: `bun run seed:remote`.
 6. Pastikan alamat production sudah final (isi `APP_URL` kalau pakai domain sendiri, lalu deploy ulang), baru cetak stiker QR.
 

@@ -6,16 +6,17 @@
  *   functions/api.func/  → API Hono (src/server/vercel.ts) dibundel jadi satu file
  *   config.json          → routes: /api/* ke function, alamat app (SPA) ke index.html-nya
  *
- * Vercel memakai folder ini apa adanya. Region function bisa diganti lewat FUNCTION_REGION
- * (bawaan sin1 = Singapura, dekat database Supabase di ap-southeast-1).
+ * Vercel memakai folder ini apa adanya. Region function mengikuti region database (lihat
+ * `functionRegion`), atau FUNCTION_REGION kalau diisi.
  */
 import { cpSync, existsSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { functionRegion } from "./vercel-region";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const OUT = path.join(ROOT, ".vercel/output");
 const FUNC = path.join(OUT, "functions/api.func");
-const region = process.env.FUNCTION_REGION || "sin1";
+const { region, reason } = functionRegion({ FUNCTION_REGION: process.env.FUNCTION_REGION, DATABASE_URL: process.env.DATABASE_URL });
 
 if (!existsSync(path.join(ROOT, "dist/index.html"))) {
   console.error("✗ dist/ belum ada. Jalankan `vite build` dulu (atau `bun run build`).");
@@ -63,4 +64,4 @@ json(path.join(OUT, "config.json"), {
   ],
 });
 
-console.log(`✓ .vercel/output siap (function di ${region}).`);
+console.log(`✓ .vercel/output siap (function di ${region}: ${reason}).`);
