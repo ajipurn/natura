@@ -73,7 +73,15 @@ export const rondaRoutes = new Hono<AppEnv>()
     return c.json({ success: "Permintaan dibatalkan." });
   })
 
-  .get("/riwayat", requireUser, async (c) => c.json({ patrols: await listPatrols(c.var.db, 90) }))
+  .get("/riwayat", requireUser, async (c) => {
+    const [patrols, houseRows] = await Promise.all([listPatrols(c.var.db, 90), listHouses(c.var.db)]);
+    return c.json({
+      patrols,
+      /** Rumah dihuni saat ini, untuk menghitung yang belum dicek tiap malam (perkiraan). */
+      activeHouses: houseRows.filter((h) => h.status === "active").length,
+      today: rondaDate(new Date()),
+    });
+  })
 
   .get(
     "/riwayat/:date",

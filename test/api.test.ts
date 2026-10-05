@@ -137,6 +137,8 @@ describe("rumah, ronda, riwayat", () => {
 
     const riwayat = await admin.get("/api/riwayat");
     expect(riwayat.data.patrols).toMatchObject([{ date: snap.data.date, filled: 1, total: 500, collectors: "Aji" }]);
+    // Jumlah rumah dihuni untuk menghitung yang belum dicek tiap malam.
+    expect(riwayat.data).toMatchObject({ today: snap.data.date, activeHouses: (snap.data.houses as { status: string }[]).filter((h) => h.status === "active").length });
     const detail = await admin.get(`/api/riwayat/${snap.data.date}`);
     expect(detail.data.collections).toMatchObject([{ houseId: house.id, status: "filled" }]);
 
