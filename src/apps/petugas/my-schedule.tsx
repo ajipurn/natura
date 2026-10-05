@@ -4,9 +4,10 @@ import { useState } from "react";
 import { api, call } from "@/client/api";
 import { useAuth } from "@/client/auth";
 import { invalidate } from "@/client/query";
+import { RadioCards } from "@/components/choice";
 import { Dialog } from "@/components/dialog";
 import { guardColorClass } from "@/components/guard-color-class";
-import { Alert, Card, Field, buttonClass, cx, inputClass } from "@/components/ui";
+import { Alert, Button, Card, Field, Textarea, buttonClass, cx } from "@/components/ui";
 import { myRequestsQuery, scheduleQuery } from "@/features/jadwal/queries";
 import { REQUEST_STATUS, requestChange } from "@/lib/request-text";
 import { DAY_NAMES, dayLabel, slotHouseLabel } from "@/lib/schedule";
@@ -54,23 +55,23 @@ export function MySchedule() {
         <div className="rounded-xl bg-warn-soft p-3 text-sm text-warn">
           <p className="font-semibold">Menunggu persetujuan admin: {requestChange(pending.fromDay, pending.toDay)}</p>
           {pending.note && <p className="mt-0.5">“{pending.note}”</p>}
-          <button
-            type="button"
+          <Button
+            variant="plain"
             disabled={cancel.isPending}
             onClick={() => cancel.mutate(pending.id)}
             className="mt-1 font-semibold underline"
           >
             Batalkan permintaan
-          </button>
+          </Button>
         </div>
       ) : user.role === "admin" ? (
         <a href="/admin/jadwal" className={cx(buttonClass("secondary", "sm"), "w-full")}>
           <LayoutDashboard className="size-4" /> Ubah jadwal di dashboard admin
         </a>
       ) : (
-        <button type="button" onClick={() => setOpen(true)} className={cx(buttonClass("secondary", "sm"), "w-full")}>
+        <Button onClick={() => setOpen(true)} variant="secondary" size="sm" className="w-full">
           <CalendarClock className="size-4" /> Minta ubah jadwal
-        </button>
+        </Button>
       )}
 
       {recent.map((r) => (
@@ -117,31 +118,18 @@ function RequestForm({ myDays, onDone }: { myDays: number[]; onDone: () => void 
       }}
     >
       {myDays.length > 0 && (
-        <fieldset>
-          <legend className="mb-1 block text-sm font-medium">Malam yang mau diganti</legend>
-          <div className="grid gap-1.5">
-            {[...myDays.map((d) => [d, dayLabel(d)] as const), [null, "Tambah malam jaga (yang sekarang tetap)"] as const].map(
-              ([day, label]) => (
-                <label
-                  key={String(day)}
-                  className={cx(
-                    "flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm",
-                    fromDay === day ? "border-primary bg-primary/10" : "border-line",
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="fromDay"
-                    checked={fromDay === day}
-                    onChange={() => setFromDay(day)}
-                    className="accent-[var(--primary)]"
-                  />
-                  {label}
-                </label>
-              ),
-            )}
-          </div>
-        </fieldset>
+        <RadioCards
+          legend="Malam yang mau diganti"
+          // Nilai pilihan berupa teks: nomor hari, atau "baru" untuk menambah malam jaga.
+          value={fromDay === null ? "baru" : String(fromDay)}
+          onValueChange={(v) => setFromDay(v === "baru" ? null : Number(v))}
+          options={[
+            ...myDays.map((d) => ({ value: String(d), label: dayLabel(d) })),
+            { value: "baru", label: "Tambah malam jaga (yang sekarang tetap)" },
+          ]}
+          // `!`: kelas bawaan RadioCards (grid-cols-2) menang urutan CSS atas grid-cols-1 biasa.
+          className="grid-cols-1"
+        />
       )}
       <fieldset>
         <legend className="mb-1 block text-sm font-medium">{myDays.length ? "Pindah ke malam" : "Mau jaga malam"}</legend>
@@ -149,9 +137,9 @@ function RequestForm({ myDays, onDone }: { myDays: number[]; onDone: () => void 
           {DAY_NAMES.map((label, day) => {
             const taken = myDays.includes(day);
             return (
-              <button
+              <Button
                 key={day}
-                type="button"
+                variant="plain"
                 disabled={taken}
                 aria-pressed={toDay === day}
                 title={taken ? "Sudah jagamu" : dayLabel(day)}
@@ -162,29 +150,28 @@ function RequestForm({ myDays, onDone }: { myDays: number[]; onDone: () => void 
                 )}
               >
                 {label}
-              </button>
+              </Button>
             );
           })}
         </div>
       </fieldset>
       <Field label="Alasan (opsional)">
-        <textarea
+        <Textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={3}
           maxLength={300}
           placeholder="Mis. mulai bulan depan shift malam di hari Ahad."
-          className={cx(inputClass, "h-auto py-2")}
         />
       </Field>
       {send.isError && <Alert>{send.error.message}</Alert>}
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={onDone} className={buttonClass("ghost")}>
+        <Button onClick={onDone} variant="ghost">
           Batal
-        </button>
-        <button type="submit" disabled={toDay === null || send.isPending} className={buttonClass("primary")}>
+        </Button>
+        <Button type="submit" disabled={toDay === null || send.isPending}>
           {send.isPending ? "Mengirim…" : "Kirim ke admin"}
-        </button>
+        </Button>
       </div>
     </form>
   );

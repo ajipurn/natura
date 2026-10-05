@@ -18,7 +18,7 @@ import { Dialog } from "@/components/dialog";
 import { guardColorClass } from "@/components/guard-color-class";
 import { Menu, type MenuItem } from "@/components/menu";
 import { QueryState } from "@/components/query-state";
-import { Alert, Card, PageHeader, buttonClass, cx } from "@/components/ui";
+import { Alert, Button, Card, PageHeader, cx } from "@/components/ui";
 import { ScheduleImportForm } from "@/features/jadwal/import-form";
 import { scheduleQuery } from "@/features/jadwal/queries";
 import { rondaDate } from "@/lib/dates";
@@ -53,9 +53,9 @@ export function JadwalPage() {
         title="Jadwal ronda"
         subtitle={`Malam ini: ${dayLabel(tonight)}`}
         action={
-          <button type="button" onClick={() => setImportOpen(true)} className={buttonClass("secondary", "sm")}>
+          <Button onClick={() => setImportOpen(true)} variant="secondary" size="sm">
             <FileSpreadsheet className="size-4" /> Impor
-          </button>
+          </Button>
         }
       />
       <QueryState query={schedule}>
@@ -166,12 +166,12 @@ function ScheduleEditor({
           <p className="mt-2 font-semibold">Belum ada jadwal ronda</p>
           <p className="mt-1 text-sm text-muted">Impor tabel jadwal dari spreadsheet, atau isi langsung per malam.</p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
-            <button type="button" onClick={onImport} className={buttonClass("primary")}>
+            <Button onClick={onImport}>
               <FileSpreadsheet className="size-5" /> Impor dari spreadsheet
-            </button>
-            <button type="button" onClick={() => setAdding(tonight)} className={buttonClass("secondary")}>
+            </Button>
+            <Button onClick={() => setAdding(tonight)} variant="secondary">
               <Plus className="size-5" /> Isi manual
-            </button>
+            </Button>
           </div>
           <AddSlotDialog
             day={adding}
@@ -315,13 +315,13 @@ function ScheduleEditor({
                   />
                 ))}
               </ol>
-              <button
-                type="button"
+              <Button
+                variant="plain"
                 onClick={() => setAdding(day)}
                 className="flex items-center gap-2 rounded-b-2xl px-4 py-2.5 text-sm font-semibold text-primary hover:bg-idle-soft"
               >
                 <Plus className="size-4" /> Tambah
-              </button>
+              </Button>
             </section>
           );
         })}
@@ -332,25 +332,20 @@ function ScheduleEditor({
           {dirty ? (
             <>
               <p className="min-w-0 flex-1 text-sm font-medium">Ada perubahan yang belum disimpan.</p>
-              <button
-                type="button"
+              <Button
                 disabled={save.isPending}
                 onClick={() => {
                   save.reset();
                   setDraft(base);
                 }}
-                className={buttonClass("ghost", "sm")}
+                variant="ghost"
+                size="sm"
               >
                 Batalkan
-              </button>
-              <button
-                type="button"
-                disabled={save.isPending}
-                onClick={() => save.mutate()}
-                className={buttonClass("primary", "sm")}
-              >
+              </Button>
+              <Button disabled={save.isPending} onClick={() => save.mutate()} size="sm">
                 {save.isPending ? "Menyimpan…" : "Simpan jadwal"}
-              </button>
+              </Button>
             </>
           ) : (
             <p className="min-w-0 flex-1 text-sm text-filled">{save.data?.success}</p>

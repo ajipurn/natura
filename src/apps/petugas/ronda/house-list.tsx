@@ -1,6 +1,6 @@
 import { CheckCircle2, ChevronDown } from "lucide-react";
 import { useState } from "react";
-import { cx } from "@/components/ui";
+import { Button, cx } from "@/components/ui";
 import { formatAmountShort, formatRupiah } from "@/lib/format";
 import { groupByBlock, houseLabelLong } from "@/lib/houses";
 import type { HouseDTO } from "@/lib/types";
@@ -59,8 +59,8 @@ export function HouseList({
         return (
           <section key={block} aria-label={`Blok ${block}`}>
             {finished ? (
-              <button
-                type="button"
+              <Button
+                variant="plain"
                 onClick={() => toggle(block)}
                 aria-expanded={isExpanded}
                 className="flex w-full items-center gap-2 rounded-xl border border-filled/30 bg-filled-soft px-3 py-2.5 text-left text-sm font-semibold text-filled"
@@ -70,7 +70,7 @@ export function HouseList({
                   Blok {block} selesai · {done}/{total}
                 </span>
                 <ChevronDown className={cx("size-4 shrink-0 transition-transform", isExpanded && "rotate-180")} aria-hidden />
-              </button>
+              </Button>
             ) : (
               <BlockHeader block={block} done={done} total={total} open={open} />
             )}
@@ -124,8 +124,8 @@ function HouseTile({
   }[state];
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="plain"
       onClick={onClick}
       aria-label={`${houseLabelLong(house)}, ${stateText}${collection?.pending ? ", belum terkirim" : ""}`}
       className={cx(
@@ -143,6 +143,6 @@ function HouseTile({
       {state === "empty" && <span className="mt-1 text-[10px] font-semibold">kosong</span>}
       {state === "vacant" && <span className="mt-1 text-[10px] font-medium">mudik</span>}
       {collection?.pending && <span className="absolute right-1 top-1 size-2 rounded-full bg-warn" aria-hidden />}
-    </button>
+    </Button>
   );
 }

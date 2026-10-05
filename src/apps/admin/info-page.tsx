@@ -4,9 +4,11 @@ import { useActionState, useState } from "react";
 import { api, call } from "@/client/api";
 import { checked, runForm, str, type FormState } from "@/client/form";
 import { invalidate } from "@/client/query";
+import { CheckboxField } from "@/components/choice";
+import { Collapsible } from "@/components/collapsible";
 import { QueryState } from "@/components/query-state";
 import { SubmitButton } from "@/components/submit-button";
-import { Alert, Card, Field, PageHeader, SectionTitle, buttonClass, cx, inputClass } from "@/components/ui";
+import { Alert, Button, Card, Field, Input, PageHeader, SectionTitle, Textarea, buttonClass } from "@/components/ui";
 import { formatDateShort } from "@/lib/dates";
 import { infoQuery, settingsQuery } from "./queries";
 
@@ -66,9 +68,9 @@ function WargaCode() {
                     >
                       <Share2 className="size-4" /> Kirim ke WhatsApp
                     </a>
-                    <button
-                      type="button"
-                      className={buttonClass("secondary", "sm")}
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={async () => {
                         try {
                           await navigator.clipboard.writeText(link);
@@ -80,16 +82,16 @@ function WargaCode() {
                       }}
                     >
                       <Copy className="size-4" /> {copied ? "Tersalin" : "Salin link"}
-                    </button>
+                    </Button>
                     <a href="/" target="_blank" rel="noopener" className={buttonClass("secondary", "sm")}>
                       <ExternalLink className="size-4" /> Lihat halaman warga
                     </a>
                   </div>
                   <div className="flex flex-wrap gap-2 border-t border-line pt-3">
-                    <button
-                      type="button"
+                    <Button
                       disabled={change.isPending}
-                      className={buttonClass("secondary", "sm")}
+                      variant="secondary"
+                      size="sm"
                       onClick={() => {
                         if (window.confirm("Buat kode baru? Warga perlu memasukkan kode baru; kode lama tidak berlaku.")) {
                           change.mutate(true);
@@ -97,11 +99,11 @@ function WargaCode() {
                       }}
                     >
                       Buat kode baru
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
                       disabled={change.isPending}
-                      className={buttonClass("danger", "sm")}
+                      variant="danger"
+                      size="sm"
                       onClick={() => {
                         if (window.confirm("Tutup halaman warga? Semua warga tidak bisa membukanya sampai kode baru dibuat.")) {
                           change.mutate(false);
@@ -109,7 +111,7 @@ function WargaCode() {
                       }}
                     >
                       Tutup halaman warga
-                    </button>
+                    </Button>
                   </div>
                 </>
               ) : (
@@ -117,14 +119,9 @@ function WargaCode() {
                   <p className="text-sm text-muted">
                     Halaman warga masih tertutup. Buat kode untuk membukanya: warga memasukkan kode ini sekali di HP-nya.
                   </p>
-                  <button
-                    type="button"
-                    disabled={change.isPending}
-                    onClick={() => change.mutate(true)}
-                    className={buttonClass("primary")}
-                  >
+                  <Button disabled={change.isPending} onClick={() => change.mutate(true)}>
                     <KeyRound className="size-5" /> Buat kode warga
-                  </button>
+                  </Button>
                 </>
               )}
               {change.isError && <Alert>{change.error.message}</Alert>}
@@ -188,22 +185,18 @@ function AnnouncementFields({ value }: { value?: Announcement }) {
   return (
     <>
       <Field label="Judul">
-        <input name="title" required maxLength={120} defaultValue={value?.title} placeholder="Kerja bakti Minggu" className={inputClass} />
+        <Input name="title" required maxLength={120} defaultValue={value?.title} placeholder="Kerja bakti Minggu" />
       </Field>
       <Field label="Isi">
-        <textarea
+        <Textarea
           name="body"
           rows={4}
           maxLength={4000}
           defaultValue={value?.body}
           placeholder="Minggu, 12 Oktober jam 07.00, kumpul di taman blok AB."
-          className={cx(inputClass, "h-auto py-2")}
         />
       </Field>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="pinned" defaultChecked={value?.pinned} className="size-4 accent-[var(--primary)]" />
-        Sematkan di atas
-      </label>
+      <CheckboxField label="Sematkan di atas" name="pinned" defaultChecked={value?.pinned} />
     </>
   );
 }
@@ -223,38 +216,40 @@ function AnnouncementItem({ announcement: a }: { announcement: Announcement }) {
   });
 
   return (
-    <li className="rounded-2xl border border-line bg-card">
-      <details className="group p-4">
-        <summary className="flex cursor-pointer list-none items-start gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold">
+    <li>
+      <Collapsible
+        card
+        title={
+          <>
+            <span className="block font-semibold">
               {a.pinned && <Pin className="mr-1 inline size-4 text-primary" aria-label="Disematkan" />}
               {a.title}
-            </p>
-            <p className="text-xs text-muted">{formatDateShort(new Date(a.createdAt).toISOString().slice(0, 10))}</p>
-            {a.body && <p className="mt-1 line-clamp-2 whitespace-pre-line text-sm text-muted group-open:hidden">{a.body}</p>}
-          </div>
-          <span className="text-sm font-semibold text-muted group-open:hidden">Ubah</span>
-          <span className="hidden text-sm font-semibold text-muted group-open:inline">Tutup</span>
-        </summary>
+            </span>
+            <span className="block text-xs text-muted">{formatDateShort(new Date(a.createdAt).toISOString().slice(0, 10))}</span>
+            {a.body && (
+              <span className="mt-1 line-clamp-2 whitespace-pre-line text-sm text-muted group-data-panel-open:hidden">{a.body}</span>
+            )}
+          </>
+        }
+      >
         <form action={formAction} className="mt-3 space-y-3">
           <AnnouncementFields value={a} />
           {state?.error && <Alert>{state.error}</Alert>}
           {state?.success && <Alert tone="success">{state.success}</Alert>}
           <div className="flex flex-wrap gap-2">
             <SubmitButton size="sm">Simpan</SubmitButton>
-            <button
-              type="button"
+            <Button
               disabled={remove.isPending}
               onClick={() => window.confirm("Hapus pengumuman ini?") && remove.mutate()}
-              className={buttonClass("danger", "sm")}
+              variant="danger"
+              size="sm"
             >
               <Trash2 className="size-4" /> Hapus
-            </button>
+            </Button>
           </div>
           {remove.isError && <Alert>{remove.error.message}</Alert>}
         </form>
-      </details>
+      </Collapsible>
     </li>
   );
 }
@@ -309,24 +304,22 @@ function ContactsEditor({ initial }: { initial: { name: string; role: string; ph
           <fieldset key={row.key} className="rounded-xl border border-line p-3">
             <legend className="sr-only">Kontak {i + 1}</legend>
             <div className="grid gap-2 sm:grid-cols-2">
-              <input
+              <Input
                 value={row.name}
                 onChange={(e) => update(row.key, { name: e.target.value })}
                 required
                 maxLength={60}
                 placeholder="Nama"
                 aria-label="Nama"
-                className={inputClass}
               />
-              <input
+              <Input
                 value={row.role}
                 onChange={(e) => update(row.key, { role: e.target.value })}
                 maxLength={60}
                 placeholder="Jabatan, mis. Ketua RT"
                 aria-label="Jabatan"
-                className={inputClass}
               />
-              <input
+              <Input
                 value={row.phone}
                 onChange={(e) => update(row.key, { phone: e.target.value })}
                 required
@@ -334,7 +327,7 @@ function ContactsEditor({ initial }: { initial: { name: string; role: string; ph
                 maxLength={20}
                 placeholder="0812-3456-7890"
                 aria-label="Nomor HP"
-                className={cx(inputClass, "sm:col-span-2")}
+                className="sm:col-span-2"
               />
             </div>
             <div className="mt-2 flex justify-end gap-1">
@@ -351,16 +344,16 @@ function ContactsEditor({ initial }: { initial: { name: string; role: string; ph
           </fieldset>
         ))}
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
+          <Button
             onClick={() => setRows((list) => [...list, { key: nextKey++, name: "", role: "", phone: "" }])}
-            className={buttonClass("secondary", "sm")}
+            variant="secondary"
+            size="sm"
           >
             <Plus className="size-4" /> Tambah kontak
-          </button>
-          <button type="submit" disabled={save.isPending} className={buttonClass("primary", "sm")}>
+          </Button>
+          <Button type="submit" disabled={save.isPending} size="sm">
             {save.isPending ? "Menyimpan…" : "Simpan kontak"}
-          </button>
+          </Button>
         </div>
         {save.isError && <Alert>{save.error.message}</Alert>}
         {save.isSuccess && <Alert tone="success">{save.data.success}</Alert>}
@@ -381,8 +374,8 @@ function IconButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="plain"
       aria-label={label}
       title={label}
       disabled={disabled}
@@ -390,6 +383,6 @@ function IconButton({
       className="flex size-9 items-center justify-center rounded-lg border border-line disabled:opacity-40"
     >
       {children}
-    </button>
+    </Button>
   );
 }

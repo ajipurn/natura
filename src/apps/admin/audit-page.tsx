@@ -4,6 +4,8 @@ import { Fragment, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { guardColorClass } from "@/components/guard-color-class";
 import { QueryState } from "@/components/query-state";
+import { ScrollArea } from "@/components/scroll-area";
+import { ChipGroup } from "@/components/toggle-group";
 import { Card, PageHeader, cx } from "@/components/ui";
 import { addDays, formatDateLong, formatTime, isIsoDate, rondaDate } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
@@ -139,24 +141,19 @@ export function AuditPage() {
                 </Card>
 
                 <div className="min-w-0">
-                  <div role="tablist" aria-label="Saring catatan" className="-mx-4 mb-3 flex gap-1.5 overflow-x-auto px-4 lg:mx-0 lg:px-0">
-                    {filters.map((f) => (
-                      <button
-                        key={f.value}
-                        type="button"
-                        role="tab"
-                        aria-selected={filter === f.value}
-                        onClick={() => setFilter(f.value)}
-                        className={cx(
-                          "shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium",
-                          filter === f.value ? "border-primary bg-primary text-primary-fg" : "border-line bg-card",
-                          f.value === "luar" && f.count > 0 && filter !== f.value && "border-warn/50 text-warn",
-                        )}
-                      >
-                        {f.label} {f.count}
-                      </button>
-                    ))}
-                  </div>
+                  <ScrollArea className="-mx-4 mb-3 overflow-x-auto lg:mx-0">
+                    <ChipGroup
+                      aria-label="Saring catatan"
+                      value={filter}
+                      onValueChange={setFilter}
+                      options={filters.map((f) => ({
+                        ...f,
+                        // Ada catatan di luar jadwal: chipnya diberi warna peringatan (warna aktif tetap menang).
+                        className: f.value === "luar" && f.count > 0 ? "border-warn/50 text-warn hover:text-warn" : undefined,
+                      }))}
+                      className="w-max min-w-full px-4 lg:px-0"
+                    />
+                  </ScrollArea>
 
                   {shown.length === 0 ? (
                     <Card className="text-center text-sm text-muted">

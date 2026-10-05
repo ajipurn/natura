@@ -1,6 +1,6 @@
 import { Copy, Share2 } from "lucide-react";
 import { useState } from "react";
-import { buttonClass, cx } from "./ui";
+import { Button, cx } from "./ui";
 
 /** Bagikan teks rekap ke WhatsApp (atau aplikasi lain lewat menu bagikan HP). */
 export function ShareRecap({ text, className }: { text: string; className?: string }) {
@@ -30,13 +30,13 @@ export function ShareRecap({ text, className }: { text: string; className?: stri
 
   return (
     <div className={cx("flex gap-2", className)}>
-      <button type="button" onClick={share} className={cx(buttonClass("secondary"), "flex-1")}>
+      <Button onClick={share} variant="secondary" className="flex-1">
         <Share2 className="size-5" /> Bagikan rekap
-      </button>
-      <button type="button" onClick={copy} className={buttonClass("secondary")} aria-label="Salin teks rekap">
+      </Button>
+      <Button onClick={copy} variant="secondary" aria-label="Salin teks rekap">
         <Copy className="size-5" />
         <span className="sr-only sm:not-sr-only">{copied ? "Tersalin" : "Salin"}</span>
-      </button>
+      </Button>
       {copied && (
         <span role="status" className="sr-only">
           Teks rekap tersalin

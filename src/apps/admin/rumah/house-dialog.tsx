@@ -4,9 +4,10 @@ import { useId, useState } from "react";
 import { Link } from "react-router";
 import { api, call } from "@/client/api";
 import { invalidate } from "@/client/query";
+import { RadioCards } from "@/components/choice";
 import { Dialog } from "@/components/dialog";
 import { QrSvg } from "@/components/qr-svg";
-import { Alert, Field, buttonClass, cx, inputClass } from "@/components/ui";
+import { Alert, Button, Field, Input, buttonClass, cx } from "@/components/ui";
 import { houseLabelLong, normalizeHouseField, parseNumberList } from "@/lib/houses";
 import { houseUrl } from "@/lib/qr";
 import type { HouseDTO, HouseStatus } from "@/lib/types";
@@ -72,15 +73,15 @@ function AddForm({ houses, initial, onDone }: { houses: HouseDTO[]; initial: { b
     >
       <div className="grid grid-cols-[7rem_1fr] gap-3">
         <Field label="Blok">
-          <input
+          <Input
             value={block}
             onChange={(e) => setBlock(e.target.value)}
             required
             maxLength={10}
-            autoFocus={!initial.block}
+            data-autofocus={!initial.block || undefined}
             list={blocksId}
             placeholder="A"
-            className={cx(inputClass, "uppercase")}
+            className="uppercase"
           />
           <datalist id={blocksId}>
             {[...new Set(houses.map((h) => h.block))].map((b) => (
@@ -89,7 +90,7 @@ function AddForm({ houses, initial, onDone }: { houses: HouseDTO[]; initial: { b
           </datalist>
         </Field>
         <Field label="Nomor rumah">
-          <input value={numbers} onChange={(e) => setNumbers(e.target.value)} required placeholder="1-20" className={inputClass} />
+          <Input value={numbers} onChange={(e) => setNumbers(e.target.value)} required placeholder="1-20" />
         </Field>
       </div>
 
@@ -111,27 +112,27 @@ function AddForm({ houses, initial, onDone }: { houses: HouseDTO[]; initial: { b
       )}
 
       <Field label="Nama KK (opsional)" hint={single ? undefined : "Hanya dipakai kalau menambah satu rumah."}>
-        <input
+        <Input
           value={single ? ownerName : ""}
           onChange={(e) => setOwnerName(e.target.value)}
           disabled={!single}
           maxLength={80}
           // Blok/nomor sudah terisi dari denah: tinggal isi nama.
-          autoFocus={Boolean(initial.block)}
+          data-autofocus={Boolean(initial.block) || undefined}
           placeholder="Pak Budi"
-          className={cx(inputClass, "disabled:opacity-50")}
+          className="disabled:opacity-50"
         />
       </Field>
 
       {add.isError && <Alert>{add.error.message}</Alert>}
       {add.isSuccess && <Alert tone="success">{add.data.success}</Alert>}
       <div className="flex justify-end gap-2 pt-1">
-        <button type="button" onClick={onDone} className={buttonClass("ghost")}>
+        <Button onClick={onDone} variant="ghost">
           {add.isSuccess ? "Selesai" : "Batal"}
-        </button>
-        <button type="submit" disabled={add.isPending || parsed === null} className={buttonClass("primary")}>
+        </Button>
+        <Button type="submit" disabled={add.isPending || parsed === null}>
           {add.isPending ? "Menyimpan…" : fresh.length > 1 ? `Tambah ${fresh.length} rumah` : "Tambah rumah"}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -198,10 +199,10 @@ function EditForm({ house, accounts, origin, onDone }: { house: AdminHouse; acco
       >
         <div className="grid grid-cols-2 gap-3">
           <Field label="Blok">
-            <input value={block} onChange={(e) => setBlock(e.target.value)} required maxLength={10} className={cx(inputClass, "uppercase")} />
+            <Input value={block} onChange={(e) => setBlock(e.target.value)} required maxLength={10} className="uppercase" />
           </Field>
           <Field label="Nomor">
-            <input value={number} onChange={(e) => setNumber(e.target.value)} required maxLength={10} className={cx(inputClass, "uppercase")} />
+            <Input value={number} onChange={(e) => setNumber(e.target.value)} required maxLength={10} className="uppercase" />
           </Field>
         </div>
 
@@ -228,51 +229,27 @@ function EditForm({ house, accounts, origin, onDone }: { house: AdminHouse; acco
             label={accounts.length ? "Nama penghuni" : "Nama KK"}
             hint={accounts.length ? "Sama dengan nama akun petugasnya: mengubah di sini ikut mengubah nama akun itu." : undefined}
           >
-            <input
+            <Input
               value={ownerName}
               onChange={(e) => setOwnerName(e.target.value)}
               required={accounts.length > 0}
               maxLength={accounts.length ? 40 : 80}
               placeholder="Pak Budi"
-              className={inputClass}
+             
             />
           </Field>
         )}
 
-        <fieldset>
-          <legend className="mb-1.5 text-sm font-medium">Status</legend>
-          <div className="grid grid-cols-2 gap-2">
-            {STATUSES.map((s) => (
-              <label
-                key={s.value}
-                className={cx(
-                  "flex cursor-pointer flex-col rounded-xl border px-3 py-2.5 transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/30",
-                  status === s.value ? "border-primary bg-primary/10" : "border-line hover:bg-idle-soft/60",
-                )}
-              >
-                <input
-                  type="radio"
-                  name="status"
-                  value={s.value}
-                  checked={status === s.value}
-                  onChange={() => setStatus(s.value)}
-                  className="sr-only"
-                />
-                <span className={cx("text-sm font-semibold", status === s.value && "text-primary")}>{s.label}</span>
-                <span className="text-xs text-muted">{s.hint}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        <RadioCards legend="Status" value={status} onValueChange={setStatus} options={STATUSES} />
 
         {save.isError && <Alert>{save.error.message}</Alert>}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onDone} className={buttonClass("ghost")}>
+          <Button onClick={onDone} variant="ghost">
             Batal
-          </button>
-          <button type="submit" disabled={save.isPending} className={buttonClass("primary")}>
+          </Button>
+          <Button type="submit" disabled={save.isPending}>
             {save.isPending ? "Menyimpan…" : "Simpan"}
-          </button>
+          </Button>
         </div>
       </form>
 
@@ -306,14 +283,13 @@ function QrSection({ house, origin }: { house: AdminHouse; origin: string }) {
             <Link to={`/admin/rumah/cetak?blok=${encodeURIComponent(house.block)}`} className={buttonClass("secondary", "sm")}>
               <Printer className="size-4" /> Cetak
             </Link>
-            <button
-              type="button"
+            <Button
               disabled={regenerate.isPending}
               onClick={() => window.confirm("Buat QR baru? Stiker lama rumah ini tidak bisa dipakai lagi.") && regenerate.mutate()}
-              className={buttonClass("secondary", "sm")}
+              variant="secondary" size="sm"
             >
               <RefreshCw className={cx("size-4", regenerate.isPending && "animate-spin")} /> QR baru
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -347,14 +323,13 @@ function DeleteSection({ house, onDeleted }: { house: AdminHouse; onDeleted: () 
           <h3 className="text-sm font-semibold">Hapus rumah</h3>
           <p className="text-xs text-muted">Belum ada catatan jimpitan. Stiker QR-nya tidak bisa dipakai lagi.</p>
         </div>
-        <button
-          type="button"
+        <Button
           disabled={remove.isPending}
           onClick={() => window.confirm(`Hapus ${houseLabelLong(house)}?`) && remove.mutate()}
-          className={cx(buttonClass("danger", "sm"), "shrink-0")}
+          variant="danger" size="sm" className="shrink-0"
         >
           <Trash2 className="size-4" /> {remove.isPending ? "Menghapus…" : "Hapus"}
-        </button>
+        </Button>
       </div>
       {remove.isError && <Alert>{remove.error.message}</Alert>}
     </section>

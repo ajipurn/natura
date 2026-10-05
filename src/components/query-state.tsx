@@ -2,7 +2,7 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import { CloudOff, RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 import { errorMessage } from "@/client/api";
-import { Card, buttonClass, cx } from "./ui";
+import { Button, Card } from "./ui";
 
 /**
  * Tampilkan data query; selama memuat pertama kali tampil kerangka, kalau gagal tampil pesan
@@ -29,9 +29,9 @@ export function ErrorCard({ message, onRetry }: { message: string; onRetry?: () 
       <p className="mt-2 font-semibold">Gagal memuat</p>
       <p className="mt-1 text-sm text-muted">{message}</p>
       {onRetry && (
-        <button type="button" onClick={onRetry} className={cx(buttonClass("secondary"), "mt-4")}>
+        <Button onClick={onRetry} variant="secondary" className="mt-4">
           <RefreshCw className="size-5" /> Coba lagi
-        </button>
+        </Button>
       )}
     </Card>
   );

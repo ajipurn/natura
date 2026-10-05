@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type ComponentProps, type ReactNode } fro
 import { fitGeoTransform, locateOnPlan, type GeoAnchor, type PlanLocation } from "@/lib/geo";
 import { lotKey } from "@/lib/site-plan";
 import { SitePlanMap } from "./site-plan-map";
-import { buttonClass, cx } from "./ui";
+import { Button } from "./ui";
 
 type Fix = { lat: number; lng: number; accuracy: number };
 type LocationState =
@@ -82,19 +82,20 @@ export function PlanWithLocation({
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
+        <Button
+          variant={enabled ? "primary" : "secondary"}
+          size="sm"
           aria-pressed={enabled}
           onClick={() => setEnabled((v) => !v)}
-          className={cx(buttonClass(enabled ? "primary" : "secondary", "sm"), "shrink-0")}
+          className="shrink-0"
         >
           {enabled ? <LocateFixed className="size-4" /> : <Locate className="size-4" />}
           {enabled ? "Lokasi menyala" : "Lokasi saya"}
-        </button>
+        </Button>
         {enabled && point && (
-          <button type="button" onClick={() => setFocusKey((k) => k + 1)} className={cx(buttonClass("ghost", "sm"), "shrink-0")}>
+          <Button variant="ghost" size="sm" onClick={() => setFocusKey((k) => k + 1)} className="shrink-0">
             <Crosshair className="size-4" /> Pusatkan
-          </button>
+          </Button>
         )}
         <p className="basis-full text-sm empty:hidden" role="status" aria-live="polite">
           {!enabled ? null : !transform ? (

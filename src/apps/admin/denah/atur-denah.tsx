@@ -3,6 +3,7 @@ import { Box, Map as MapIcon } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
 import { Link } from "react-router";
 import { QueryState } from "@/components/query-state";
+import { SegmentedControl } from "@/components/toggle-group";
 import { Card, SectionTitle, cx } from "@/components/ui";
 import { matchPlan } from "@/lib/site-plan";
 import { SITE_PLAN } from "@/site-plan";
@@ -10,6 +11,11 @@ import { housesQuery } from "../queries";
 import { PlanCalibration } from "./plan-calibration";
 
 const SiteMap3D = lazy(() => import("@/components/site-map-3d"));
+
+const VIEWS = [
+  { value: "2d", label: "Denah", icon: MapIcon },
+  { value: "3d", label: "3D", icon: Box },
+] as const;
 
 /**
  * Tab "Atur denah": ringkasan kecocokan denah dengan data rumah (rumahnya didaftarkan di Rumah & QR),
@@ -52,28 +58,7 @@ export function AturDenah() {
 
               <div className="mt-6 flex items-center justify-between gap-3">
                 <SectionTitle>Pratinjau</SectionTitle>
-                <div role="tablist" aria-label="Tampilan" className="flex rounded-xl border border-line bg-card p-0.5">
-                  {(
-                    [
-                      ["2d", "Denah", MapIcon],
-                      ["3d", "3D", Box],
-                    ] as const
-                  ).map(([value, label, Icon]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      role="tab"
-                      aria-selected={view === value}
-                      onClick={() => setView(value)}
-                      className={cx(
-                        "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold",
-                        view === value ? "bg-primary text-primary-fg" : "text-muted",
-                      )}
-                    >
-                      <Icon className="size-4" /> {label}
-                    </button>
-                  ))}
-                </div>
+                <SegmentedControl aria-label="Tampilan" size="sm" value={view} onValueChange={setView} options={VIEWS} />
               </div>
               {view === "2d" ? (
                 <PlanCalibration houses={houses} />

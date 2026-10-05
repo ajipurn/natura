@@ -5,7 +5,7 @@ import { useAuth } from "@/client/auth";
 import { int, str, type FormState } from "@/client/form";
 import { queryClient } from "@/client/query";
 import { SubmitButton } from "@/components/submit-button";
-import { Alert, Card, Field, PageTitle, inputClass } from "@/components/ui";
+import { Alert, Card, Field, Input, PageTitle } from "@/components/ui";
 
 async function setupAction(_prev: FormState, formData: FormData): Promise<FormState> {
   try {
@@ -45,38 +45,38 @@ export function SetupPage() {
         <Card className="space-y-4">
           <h2 className="font-semibold">Lingkungan</h2>
           <Field label="Nama lingkungan" hint="Muncul di rekap dan stiker QR.">
-            <input name="communityName" required maxLength={80} placeholder="Cluster Natura" className={inputClass} />
+            <Input name="communityName" required maxLength={80} placeholder="Cluster Natura" />
           </Field>
           <Field label="Nominal jimpitan per rumah (Rp)" hint="Bisa diubah nanti dan saat mencatat.">
-            <input name="defaultAmount" required inputMode="numeric" defaultValue="500" className={inputClass} />
+            <Input name="defaultAmount" required inputMode="numeric" defaultValue="500" />
           </Field>
         </Card>
 
         <Card className="space-y-4">
           <h2 className="font-semibold">Akun admin</h2>
           <Field label="Nama">
-            <input name="name" required maxLength={40} autoComplete="name" placeholder="Pak Budi" className={inputClass} />
+            <Input name="name" required maxLength={40} autoComplete="name" placeholder="Pak Budi" />
           </Field>
           <Field label="PIN (4–6 angka)">
-            <input
+            <Input
               name="pin"
               required
               type="password"
               inputMode="numeric"
               pattern="\d{4,6}"
               autoComplete="new-password"
-              className={inputClass}
+             
             />
           </Field>
           <Field label="Ulangi PIN">
-            <input
+            <Input
               name="pinConfirm"
               required
               type="password"
               inputMode="numeric"
               pattern="\d{4,6}"
               autoComplete="new-password"
-              className={inputClass}
+             
             />
           </Field>
         </Card>

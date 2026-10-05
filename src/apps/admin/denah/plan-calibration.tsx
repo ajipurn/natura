@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { api, call } from "@/client/api";
 import { invalidate } from "@/client/query";
 import { PlanWithLocation } from "@/components/plan-with-location";
-import { Alert, Card, buttonClass, cx, inputClass } from "@/components/ui";
+import { Alert, Button, Card, Input, cx } from "@/components/ui";
 import { fitGeoTransform, formatLatLng, MAX_ANCHORS, MIN_ANCHORS, parseLatLng, type GeoAnchor } from "@/lib/geo";
 import type { PlanPoint } from "@/lib/site-plan";
 import type { HouseDTO } from "@/lib/types";
@@ -76,9 +76,9 @@ export function PlanCalibration({ houses }: { houses: HouseDTO[] }) {
             </p>
           </div>
           {!adding && anchors.length < MAX_ANCHORS && (
-            <button type="button" onClick={() => setAdding(true)} className={buttonClass("secondary", "sm")}>
+            <Button onClick={() => setAdding(true)} variant="secondary" size="sm">
               <Plus className="size-4" /> Tambah titik acuan
-            </button>
+            </Button>
           )}
         </div>
 
@@ -97,15 +97,15 @@ export function PlanCalibration({ houses }: { houses: HouseDTO[] }) {
                       selisih ±{Math.round(residual)} m{residual > OK_RESIDUAL && " · mungkin salah"}
                     </span>
                   )}
-                  <button
-                    type="button"
+                  <Button
+                    variant="plain"
                     disabled={save.isPending}
                     onClick={() => save.mutate(anchors.filter((_, j) => j !== i))}
                     className="shrink-0 rounded-lg p-1.5 text-muted hover:text-empty"
                     aria-label={`Hapus titik acuan ${i + 1}`}
                   >
                     <Trash2 className="size-4" />
-                  </button>
+                  </Button>
                 </li>
               );
             })}
@@ -128,13 +128,13 @@ export function PlanCalibration({ houses }: { houses: HouseDTO[] }) {
               <span>
                 <strong>2.</strong> Koordinat GPS titik itu
               </span>
-              <input
+              <Input
                 value={coords}
                 onChange={(e) => setCoords(e.target.value)}
                 placeholder="-6.208800, 106.845600"
                 inputMode="decimal"
                 aria-label="Koordinat GPS"
-                className={cx(inputClass, "mt-1 font-mono")}
+                className="mt-1 font-mono"
               />
               <span className="mt-1 block text-xs text-muted">
                 Di Google Maps: klik kanan titik yang sama, lalu klik angka koordinatnya untuk menyalin. Atau berdiri di
@@ -145,16 +145,16 @@ export function PlanCalibration({ houses }: { houses: HouseDTO[] }) {
             {coords.trim() && !parsed && <p className="text-xs text-empty">Format koordinat belum benar.</p>}
             {save.isError && <Alert>{save.error.message}</Alert>}
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={fillFromMyPosition} className={buttonClass("secondary", "sm")}>
+              <Button onClick={fillFromMyPosition} variant="secondary" size="sm">
                 <LocateFixed className="size-4" /> Pakai lokasi saya
-              </button>
+              </Button>
               <span className="flex-1" />
-              <button type="button" onClick={closeForm} className={buttonClass("ghost", "sm")}>
+              <Button onClick={closeForm} variant="ghost" size="sm">
                 Batal
-              </button>
-              <button type="submit" disabled={!pick || !parsed || save.isPending} className={buttonClass("primary", "sm")}>
+              </Button>
+              <Button type="submit" disabled={!pick || !parsed || save.isPending} size="sm">
                 {save.isPending ? "Menyimpan…" : "Simpan titik"}
-              </button>
+              </Button>
             </div>
           </form>
         )}

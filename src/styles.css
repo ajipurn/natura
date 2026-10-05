@@ -94,3 +94,26 @@ body {
     color: #000;
   }
 }
+
+/* Scrollbar bawaan (mis. daftar Select, di HP) disamakan warnanya dengan scrollbar OverlayScrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--fg) 26%, transparent) transparent;
+}
+
+/* Scrollbar OverlayScrollbars (lihat src/client/scrollbars.ts): tipis, menebal saat disentuh kursor, warnanya ikut tema. */
+.os-theme-app {
+  box-sizing: border-box;
+  --os-size: 10px;
+  --os-padding-perpendicular: 2px;
+  --os-padding-axis: 2px;
+  --os-track-border-radius: 10px;
+  --os-handle-border-radius: 10px;
+  --os-handle-interactive-area-offset: 4px;
+  --os-handle-perpendicular-size: 60%;
+  --os-handle-perpendicular-size-hover: 100%;
+  --os-handle-perpendicular-size-active: 100%;
+  --os-handle-bg: color-mix(in srgb, var(--fg) 26%, transparent);
+  --os-handle-bg-hover: color-mix(in srgb, var(--fg) 40%, transparent);
+  --os-handle-bg-active: color-mix(in srgb, var(--fg) 55%, transparent);
+}

@@ -3,9 +3,11 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Hand, LayoutList, Map as MapIcon,
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { ErrorCard, QueryState } from "@/components/query-state";
+import { ScrollArea } from "@/components/scroll-area";
 import { ShareRecap } from "@/components/share-recap";
 import { SitePlanMap } from "@/components/site-plan-map";
-import { Card, cx, inputClass, PageTitle } from "@/components/ui";
+import { ChipGroup, SegmentedControl } from "@/components/toggle-group";
+import { Button, Card, Input, PageTitle, cx } from "@/components/ui";
 import { addDays, formatDateLong, formatDateShort, formatTime, isIsoDate, rondaDate } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import type { MarkerState } from "@/lib/house-state";
@@ -17,6 +19,12 @@ import { CorrectionForm } from "./correction-form";
 import { patrolQuery } from "./queries";
 
 type Filter = "semua" | "ada" | "kosong" | "belum";
+type View = "daftar" | "denah";
+
+const VIEWS = [
+  { value: "daftar", label: "Daftar", icon: LayoutList },
+  { value: "denah", label: "Denah", icon: MapIcon },
+] as const;
 
 const percent = (part: number, whole: number) => (whole ? (part / whole) * 100 : 0);
 
@@ -100,7 +108,7 @@ function NightDetail({
 }) {
   const [filter, setFilter] = useState<Filter>("semua");
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<"daftar" | "denah">("daftar");
+  const [view, setView] = useState<View>("daftar");
   const [editing, setEditing] = useState<number | null>(null);
 
   const summary = summarize(houses, collections);
@@ -117,11 +125,11 @@ function NightDetail({
       return filter === "semua" || (filter === "ada" && s === "filled") || (filter === "kosong" && s === "empty") || (filter === "belum" && s === "none");
     });
 
-  const tabs: [Filter, string, number][] = [
-    ["semua", "Semua", houses.length],
-    ["ada", "Ada", summary.filled.length],
-    ["kosong", "Kosong", summary.empty.length],
-    ["belum", "Belum dicek", summary.unchecked.length],
+  const filters: { value: Filter; label: string; count: number }[] = [
+    { value: "semua", label: "Semua", count: houses.length },
+    { value: "ada", label: "Ada", count: summary.filled.length },
+    { value: "kosong", label: "Kosong", count: summary.empty.length },
+    { value: "belum", label: "Belum dicek", count: summary.unchecked.length },
   ];
 
   return (
@@ -176,56 +184,28 @@ function NightDetail({
       ) : (
         <>
           <div className="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center">
-            <div role="tablist" aria-label="Saring rumah" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 lg:mx-0 lg:px-0">
-              {tabs.map(([value, label, count]) => (
-                <button
-                  key={value}
-                  type="button"
-                  role="tab"
-                  aria-selected={filter === value}
-                  onClick={() => setFilter(value)}
-                  className={cx(
-                    "shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium",
-                    filter === value ? "border-primary bg-primary text-primary-fg" : "border-line bg-card",
-                  )}
-                >
-                  {label} {count}
-                </button>
-              ))}
-            </div>
+            <ScrollArea className="-mx-4 overflow-x-auto lg:mx-0">
+              <ChipGroup
+                aria-label="Saring rumah"
+                value={filter}
+                onValueChange={setFilter}
+                options={filters}
+                className="w-max min-w-full px-4 lg:px-0"
+              />
+            </ScrollArea>
             <div className="flex gap-2 lg:ml-auto">
               <label className="relative block min-w-0 flex-1 lg:w-60">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted" />
-                <input
+                <Input
                   type="search"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Cari rumah atau nama…"
                   aria-label="Cari rumah"
-                  className={cx(inputClass, "h-10 pl-10")}
+                  className="pl-10"
                 />
               </label>
-              <div role="tablist" aria-label="Tampilan" className="flex shrink-0 rounded-xl border border-line bg-card p-0.5">
-                {(
-                  [
-                    ["daftar", "Daftar", LayoutList],
-                    ["denah", "Denah", MapIcon],
-                  ] as const
-                ).map(([value, label, Icon]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    role="tab"
-                    aria-selected={view === value}
-                    aria-label={label}
-                    title={label}
-                    onClick={() => setView(value)}
-                    className={cx("flex size-9 items-center justify-center rounded-lg", view === value ? "bg-primary text-primary-fg" : "text-muted")}
-                  >
-                    <Icon className="size-5" />
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl aria-label="Tampilan" iconOnly value={view} onValueChange={setView} options={VIEWS} className="shrink-0" />
             </div>
           </div>
 
@@ -269,19 +249,17 @@ function NightDetail({
                           </div>
                           <StatusBadge status={stateOf(h)} amount={c?.amount ?? 0} />
                           {canCorrect && (
-                            <button
-                              type="button"
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
                               onClick={() => setEditing(isEditing ? null : h.id)}
                               aria-expanded={isEditing}
                               aria-label={`Koreksi ${houseLabel(h)}`}
                               title="Koreksi"
-                              className={cx(
-                                "flex size-8 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-idle-soft hover:text-fg",
-                                isEditing && "bg-idle-soft text-fg",
-                              )}
+                              className={cx(isEditing && "bg-idle-soft text-fg")}
                             >
                               <Pencil className="size-4" />
-                            </button>
+                            </Button>
                           )}
                         </div>
                         {isEditing && (

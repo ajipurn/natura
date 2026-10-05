@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { useFormStatus } from "react-dom";
-import { buttonClass, cx } from "./ui";
+import { Button } from "./ui";
 
+/** Tombol kirim form (Base UI Button); tetap bisa difokus selama form diproses. */
 export function SubmitButton({
   children,
   pendingText = "Menyimpan…",
@@ -12,23 +13,26 @@ export function SubmitButton({
 }: {
   children: ReactNode;
   pendingText?: string;
-  variant?: Parameters<typeof buttonClass>[0];
-  size?: Parameters<typeof buttonClass>[1];
+  variant?: Parameters<typeof Button>[0]["variant"];
+  size?: Parameters<typeof Button>[0]["size"];
   className?: string;
   /** Tampilkan konfirmasi sebelum mengirim form. */
   confirm?: string;
 }) {
   const { pending } = useFormStatus();
   return (
-    <button
+    <Button
       type="submit"
+      variant={variant}
+      size={size}
       disabled={pending}
-      className={cx(buttonClass(variant, size), className)}
+      focusableWhenDisabled
+      className={className}
       onClick={(e) => {
         if (confirm && !window.confirm(confirm)) e.preventDefault();
       }}
     >
       {pending ? pendingText : children}
-    </button>
+    </Button>
   );
 }

@@ -3,7 +3,8 @@ import { CalendarClock, Check, X } from "lucide-react";
 import { useState } from "react";
 import { api, call } from "@/client/api";
 import { invalidate } from "@/client/query";
-import { Alert, Card, buttonClass, cx, inputClass } from "@/components/ui";
+import { Collapsible } from "@/components/collapsible";
+import { Alert, Button, Card, Input, cx } from "@/components/ui";
 import { formatDateShort, formatTime } from "@/lib/dates";
 import { REQUEST_STATUS, requestChange } from "@/lib/request-text";
 import { DAY_NAMES } from "@/lib/schedule";
@@ -56,8 +57,7 @@ export function RequestsPanel({ locked }: { locked: boolean }) {
         </ul>
       )}
       {decided.length > 0 && (
-        <details className="mt-2 text-sm">
-          <summary className="cursor-pointer font-semibold text-muted">Sudah diproses ({decided.length})</summary>
+        <Collapsible title={`Sudah diproses (${decided.length})`} className="mt-2 text-sm" triggerClassName="font-semibold text-muted">
           <ul className="mt-2 space-y-1.5">
             {decided.map((r) => (
               <li key={r.id}>
@@ -73,7 +73,7 @@ export function RequestsPanel({ locked }: { locked: boolean }) {
               </li>
             ))}
           </ul>
-        </details>
+        </Collapsible>
       )}
     </Card>
   );
@@ -105,22 +105,12 @@ function PendingRequest({ request: r, locked }: { request: Request; locked: bool
         </div>
         {!rejecting && (
           <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={locked || decide.isPending}
-              onClick={() => setRejecting(true)}
-              className={buttonClass("secondary", "sm")}
-            >
+            <Button disabled={locked || decide.isPending} onClick={() => setRejecting(true)} variant="secondary" size="sm">
               <X className="size-4" /> Tolak
-            </button>
-            <button
-              type="button"
-              disabled={locked || decide.isPending}
-              onClick={() => decide.mutate("setujui")}
-              className={buttonClass("primary", "sm")}
-            >
+            </Button>
+            <Button disabled={locked || decide.isPending} onClick={() => decide.mutate("setujui")} size="sm">
               <Check className="size-4" /> {decide.isPending ? "Menyimpan…" : "Setujui"}
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -132,21 +122,21 @@ function PendingRequest({ request: r, locked }: { request: Request; locked: bool
             decide.mutate("tolak");
           }}
         >
-          <input
+          <Input
             value={response}
             onChange={(e) => setResponse(e.target.value)}
             maxLength={300}
             autoFocus
             placeholder="Alasan (opsional), mis. malam Rabu sudah penuh"
             aria-label="Alasan menolak"
-            className={cx(inputClass, "h-9 min-w-0 flex-1 text-sm")}
+            className="h-9 min-w-0 flex-1 text-sm"
           />
-          <button type="button" onClick={() => setRejecting(false)} className={buttonClass("ghost", "sm")}>
+          <Button onClick={() => setRejecting(false)} variant="ghost" size="sm">
             Batal
-          </button>
-          <button type="submit" disabled={locked || decide.isPending} className={buttonClass("danger", "sm")}>
+          </Button>
+          <Button type="submit" disabled={locked || decide.isPending} variant="danger" size="sm">
             Tolak permintaan
-          </button>
+          </Button>
         </form>
       )}
       {decide.isError && (

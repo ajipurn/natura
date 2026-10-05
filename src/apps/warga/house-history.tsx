@@ -3,7 +3,7 @@ import { Star } from "lucide-react";
 import { api, call } from "@/client/api";
 import { Dialog } from "@/components/dialog";
 import { QueryState } from "@/components/query-state";
-import { buttonClass, cx } from "@/components/ui";
+import { Button, cx } from "@/components/ui";
 import { daysInMonth, formatDateShort, formatMonth } from "@/lib/dates";
 import { formatAmountShort, formatRupiah } from "@/lib/format";
 import { scheduleDay } from "@/lib/schedule";
@@ -35,14 +35,14 @@ export function HouseHistoryDialog({
       description="Riwayat jimpitan ± 3 bulan terakhir"
       footer={
         houseId !== null && (
-          <button
-            type="button"
+          <Button
+            variant={isMine ? "primary" : "secondary"}
+            size="sm"
             onClick={() => onMyHouse(isMine ? null : houseId)}
             aria-pressed={isMine}
-            className={buttonClass(isMine ? "primary" : "secondary", "sm")}
           >
             <Star className={cx("size-4", isMine && "fill-current")} /> {isMine ? "Rumah saya" : "Tandai sebagai rumah saya"}
-          </button>
+          </Button>
         )
       }
     >

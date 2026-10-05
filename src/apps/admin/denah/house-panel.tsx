@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Hand, Pencil, ScanLine, Table2, X } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { Link } from "react-router";
-import { Card, buttonClass, cx } from "@/components/ui";
+import { ScrollArea } from "@/components/scroll-area";
+import { Button, Card, buttonClass, cx } from "@/components/ui";
 import { formatDateShort, formatMonth, formatTime } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { houseLabel, type HouseRef } from "@/lib/houses";
@@ -38,11 +39,10 @@ export function MapWithPanel({
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_19rem] xl:items-start">
       <div className="min-w-0 space-y-3">{map}</div>
-      <aside
-        ref={panelRef}
-        className="scroll-mt-20 xl:sticky xl:top-6 xl:max-h-[calc(100dvh-3rem)] xl:overflow-y-auto"
-      >
-        {panel}
+      <aside ref={panelRef} className="scroll-mt-20 xl:sticky xl:top-6">
+        <ScrollArea className="xl:max-h-[calc(100dvh-3rem)] xl:overflow-y-auto">
+          {panel}
+        </ScrollArea>
       </aside>
     </div>
   );
@@ -72,14 +72,14 @@ export function HouseChips<H extends HouseRef & { id: number }>({
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {houses.map((h) => (
-            <button
+            <Button
               key={h.id}
-              type="button"
+              variant="plain"
               onClick={() => onSelect(h.id)}
               className="rounded-full border border-line px-2.5 py-0.5 text-sm font-semibold tabular-nums hover:border-primary/50"
             >
               {render ? render(h) : houseLabel(h)}
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -145,14 +145,15 @@ export function HousePanel({
             {house.ownerName ?? "Belum ada nama"}
           </p>
         </div>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onClose}
           aria-label="Tutup"
-          className="-mr-2 -mt-1 flex size-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-idle-soft"
+          className="-mr-2 -mt-1"
         >
           <X className="size-5" />
-        </button>
+        </Button>
       </div>
 
       {tonight && (

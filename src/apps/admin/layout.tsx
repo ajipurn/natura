@@ -20,7 +20,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router";
 import { api, call } from "@/client/api";
 import { queryClient } from "@/client/query";
-import { cx } from "@/components/ui";
+import { ScrollArea } from "@/components/scroll-area";
+import { Button, cx } from "@/components/ui";
 import type { SessionUser } from "@/server/auth";
 import { requestsQuery } from "./queries";
 
@@ -79,16 +80,11 @@ export function AdminLayout({ user, children }: { user: SessionUser; children: R
 
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden print:hidden" role="dialog" aria-modal="true" aria-label="Menu">
-          <button type="button" aria-label="Tutup menu" className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
+          <Button variant="plain" aria-label="Tutup menu" className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
           <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-card shadow-xl">
-            <button
-              type="button"
-              aria-label="Tutup menu"
-              onClick={() => setOpen(false)}
-              className="absolute right-2 top-3 flex size-10 items-center justify-center rounded-lg"
-            >
+            <Button variant="ghost" size="icon" aria-label="Tutup menu" onClick={() => setOpen(false)} className="absolute right-2 top-3">
               <X className="size-5" />
-            </button>
+            </Button>
             <Sidebar user={user} />
           </aside>
         </div>
@@ -96,14 +92,9 @@ export function AdminLayout({ user, children }: { user: SessionUser; children: R
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-line bg-card/95 px-3 py-2 backdrop-blur lg:hidden print:hidden">
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            aria-label="Buka menu"
-            className="flex size-10 items-center justify-center rounded-lg"
-          >
+          <Button variant="ghost" size="icon" onClick={() => setOpen(true)} aria-label="Buka menu">
             <Menu className="size-6" />
-          </button>
+          </Button>
           <span className="font-semibold">Admin Jimpitan</span>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-5 lg:px-8 lg:pt-8 print:max-w-none print:p-0">
@@ -135,52 +126,54 @@ function Sidebar({ user }: { user: SessionUser }) {
         <p className="text-xs font-semibold uppercase tracking-wide text-primary">Jimpitan</p>
         <p className="text-lg font-bold">Admin</p>
       </div>
-      <nav className="flex-1 overflow-y-auto px-3" aria-label="Menu admin">
-        {NAV.map(({ group, items }) => (
-          <div key={group} className="mb-4">
-            <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted">{group}</p>
-            <ul>
-              {items.map(({ to, label, icon: Icon, end }) => (
-                <li key={to}>
-                  <NavLink
-                    to={to}
-                    end={end}
-                    className={({ isActive }) =>
-                      cx(
-                        "flex items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium",
-                        isActive ? "bg-primary/12 text-primary" : "text-fg hover:bg-idle-soft",
-                      )
-                    }
-                  >
-                    <Icon className="size-5" /> {label}
-                    {to === "/admin/jadwal" && pendingRequests > 0 && (
-                      <span
-                        className="ml-auto rounded-full bg-warn px-2 py-0.5 text-xs font-bold text-card"
-                        aria-label={`${pendingRequests} permintaan ubah jadwal`}
-                      >
-                        {pendingRequests}
-                      </span>
-                    )}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </nav>
+      <ScrollArea element="nav" aria-label="Menu admin" className="min-h-0 flex-1 overflow-y-auto">
+        <div className="px-3">
+          {NAV.map(({ group, items }) => (
+            <div key={group} className="mb-4">
+              <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted">{group}</p>
+              <ul>
+                {items.map(({ to, label, icon: Icon, end }) => (
+                  <li key={to}>
+                    <NavLink
+                      to={to}
+                      end={end}
+                      className={({ isActive }) =>
+                        cx(
+                          "flex items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium",
+                          isActive ? "bg-primary/12 text-primary" : "text-fg hover:bg-idle-soft",
+                        )
+                      }
+                    >
+                      <Icon className="size-5" /> {label}
+                      {to === "/admin/jadwal" && pendingRequests > 0 && (
+                        <span
+                          className="ml-auto rounded-full bg-warn px-2 py-0.5 text-xs font-bold text-card"
+                          aria-label={`${pendingRequests} permintaan ubah jadwal`}
+                        >
+                          {pendingRequests}
+                        </span>
+                      )}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
       <div className="border-t border-line p-3">
         <a href="/petugas/" className="flex items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium hover:bg-idle-soft">
           <ScanLine className="size-5 text-primary" /> Buka app petugas
         </a>
-        <button
-          type="button"
+        <Button
+          variant="plain"
           onClick={() => logout.mutate()}
           disabled={logout.isPending}
           className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-sm font-medium text-empty hover:bg-empty-soft"
         >
           <LogOut className="size-5" /> Keluar
           <span className="ml-auto truncate text-xs font-normal text-muted">{user.name}</span>
-        </button>
+        </Button>
       </div>
     </div>
   );

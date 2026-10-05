@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useState } from "react";
 import { GuardChip } from "@/components/guard-chip";
 import { guardColorClass } from "@/components/guard-color-class";
-import { cx } from "@/components/ui";
+import { Button, cx } from "@/components/ui";
 import { dayLabel, scheduleDay, slotHouseLabel } from "@/lib/schedule";
 import type { ScheduleDTO } from "@/lib/types";
 
@@ -31,8 +31,8 @@ export function TonightGuards({ schedule, date, userId }: { schedule: ScheduleDT
       aria-label="Jaga malam ini"
       className={cx("rounded-2xl border bg-card", mine ? "border-primary/60" : "border-line")}
     >
-      <button
-        type="button"
+      <Button
+        variant="plain"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
         className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm"
@@ -47,7 +47,7 @@ export function TonightGuards({ schedule, date, userId }: { schedule: ScheduleDT
           {names && <span className="text-muted"> · {mine ? `bersama ${names}` : names}</span>}
         </span>
         <ChevronDown className={cx("size-4 shrink-0 text-muted transition-transform", expanded && "rotate-180")} aria-hidden />
-      </button>
+      </Button>
       {expanded && (
         <div className="border-t border-line px-3 pb-3 pt-2">
           <div className="flex items-baseline justify-between gap-2">

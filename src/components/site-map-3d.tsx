@@ -15,7 +15,7 @@ import {
   type SitePlan,
 } from "@/lib/site-plan";
 import type { HouseDTO } from "@/lib/types";
-import { cx } from "./ui";
+import { Button, cx } from "./ui";
 
 /** Warna status ada di atap, karena atap yang paling terlihat dari atas. */
 const ROOF_COLORS: Record<MarkerState, string> = {
@@ -299,14 +299,14 @@ export default function SiteMap3D({
       </div>
       <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-1.5">
         <p className="text-xs text-muted">Geser untuk memutar · cubit untuk zoom · dua jari untuk menggeser</p>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="icon"
           onClick={() => apiRef.current?.resetView()}
-          className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-line"
           aria-label="Kembalikan sudut pandang"
         >
           <RotateCcw className="size-5" />
-        </button>
+        </Button>
       </div>
     </div>
   );

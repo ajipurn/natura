@@ -1,7 +1,7 @@
 import { Home, Search, UserPlus, UserRound } from "lucide-react";
 import { useState } from "react";
 import { Dialog } from "@/components/dialog";
-import { cx, inputClass } from "@/components/ui";
+import { Button, Input } from "@/components/ui";
 import { compareHouses, houseLabel, searchHouses } from "@/lib/houses";
 import { DAY_NAMES, dayLabel } from "@/lib/schedule";
 import type { HouseDTO } from "@/lib/types";
@@ -75,14 +75,14 @@ function Picker({
     <div className="space-y-4">
       <label className="relative block">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted" />
-        <input
+        <Input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          autoFocus
+          data-autofocus
           placeholder="Nama petugas atau rumah (mis. AD3)"
           aria-label="Cari petugas atau rumah"
-          className={cx(inputClass, "pl-10")}
+          className="pl-10"
         />
       </label>
 
@@ -96,8 +96,8 @@ function Picker({
               const already = taken.has(u.id);
               return (
                 <li key={u.id}>
-                  <button
-                    type="button"
+                  <Button
+                    variant="plain"
                     disabled={already}
                     onClick={() => addUser(u)}
                     className="flex w-full items-center gap-3 px-1 py-2.5 text-left hover:bg-idle-soft disabled:opacity-50"
@@ -111,7 +111,7 @@ function Picker({
                       </span>
                     </span>
                     {already && <span className="shrink-0 text-xs text-muted">sudah di malam ini</span>}
-                  </button>
+                  </Button>
                 </li>
               );
             })}
@@ -125,8 +125,8 @@ function Picker({
           <ul className="divide-y divide-line">
             {[...matchedHouses].sort(compareHouses).map((h) => (
               <li key={h.id}>
-                <button
-                  type="button"
+                <Button
+                  variant="plain"
                   onClick={() =>
                     onAdd({ name: null, userId: null, userActive: null, color: null, block: h.block, number: h.number, houseId: h.id, ownerName: h.ownerName })
                   }
@@ -135,7 +135,7 @@ function Picker({
                   <Home className="size-5 shrink-0 text-muted" />
                   <span className="font-medium">{houseLabel(h)}</span>
                   <span className="min-w-0 flex-1 truncate text-sm text-muted">{h.ownerName ?? "—"}</span>
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -143,8 +143,8 @@ function Picker({
       )}
 
       {q && !exactAccount && (
-        <button
-          type="button"
+        <Button
+          variant="plain"
           onClick={() =>
             onAdd({ name: query.trim().slice(0, 60), userId: null, userActive: null, color: null, block: "", number: "", houseId: null, ownerName: null })
           }
@@ -155,7 +155,7 @@ function Picker({
             Tambah “<strong>{query.trim()}</strong>” tanpa akun
             <span className="block text-xs text-muted">Hanya nama di jadwal; tidak bisa masuk ke app petugas.</span>
           </span>
-        </button>
+        </Button>
       )}
     </div>
   );

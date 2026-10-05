@@ -21,7 +21,8 @@ import { invalidate } from "@/client/query";
 import { BarChart } from "@/components/bar-chart";
 import { GuardChip } from "@/components/guard-chip";
 import { ErrorCard, LoadingCards, QueryState } from "@/components/query-state";
-import { Alert, Card, PageTitle, SectionTitle, buttonClass, cx, inputClass } from "@/components/ui";
+import { SegmentedControl } from "@/components/toggle-group";
+import { Alert, Button, Card, Input, PageTitle, SectionTitle, buttonClass, cx } from "@/components/ui";
 import { addDays, daysInMonth, formatDateLong, formatDateShort, formatMonth, shiftMonth } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
@@ -107,7 +108,7 @@ function CodeForm() {
           <KeyRound className="size-5 text-primary" /> Masukkan kode warga
         </p>
         <p className="text-sm text-muted">Kodenya dibagikan pengurus di grup warga.</p>
-        <input
+        <Input
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           required
@@ -117,12 +118,12 @@ function CodeForm() {
           spellCheck={false}
           aria-label="Kode warga"
           placeholder="Contoh: K7MP2XQ9"
-          className={cx(inputClass, "text-center font-mono text-xl tracking-[0.3em]")}
+          className="text-center font-mono text-xl tracking-[0.3em]"
         />
         {enter.isError && <Alert>{enter.error.message}</Alert>}
-        <button type="submit" disabled={enter.isPending} className={cx(buttonClass("primary"), "w-full")}>
+        <Button type="submit" disabled={enter.isPending} className="w-full">
           {enter.isPending ? "Memeriksa…" : "Buka info warga"}
-        </button>
+        </Button>
       </form>
     </Card>
   );
@@ -215,28 +216,32 @@ function GuardSchedule({ schedule, tonight, date }: { schedule: Guard[]; tonight
 
   return (
     <Card className="p-0">
-      <div role="tablist" aria-label="Pilih malam" className="flex gap-1 overflow-x-auto border-b border-line p-2 sm:grid sm:grid-cols-7">
-        {[0, 1, 2, 3, 4, 5, 6].map((i) => {
-          const d = (tonight + i) % 7;
-          const count = schedule.filter((s) => s.day === d).length;
-          return (
-            <button
-              key={d}
-              type="button"
-              role="tab"
-              aria-selected={offset === i}
-              onClick={() => setOffset(i)}
-              className={cx(
-                "flex min-w-14 shrink-0 flex-col items-center rounded-xl px-2.5 py-1.5 leading-tight sm:min-w-0",
-                offset === i ? "bg-primary text-primary-fg" : "text-fg hover:bg-idle-soft",
-              )}
-            >
-              <span className="text-[11px] font-medium opacity-80">{i === 0 ? "Malam ini" : formatDateShort(addDays(date, i)).split(", ")[1]}</span>
-              <span className="text-sm font-semibold">{DAY_NAMES[d]}</span>
-              <span className={cx("text-[11px]", offset === i ? "opacity-80" : "text-muted")}>{count} org</span>
-            </button>
-          );
-        })}
+      <div className="overflow-x-auto border-b border-line p-2">
+        <SegmentedControl
+          aria-label="Pilih malam"
+          value={String(offset)}
+          onValueChange={(v) => setOffset(Number(v))}
+          options={[0, 1, 2, 3, 4, 5, 6].map((i) => {
+            const d = (tonight + i) % 7;
+            const count = schedule.filter((s) => s.day === d).length;
+            return {
+              value: String(i),
+              label: (
+                <>
+                  <span className="block text-[11px] font-medium opacity-80">
+                    {i === 0 ? "Malam ini" : formatDateShort(addDays(date, i)).split(", ")[1]}
+                  </span>
+                  <span className="block">{DAY_NAMES[d]}</span>
+                  <span className={cx("block text-[11px] font-normal", offset === i ? "opacity-80" : "text-muted")}>{count} org</span>
+                </>
+              ),
+              // Tiga baris (tanggal, hari, jumlah petugas): tingginya mengikuti isi.
+              className: "h-auto min-w-14 shrink-0 py-1.5 text-center leading-tight sm:min-w-0",
+            };
+          })}
+          // Tanpa garis tepi: menyatu dengan kepala kartu. Di HP bisa digeser, di layar lebar 7 kolom.
+          className="min-w-max gap-1 border-transparent sm:grid sm:min-w-0 sm:grid-cols-7"
+        />
       </div>
       <div className="p-4">
         <p className="text-sm text-muted">
@@ -274,24 +279,19 @@ function MonthRecap({ today }: { today: string }) {
       </SectionTitle>
       <Card>
         <div className="flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={() => setMonth(shiftMonth(month, -1))}
-            className="flex size-10 items-center justify-center rounded-lg border border-line"
-            aria-label="Bulan sebelumnya"
-          >
+          <Button variant="secondary" size="icon" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Bulan sebelumnya">
             <ChevronLeft className="size-5" />
-          </button>
+          </Button>
           <p className="font-semibold">{formatMonth(month)}</p>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="icon"
             onClick={() => setMonth(shiftMonth(month, 1))}
             disabled={month >= thisMonth}
-            className="flex size-10 items-center justify-center rounded-lg border border-line disabled:opacity-40"
             aria-label="Bulan berikutnya"
           >
             <ChevronRight className="size-5" />
-          </button>
+          </Button>
         </div>
         <QueryState query={recap} loading={<p className="py-8 text-center text-muted">Memuat…</p>}>
           {(data) =>
@@ -356,8 +356,8 @@ function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string 
           rumah untuk melihat riwayatnya.
         </p>
         {mine && (
-          <button
-            type="button"
+          <Button
+            variant="plain"
             onClick={() => setOpen(mine)}
             className="flex w-full items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2.5 text-left"
           >
@@ -367,17 +367,17 @@ function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string 
               <span className="block text-sm text-muted">{houseMonthText(mine)}</span>
             </span>
             <span className="shrink-0 text-sm font-semibold text-primary">Riwayat</span>
-          </button>
+          </Button>
         )}
         <label className="relative block">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted" />
-          <input
+          <Input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Cari rumah, mis. AD3"
             aria-label="Cari rumah"
-            className={cx(inputClass, "pl-10")}
+            className="pl-10"
           />
         </label>
         {shown.length === 0 ? (
@@ -394,8 +394,8 @@ function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string 
                     const ratio = checked ? h.filled / checked : null;
                     return (
                       <li key={h.id}>
-                        <button
-                          type="button"
+                        <Button
+                          variant="plain"
                           onClick={() => setOpen(h)}
                           aria-label={`${houseLabel(h)}: ${houseMonthText(h)}. Lihat riwayat`}
                           className={cx(
@@ -414,7 +414,7 @@ function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string 
                           <span className="block text-[11px]">
                             {h.status === "vacant" ? "mudik" : checked ? `${h.filled}/${checked}` : "–"}
                           </span>
-                        </button>
+                        </Button>
                       </li>
                     );
                   })}

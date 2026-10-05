@@ -2,7 +2,7 @@ import { useActionState } from "react";
 import { api, call } from "@/client/api";
 import { int, runForm, str, type FormState } from "@/client/form";
 import { SubmitButton } from "@/components/submit-button";
-import { Alert, Field, inputClass } from "@/components/ui";
+import { Alert, Field, Input } from "@/components/ui";
 
 function saveSettingsAction(_prev: FormState, formData: FormData) {
   return runForm(
@@ -22,10 +22,10 @@ export function SettingsForm({ communityName, defaultAmount }: { communityName: 
   return (
     <form action={formAction} className="space-y-4">
       <Field label="Nama lingkungan" hint="Muncul di rekap WA dan stiker QR.">
-        <input name="communityName" required maxLength={80} defaultValue={communityName} className={inputClass} />
+        <Input name="communityName" required maxLength={80} defaultValue={communityName} />
       </Field>
       <Field label="Nominal jimpitan per rumah (Rp)" hint="Nilai awal saat petugas menekan “Ada”.">
-        <input name="defaultAmount" required inputMode="numeric" defaultValue={defaultAmount} className={inputClass} />
+        <Input name="defaultAmount" required inputMode="numeric" defaultValue={defaultAmount} />
       </Field>
       {state?.error && <Alert>{state.error}</Alert>}
       {state?.success && <Alert tone="success">{state.success}</Alert>}

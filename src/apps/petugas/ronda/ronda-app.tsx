@@ -17,7 +17,8 @@ import { Link } from "react-router";
 import { QrScanner } from "@/components/qr-scanner";
 import { ShareRecap } from "@/components/share-recap";
 import { PlanWithLocation } from "@/components/plan-with-location";
-import { Alert, Card, buttonClass, cx } from "@/components/ui";
+import { SegmentedControl } from "@/components/toggle-group";
+import { Alert, Button, Card, buttonClass, cx } from "@/components/ui";
 import { formatDateLong, formatTime } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import type { MarkerState } from "@/lib/house-state";
@@ -38,6 +39,12 @@ type Toast = { text: string; tone: "ok" | "error" };
 type View = "list" | "map" | "3d";
 
 const VIEW_KEY = "jimpitan:ronda-view";
+
+const VIEWS = [
+  { value: "list", label: "Daftar", icon: LayoutGrid },
+  { value: "map", label: "Denah", icon: MapIcon },
+  { value: "3d", label: "3D", icon: Box },
+] as const;
 
 // three.js cukup besar; hanya diunduh saat tab 3D dibuka.
 const SiteMap3D = lazy(() => import("@/components/site-map-3d"));
@@ -161,40 +168,16 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
           <CloudOff className="mx-auto size-10 text-muted" />
           <p className="mt-3 font-semibold">Data rumah belum terunduh</p>
           <p className="mt-1 text-sm text-muted">Sambungkan internet sekali supaya halaman ini bisa dipakai offline.</p>
-          <button type="button" onClick={() => store.sync()} className={cx(buttonClass("primary"), "mt-4")}>
+          <Button onClick={() => store.sync()} className="mt-4">
             <RefreshCw className="size-5" /> Coba lagi
-          </button>
+          </Button>
         </Card>
       </div>
     );
   }
 
   const viewSwitch = (
-    <div role="tablist" aria-label="Tampilan" className="flex shrink-0 rounded-xl border border-line bg-card p-0.5">
-      {(
-        [
-          ["list", "Daftar", LayoutGrid],
-          ["map", "Denah", MapIcon],
-          ["3d", "3D", Box],
-        ] as const
-      ).map(([value, label, Icon]) => (
-        <button
-          key={value}
-          type="button"
-          role="tab"
-          aria-selected={view === value}
-          aria-label={label}
-          title={label}
-          onClick={() => changeView(value)}
-          className={cx(
-            "flex size-9 items-center justify-center rounded-lg",
-            view === value ? "bg-primary text-primary-fg" : "text-muted",
-          )}
-        >
-          <Icon className="size-5" />
-        </button>
-      ))}
-    </div>
+    <SegmentedControl aria-label="Tampilan" compact value={view} onValueChange={changeView} options={VIEWS} className="shrink-0" />
   );
   const allDone = summary.unchecked.length === 0 && summary.checked > 0;
   const recap = (
@@ -282,9 +265,9 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                   {r.label}: {r.error}
                 </span>
               ))}
-              <button type="button" onClick={store.dismissRejections} className="mt-1 font-semibold underline">
+              <Button variant="plain" onClick={store.dismissRejections} className="mt-1 font-semibold underline">
                 Tutup
-              </button>
+              </Button>
             </Alert>
           )}
           {lastEntry && (
@@ -318,29 +301,30 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
           <>
             <div className="mb-3 flex items-center justify-between gap-2">
               {view === "list" ? (
-                <div role="tablist" aria-label="Saring rumah" className="flex min-w-0 flex-1 rounded-xl bg-idle-soft p-0.5 text-sm">
-                  {(
+                <SegmentedControl
+                  aria-label="Saring rumah"
+                  fill
+                  size="sm"
+                  value={filter}
+                  onValueChange={setFilter}
+                  // Angkanya kecil dan jaraknya rapat supaya tiga pilihan muat di samping tombol tampilan di HP.
+                  options={(
                     [
                       ["belum", "Belum", summary.unchecked.length],
                       ["sudah", "Sudah", summary.checked],
                       ["semua", "Semua", houses.length],
                     ] as const
-                  ).map(([value, label, count]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      role="tab"
-                      aria-selected={filter === value}
-                      onClick={() => setFilter(value)}
-                      className={cx(
-                        "flex-1 whitespace-nowrap rounded-lg px-1 py-1.5 font-semibold",
-                        filter === value ? "bg-card text-fg shadow-sm" : "text-muted",
-                      )}
-                    >
-                      {label} <span className="text-xs font-normal">{count}</span>
-                    </button>
-                  ))}
-                </div>
+                  ).map(([value, label, count]) => ({
+                    value,
+                    label: (
+                      <>
+                        {label} <span className="text-xs font-normal">{count}</span>
+                      </>
+                    ),
+                    className: "px-1",
+                  }))}
+                  className="min-w-0 flex-1"
+                />
               ) : (
                 <p className="text-sm font-semibold">{view === "map" ? "Denah" : "Denah 3D"}</p>
               )}
@@ -479,16 +463,16 @@ const percent = (part: number, whole: number) => (whole ? (part / whole) * 100 :
 function ActionButtons({ onSearch, onScan }: { onSearch: () => void; onScan: () => void }) {
   return (
     <>
-      <button type="button" onClick={onSearch} className={cx(buttonClass("secondary"), "h-12 shrink-0 px-4")}>
+      <Button onClick={onSearch} variant="secondary" className="h-12 shrink-0 px-4">
         <Search className="size-5" /> Cari
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="plain"
         onClick={onScan}
         className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-lg font-bold text-primary-fg active:scale-[0.98]"
       >
         <ScanLine className="size-6" /> Scan QR
-      </button>
+      </Button>
     </>
   );
 }
@@ -522,9 +506,9 @@ function LastEntry({
         </span>
       </p>
       {onEdit && (
-        <button type="button" onClick={onEdit} className="shrink-0 font-semibold text-primary">
+        <Button variant="plain" onClick={onEdit} className="shrink-0 font-semibold text-primary">
           Ubah
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -551,8 +535,8 @@ function SyncChip({
           : "Tersimpan";
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="plain"
       onClick={onRetry}
       className={cx(
         "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold",
@@ -562,7 +546,7 @@ function SyncChip({
     >
       {offline ? <CloudOff className="size-4" /> : <CloudUpload className="size-4" />}
       {label}
-    </button>
+    </Button>
   );
 }
 

@@ -5,7 +5,8 @@ import { api, call, errorMessage } from "@/client/api";
 import { safeNext, useAuth } from "@/client/auth";
 import { queryClient } from "@/client/query";
 import { ErrorCard } from "@/components/query-state";
-import { Alert, Field, PageTitle, buttonClass, cx, inputClass } from "@/components/ui";
+import { Select } from "@/components/select";
+import { Alert, Button, Field, Input, PageTitle } from "@/components/ui";
 
 const LAST_USER_KEY = "jimpitan:last-user";
 
@@ -75,28 +76,19 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
         </div>
       ) : (
         <form className="mt-6 space-y-4" onSubmit={submit}>
-          <Field label="Nama">
-            <select
-              name="userId"
-              required
-              value={list.some((u) => String(u.id) === userId) ? userId : ""}
-              onChange={(e) => setUserId(e.target.value)}
-              className={inputClass}
-              disabled={users.isPending}
-            >
-              <option value="" disabled>
-                {users.isPending ? "Memuat…" : "Pilih nama…"}
-              </option>
-              {list.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                  {u.house && list.some((o) => o.id !== u.id && o.name.toLowerCase() === u.name.toLowerCase()) && ` (${u.house})`}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <Select
+            label="Nama"
+            name="userId"
+            required
+            value={list.some((u) => String(u.id) === userId) ? userId : ""}
+            onValueChange={setUserId}
+            // Blok/nomor rumah tampil di samping nama, jadi nama kembar tetap bisa dibedakan.
+            options={list.map((u) => ({ value: String(u.id), label: u.name, hint: u.house ?? undefined }))}
+            placeholder={users.isPending ? "Memuat…" : "Pilih nama…"}
+            disabled={users.isPending}
+          />
           <Field label="PIN">
-            <input
+            <Input
               ref={pinRef}
               name="pin"
               required
@@ -104,13 +96,13 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
               inputMode="numeric"
               pattern="\d{4,6}"
               autoComplete="current-password"
-              className={`${inputClass} text-center text-2xl tracking-[0.5em]`}
+              className="text-center text-2xl tracking-[0.5em]"
             />
           </Field>
           {error && <Alert>{error}</Alert>}
-          <button type="submit" disabled={pending} className={cx(buttonClass("primary", "lg"), "w-full")}>
+          <Button type="submit" disabled={pending} size="lg" className="w-full">
             {pending ? "Memeriksa…" : "Masuk"}
-          </button>
+          </Button>
           <p className="text-center text-sm text-muted">Lupa PIN? Minta admin untuk mengatur ulang.</p>
         </form>
       )}

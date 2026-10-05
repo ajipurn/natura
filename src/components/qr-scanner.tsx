@@ -1,7 +1,7 @@
 import jsQR from "jsqr";
 import { Flashlight, FlashlightOff, Keyboard, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { cx } from "./ui";
+import { Button, cx } from "./ui";
 
 type Detect = (video: HTMLVideoElement) => Promise<string | null>;
 
@@ -176,14 +176,14 @@ export function QrScanner({
     <div className="fixed inset-0 z-40 flex flex-col bg-black text-white">
       <div className="flex items-center justify-between px-4 pb-2 pt-[max(env(safe-area-inset-top),12px)]">
         <p className="font-semibold">Scan QR rumah</p>
-        <button
-          type="button"
+        <Button
+          variant="plain"
           onClick={onClose}
           className="flex size-11 items-center justify-center rounded-full bg-white/15"
           aria-label="Tutup scanner"
         >
           <X className="size-6" />
-        </button>
+        </Button>
       </div>
 
       <div className="relative flex-1 overflow-hidden">
@@ -205,13 +205,13 @@ export function QrScanner({
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6">
             <p className="rounded-2xl bg-white/10 p-4 text-center">{error}</p>
             {onManual && (
-              <button
-                type="button"
+              <Button
+                variant="plain"
                 onClick={onManual}
                 className="flex h-12 items-center gap-2 rounded-full bg-white px-6 font-semibold text-black"
               >
                 <Keyboard className="size-5" /> Catat manual
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -226,17 +226,17 @@ export function QrScanner({
       >
         <p className="text-sm text-white/80">Arahkan kamera ke stiker QR di wadah jimpitan.</p>
         {onManual && (
-          <button
-            type="button"
+          <Button
+            variant="plain"
             onClick={onManual}
             className="flex h-12 shrink-0 items-center gap-2 rounded-full bg-white/15 px-4 text-sm font-semibold"
           >
             <Keyboard className="size-5" /> Ketik manual
-          </button>
+          </Button>
         )}
         {torchSupported && (
-          <button
-            type="button"
+          <Button
+            variant="plain"
             onClick={toggleTorch}
             className={cx(
               "flex size-12 shrink-0 items-center justify-center rounded-full",
@@ -246,7 +246,7 @@ export function QrScanner({
             aria-pressed={torchOn}
           >
             {torchOn ? <Flashlight className="size-6" /> : <FlashlightOff className="size-6" />}
-          </button>
+          </Button>
         )}
       </div>
     </div>

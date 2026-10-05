@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { MapPinPlus } from "lucide-react";
 import { api, call } from "@/client/api";
 import { invalidate } from "@/client/query";
-import { Alert, buttonClass, cx } from "@/components/ui";
+import { Alert, Button } from "@/components/ui";
 import { HOUSE_REFRESH } from "../queries";
 
 /**
@@ -15,14 +15,13 @@ export function RegisterPlanHouses({ count, banner = false }: { count: number; b
     onSuccess: () => invalidate(...HOUSE_REFRESH),
   });
   const button = count > 0 && (
-    <button
-      type="button"
+    <Button
       disabled={register.isPending}
       onClick={() => window.confirm(`Daftarkan ${count} rumah dari denah? Nama KK bisa diisi nanti.`) && register.mutate()}
-      className={cx(buttonClass("secondary", "sm"), "shrink-0")}
+      variant="secondary" size="sm" className="shrink-0"
     >
       <MapPinPlus className="size-4" /> {register.isPending ? "Mendaftarkan…" : `Daftarkan ${count} rumah dari denah`}
-    </button>
+    </Button>
   );
   const messages = (
     <>

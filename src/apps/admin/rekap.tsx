@@ -3,7 +3,10 @@ import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Search } from "lu
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { QueryState } from "@/components/query-state";
-import { Card, PageHeader, buttonClass, cx, inputClass } from "@/components/ui";
+import { ScrollArea } from "@/components/scroll-area";
+import { Select } from "@/components/select";
+import { ChipGroup } from "@/components/toggle-group";
+import { Button, Card, Input, PageHeader, cx } from "@/components/ui";
 import { formatDateShort, formatMonth, isMonth, rondaDate, shiftMonth } from "@/lib/dates";
 import { formatAmountShort, formatRupiah } from "@/lib/format";
 import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
@@ -15,6 +18,12 @@ import { recapQuery } from "./queries";
 
 type Filter = "semua" | "kosong" | "tidak-dicek";
 type Sort = "rumah" | "total" | "kosong";
+
+const SORTS: { value: Sort; label: string }[] = [
+  { value: "rumah", label: "Blok & nomor" },
+  { value: "total", label: "Total terbesar" },
+  { value: "kosong", label: "Paling sering kosong" },
+];
 
 function saveFile(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
@@ -59,17 +68,12 @@ export function RekapPage() {
         subtitle="Jimpitan per rumah per malam ronda"
         action={
           <div className="flex shrink-0 gap-2">
-            <button type="button" disabled={!ready || exporting} onClick={exportXlsx} className={buttonClass("secondary", "sm")}>
+            <Button disabled={!ready || exporting} onClick={exportXlsx} variant="secondary" size="sm">
               <FileSpreadsheet className="size-4" /> {exporting ? "Menyiapkan…" : "Excel"}
-            </button>
-            <button
-              type="button"
-              disabled={!ready}
-              onClick={() => query.data && downloadCsv(month, query.data)}
-              className={buttonClass("secondary", "sm")}
-            >
+            </Button>
+            <Button disabled={!ready} onClick={() => query.data && downloadCsv(month, query.data)} variant="secondary" size="sm">
               <FileText className="size-4" /> CSV
-            </button>
+            </Button>
           </div>
         }
       />
@@ -161,40 +165,28 @@ function RecapBody({ data }: { data: MonthRecap }) {
       <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center">
         <label className="relative block lg:w-64">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted" />
-          <input
+          <Input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cari rumah atau nama…"
             aria-label="Cari rumah"
-            className={cx(inputClass, "h-10 pl-10")}
+            className="h-10 pl-10"
           />
         </label>
-        <div role="tablist" aria-label="Saring rumah" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 lg:mx-0 lg:px-0">
-          {filters.map((f) => (
-            <button
-              key={f.value}
-              type="button"
-              role="tab"
-              aria-selected={filter === f.value}
-              onClick={() => setFilter(f.value)}
-              className={cx(
-                "shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium",
-                filter === f.value ? "border-primary bg-primary text-primary-fg" : "border-line bg-card",
-              )}
-            >
-              {f.label} {stats.filter(f.match).length}
-            </button>
-          ))}
-        </div>
-        <label className="flex items-center gap-2 text-sm lg:ml-auto">
+        <ScrollArea className="-mx-4 overflow-x-auto lg:mx-0">
+          <ChipGroup
+            aria-label="Saring rumah"
+            value={filter}
+            onValueChange={setFilter}
+            options={filters.map((f) => ({ value: f.value, label: f.label, count: stats.filter(f.match).length }))}
+            className="w-max min-w-full px-4 lg:px-0"
+          />
+        </ScrollArea>
+        <div className="flex items-center gap-2 text-sm lg:ml-auto">
           <span className="text-muted">Urutkan</span>
-          <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className={cx(inputClass, "h-10 w-auto")}>
-            <option value="rumah">Blok & nomor</option>
-            <option value="total">Total terbesar</option>
-            <option value="kosong">Paling sering kosong</option>
-          </select>
-        </label>
+          <Select aria-label="Urutkan" value={sort} onValueChange={setSort} options={SORTS} className="h-10 w-56" />
+        </div>
       </div>
 
       <Legend />
@@ -202,7 +194,7 @@ function RecapBody({ data }: { data: MonthRecap }) {
       {visible.length === 0 ? (
         <Card className="mt-3 text-center text-muted">Tidak ada rumah yang cocok.</Card>
       ) : (
-        <div className="mt-3 overflow-x-auto rounded-2xl border border-line bg-card">
+        <ScrollArea className="mt-3 overflow-x-auto rounded-2xl border border-line bg-card">
           <table className="min-w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-line text-xs text-muted">
@@ -272,7 +264,7 @@ function RecapBody({ data }: { data: MonthRecap }) {
               </tr>
             </tfoot>
           </table>
-        </div>
+        </ScrollArea>
       )}
     </>
   );

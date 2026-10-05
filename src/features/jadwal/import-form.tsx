@@ -1,8 +1,9 @@
 import { startTransition, useActionState, useMemo, useState } from "react";
 import { api, call } from "@/client/api";
 import { checked, runForm, type FormState } from "@/client/form";
+import { CheckboxField } from "@/components/choice";
 import { SubmitButton } from "@/components/submit-button";
-import { Alert, buttonClass, cx, inputClass } from "@/components/ui";
+import { Alert, Button, Textarea, cx } from "@/components/ui";
 import { guardColorClass } from "@/components/guard-color-class";
 import { GUARD_COLOR_LABEL, GUARD_COLORS, type GuardColor } from "@/lib/guard-color";
 import { analyzeSchedule, DAY_NAMES, parseSchedule } from "@/lib/schedule";
@@ -88,7 +89,7 @@ export function ScheduleImportForm({
           Salin tabel jadwal dari Excel / Google Sheets (judul hari + isinya), lalu tempel di sini; warna selnya ikut
           terbawa. Bisa juga diketik per hari, seperti contoh.
         </p>
-        <textarea
+        <Textarea
           name="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -102,7 +103,7 @@ export function ScheduleImportForm({
           }}
           rows={8}
           placeholder={EXAMPLE}
-          className={cx(inputClass, "h-auto py-2 font-mono text-sm")}
+          className="font-mono text-sm"
           aria-label="Teks jadwal ronda"
         />
 
@@ -154,24 +155,18 @@ export function ScheduleImportForm({
         )}
 
         <input type="hidden" name="colors" value={colors ? JSON.stringify(colors) : ""} />
-        <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" name="fillNames" defaultChecked className="mt-0.5 size-4 accent-[var(--primary)]" />
-          <span>Isi nama KK dari jadwal untuk rumah tanpa akun petugas yang nama KK-nya masih kosong</span>
-        </label>
-        <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" name="overwriteNames" className="mt-0.5 size-4 accent-[var(--primary)]" />
-          <span>Ganti juga nama KK yang sudah terisi</span>
-        </label>
+        <CheckboxField
+          name="fillNames"
+          defaultChecked
+          label="Isi nama KK dari jadwal untuk rumah tanpa akun petugas yang nama KK-nya masih kosong"
+        />
+        <CheckboxField name="overwriteNames" label="Ganti juga nama KK yang sudah terisi" />
 
         {state?.error && <Alert>{state.error}</Alert>}
         {state?.success && <Alert tone="success">{state.success}</Alert>}
-        <button
-          type="submit"
-          disabled={pending || preview.entries.length === 0}
-          className={cx(buttonClass("primary"), "w-full")}
-        >
+        <Button type="submit" disabled={pending || preview.entries.length === 0} className="w-full">
           {pending ? "Menyimpan…" : "Simpan jadwal"}
-        </button>
+        </Button>
       </form>
 
       {hasSchedule && (

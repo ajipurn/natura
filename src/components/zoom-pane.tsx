@@ -1,6 +1,7 @@
 import { Minus, Plus } from "lucide-react";
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { cx } from "./ui";
+import { useOverlayScrollbars } from "overlayscrollbars-react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Button, cx } from "./ui";
 
 const ZOOM_LEVELS = [1, 1.5, 2, 3, 4];
 /** Zoom minimum saat menuju sebuah titik (mis. lokasi petugas), supaya kavling di sekitarnya terbaca. */
@@ -26,6 +27,14 @@ export function ZoomPane({
   className?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
+  // Scrollbar aplikasi; elemen scroll tetap `scrollRef` (dipakai untuk zoom dan menuju titik).
+  const [initScrollbars] = useOverlayScrollbars({ defer: true });
+  useEffect(() => {
+    const host = hostRef.current;
+    const viewport = scrollRef.current;
+    if (host && viewport) initScrollbars({ target: host, elements: { viewport, content: viewport } });
+  }, [initScrollbars]);
   const [zoomIndex, setZoomIndex] = useState(0);
   const zoom = ZOOM_LEVELS[zoomIndex];
   const prevZoom = useRef(zoom);
@@ -79,29 +88,31 @@ export function ZoomPane({
 
   return (
     <div className={cx("overflow-hidden rounded-2xl border border-line bg-card", className)}>
-      <div ref={scrollRef} className="max-h-[60vh] overflow-auto overscroll-contain">
-        <div style={{ width: `${zoom * 100}%` }}>{children}</div>
+      <div ref={hostRef}>
+        <div ref={scrollRef} className="max-h-[60vh] overflow-auto overscroll-contain">
+          <div style={{ width: `${zoom * 100}%` }}>{children}</div>
+        </div>
       </div>
       <div className="flex items-center justify-end gap-1 border-t border-line px-2 py-1.5">
         <span className="mr-auto pl-1 text-xs text-muted">Zoom {Math.round(zoom * 100)}%</span>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="icon"
           onClick={() => setZoomIndex((i) => Math.max(0, i - 1))}
           disabled={zoomIndex === 0}
-          className="flex size-10 items-center justify-center rounded-lg border border-line disabled:opacity-40"
           aria-label="Perkecil denah"
         >
           <Minus className="size-5" />
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="secondary"
+          size="icon"
           onClick={() => setZoomIndex((i) => Math.min(ZOOM_LEVELS.length - 1, i + 1))}
           disabled={zoomIndex === ZOOM_LEVELS.length - 1}
-          className="flex size-10 items-center justify-center rounded-lg border border-line disabled:opacity-40"
           aria-label="Perbesar denah"
         >
           <Plus className="size-5" />
-        </button>
+        </Button>
       </div>
     </div>
   );

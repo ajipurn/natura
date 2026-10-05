@@ -4,8 +4,10 @@ import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Legend, LegendItem } from "@/components/map-legend";
 import { QueryState } from "@/components/query-state";
+import { ScrollArea } from "@/components/scroll-area";
 import { SitePlanMap } from "@/components/site-plan-map";
-import { Card, PageHeader, buttonClass, cx, inputClass } from "@/components/ui";
+import { ChipGroup, SegmentedControl } from "@/components/toggle-group";
+import { Button, Card, Input, PageHeader, buttonClass, cx } from "@/components/ui";
 import type { MarkerState } from "@/lib/house-state";
 import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
 import { matchPlan } from "@/lib/site-plan";
@@ -70,9 +72,9 @@ export function RumahPage() {
                       <Printer className="size-4" /> <span className="max-sm:sr-only">Cetak QR</span>
                     </Link>
                   )}
-                  <button type="button" onClick={() => setAdding({ block: "", number: "" })} className={buttonClass("primary", "sm")}>
+                  <Button size="sm" onClick={() => setAdding({ block: "", number: "" })}>
                     <Plus className="size-4" /> Tambah
-                  </button>
+                  </Button>
                 </div>
               }
             />
@@ -89,9 +91,9 @@ export function RumahPage() {
                   </p>
                 </div>
                 <div className="flex flex-wrap items-start justify-center gap-2">
-                  <button type="button" onClick={() => setAdding({ block: "", number: "" })} className={buttonClass("primary", "sm")}>
+                  <Button size="sm" onClick={() => setAdding({ block: "", number: "" })}>
                     <Plus className="size-4" /> Tambah rumah
-                  </button>
+                  </Button>
                   <RegisterPlanHouses count={matchPlan(SITE_PLAN, houses).missing.length} />
                 </div>
               </Card>
@@ -100,51 +102,33 @@ export function RumahPage() {
                 <div className="mb-3 flex items-center gap-2">
                   <label className="relative block min-w-0 flex-1 sm:max-w-sm">
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted" />
-                    <input
+                    <Input
                       type="search"
                       value={search}
-                      onChange={(e) => setSearch(e.target.value)}
+                      onValueChange={setSearch}
                       placeholder="Cari nomor atau nama…"
                       aria-label="Cari rumah"
-                      className={cx(inputClass, "pl-10")}
+                      className="pl-10"
                     />
                   </label>
-                  <div role="tablist" aria-label="Tampilan" className="ml-auto flex shrink-0 rounded-xl border border-line bg-card p-0.5">
-                    {VIEWS.map(({ value, label, icon: Icon }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        role="tab"
-                        aria-selected={view === value}
-                        title={label}
-                        onClick={() => setParams(value === "denah" ? { tampilan: "denah" } : {}, { replace: true })}
-                        className={cx(
-                          "flex h-9.5 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold",
-                          view === value ? "bg-primary text-primary-fg" : "text-muted hover:text-fg",
-                        )}
-                      >
-                        <Icon className="size-4" /> <span className="max-sm:sr-only">{label}</span>
-                      </button>
-                    ))}
-                  </div>
+                  <SegmentedControl
+                    aria-label="Tampilan"
+                    compact
+                    value={view}
+                    onValueChange={(next) => setParams(next === "denah" ? { tampilan: "denah" } : {}, { replace: true })}
+                    options={VIEWS}
+                    className="ml-auto shrink-0"
+                  />
                 </div>
-                <div role="tablist" aria-label="Saring rumah" className="-mx-4 mb-5 flex gap-1.5 overflow-x-auto px-4 lg:mx-0 lg:px-0">
-                  {FILTERS.map((f) => (
-                    <button
-                      key={f.value}
-                      type="button"
-                      role="tab"
-                      aria-selected={filter === f.value}
-                      onClick={() => setFilter(f.value)}
-                      className={cx(
-                        "shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium",
-                        filter === f.value ? "border-primary bg-primary text-primary-fg" : "border-line bg-card text-muted hover:text-fg",
-                      )}
-                    >
-                      {f.label} <span className="opacity-70">{counts[f.value]}</span>
-                    </button>
-                  ))}
-                </div>
+                <ScrollArea className="-mx-4 mb-5 overflow-x-auto lg:mx-0">
+                  <ChipGroup
+                    aria-label="Saring rumah"
+                    value={filter}
+                    onValueChange={setFilter}
+                    options={FILTERS.map((f) => ({ value: f.value, label: f.label, count: counts[f.value] }))}
+                    className="w-max min-w-full px-4 lg:px-0"
+                  />
+                </ScrollArea>
 
                 {view === "denah" ? (
                   <HouseMap
@@ -225,8 +209,8 @@ function BlockSection({
 function HouseTile({ house, hasAccount, onOpen }: { house: AdminHouse; hasAccount: boolean; onOpen: () => void }) {
   const vacant = house.status === "vacant";
   return (
-    <button
-      type="button"
+    <Button
+      variant="plain"
       onClick={onOpen}
       className={cx(
         "flex size-full flex-col gap-1 rounded-xl border px-3 py-2.5 text-left transition hover:border-primary/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
@@ -246,7 +230,7 @@ function HouseTile({ house, hasAccount, onOpen }: { house: AdminHouse; hasAccoun
           <span className="italic text-muted/70">Belum ada nama</span>
         )}
       </span>
-    </button>
+    </Button>
   );
 }
 
@@ -299,14 +283,14 @@ function HouseMap({
           <p className="text-muted">{offPlan.length} rumah terdaftar tidak ada di denah (blok/nomornya tidak cocok dengan kavling):</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {offPlan.map((h) => (
-              <button
+              <Button
                 key={h.id}
-                type="button"
+                variant="plain"
                 onClick={() => onOpen(h.id)}
                 className="rounded-full border border-line px-2.5 py-0.5 font-semibold hover:border-primary/50"
               >
                 {houseLabel(h)}
-              </button>
+              </Button>
             ))}
           </div>
         </div>

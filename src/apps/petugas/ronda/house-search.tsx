@@ -1,6 +1,6 @@
 import { Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { cx } from "@/components/ui";
+import { Button, cx } from "@/components/ui";
 import { formatRupiah } from "@/lib/format";
 import { houseLabel, searchHouses } from "@/lib/houses";
 import type { HouseDTO } from "@/lib/types";
@@ -37,14 +37,14 @@ export function HouseSearch({
           <h2 id="house-search-title" className="text-lg font-bold">
             Catat manual
           </h2>
-          <button
-            type="button"
+          <Button
+            variant="plain"
             onClick={onClose}
             className="flex size-10 items-center justify-center rounded-full bg-idle-soft"
             aria-label="Tutup"
           >
             <X className="size-5" />
-          </button>
+          </Button>
         </div>
         <form
           className="relative mt-3"
@@ -73,8 +73,8 @@ export function HouseSearch({
             const c = collections.get(h.id);
             return (
               <li key={h.id}>
-                <button
-                  type="button"
+                <Button
+                  variant="plain"
                   onClick={() => onPick(h)}
                   className="flex w-full items-center gap-3 px-1 py-3 text-left active:bg-idle-soft"
                 >
@@ -97,7 +97,7 @@ export function HouseSearch({
                           ? "Mudik"
                           : "Belum"}
                   </span>
-                </button>
+                </Button>
               </li>
             );
           })}

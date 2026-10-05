@@ -1,6 +1,7 @@
-import { Check, Minus, Plus, UserCheck, X } from "lucide-react";
+import { Check, UserCheck, X } from "lucide-react";
 import { useState } from "react";
-import { buttonClass, cx } from "@/components/ui";
+import { AmountField } from "@/components/amount-field";
+import { Button, cx } from "@/components/ui";
 import { formatTime } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { houseLabelLong } from "@/lib/houses";
@@ -65,14 +66,14 @@ export function HouseSheet({
             </h2>
             {house.ownerName && <p className="text-muted">{house.ownerName}</p>}
           </div>
-          <button
-            type="button"
+          <Button
+            variant="plain"
             onClick={onClose}
             className="flex size-10 items-center justify-center rounded-full bg-idle-soft"
             aria-label="Tutup"
           >
             <X className="size-5" />
-          </button>
+          </Button>
         </div>
 
         {house.status === "vacant" && (
@@ -123,20 +124,20 @@ export function HouseSheet({
 
         {byOther && !replacing ? (
           <div className="mt-5 grid gap-3">
-            <button
-              type="button"
+            <Button
+              variant="plain"
               onClick={onClose}
               className="flex h-14 items-center justify-center rounded-2xl bg-primary text-lg font-bold text-primary-fg shadow-sm active:scale-[0.98]"
             >
               Oke, biarkan
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
               onClick={() => setReplacing(true)}
-              className={buttonClass("ghost", "sm")}
+              variant="ghost"
+              size="sm"
             >
               Ganti catatan {otherName}
-            </button>
+            </Button>
           </div>
         ) : (
           <>
@@ -144,41 +145,17 @@ export function HouseSheet({
               <p className="mb-2 text-sm font-medium text-muted">
                 Isi jimpitan
               </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAmount((a) => Math.max(0, a - STEP))}
-                  className={buttonClass("secondary")}
-                  aria-label="Kurangi"
-                >
-                  <Minus className="size-5" />
-                </button>
-                <input
-                  inputMode="numeric"
-                  value={amount.toLocaleString("id-ID")}
-                  onChange={(e) => {
-                    const n = Number(e.target.value.replace(/\D/g, ""));
-                    if (Number.isSafeInteger(n) && n <= 1_000_000) setAmount(n);
-                  }}
-                  className="h-11 min-w-0 flex-1 rounded-xl border border-line bg-card text-center text-xl font-semibold"
-                  aria-label="Nominal (Rp)"
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setAmount((a) => Math.min(1_000_000, a + STEP))
-                  }
-                  className={buttonClass("secondary")}
-                  aria-label="Tambah"
-                >
-                  <Plus className="size-5" />
-                </button>
-              </div>
+              <AmountField
+                value={amount}
+                onValueChange={setAmount}
+                step={STEP}
+                max={1_000_000}
+              />
               <div className="mt-2 flex flex-wrap gap-2">
                 {presets.map((p) => (
-                  <button
+                  <Button
                     key={p}
-                    type="button"
+                    variant="plain"
                     onClick={() => setAmount(p)}
                     className={cx(
                       "rounded-full border px-3 py-1 text-sm",
@@ -188,29 +165,29 @@ export function HouseSheet({
                     )}
                   >
                     {formatRupiah(p)}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
 
             <div className="mt-5 grid gap-3">
-              <button
-                type="button"
+              <Button
+                variant="plain"
                 onClick={() => onRecord("filled", amount)}
                 disabled={amount <= 0}
                 className="flex h-16 items-center justify-center gap-2 rounded-2xl bg-filled text-xl font-bold text-white shadow-sm active:scale-[0.98] disabled:opacity-50 dark:text-black"
               >
                 <Check className="size-7" strokeWidth={3} /> Ada ·{" "}
                 {formatRupiah(amount)}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="plain"
                 onClick={() => onRecord("empty", 0)}
                 disabled={keepsFilled}
                 className="flex h-14 items-center justify-center gap-2 rounded-2xl border-2 border-empty text-lg font-bold text-empty active:scale-[0.98] disabled:opacity-40"
               >
                 Kosong
-              </button>
+              </Button>
               {keepsFilled ? (
                 <p className="text-center text-xs text-muted">
                   Catatan Ada milik {otherName} tidak bisa diganti Kosong atau
@@ -218,13 +195,13 @@ export function HouseSheet({
                 </p>
               ) : (
                 existing && (
-                  <button
-                    type="button"
+                  <Button
                     onClick={() => onRecord("none", 0)}
-                    className={buttonClass("ghost", "sm")}
+                    variant="ghost"
+                    size="sm"
                   >
                     Hapus catatan (belum dicek)
-                  </button>
+                  </Button>
                 )
               )}
             </div>

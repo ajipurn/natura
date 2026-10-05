@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 import { api, call } from "@/client/api";
 import { invalidate } from "@/client/query";
-import { Alert, buttonClass, cx } from "@/components/ui";
+import { Alert, Button, cx } from "@/components/ui";
 import { formatRupiah } from "@/lib/format";
 
 export function QuickRecord({
@@ -35,31 +35,26 @@ export function QuickRecord({
           <strong>{current.status === "filled" ? `Ada · ${formatRupiah(current.amount)}` : "Kosong"}</strong>
         </p>
       )}
-      <button
-        type="button"
+      <Button
+        variant="plain"
         disabled={pending}
         onClick={() => submit("filled", defaultAmount)}
         className="flex h-16 w-full items-center justify-center gap-2 rounded-2xl bg-filled text-xl font-bold text-white disabled:opacity-60 dark:text-black"
       >
         <Check className="size-7" strokeWidth={3} /> Ada · {formatRupiah(defaultAmount)}
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="plain"
         disabled={pending}
         onClick={() => submit("empty", 0)}
         className="flex h-14 w-full items-center justify-center rounded-2xl border-2 border-empty text-lg font-bold text-empty disabled:opacity-60"
       >
         Kosong
-      </button>
+      </Button>
       {current && (
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => submit("none", 0)}
-          className={cx(buttonClass("ghost", "sm"), "w-full")}
-        >
+        <Button variant="ghost" size="sm" disabled={pending} onClick={() => submit("none", 0)} className="w-full">
           Hapus catatan malam ini
-        </button>
+        </Button>
       )}
       {record.isError && <Alert>{record.error.message}</Alert>}
       <p className="text-center text-xs text-muted">

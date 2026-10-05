@@ -1,15 +1,17 @@
 import { CalendarRange, Moon, Settings2 } from "lucide-react";
 import { useSearchParams } from "react-router";
-import { PageHeader, cx } from "@/components/ui";
+import { SegmentedControl } from "@/components/toggle-group";
+import { PageHeader } from "@/components/ui";
 import { SITE_PLAN } from "@/site-plan";
 import { AturDenah } from "./atur-denah";
 import { MonthMap } from "./month-map";
 import { TonightMap } from "./tonight-map";
 
+// Di HP ikonnya disembunyikan supaya ketiga labelnya muat.
 const MODES = [
-  { value: "malam", label: "Malam ini", icon: Moon },
-  { value: "bulan", label: "Bulanan", icon: CalendarRange },
-  { value: "atur", label: "Atur denah", icon: Settings2 },
+  { value: "malam", label: "Malam ini", icon: Moon, className: "max-sm:[&>svg]:hidden" },
+  { value: "bulan", label: "Bulanan", icon: CalendarRange, className: "max-sm:[&>svg]:hidden" },
+  { value: "atur", label: "Atur denah", icon: Settings2, className: "max-sm:[&>svg]:hidden" },
 ] as const;
 
 type Mode = (typeof MODES)[number]["value"];
@@ -25,23 +27,14 @@ export function DenahPage() {
   return (
     <>
       <PageHeader title="Peta ronda" subtitle={`${SITE_PLAN.name} · ${SITE_PLAN.lots.length} kavling`} />
-      <div role="tablist" aria-label="Tampilan peta" className="mb-4 flex rounded-xl border border-line bg-card p-0.5 sm:w-fit">
-        {MODES.map(({ value, label, icon: Icon }) => (
-          <button
-            key={value}
-            type="button"
-            role="tab"
-            aria-selected={mode === value}
-            onClick={() => setParams(value === "malam" ? {} : { mode: value }, { replace: true })}
-            className={cx(
-              "flex h-9.5 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-semibold",
-              mode === value ? "bg-primary text-primary-fg" : "text-muted hover:text-fg",
-            )}
-          >
-            <Icon className="size-4 max-sm:hidden" /> {label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        aria-label="Tampilan peta"
+        fill
+        value={mode}
+        onValueChange={(next) => setParams(next === "malam" ? {} : { mode: next }, { replace: true })}
+        options={MODES}
+        className="mb-4 sm:w-fit"
+      />
       {mode === "malam" ? <TonightMap /> : mode === "bulan" ? <MonthMap /> : <AturDenah />}
     </>
   );

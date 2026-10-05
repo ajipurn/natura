@@ -3,7 +3,7 @@ import { Printer, TriangleAlert } from "lucide-react";
 import { Link, useSearchParams } from "react-router";
 import { QrSvg } from "@/components/qr-svg";
 import { QueryState } from "@/components/query-state";
-import { PageHeader, buttonClass, cx } from "@/components/ui";
+import { Button, PageHeader, cx } from "@/components/ui";
 import { compareHouses } from "@/lib/houses";
 import { houseUrl } from "@/lib/qr";
 import { housesQuery } from "../queries";
@@ -29,9 +29,9 @@ export function CetakPage() {
                 title="Cetak stiker QR"
                 subtitle={`${houses.length} stiker`}
                 action={
-                  <button type="button" onClick={() => window.print()} className={buttonClass("primary", "sm")}>
+                  <Button onClick={() => window.print()} size="sm">
                     <Printer className="size-4" /> Cetak
-                  </button>
+                  </Button>
                 }
               />
 

@@ -6,7 +6,7 @@ import { useAuth } from "@/client/auth";
 import { queryClient } from "@/client/query";
 import { ChangePinForm } from "@/features/auth/change-pin-form";
 import { MySchedule } from "./my-schedule";
-import { Card, PageHeader, SectionTitle, buttonClass, cx } from "@/components/ui";
+import { Button, Card, PageHeader, SectionTitle } from "@/components/ui";
 
 export function AkunPage() {
   const user = useAuth().data?.user;
@@ -55,14 +55,9 @@ export function AkunPage() {
         <ChangePinForm />
       </Card>
 
-      <button
-        type="button"
-        disabled={logout.isPending}
-        onClick={() => logout.mutate()}
-        className={cx(buttonClass("danger"), "mt-6 w-full")}
-      >
+      <Button variant="danger" disabled={logout.isPending} onClick={() => logout.mutate()} className="mt-6 w-full">
         <LogOut className="size-5" /> {logout.isPending ? "Keluar…" : "Keluar"}
-      </button>
+      </Button>
       {logout.isError && <p className="mt-2 text-center text-sm text-empty">{logout.error.message}</p>}
     </>
   );
