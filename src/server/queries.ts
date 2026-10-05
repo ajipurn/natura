@@ -1,18 +1,15 @@
-import "server-only";
-import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
-import { daysInMonth, localDate, rondaDate } from "@/lib/dates";
+import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { daysInMonth, rondaDate } from "@/lib/dates";
 import { compareHouses } from "@/lib/houses";
-import { DEFAULT_MAP_SIZE } from "@/lib/site-map";
-import type { CollectionDTO, HouseDTO, RondaSnapshot, SiteMapInfo } from "@/lib/types";
+import type { CollectionDTO, HouseDTO, MonthCell, MonthRecap, RondaSnapshot } from "@/lib/types";
 import type { SessionUser } from "./auth";
-import { getDb } from "./db";
+import type { Db } from "./db";
 import { listSchedule } from "./schedule";
-import { collections, houses, patrols, settings, siteMap, users } from "./schema";
+import { collections, houses, patrols, settings, users } from "./schema";
 
 export const DEFAULT_SETTINGS = { communityName: "Lingkungan Kita", defaultAmount: 500 };
 
-export async function getSettings() {
-  const db = await getDb();
+export async function getSettings(db: Db) {
   const [row] = await db
     .select({ communityName: settings.communityName, defaultAmount: settings.defaultAmount })
     .from(settings)
@@ -21,14 +18,12 @@ export async function getSettings() {
   return row ?? DEFAULT_SETTINGS;
 }
 
-export async function hasAnyUser(): Promise<boolean> {
-  const db = await getDb();
+export async function hasAnyUser(db: Db): Promise<boolean> {
   const rows = await db.select({ id: users.id }).from(users).limit(1);
   return rows.length > 0;
 }
 
-export async function listLoginUsers() {
-  const db = await getDb();
+export async function listLoginUsers(db: Db) {
   return db
     .select({ id: users.id, name: users.name })
     .from(users)
@@ -36,9 +31,8 @@ export async function listLoginUsers() {
     .orderBy(asc(users.name));
 }
 
-export async function listUsers() {
-  const db = await getDb();
-  return db
+export async function listUsers(db: Db) {
+  const rows = await db
     .select({
       id: users.id,
       name: users.name,
@@ -48,6 +42,7 @@ export async function listUsers() {
     })
     .from(users)
     .orderBy(asc(users.name));
+  return rows.map((u) => ({ ...u, lockedUntil: u.lockedUntil?.toISOString() ?? null }));
 }
 
 const houseColumns = {
@@ -57,19 +52,15 @@ const houseColumns = {
   ownerName: houses.ownerName,
   token: houses.token,
   status: houses.status,
-  mapX: houses.mapX,
-  mapY: houses.mapY,
 };
 
-export async function listHouses(): Promise<HouseDTO[]> {
-  const db = await getDb();
+export async function listHouses(db: Db): Promise<HouseDTO[]> {
   const rows = await db.select(houseColumns).from(houses);
   return rows.sort(compareHouses);
 }
 
 /** Rumah beserta jumlah catatan jimpitannya (untuk tahu boleh dihapus atau tidak). */
-export async function listHousesWithUsage() {
-  const db = await getDb();
+export async function listHousesWithUsage(db: Db) {
   const rows = await db
     .select({
       ...houseColumns,
@@ -81,8 +72,7 @@ export async function listHousesWithUsage() {
   return rows.sort(compareHouses);
 }
 
-export async function getHouseByToken(token: string) {
-  const db = await getDb();
+export async function getHouseByToken(db: Db, token: string) {
   const [row] = await db
     .select({ ...houseColumns, createdAt: houses.createdAt })
     .from(houses)
@@ -91,8 +81,7 @@ export async function getHouseByToken(token: string) {
   return row ?? null;
 }
 
-async function collectionsForPatrol(patrolId: number): Promise<CollectionDTO[]> {
-  const db = await getDb();
+export async function getCollectionsForDate(db: Db, date: string): Promise<CollectionDTO[]> {
   const rows = await db
     .select({
       houseId: collections.houseId,
@@ -103,63 +92,19 @@ async function collectionsForPatrol(patrolId: number): Promise<CollectionDTO[]> 
       collectorName: users.name,
     })
     .from(collections)
+    .innerJoin(patrols, eq(patrols.id, collections.patrolId))
     .leftJoin(users, eq(users.id, collections.collectedBy))
-    .where(eq(collections.patrolId, patrolId));
+    .where(eq(patrols.date, date));
   return rows.map((r) => ({ ...r, recordedAt: r.recordedAt.toISOString() }));
 }
 
-export async function getCollectionsForDate(date: string): Promise<CollectionDTO[]> {
-  const db = await getDb();
-  const [patrol] = await db
-    .select({ id: patrols.id })
-    .from(patrols)
-    .where(eq(patrols.date, date))
-    .limit(1);
-  return patrol ? collectionsForPatrol(patrol.id) : [];
-}
-
-export const SITE_MAP_IMAGE_PATH = "/api/denah/gambar";
-
-/** Info denah tanpa isi gambarnya (gambar diambil terpisah lewat SITE_MAP_IMAGE_PATH). */
-export async function getSiteMapInfo(): Promise<SiteMapInfo> {
-  const db = await getDb();
-  const [row] = await db
-    .select({
-      hasImage: sql<boolean>`${siteMap.imageData} is not null`,
-      width: siteMap.width,
-      height: siteMap.height,
-      updatedAt: siteMap.updatedAt,
-    })
-    .from(siteMap)
-    .where(eq(siteMap.id, 1))
-    .limit(1);
-  if (!row) return { imageUrl: null, ...DEFAULT_MAP_SIZE };
-  return {
-    // Versi di URL supaya gambar boleh di-cache selamanya dan tetap berganti saat diperbarui.
-    imageUrl: row.hasImage ? `${SITE_MAP_IMAGE_PATH}?v=${row.updatedAt.getTime()}` : null,
-    width: row.width,
-    height: row.height,
-  };
-}
-
-export async function getSiteMapImage() {
-  const db = await getDb();
-  const [row] = await db
-    .select({ data: siteMap.imageData, type: siteMap.imageType })
-    .from(siteMap)
-    .where(eq(siteMap.id, 1))
-    .limit(1);
-  return row?.data && row.type ? { data: row.data, type: row.type } : null;
-}
-
-export async function getRondaSnapshot(user: SessionUser, now = new Date()): Promise<RondaSnapshot> {
+export async function getRondaSnapshot(db: Db, user: SessionUser, now = new Date()): Promise<RondaSnapshot> {
   const date = rondaDate(now);
-  const [settingsRow, houseRows, collectionRows, siteMapInfo, schedule] = await Promise.all([
-    getSettings(),
-    listHouses(),
-    getCollectionsForDate(date),
-    getSiteMapInfo(),
-    listSchedule(),
+  const [settingsRow, houseRows, collectionRows, schedule] = await Promise.all([
+    getSettings(db),
+    listHouses(db),
+    getCollectionsForDate(db, date),
+    listSchedule(db),
   ]);
   return {
     date,
@@ -168,20 +113,27 @@ export async function getRondaSnapshot(user: SessionUser, now = new Date()): Pro
     user,
     houses: houseRows,
     collections: collectionRows,
-    siteMap: siteMapInfo,
     schedule,
   };
 }
 
-export async function listPatrols(limit = 90) {
-  const db = await getDb();
-  return db
+export type PatrolSummary = {
+  date: string;
+  filled: number;
+  empty: number;
+  total: number;
+  collectors: string | null;
+};
+
+export async function listPatrols(db: Db, limit = 90): Promise<PatrolSummary[]> {
+  const rows = await db
     .select({
       date: patrols.date,
       filled: sql<number>`count(${collections.id}) filter (where ${collections.status} = 'filled')`.mapWith(Number),
       empty: sql<number>`count(${collections.id}) filter (where ${collections.status} = 'empty' and ${houses.status} = 'active')`.mapWith(Number),
       total: sql<number>`coalesce(sum(${collections.amount}) filter (where ${collections.status} = 'filled'), 0)`.mapWith(Number),
-      collectors: sql<string | null>`string_agg(distinct ${users.name}, ', ' order by ${users.name})`,
+      // JSON supaya nama yang mengandung koma tetap utuh.
+      collectors: sql<string>`json_group_array(distinct ${users.name}) filter (where ${users.name} is not null)`,
     })
     .from(patrols)
     .leftJoin(collections, eq(collections.patrolId, patrols.id))
@@ -190,36 +142,35 @@ export async function listPatrols(limit = 90) {
     .groupBy(patrols.id)
     .orderBy(desc(patrols.date))
     .limit(limit);
+  return rows.map((r) => {
+    const names = (JSON.parse(r.collectors ?? "[]") as string[]).sort((a, b) => a.localeCompare(b, "id"));
+    return { ...r, collectors: names.length ? names.join(", ") : null };
+  });
 }
 
-/** Riwayat jimpitan satu rumah: malam-malam ronda terakhir sejak rumah didaftarkan. */
-export async function getHouseHistory(house: { id: number; createdAt: Date }, limit = 30) {
-  const db = await getDb();
-  const rows = await db
+/**
+ * Riwayat jimpitan satu rumah: malam-malam ronda terakhir sejak rumah didaftarkan.
+ * Pakai tanggal malam ronda, supaya rumah yang didaftarkan pagi hari tetap ikut malam sebelumnya.
+ */
+export async function getHouseHistory(db: Db, house: { id: number; createdAt: Date }, limit = 30) {
+  return db
     .select({
       date: patrols.date,
       status: collections.status,
       amount: collections.amount,
     })
     .from(patrols)
-    .leftJoin(
-      collections,
-      and(eq(collections.patrolId, patrols.id), eq(collections.houseId, house.id)),
-    )
-    .where(gte(patrols.date, localDate(house.createdAt)))
+    .leftJoin(collections, and(eq(collections.patrolId, patrols.id), eq(collections.houseId, house.id)))
+    .where(gte(patrols.date, rondaDate(house.createdAt)))
     .orderBy(desc(patrols.date))
     .limit(limit);
-  return rows;
 }
 
-export type MonthCell = { status: "filled" | "empty"; amount: number };
-
 /** Data rekap bulanan: matriks rumah × tanggal ronda. */
-export async function getMonthRecap(month: string) {
+export async function getMonthRecap(db: Db, month: string): Promise<MonthRecap> {
   const days = daysInMonth(month);
-  const db = await getDb();
   const [houseRows, rows] = await Promise.all([
-    listHouses(),
+    listHouses(db),
     db
       .select({
         date: patrols.date,
@@ -243,8 +194,8 @@ export async function getMonthRecap(month: string) {
   return { houses: houseRows, dates, cells };
 }
 
-export async function getHousesByIds(ids: number[]) {
-  if (ids.length === 0) return [];
-  const db = await getDb();
-  return db.select({ id: houses.id }).from(houses).where(inArray(houses.id, ids));
+/** Id semua rumah yang terdaftar (jumlahnya kecil, jadi lebih murah daripada query per id). */
+export async function getHouseIds(db: Db): Promise<Set<number>> {
+  const rows = await db.select({ id: houses.id }).from(houses);
+  return new Set(rows.map((r) => r.id));
 }

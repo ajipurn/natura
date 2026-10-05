@@ -1,5 +1,3 @@
-"use client";
-
 import { useId, useMemo, type KeyboardEvent } from "react";
 import { houseLabelLong } from "@/lib/houses";
 import {
@@ -12,7 +10,7 @@ import {
   type SitePlan,
 } from "@/lib/site-plan";
 import type { HouseDTO } from "@/lib/types";
-import { STATE_TEXT, type MarkerState } from "./site-map";
+import { STATE_TEXT, type MarkerState } from "@/lib/house-state";
 import { cx } from "./ui";
 import { ZoomPane } from "./zoom-pane";
 

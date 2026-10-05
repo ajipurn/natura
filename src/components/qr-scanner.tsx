@@ -1,5 +1,3 @@
-"use client";
-
 import jsQR from "jsqr";
 import { Flashlight, FlashlightOff, Keyboard, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";

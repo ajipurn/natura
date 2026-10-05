@@ -1,0 +1,48 @@
+import { createBrowserRouter, Outlet } from "react-router";
+import { NotFound } from "@/components/not-found";
+import { LoginPage } from "@/features/auth/login-page";
+import { RequireAuth } from "@/features/auth/require-auth";
+import { PatrolDetail } from "@/features/riwayat/patrol-detail";
+import { PatrolList } from "@/features/riwayat/patrol-list";
+import { DenahPage } from "./denah/denah-page";
+import { InfoPage } from "./info-page";
+import { JadwalPage } from "./jadwal-page";
+import { AdminLayout } from "./layout";
+import { PengaturanPage } from "./pengaturan/pengaturan-page";
+import { PetugasPage } from "./petugas/petugas-page";
+import { RekapPage } from "./rekap";
+import { RingkasanPage } from "./ringkasan-page";
+import { CetakPage } from "./rumah/cetak";
+import { RumahPage } from "./rumah/rumah-page";
+import { SetupPage } from "./setup";
+
+export const router = createBrowserRouter([
+  { path: "/admin/masuk", element: <LoginPage title="Masuk admin" homePath="/admin" setupPath="/admin/setup" /> },
+  { path: "/admin/setup", element: <SetupPage /> },
+  {
+    path: "/admin",
+    element: (
+      <RequireAuth loginPath="/admin/masuk" adminOnly>
+        {(user) => (
+          <AdminLayout user={user}>
+            <Outlet />
+          </AdminLayout>
+        )}
+      </RequireAuth>
+    ),
+    children: [
+      { index: true, element: <RingkasanPage /> },
+      { path: "riwayat", element: <PatrolList basePath="/admin/riwayat" /> },
+      { path: "riwayat/:tanggal", element: <PatrolDetail basePath="/admin/riwayat" canCorrect /> },
+      { path: "rekap", element: <RekapPage /> },
+      { path: "jadwal", element: <JadwalPage /> },
+      { path: "rumah", element: <RumahPage /> },
+      { path: "rumah/cetak", element: <CetakPage /> },
+      { path: "denah", element: <DenahPage /> },
+      { path: "petugas", element: <PetugasPage /> },
+      { path: "info", element: <InfoPage /> },
+      { path: "pengaturan", element: <PengaturanPage /> },
+      { path: "*", element: <NotFound home="/admin" /> },
+    ],
+  },
+]);

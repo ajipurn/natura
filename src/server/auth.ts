@@ -1,67 +1,80 @@
-import "server-only";
 import { eq } from "drizzle-orm";
+import type { Context } from "hono";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { createMiddleware } from "hono/factory";
 import { jwtVerify, SignJWT } from "jose";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { cache } from "react";
 import type { Role } from "@/lib/types";
-import { getDb } from "./db";
-import { users } from "./schema";
+import type { AppEnv } from "./env";
+import { settings, users } from "./schema";
 
-const COOKIE_NAME = "jimpitan_session";
+const SESSION_COOKIE = "jimpitan_session";
+const WARGA_COOKIE = "jimpitan_warga";
 const SESSION_DAYS = 90;
+const WARGA_DAYS = 365;
 /** Sesi diperpanjang otomatis kalau umurnya sudah lewat sekian hari. */
 const REFRESH_AFTER_DAYS = 7;
 const DAY_SECONDS = 24 * 60 * 60;
 
 export type SessionUser = { id: number; name: string; role: Role };
 
-function getSecret(): Uint8Array {
-  const secret = process.env.AUTH_SECRET;
+type Ctx = Context<AppEnv>;
+
+function isDev(c: Ctx) {
+  return c.env.DEV === "1";
+}
+
+function getSecret(c: Ctx): Uint8Array {
+  const secret = c.env.AUTH_SECRET;
   if (secret && secret.length >= 32) return new TextEncoder().encode(secret);
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("AUTH_SECRET wajib diisi (minimal 32 karakter).");
-  }
+  if (!isDev(c)) throw new Error("AUTH_SECRET wajib diisi (minimal 32 karakter): wrangler secret put AUTH_SECRET");
   return new TextEncoder().encode("dev-only-secret-jangan-dipakai-di-production!");
 }
 
-export async function startSession(user: { id: number; sessionVersion: number }) {
-  const token = await new SignJWT({ v: user.sessionVersion })
+async function sign(c: Ctx, claims: Record<string, unknown>, subject: string, days: number) {
+  return new SignJWT(claims)
     .setProtectedHeader({ alg: "HS256" })
-    .setSubject(String(user.id))
+    .setSubject(subject)
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_DAYS}d`)
-    .sign(getSecret());
-  (await cookies()).set(COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_DAYS * DAY_SECONDS,
-  });
+    .setExpirationTime(`${days}d`)
+    .sign(getSecret(c));
 }
 
-export async function endSession() {
-  (await cookies()).delete(COOKIE_NAME);
+async function verify(c: Ctx, token: string | undefined) {
+  if (!token) return null;
+  try {
+    return (await jwtVerify(token, getSecret(c), { algorithms: ["HS256"] })).payload;
+  } catch {
+    return null;
+  }
+}
+
+function cookieOptions(c: Ctx, days: number) {
+  return {
+    httpOnly: true,
+    secure: !isDev(c),
+    sameSite: "Lax" as const,
+    path: "/",
+    maxAge: days * DAY_SECONDS,
+  };
+}
+
+export async function startSession(c: Ctx, user: { id: number; sessionVersion: number }) {
+  const token = await sign(c, { v: user.sessionVersion }, String(user.id), SESSION_DAYS);
+  setCookie(c, SESSION_COOKIE, token, cookieOptions(c, SESSION_DAYS));
+}
+
+export function endSession(c: Ctx) {
+  deleteCookie(c, SESSION_COOKIE, { path: "/" });
 }
 
 type Session = { user: SessionUser; sessionVersion: number; issuedAt: number };
 
-const readSession = cache(async (): Promise<Session | null> => {
-  const token = (await cookies()).get(COOKIE_NAME)?.value;
-  if (!token) return null;
+async function readSession(c: Ctx): Promise<Session | null> {
+  const payload = await verify(c, getCookie(c, SESSION_COOKIE));
+  const id = Number(payload?.sub);
+  if (!payload || !Number.isInteger(id)) return null;
 
-  let payload;
-  try {
-    ({ payload } = await jwtVerify(token, getSecret(), { algorithms: ["HS256"] }));
-  } catch {
-    return null;
-  }
-  const id = Number(payload.sub);
-  if (!Number.isInteger(id)) return null;
-
-  const db = await getDb();
-  const [user] = await db
+  const [user] = await c.var.db
     .select({
       id: users.id,
       name: users.name,
@@ -79,33 +92,59 @@ const readSession = cache(async (): Promise<Session | null> => {
     sessionVersion: user.sessionVersion,
     issuedAt: payload.iat ?? 0,
   };
+}
+
+export async function getSessionUser(c: Ctx): Promise<SessionUser | null> {
+  return (await readSession(c))?.user ?? null;
+}
+
+const unauthorized = (c: Ctx) => c.json({ error: "Sesi login habis. Silakan masuk lagi." }, 401);
+
+/** Wajib login (petugas atau admin). Sesi diperpanjang supaya petugas yang rutin ronda tidak perlu login ulang. */
+export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
+  const session = await readSession(c);
+  if (!session) return unauthorized(c);
+  if (Date.now() / 1000 - session.issuedAt > REFRESH_AFTER_DAYS * DAY_SECONDS) {
+    await startSession(c, { id: session.user.id, sessionVersion: session.sessionVersion });
+  }
+  c.set("user", session.user);
+  await next();
 });
 
-export async function getCurrentUser(): Promise<SessionUser | null> {
-  return (await readSession())?.user ?? null;
+export const requireAdmin = createMiddleware<AppEnv>(async (c, next) => {
+  const user = await getSessionUser(c);
+  if (!user) return unauthorized(c);
+  if (user.role !== "admin") return c.json({ error: "Khusus admin." }, 403);
+  c.set("user", user);
+  await next();
+});
+
+/* ---------- Akses halaman warga (pakai kode bersama) ---------- */
+
+export async function startWargaAccess(c: Ctx, codeVersion: number) {
+  const token = await sign(c, { scope: "warga", v: codeVersion }, "warga", WARGA_DAYS);
+  setCookie(c, WARGA_COOKIE, token, cookieOptions(c, WARGA_DAYS));
 }
 
-/**
- * Perpanjang cookie sesi supaya petugas yang rutin ronda tidak perlu login ulang.
- * Hanya bisa dipanggil dari Route Handler atau Server Action.
- */
-export async function refreshSessionIfNeeded() {
-  const session = await readSession();
-  if (!session) return;
-  const ageSeconds = Date.now() / 1000 - session.issuedAt;
-  if (ageSeconds > REFRESH_AFTER_DAYS * DAY_SECONDS) {
-    await startSession({ id: session.user.id, sessionVersion: session.sessionVersion });
+export function endWargaAccess(c: Ctx) {
+  deleteCookie(c, WARGA_COOKIE, { path: "/" });
+}
+
+/** Warga dengan kode yang masih berlaku, atau petugas/admin yang sedang login. */
+export async function hasWargaAccess(c: Ctx): Promise<boolean> {
+  const payload = await verify(c, getCookie(c, WARGA_COOKIE));
+  if (payload?.scope === "warga") {
+    const [row] = await c.var.db
+      .select({ code: settings.wargaCode, version: settings.wargaCodeVersion })
+      .from(settings)
+      .where(eq(settings.id, 1))
+      .limit(1);
+    if (row?.code && row.version === payload.v) return true;
   }
+  return (await getSessionUser(c)) !== null;
 }
 
-export async function requireUser(): Promise<SessionUser> {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
-  return user;
-}
-
-export async function requireAdmin(): Promise<SessionUser> {
-  const user = await requireUser();
-  if (user.role !== "admin") redirect("/ronda");
-  return user;
-}
+export const requireWarga = createMiddleware<AppEnv>(async (c, next) => {
+  if (!(await hasWargaAccess(c))) return c.json({ error: "Masukkan kode warga dulu." }, 401);
+  await next();
+});

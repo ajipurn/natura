@@ -1,12 +1,10 @@
-"use client";
-
 import { RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DObject, CSS2DRenderer } from "three/addons/renderers/CSS2DRenderer.js";
-import type { MapSize } from "@/lib/site-map";
-import { houseFootprint, planProjection, toWorld, worldDimensions, type WorldPoint } from "@/lib/site-map-3d";
+import type { MarkerState } from "@/lib/house-state";
+import { planProjection, type WorldPoint } from "@/lib/site-map-3d";
 import {
   matchPlan,
   polygonBounds,
@@ -17,7 +15,6 @@ import {
   type SitePlan,
 } from "@/lib/site-plan";
 import type { HouseDTO } from "@/lib/types";
-import type { MarkerState } from "./site-map";
 import { cx } from "./ui";
 
 /** Warna status ada di atap, karena atap yang paling terlihat dari atas. */
@@ -48,7 +45,6 @@ type BuildContext = {
   neutralRoofMat: THREE.Material;
   /** Label HTML yang menempel pada objek 3D. */
   attachLabel: (el: HTMLElement, parent: THREE.Object3D, position: THREE.Vector3) => void;
-  onTextureLoaded: (texture: THREE.Texture) => void;
 };
 
 type BuiltScene = {
@@ -60,23 +56,18 @@ type BuiltScene = {
 };
 
 /**
- * Denah 3D (tampilan tambahan). Dengan denah kode (`plan`), rumah berdiri di atas kavlingnya
- * lengkap dengan jalan, taman, dan saluran. Tanpa itu, rumah memakai posisi penanda denah manual
- * dan gambar denah (kalau ada) jadi alasnya. Gambar hanya dirender ulang saat ada perubahan.
+ * Denah 3D (tampilan tambahan): rumah berdiri di atas kavlingnya lengkap dengan jalan, taman,
+ * dan saluran. Gambar hanya dirender ulang saat ada perubahan.
  */
 export default function SiteMap3D({
   houses,
-  size,
-  imageUrl,
   plan,
   markers,
   onHouseClick,
   className,
 }: {
   houses: HouseDTO[];
-  size: MapSize;
-  imageUrl: string | null;
-  plan?: SitePlan | null;
+  plan: SitePlan;
   markers: Record<number, MarkerState>;
   onHouseClick?: (house: HouseDTO) => void;
   className?: string;
@@ -87,8 +78,6 @@ export default function SiteMap3D({
   const markersRef = useRef(markers);
   const onHouseClickRef = useRef(onHouseClick);
   const [error, setError] = useState<string | null>(null);
-  // Angka, bukan objek: objek ukuran ikut berganti setiap data diperbarui.
-  const { width: mapWidth, height: mapHeight } = size;
 
   useEffect(() => {
     housesRef.current = houses;
@@ -96,16 +85,8 @@ export default function SiteMap3D({
     onHouseClickRef.current = onHouseClick;
   });
 
-  // Data snapshot diperbarui berkala; adegan hanya dibangun ulang kalau rumah/letaknya berubah.
-  const layoutKey = useMemo(
-    () =>
-      JSON.stringify(
-        plan
-          ? houses.map((h) => [h.id, h.block, h.number])
-          : houses.filter((h) => h.mapX != null && h.mapY != null).map((h) => [h.id, h.number, h.mapX, h.mapY]),
-      ),
-    [houses, plan],
-  );
+  // Data snapshot diperbarui berkala; adegan hanya dibangun ulang kalau rumahnya berubah.
+  const layoutKey = useMemo(() => JSON.stringify(houses.map((h) => [h.id, h.block, h.number])), [houses]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -142,7 +123,6 @@ export default function SiteMap3D({
     const labels: HTMLElement[] = [];
 
     let frame = 0;
-    let disposed = false;
     const requestRender = () => {
       if (!frame) frame = requestAnimationFrame(renderFrame);
     };
@@ -176,14 +156,8 @@ export default function SiteMap3D({
         object.position.copy(position);
         parent.add(object);
       },
-      onTextureLoaded: (texture) => {
-        if (disposed) return texture.dispose();
-        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-        track(texture);
-        requestRender();
-      },
     };
-    const built = plan ? buildPlanScene(ctx, plan) : buildMarkerScene(ctx, { width: mapWidth, height: mapHeight }, imageUrl);
+    const built = buildPlanScene(ctx, plan);
     const { meshes, houseLabels, bounds, footprint } = built;
     const pickables = [...meshes.values()].flatMap(({ body, roof }) => [body, roof]);
     const maxDim = Math.max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ);
@@ -287,7 +261,6 @@ export default function SiteMap3D({
     resetView();
 
     return () => {
-      disposed = true;
       apiRef.current = null;
       cancelAnimationFrame(frame);
       observer.disconnect();
@@ -301,19 +274,17 @@ export default function SiteMap3D({
       renderer.domElement.remove();
       labelRenderer.domElement.remove();
     };
-    // houses dibaca lewat ref; layoutKey mewakili perubahan rumah/letaknya.
-  }, [layoutKey, plan, mapWidth, mapHeight, imageUrl]);
+    // houses dibaca lewat ref; layoutKey mewakili perubahan rumah.
+  }, [layoutKey, plan]);
 
   useEffect(() => {
     apiRef.current?.setMarkers(markers);
   }, [markers]);
 
-  const houseCount = plan
-    ? matchPlan(plan, houses).lotHouse.size
-    : houses.filter((h) => h.mapX != null && h.mapY != null).length;
+  const houseCount = matchPlan(plan, houses).lotHouse.size;
   // Tinggi bingkai mengikuti bentuk denah (sedikit lebih tinggi untuk sudut pandang miring),
   // supaya denah yang melebar tidak tampil kecil dengan ruang kosong di HP.
-  const [aspectW, aspectH] = plan ? [plan.viewBox[2], plan.viewBox[3]] : [mapWidth, mapHeight];
+  const [aspectW, aspectH] = [plan.viewBox[2], plan.viewBox[3]];
 
   return (
     <div className={cx("overflow-hidden rounded-2xl border border-line bg-card", className)}>
@@ -348,77 +319,6 @@ function houseLabelElement(text: string, houseId: number): HTMLDivElement {
   el.setAttribute("aria-hidden", "true");
   el.className = HOUSE_LABEL_CLASS;
   return el;
-}
-
-/** Denah manual: rumah kotak di posisi penanda, gambar denah (kalau ada) sebagai alas. */
-function buildMarkerScene(ctx: BuildContext, size: MapSize, imageUrl: string | null): BuiltScene {
-  const { scene, track, cssColor } = ctx;
-  const dims = worldDimensions(size);
-  const maxDim = Math.max(dims.width, dims.depth);
-
-  const base = new THREE.Mesh(
-    track(new THREE.BoxGeometry(dims.width, 1.5, dims.depth)),
-    track(new THREE.MeshLambertMaterial({ color: cssColor("--line", "#e2e8f0") })),
-  );
-  base.position.y = -0.75;
-  scene.add(base);
-
-  const groundGeo = track(new THREE.PlaneGeometry(dims.width, dims.depth));
-  groundGeo.rotateX(-Math.PI / 2);
-  const groundMat = track(new THREE.MeshLambertMaterial({ color: imageUrl ? 0xffffff : cssColor("--card", "#ffffff") }));
-  const ground = new THREE.Mesh(groundGeo, groundMat);
-  ground.position.y = 0.01;
-  scene.add(ground);
-
-  if (imageUrl) {
-    new THREE.TextureLoader().load(imageUrl, (texture) => {
-      texture.colorSpace = THREE.SRGBColorSpace;
-      groundMat.map = texture;
-      groundMat.needsUpdate = true;
-      ctx.onTextureLoaded(texture);
-    });
-  } else {
-    const lineColor = cssColor("--line", "#e2e8f0");
-    const grid = new THREE.GridHelper(maxDim, Math.round(maxDim / 4), lineColor, lineColor);
-    grid.scale.set(dims.width / maxDim, 1, dims.depth / maxDim);
-    grid.position.y = 0.02;
-    track(grid.geometry);
-    track(grid.material as THREE.Material);
-    scene.add(grid);
-  }
-
-  // Rumah: badan kotak + atap limas. Geometri dipakai bersama.
-  const placed = ctx.houses.filter((h) => h.mapX != null && h.mapY != null);
-  const points = placed.map((h) => toWorld({ x: h.mapX!, y: h.mapY! }, dims));
-  const s = houseFootprint(points);
-  const bodyGeo = track(new THREE.BoxGeometry(s, s * 0.8, s));
-  bodyGeo.translate(0, s * 0.4, 0);
-  const roofGeo = track(new THREE.ConeGeometry(s * 0.78, s * 0.55, 4));
-  roofGeo.rotateY(Math.PI / 4);
-  roofGeo.translate(0, s * 0.8 + s * 0.275, 0);
-
-  const meshes = new Map<number, HouseMeshes>();
-  const houseLabels: HTMLElement[] = [];
-  placed.forEach((house, i) => {
-    const group = new THREE.Group();
-    group.position.set(points[i].x, 0, points[i].z);
-    const body = new THREE.Mesh(bodyGeo, ctx.wallMat);
-    const roof = new THREE.Mesh(roofGeo, ctx.neutralRoofMat);
-    body.userData.houseId = roof.userData.houseId = house.id;
-    group.add(body, roof);
-    meshes.set(house.id, { body, roof });
-    const label = houseLabelElement(house.number, house.id);
-    houseLabels.push(label);
-    ctx.attachLabel(label, group, new THREE.Vector3(0, s * 1.55, 0));
-    scene.add(group);
-  });
-
-  return {
-    meshes,
-    houseLabels,
-    bounds: { minX: -dims.width / 2, maxX: dims.width / 2, minZ: -dims.depth / 2, maxZ: dims.depth / 2 },
-    footprint: s,
-  };
 }
 
 /** Denah kode: maket kawasan, taman, saluran, kavling belum dibangun, dan rumah di atas kavlingnya. */

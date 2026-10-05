@@ -1,11 +1,13 @@
-// Service worker Jimpitan: halaman Ronda tetap bisa dibuka walau sinyal hilang.
-// Data catatan disimpan di HP (localStorage) oleh halaman Ronda dan dikirim saat online.
+// Service worker Jimpitan: app petugas tetap bisa dibuka walau sinyal hilang.
+// Data catatan disimpan di HP (localStorage) oleh layar Ronda dan dikirim saat online.
 
-const CACHE = "jimpitan-v3";
-const OFFLINE_PAGES = ["/ronda"];
+const CACHE = "jimpitan-v4";
+/** Kerangka app petugas (SPA): semua alamat /petugas/* memakai halaman ini. */
+const SHELL = "/petugas/";
 const NETWORK_TIMEOUT_MS = 4000;
 
-self.addEventListener("install", () => {
+self.addEventListener("install", (event) => {
+  event.waitUntil(precacheShell().catch(() => {}));
   self.skipWaiting();
 });
 
@@ -25,24 +27,32 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // File build Next.js dan gambar denah (?v=versi) punya URL unik per versi, aman disimpan selamanya.
-  if (
-    url.pathname.startsWith("/_next/static/") ||
-    url.pathname.startsWith("/icons/") ||
-    (url.pathname === "/api/denah/gambar" && url.searchParams.has("v"))
-  ) {
+  // File hasil build Vite punya nama unik per versi, aman disimpan selamanya.
+  if (url.pathname.startsWith("/assets/") || url.pathname.startsWith("/icons/")) {
     event.respondWith(cacheFirst(request));
     return;
   }
 
   if (request.mode === "navigate") {
-    event.respondWith(
-      OFFLINE_PAGES.includes(url.pathname)
-        ? networkFirst(request, url.pathname)
-        : fetch(request).catch(() => offlineResponse()),
-    );
+    const inPetugas = url.pathname === "/petugas" || url.pathname.startsWith("/petugas/");
+    event.respondWith(inPetugas ? networkFirstShell(request) : fetch(request).catch(() => offlineResponse()));
   }
 });
+
+/** Simpan kerangka app petugas beserta file JS/CSS yang dipakainya. */
+async function precacheShell(response) {
+  const cache = await caches.open(CACHE);
+  const res = response ?? (await fetch(SHELL, { cache: "no-store" }));
+  if (!res.ok || res.redirected) return;
+  const html = await res.clone().text();
+  await cache.put(SHELL, res);
+  const assets = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]);
+  await Promise.all(
+    assets.map(async (asset) => {
+      if (!(await cache.match(asset))) await cache.add(asset);
+    }),
+  );
+}
 
 async function cacheFirst(request) {
   const cache = await caches.open(CACHE);
@@ -53,15 +63,15 @@ async function cacheFirst(request) {
   return response;
 }
 
-async function networkFirst(request, cacheKey) {
+async function networkFirstShell(request) {
   const cache = await caches.open(CACHE);
   const network = fetch(request).then((response) => {
-    // Redirect (mis. ke /login) tidak disimpan.
-    if (response.ok && !response.redirected) cache.put(cacheKey, response.clone());
+    // Versi baru app: perbarui salinan kerangka dan file-filenya di belakang layar.
+    if (response.ok && !response.redirected) precacheShell(response.clone()).catch(() => {});
     return response;
   });
   network.catch(() => {}); // kegagalan ditangani di bawah
-  const cached = await cache.match(cacheKey);
+  const cached = await cache.match(SHELL);
 
   if (!cached) {
     try {
@@ -82,8 +92,8 @@ function offlineResponse() {
   return new Response(
     "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'><title>Offline</title>" +
       "<body style='font-family:system-ui;padding:24px;line-height:1.5'><h1>Sedang offline</h1>" +
-      "<p>Halaman ini butuh internet. Halaman Ronda tetap bisa dipakai offline kalau sudah pernah dibuka saat ada sinyal.</p>" +
-      "<p><a href='/ronda'>Buka halaman Ronda</a></p></body>",
+      "<p>Halaman ini butuh internet. App petugas tetap bisa dipakai offline kalau sudah pernah dibuka saat ada sinyal.</p>" +
+      "<p><a href='/petugas/'>Buka app petugas</a></p></body>",
     { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } },
   );
 }

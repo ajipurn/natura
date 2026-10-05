@@ -1,0 +1,4 @@
+# Salin ke .dev.vars untuk `bun run dev`. Jangan di-commit.
+DEV=1
+# Opsional saat development; wajib di production lewat `bunx wrangler secret put AUTH_SECRET`.
+AUTH_SECRET=

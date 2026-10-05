@@ -1,13 +1,12 @@
-import "server-only";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { analyzeSchedule, type ScheduleEntry } from "@/lib/schedule";
 import { houseKey } from "@/lib/site-plan";
 import type { ScheduleDTO } from "@/lib/types";
-import { getDb } from "./db";
+import { chunk, rowsPerInsert, type Db } from "./db";
 import { houses, rondaSchedule } from "./schema";
 
-export async function listSchedule(): Promise<ScheduleDTO[]> {
-  const db = await getDb();
+export async function listSchedule(db: Db): Promise<ScheduleDTO[]> {
   return db
     .select({
       day: rondaSchedule.dayOfWeek,
@@ -35,33 +34,49 @@ export type ScheduleImportSummary = {
 
 /** Ganti seluruh jadwal; kalau diminta, isi nama KK dari jadwal. */
 export async function saveSchedule(
+  db: Db,
   entries: ScheduleEntry[],
   options: { fillNames: boolean; overwriteNames: boolean },
 ): Promise<ScheduleImportSummary> {
-  const db = await getDb();
   const houseRows = await db
     .select({ id: houses.id, block: houses.block, number: houses.number, ownerName: houses.ownerName })
     .from(houses);
   const byKey = new Map(houseRows.map((h) => [houseKey(h), h]));
   const { unknown, conflicting, uniqueNames } = analyzeSchedule(entries, new Set(byKey.keys()));
 
-  let namesFilled = 0;
-  await db.transaction(async (tx) => {
-    await tx.delete(rondaSchedule);
-    if (entries.length > 0) {
-      await tx.insert(rondaSchedule).values(
-        entries.map((e) => ({ dayOfWeek: e.day, position: e.position, name: e.name, block: e.block, number: e.number })),
-      );
-    }
-    if (!options.fillNames) return;
+  // Satu batch D1 = semua berhasil atau semua batal, seperti transaksi.
+  const statements: BatchItem<"sqlite">[] = [db.delete(rondaSchedule)];
+  for (const part of chunk(entries, rowsPerInsert(5))) {
+    statements.push(
+      db
+        .insert(rondaSchedule)
+        .values(part.map((e) => ({ dayOfWeek: e.day, position: e.position, name: e.name, block: e.block, number: e.number }))),
+    );
+  }
+  const names: { id: number; name: string }[] = [];
+  if (options.fillNames) {
     for (const [key, name] of uniqueNames) {
       const house = byKey.get(key);
       if (!house || house.ownerName === name) continue;
       if (house.ownerName && !options.overwriteNames) continue;
-      await tx.update(houses).set({ ownerName: name }).where(eq(houses.id, house.id));
-      namesFilled++;
+      names.push({ id: house.id, name });
     }
-  });
+  }
+  // Satu UPDATE untuk banyak rumah (CASE id ...), 3 parameter per rumah.
+  for (const part of chunk(names, rowsPerInsert(3))) {
+    const cases = sql.join(
+      part.map((n) => sql`when ${n.id} then ${n.name}`),
+      sql` `,
+    );
+    statements.push(
+      db
+        .update(houses)
+        .set({ ownerName: sql`case ${houses.id} ${cases} end` })
+        .where(inArray(houses.id, part.map((n) => n.id))),
+    );
+  }
+  const namesFilled = names.length;
+  await db.batch(statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
 
   return {
     saved: entries.length,
@@ -72,7 +87,6 @@ export async function saveSchedule(
   };
 }
 
-export async function clearSchedule() {
-  const db = await getDb();
+export async function clearSchedule(db: Db) {
   await db.delete(rondaSchedule);
 }

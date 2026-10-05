@@ -1,5 +1,3 @@
-"use client";
-
 import { Copy, Share2 } from "lucide-react";
 import { useState } from "react";
 import { buttonClass, cx } from "./ui";

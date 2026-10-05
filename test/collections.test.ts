@@ -1,11 +1,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { applyEntries } from "@/server/collections";
-import { getDb } from "@/server/db";
+import type { Db } from "@/server/db";
 import { getCollectionsForDate, getMonthRecap, listPatrols } from "@/server/queries";
 import { houses, users } from "@/server/schema";
 import type { SessionUser } from "@/server/auth";
 import type { EntryInput } from "@/lib/types";
+import { createTestEnv } from "./helpers/d1";
 
+let db: Db;
 let petugas: SessionUser;
 let houseA1: number;
 let houseA2: number;
@@ -25,7 +27,7 @@ function entry(partial: Partial<EntryInput> & { houseId: number }): EntryInput {
 }
 
 beforeAll(async () => {
-  const db = await getDb();
+  ({ db } = await createTestEnv());
   const [u] = await db
     .insert(users)
     .values({ name: "Budi", pinHash: "x", role: "petugas" })
@@ -45,6 +47,7 @@ beforeAll(async () => {
 describe("applyEntries", () => {
   it("menyimpan catatan dan menolak data yang tidak masuk akal", async () => {
     const results = await applyEntries(
+      db,
       petugas,
       [
         entry({ houseId: houseA1 }),
@@ -57,30 +60,31 @@ describe("applyEntries", () => {
     expect(results.map((r) => r.ok)).toEqual([true, false, false, false]);
     expect(results[0]).toMatchObject({ ok: true, date: "2026-10-04" });
 
-    const saved = await getCollectionsForDate("2026-10-04");
+    const saved = await getCollectionsForDate(db, "2026-10-04");
     expect(saved).toHaveLength(1);
     expect(saved[0]).toMatchObject({ houseId: houseA1, status: "filled", amount: 500, collectorName: "Budi" });
   });
 
   it("catatan terbaru menang, sinkron telat tidak menimpa koreksi", async () => {
     const later = new Date(NOW.getTime() + 60_000).toISOString();
-    await applyEntries(petugas, [entry({ houseId: houseA1, status: "empty", recordedAt: later })], NOW);
+    await applyEntries(db, petugas, [entry({ houseId: houseA1, status: "empty", recordedAt: later })], NOW);
     // Catatan lama (dari HP lain yang baru online) datang belakangan.
-    await applyEntries(petugas, [entry({ houseId: houseA1, status: "filled", amount: 1000 })], NOW);
+    await applyEntries(db, petugas, [entry({ houseId: houseA1, status: "filled", amount: 1000 })], NOW);
 
-    const saved = await getCollectionsForDate("2026-10-04");
+    const saved = await getCollectionsForDate(db, "2026-10-04");
     expect(saved[0]).toMatchObject({ status: "empty", amount: 0 });
   });
 
   it("menghapus catatan dengan status none", async () => {
     const later = new Date(NOW.getTime() + 120_000).toISOString();
-    await applyEntries(petugas, [entry({ houseId: houseA1, status: "none", recordedAt: later })], NOW);
-    expect(await getCollectionsForDate("2026-10-04")).toHaveLength(0);
+    await applyEntries(db, petugas, [entry({ houseId: houseA1, status: "none", recordedAt: later })], NOW);
+    expect(await getCollectionsForDate(db, "2026-10-04")).toHaveLength(0);
   });
 
   it("catatan lewat tengah malam masuk malam sebelumnya", async () => {
     const afterMidnight = "2026-10-04T18:30:00Z"; // 01:30 WIB tanggal 5
     const results = await applyEntries(
+      db,
       petugas,
       [entry({ houseId: houseA2, recordedAt: afterMidnight })],
       new Date("2026-10-04T19:00:00Z"),
@@ -89,12 +93,36 @@ describe("applyEntries", () => {
   });
 
   it("muncul di daftar riwayat dan rekap bulanan", async () => {
-    const patrols = await listPatrols();
+    const patrols = await listPatrols(db);
     expect(patrols[0]).toMatchObject({ date: "2026-10-04", filled: 1, empty: 0, total: 500, collectors: "Budi" });
 
-    const recap = await getMonthRecap("2026-10");
+    const recap = await getMonthRecap(db, "2026-10");
     expect(recap.dates).toEqual(["2026-10-04"]);
     expect(recap.cells[`${houseA2}:2026-10-04`]).toEqual({ status: "filled", amount: 500 });
     expect(recap.cells[`${houseA1}:2026-10-04`]).toBeUndefined();
+  });
+});
+
+describe("applyEntries dengan banyak catatan sekaligus", () => {
+  it("antrean panjang dari HP (lebih dari batas 100 parameter D1) tersimpan semua", async () => {
+    const rows = [];
+    for (let i = 0; i < 40; i++) {
+      const [row] = await db
+        .insert(houses)
+        .values({ block: "Z", number: String(i + 1), token: `TOKENZ${String(i).padStart(4, "0")}` })
+        .returning({ id: houses.id });
+      rows.push(row);
+    }
+    const at = "2026-10-03T14:00:00Z"; // 21:00 WIB tanggal 3
+    const entries = rows.flatMap((r, i) => [
+      entry({ houseId: r.id, status: "empty", recordedAt: at }),
+      // Dikoreksi semenit kemudian di HP yang sama.
+      entry({ houseId: r.id, status: i % 2 ? "filled" : "none", amount: 700, recordedAt: "2026-10-03T14:01:00Z" }),
+    ]);
+    const results = await applyEntries(db, petugas, entries, NOW);
+    expect(results.every((r) => r.ok)).toBe(true);
+    const saved = await getCollectionsForDate(db, "2026-10-03");
+    expect(saved).toHaveLength(20);
+    expect(saved.every((c) => c.status === "filled" && c.amount === 700)).toBe(true);
   });
 });

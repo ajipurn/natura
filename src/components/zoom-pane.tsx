@@ -1,5 +1,3 @@
-"use client";
-
 import { Minus, Plus } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cx } from "./ui";

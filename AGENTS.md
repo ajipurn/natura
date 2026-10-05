@@ -1,9 +1,9 @@
-<!-- BEGIN:nextjs-agent-rules -->
+# Catatan untuk agen
 
-# This is NOT the Next.js you know
-
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
-
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
-
-<!-- END:nextjs-agent-rules -->
+- Stack: Vite + React (tiga SPA: `index.html`, `petugas/index.html`, `admin/index.html`), API Hono di Cloudflare Workers (`src/server/worker.ts`), database Cloudflare D1 lewat Drizzle. Lihat README.
+- Versi paket lebih baru dari data latih (Vite 8 dengan Rolldown, React Router 8, Hono 4, Wrangler 4, Miniflare 5). Baca tipe/dokumentasi di `node_modules` sebelum memakai API yang belum dikenal.
+- D1: maksimal 100 parameter per query (pakai `chunk` + `rowsPerInsert` dari `src/server/db.ts`), tidak ada transaksi interaktif (pakai `db.batch`).
+- Rute API dipasang di `src/server/app.ts`. Sub-app yang dipasang di "/" jangan memakai `.use()` (ikut mengenai rute lain); pasang middleware per rute.
+- Pakai Bun sebagai package manager (`bun install`, `bun run …`, `bunx …`), bukan npm. Tes lewat `bun run test` (Vitest), bukan `bun test`.
+- Tes: `bun run test` (tes API memakai D1 Miniflare, lihat `test/helpers/d1.ts`), `bun run lint`, `bun run typecheck`.
+- Commit langsung di `main`, pesan mengikuti Conventional Commits, tanpa atribusi.

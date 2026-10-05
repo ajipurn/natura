@@ -37,6 +37,7 @@ export function PageHeader({
 }) {
   return (
     <div className="mb-4 flex items-start justify-between gap-3">
+      <PageTitle title={title} />
       <div className="min-w-0">
         <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
         {subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}
@@ -82,4 +83,9 @@ export function Alert({ tone = "error", children }: { tone?: "error" | "success"
 
 export function SectionTitle({ children }: { children: ReactNode }) {
   return <h2 className="mb-2 mt-6 text-sm font-semibold uppercase tracking-wide text-muted">{children}</h2>;
+}
+
+/** Judul tab browser (React memindahkan <title> ke <head>). */
+export function PageTitle({ title }: { title: string }) {
+  return <title>{`${title} · Jimpitan`}</title>;
 }

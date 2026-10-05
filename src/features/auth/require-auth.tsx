@@ -1,0 +1,69 @@
+import { ShieldAlert } from "lucide-react";
+import type { ReactNode } from "react";
+import { Navigate, useLocation } from "react-router";
+import { errorMessage } from "@/client/api";
+import { useAuth } from "@/client/auth";
+import type { SessionUser } from "@/server/auth";
+import { ErrorCard, LoadingCards } from "@/components/query-state";
+import { Card, buttonClass, cx } from "@/components/ui";
+
+/**
+ * Halaman yang perlu login. Belum login → layar masuk (lalu kembali ke sini);
+ * aplikasi belum disiapkan → halaman setup admin.
+ */
+export function RequireAuth({
+  loginPath,
+  adminOnly = false,
+  children,
+}: {
+  loginPath: string;
+  adminOnly?: boolean;
+  children: (user: SessionUser) => ReactNode;
+}) {
+  const auth = useAuth();
+  const location = useLocation();
+
+  if (!auth.data) {
+    if (auth.isError) return <Centered><ErrorCard message={errorMessage(auth.error)} onRetry={() => void auth.refetch()} /></Centered>;
+    return <Centered><LoadingCards count={2} /></Centered>;
+  }
+  if (auth.data.setupNeeded) {
+    return adminOnly ? (
+      <Navigate to="/admin/setup" replace />
+    ) : (
+      <Centered>
+        <Card className="text-center">
+          <p className="font-semibold">Aplikasi belum disiapkan</p>
+          <p className="mt-1 text-sm text-muted">Admin perlu menyiapkan aplikasi dulu.</p>
+          <a href="/admin/setup" className={cx(buttonClass("primary"), "mt-4")}>
+            Siapkan sebagai admin
+          </a>
+        </Card>
+      </Centered>
+    );
+  }
+  const user = auth.data.user;
+  if (!user) {
+    const next = location.pathname + location.search;
+    return <Navigate to={`${loginPath}?next=${encodeURIComponent(next)}`} replace />;
+  }
+  if (adminOnly && user.role !== "admin") {
+    return (
+      <Centered>
+        <Card className="text-center">
+          <ShieldAlert className="mx-auto size-10 text-warn" />
+          <p className="mt-2 font-semibold">Khusus admin</p>
+          <p className="mt-1 text-sm text-muted">Akun {user.name} adalah petugas ronda.</p>
+          <a href="/petugas/" className={cx(buttonClass("primary"), "mt-4")}>
+            Buka app petugas
+          </a>
+        </Card>
+      </Centered>
+    );
+  }
+  return <>{children(user)}</>;
+}
+
+function Centered({ children }: { children: ReactNode }) {
+  return <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-10">{children}</main>;
+}

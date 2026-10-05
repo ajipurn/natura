@@ -1,132 +1,106 @@
-import {
-  boolean,
-  date,
-  doublePrecision,
-  index,
-  integer,
-  pgEnum,
-  pgTable,
-  serial,
-  text,
-  timestamp,
-  uniqueIndex,
-} from "drizzle-orm/pg-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
-export const roleEnum = pgEnum("role", ["admin", "petugas"]);
-/** `vacant` = rumah kosong / penghuni mudik, tidak dihitung sebagai bolong. */
-export const houseStatusEnum = pgEnum("house_status", ["active", "vacant"]);
-/** `filled` = wadah jimpitan ada isinya, `empty` = kosong. */
-export const collectionStatusEnum = pgEnum("collection_status", [
-  "filled",
-  "empty",
-]);
-export const collectionMethodEnum = pgEnum("collection_method", [
-  "scan",
-  "manual",
-]);
+/**
+ * Skema Cloudflare D1 (SQLite).
+ * Nilai bawaan diisi oleh aplikasi ($defaultFn) karena SQLite tidak mengenal DEFAULT saat insert banyak baris.
+ */
+const createdAt = () =>
+  integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date());
 
 /** Satu baris saja (id = 1). */
-export const settings = pgTable("settings", {
-  id: integer("id").primaryKey().default(1),
+export const settings = sqliteTable("settings", {
+  id: integer("id").primaryKey().$defaultFn(() => 1),
   communityName: text("community_name").notNull(),
-  defaultAmount: integer("default_amount").notNull().default(500),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
+  defaultAmount: integer("default_amount").notNull().$defaultFn(() => 500),
+  /** Kode untuk membuka halaman warga. Null = halaman warga belum dibuka untuk umum. */
+  wargaCode: text("warga_code"),
+  /** Dinaikkan saat kode warga diganti supaya akses lama tidak berlaku lagi. */
+  wargaCodeVersion: integer("warga_code_version").notNull().$defaultFn(() => 1),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
-    .defaultNow(),
-}).enableRLS();
+    .$defaultFn(() => new Date()),
+});
 
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
+export const users = sqliteTable("users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull().unique(),
   pinHash: text("pin_hash").notNull(),
-  role: roleEnum("role").notNull().default("petugas"),
-  active: boolean("active").notNull().default(true),
-  failedAttempts: integer("failed_attempts").notNull().default(0),
-  lockedUntil: timestamp("locked_until", { withTimezone: true }),
-  /** Dinaikkan saat PIN diganti supaya sesi lama tidak berlaku lagi. */
-  sessionVersion: integer("session_version").notNull().default(1),
-  createdAt: timestamp("created_at", { withTimezone: true })
+  role: text("role", { enum: ["admin", "petugas"] })
     .notNull()
-    .defaultNow(),
-}).enableRLS();
+    .$defaultFn(() => "petugas"),
+  active: integer("active", { mode: "boolean" })
+    .notNull()
+    .$defaultFn(() => true),
+  failedAttempts: integer("failed_attempts")
+    .notNull()
+    .$defaultFn(() => 0),
+  lockedUntil: integer("locked_until", { mode: "timestamp_ms" }),
+  /** Dinaikkan saat PIN diganti supaya sesi lama tidak berlaku lagi. */
+  sessionVersion: integer("session_version")
+    .notNull()
+    .$defaultFn(() => 1),
+  createdAt: createdAt(),
+});
 
-export const houses = pgTable(
+export const houses = sqliteTable(
   "houses",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     block: text("block").notNull(),
     number: text("number").notNull(),
     ownerName: text("owner_name"),
     /** Kode acak yang dicetak di QR. */
     token: text("token").notNull().unique(),
-    status: houseStatusEnum("status").notNull().default("active"),
-    /** Posisi di denah, 0–1 relatif terhadap lebar/tinggi denah. Null = belum ditaruh. */
-    mapX: doublePrecision("map_x"),
-    mapY: doublePrecision("map_y"),
-    createdAt: timestamp("created_at", { withTimezone: true })
+    /** `vacant` = rumah kosong / penghuni mudik, tidak dihitung sebagai bolong. */
+    status: text("status", { enum: ["active", "vacant"] })
       .notNull()
-      .defaultNow(),
+      .$defaultFn(() => "active"),
+    createdAt: createdAt(),
   },
   (t) => [uniqueIndex("houses_block_number_idx").on(t.block, t.number)],
-).enableRLS();
+);
 
-/** Satu malam ronda. Jam 00:00–11:59 masih dihitung malam sebelumnya. */
-export const patrols = pgTable("patrols", {
-  id: serial("id").primaryKey(),
-  date: date("date", { mode: "string" }).notNull().unique(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-}).enableRLS();
+/** Satu malam ronda (YYYY-MM-DD). Jam 00:00–11:59 masih dihitung malam sebelumnya. */
+export const patrols = sqliteTable("patrols", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  date: text("date").notNull().unique(),
+  createdAt: createdAt(),
+});
 
-export const collections = pgTable(
+export const collections = sqliteTable(
   "collections",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     patrolId: integer("patrol_id")
       .notNull()
       .references(() => patrols.id, { onDelete: "cascade" }),
     houseId: integer("house_id")
       .notNull()
       .references(() => houses.id, { onDelete: "restrict" }),
-    status: collectionStatusEnum("status").notNull(),
-    amount: integer("amount").notNull().default(0),
-    method: collectionMethodEnum("method").notNull(),
-    collectedBy: integer("collected_by").references(() => users.id, {
-      onDelete: "set null",
-    }),
+    /** `filled` = wadah jimpitan ada isinya, `empty` = kosong. */
+    status: text("status", { enum: ["filled", "empty"] }).notNull(),
+    amount: integer("amount").notNull(),
+    method: text("method", { enum: ["scan", "manual"] }).notNull(),
+    collectedBy: integer("collected_by").references(() => users.id, { onDelete: "set null" }),
     /** Waktu dicatat di HP petugas (bisa lebih awal dari waktu sinkron). */
-    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
-    syncedAt: timestamp("synced_at", { withTimezone: true })
+    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
+    syncedAt: integer("synced_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
+      .$defaultFn(() => new Date()),
   },
-  (t) => [
-    uniqueIndex("collections_patrol_house_idx").on(t.patrolId, t.houseId),
-  ],
-).enableRLS();
-
-/** Denah perumahan (satu baris, id = 1). Gambar latar opsional, disimpan sebagai base64. */
-export const siteMap = pgTable("site_map", {
-  id: integer("id").primaryKey().default(1),
-  imageData: text("image_data"),
-  imageType: text("image_type"),
-  /** Ukuran denah dalam piksel; menentukan perbandingan lebar:tinggi. */
-  width: integer("width").notNull().default(1000),
-  height: integer("height").notNull().default(1300),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-}).enableRLS();
+  (t) => [uniqueIndex("collections_patrol_house_idx").on(t.patrolId, t.houseId)],
+);
 
 /**
  * Jadwal ronda mingguan. `dayOfWeek` = hari malamnya (0 = Ahad/malam Senin … 6 = Sabtu/malam Minggu).
  * Rumah dicatat lewat blok + nomor (bukan id) supaya jadwal tetap tersimpan walau rumahnya belum terdaftar.
  */
-export const rondaSchedule = pgTable(
+export const rondaSchedule = sqliteTable(
   "ronda_schedule",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     dayOfWeek: integer("day_of_week").notNull(),
     position: integer("position").notNull(),
     name: text("name"),
@@ -134,9 +108,33 @@ export const rondaSchedule = pgTable(
     number: text("number").notNull(),
   },
   (t) => [index("ronda_schedule_day_idx").on(t.dayOfWeek, t.position)],
-).enableRLS();
+);
+
+/** Pengumuman untuk warga. */
+export const announcements = sqliteTable("announcements", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  /** Disematkan di atas. */
+  pinned: integer("pinned", { mode: "boolean" })
+    .notNull()
+    .$defaultFn(() => false),
+  createdAt: createdAt(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+/** Kontak pengurus yang tampil di halaman warga, urut sesuai `position`. */
+export const contacts = sqliteTable("contacts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  /** Jabatan, mis. "Ketua RT". */
+  role: text("role").notNull(),
+  phone: text("phone").notNull(),
+  position: integer("position").notNull(),
+});
 
 export type User = typeof users.$inferSelect;
 export type House = typeof houses.$inferSelect;
 export type Collection = typeof collections.$inferSelect;
-export type Settings = typeof settings.$inferSelect;

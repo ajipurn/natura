@@ -1,4 +1,5 @@
-export const APP_TIMEZONE = process.env.NEXT_PUBLIC_TIMEZONE || "Asia/Jakarta";
+/** Zona waktu untuk menentukan tanggal ronda. WITA: "Asia/Makassar", WIT: "Asia/Jayapura". */
+export const APP_TIMEZONE = "Asia/Jakarta";
 
 /** Jam 00:00–11:59 masih dihitung ronda malam sebelumnya. */
 const CUTOFF_HOURS = 12;

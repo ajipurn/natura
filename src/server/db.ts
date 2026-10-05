@@ -1,53 +1,26 @@
-import path from "node:path";
-import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
-import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
 import * as schema from "./schema";
 
-export type Db = PostgresJsDatabase<typeof schema>;
+export type Db = DrizzleD1Database<typeof schema>;
 
-const MIGRATIONS_FOLDER = path.join(process.cwd(), "drizzle");
+/** Binding D1 (`env.DB`), atau D1 dari Miniflare saat tes. */
+export type D1 = Parameters<typeof drizzle>[0];
 
-const globalForDb = globalThis as unknown as { __jimpitanDb?: Promise<Db> };
-
-/**
- * DATABASE_URL:
- * - kosong / `pglite:<folder>` / `pglite:memory` → Postgres lokal (PGlite), dimigrasi otomatis.
- *   Cocok untuk development tanpa perlu install apa pun.
- * - `postgres://...` → Postgres sungguhan (mis. Supabase). Jalankan `npm run db:migrate` dulu.
- */
-export function getDb(): Promise<Db> {
-  globalForDb.__jimpitanDb ??= createDb(process.env.DATABASE_URL).catch(
-    (err) => {
-      globalForDb.__jimpitanDb = undefined;
-      throw err;
-    },
-  );
-  return globalForDb.__jimpitanDb;
+/** Drizzle di atas binding D1. Murah dibuat, jadi dibuat per permintaan. */
+export function createDb(d1: D1): Db {
+  return drizzle(d1, { schema });
 }
 
-async function createDb(url: string | undefined): Promise<Db> {
-  if (!url || url.startsWith("pglite:")) {
-    return createPgliteDb(url?.slice("pglite:".length) || ".data/pglite");
-  }
-  // `prepare: false` supaya kompatibel dengan connection pooler (Supabase/PgBouncer).
-  const client = postgres(url, { prepare: false, max: 5 });
-  return drizzlePostgres(client, { schema });
+/** D1 membatasi 100 parameter per query, jadi insert banyak baris dipecah per sekian baris. */
+export const MAX_PARAMS = 100;
+
+export function chunk<T>(items: T[], size: number): T[][] {
+  const result: T[][] = [];
+  for (let i = 0; i < items.length; i += size) result.push(items.slice(i, i + size));
+  return result;
 }
 
-async function createPgliteDb(location: string): Promise<Db> {
-  const [{ PGlite }, { drizzle }, { migrate }] = await Promise.all([
-    import("@electric-sql/pglite"),
-    import("drizzle-orm/pglite"),
-    import("drizzle-orm/pglite/migrator"),
-  ]);
-  const client =
-    location === "memory"
-      ? new PGlite()
-      : // Hanya untuk development lokal; jangan buat Turbopack menelusuri seluruh proyek.
-        new PGlite(path.resolve(/*turbopackIgnore: true*/ process.cwd(), location));
-  const db = drizzle(client, { schema });
-  await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
-  // API query builder-nya sama; tipe disamakan supaya kode lain tidak perlu tahu drivernya.
-  return db as unknown as Db;
+/** Ukuran potongan untuk insert banyak baris dengan `columns` kolom per baris. */
+export function rowsPerInsert(columns: number): number {
+  return Math.max(1, Math.floor(MAX_PARAMS / columns));
 }

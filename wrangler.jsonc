@@ -1,0 +1,29 @@
+// Konfigurasi Cloudflare Workers. Lihat README bagian "Deploy ke Cloudflare".
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jimpitan-natura",
+  "main": "src/server/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    // File statis (hasil build Vite) dilayani langsung; sisanya ke Worker (API + halaman SPA).
+    "not_found_handling": "none",
+    "run_worker_first": ["/api/*"],
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "jimpitan-natura",
+      // Isi dengan database_id dari `bunx wrangler d1 create jimpitan-natura --location apac`.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  // Jalankan Worker dekat database D1 (lebih sedikit jeda per query).
+  "placement": { "mode": "smart" },
+  "observability": { "enabled": true },
+  "vars": {
+    // Alamat publik untuk QR yang dicetak. Kosong = pakai alamat yang sedang dibuka admin.
+    "APP_URL": ""
+  }
+}

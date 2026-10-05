@@ -1,118 +1,136 @@
 # Jimpitan
 
-Web app untuk mencatat jimpitan saat ronda. Setiap rumah punya stiker QR di dekat wadah jimpitan. Petugas ronda scan QR-nya, tekan **Ada** atau **Kosong**, dan rekapnya langsung tersusun.
+Aplikasi jimpitan ronda Cluster Natura. Setiap rumah punya stiker QR di dekat wadah jimpitan. Petugas ronda scan QR-nya, tekan **Ada** atau **Kosong**, dan rekapnya langsung tersusun.
+
+Satu aplikasi, tiga bagian:
+
+| Alamat | Untuk | Isi |
+| --- | --- | --- |
+| `/petugas/` | Petugas ronda (HP) | Scan QR, catat manual, denah 2D/3D, jaga malam ini, riwayat, jadwal. Tetap jalan tanpa sinyal. |
+| `/admin/` | Pengurus (laptop/HP) | Dashboard ringkasan, data rumah & cetak QR, petugas, jadwal, rekap bulanan, riwayat & koreksi, denah, info warga, pengaturan. |
+| `/` | Warga | Pengumuman, jaga malam ini & jadwal seminggu, rekap jimpitan per bulan, status per rumah, kontak pengurus. Dibuka dengan **kode warga**. |
+
+Stiker QR berisi alamat `/r/<kode>`: dibuka pakai kamera HP biasa, warga melihat riwayat jimpitan rumah itu, dan petugas yang sudah masuk bisa langsung mencatat.
 
 ## Fitur
 
-- **Scan QR per rumah** langsung dari halaman Ronda. Ada tombol senter untuk HP Android dan mendukung iPhone.
-- **Ada / Kosong + nominal.** Nominal awal bisa diatur dan diubah saat mencatat (Rp 500, 1.000, dst).
-- **Catat manual kalau QR gagal di-scan:** ketik "A12", "12", atau nama KK, lewat tombol **Manual**, **Ketik manual** di scanner, atau saat kamera tidak bisa dibuka. Catatannya ditandai "manual" di riwayat.
-- **Tetap jalan tanpa sinyal.** Catatan disimpan di HP dulu, lalu terkirim otomatis begitu online. Halaman Ronda juga bisa dibuka ulang saat offline.
-- **Kotak per blok berwarna:** hijau = ada, merah = kosong, putih = belum dicek. Ada filter "yang belum saja" supaya tidak ada rumah terlewat.
-- **Denah Cluster Natura (SVG):** denah digambar ulang sebagai kode dari denah cetak (95 kavling, jalan, taman, saluran). Kavling diwarnai sesuai status, kavling yang belum dibangun diarsir, bisa di-zoom dan diketuk untuk mencatat. Denah juga muncul di riwayat tiap malam.
-- **Tampilan 3D (tambahan):** denah yang sama sebagai maket 3D (three.js). Rumah berdiri di atas kavlingnya, atap berwarna sesuai status, bisa diputar/zoom/digeser, dan diketuk untuk mencatat. Kodenya hanya diunduh saat tab 3D dibuka.
-- **Rekap ke WhatsApp** sekali tekan, misalnya: *✅ Ada: 47 rumah · ⭕ Kosong: 3 (A-3, B-7, C-1) · 💰 Total: Rp 23.500 · 👮 Petugas: Andi, Budi*.
-- **Status rumah kosong/mudik** supaya tidak dihitung bolong.
-- **Jadwal ronda:** admin menempel tabel jadwal dari Excel/Google Sheets (atau teks per hari). Nama KK ikut terisi otomatis, halaman Ronda menampilkan siapa yang **jaga malam ini**, dan semua petugas bisa melihat jadwal seminggu di Menu → Jadwal ronda.
-- **Riwayat per malam**, termasuk jam, petugas, cara mencatat (scan/manual), dan koreksi oleh admin.
-- **Rekap bulanan** berupa tabel rumah × tanggal yang bisa diunduh sebagai CSV (Excel/Google Sheets).
-- **Halaman warga:** scan stiker QR pakai kamera HP biasa untuk melihat riwayat jimpitan rumah itu tanpa login. Nama KK hanya terlihat oleh petugas.
-- **Cetak stiker QR** di kertas A4 (12 per halaman), bisa difilter per blok.
-- **Login petugas pakai nama + PIN.** Akun terkunci 5 menit setelah 5 kali PIN salah. Login bertahan lama supaya petugas tidak perlu login tiap malam.
+- **Scan QR per rumah** dari app petugas. Ada tombol senter untuk HP Android dan mendukung iPhone.
+- **Ada / Kosong + nominal.** Nominal awal bisa diatur dan diubah saat mencatat.
+- **Catat manual kalau QR gagal di-scan:** ketik "A12", "12", atau nama KK. Catatannya ditandai "manual" di riwayat.
+- **Tetap jalan tanpa sinyal.** Catatan disimpan di HP dulu, lalu terkirim otomatis begitu online. App petugas bisa dibuka ulang saat offline (service worker).
+- **Denah Cluster Natura (SVG)** digambar sebagai kode dari denah cetak (95 kavling, jalan, taman, saluran). Kavling diwarnai sesuai status dan bisa diketuk untuk mencatat. **Tampilan 3D** (three.js) hanya diunduh saat dibuka.
+- **Rekap ke WhatsApp** sekali tekan.
+- **Jadwal ronda:** admin menempel tabel jadwal dari Excel/Google Sheets. Nama KK ikut terisi otomatis, dan app petugas menampilkan siapa yang **jaga malam ini**.
+- **Dashboard admin:** ringkasan malam ini, total bulan ini, grafik 30 malam terakhir, rumah yang sering kosong, dan daftar hal yang belum disiapkan.
+- **Riwayat per malam** (jam, petugas, scan/manual) dan koreksi oleh admin.
+- **Rekap bulanan** berupa tabel rumah × tanggal, bisa diunduh sebagai CSV.
+- **Halaman warga** dengan kode bersama dari pengurus: pengumuman, jadwal, rekap per bulan, status per rumah (tanpa nama), dan kontak (telepon/WhatsApp). Ganti kode kapan saja; akses lama otomatis tidak berlaku.
+- **Cetak stiker QR** di kertas A4, bisa difilter per blok.
+- **Login nama + PIN.** Akun terkunci 15 menit setelah 5 kali PIN salah. Login bertahan lama supaya petugas tidak perlu login tiap malam.
 - **Bisa dipasang di layar utama HP** (PWA). Mode gelap mengikuti pengaturan HP.
 
 Ronda yang lewat tengah malam tetap dihitung malam sebelumnya: jam 00.00–11.59 masuk tanggal kemarin.
 
 ## Cara pakai
 
-1. Buka aplikasi pertama kali, lalu isi nama lingkungan, nominal jimpitan, dan akun admin.
-2. Di **Admin → Denah**, tekan **Daftarkan rumah dari denah**. Semua kavling berpenghuni langsung jadi data rumah. Nama KK dan rumah tambahan bisa diisi di **Admin → Data rumah**.
-3. Di **Admin → Data rumah**, klik **Cetak QR**, cetak di kertas stiker (sebaiknya vinyl atau dilaminasi), lalu tempel dekat wadah jimpitan.
-4. Di **Admin → Petugas ronda**, buat akun untuk setiap petugas beserta PIN-nya.
-5. Di **Menu → Jadwal ronda**, tempel tabel jadwal (salin langsung dari spreadsheet: baris judul hari seperti "AHAD (MALAM SENIN)", isinya "NAMA (BLOK-NO)"). Pratinjau menunjukkan kode rumah yang belum terdaftar dan nama ganda sebelum disimpan.
-6. Petugas membuka halaman **Ronda** sekali saat ada sinyal (supaya tersimpan untuk offline), lalu tekan **Scan QR** saat keliling. Pilih tampilan **Daftar**, **Denah**, atau **3D** sesuai selera.
-7. Selesai ronda, tekan **Bagikan rekap** dan kirim ke grup WA.
+1. Buka `/admin/` pertama kali, lalu isi nama lingkungan, nominal jimpitan, dan akun admin.
+2. Ikuti daftar **Yang perlu disiapkan** di Ringkasan:
+   - **Denah → Daftarkan rumah dari denah.** Semua kavling berpenghuni langsung jadi data rumah. Nama KK bisa diisi di **Rumah & QR**.
+   - **Petugas:** buat akun tiap petugas beserta PIN-nya.
+   - **Jadwal ronda:** tempel tabel jadwal (judul hari seperti "AHAD (MALAM SENIN)", isi "NAMA (BLOK-NO)").
+   - **Info warga:** buat kode warga, lalu kirim link-nya ke grup WA. Tambahkan pengumuman dan kontak pengurus.
+3. **Rumah & QR → Cetak QR**, cetak di kertas stiker (sebaiknya vinyl atau dilaminasi), lalu tempel dekat wadah jimpitan.
+4. Petugas membuka `/petugas/` sekali saat ada sinyal (supaya tersimpan untuk offline), lalu tekan **Scan QR** saat keliling.
+5. Selesai ronda, tekan **Bagikan rekap** dan kirim ke grup WA.
+
+> Kamera hanya bisa dipakai lewat **HTTPS** (atau `localhost`). Isi `APP_URL` sebelum mencetak stiker, karena alamat di QR tidak bisa diubah setelah ditempel. Kalau stiker rusak atau hilang, buat QR baru untuk rumah itu di Rumah & QR.
 
 ### Mengubah denah
 
-Denah ada di `src/site-plan/natura.ts`. Koordinatnya piksel pada foto denah cetak (2000×1125). Tiap kavling berisi blok, nomor, `built` (`false` = dicoret / belum dibangun), dan titik-titik kelilingnya. Kalau ada rumah baru dibangun, ubah `built` kavling itu menjadi `true`, lalu daftarkan dari halaman Denah. Untuk perumahan lain tanpa denah kode, isi `SITE_PLAN` di `src/site-plan/index.ts` dengan `null`: halaman Denah kembali ke mode gambar + penanda yang diatur admin.
-
-> Kamera hanya bisa dipakai lewat **HTTPS** (atau `localhost`). Isi `APP_URL` sebelum mencetak stiker, karena alamat di QR tidak bisa diubah setelah ditempel. Kalau stiker rusak atau hilang, buat QR baru untuk rumah itu di halaman Data rumah.
+Denah ada di `src/site-plan/natura.ts`. Koordinatnya piksel pada foto denah cetak (2000×1125). Tiap kavling berisi blok, nomor, `built` (`false` = dicoret / belum dibangun), dan titik-titik kelilingnya. Kalau ada rumah baru dibangun, ubah `built` kavling itu menjadi `true`, lalu daftarkan dari halaman Denah.
 
 ## Menjalankan di komputer
 
-Butuh Node.js 20.9 atau lebih baru.
+Butuh [Bun](https://bun.sh) dan Node.js 22.22 atau lebih baru (Vite dan Wrangler berjalan di Node).
 
 ```bash
-npm install
-npm run dev
+bun install
+cp .dev.vars.example .dev.vars
+bun run dev
 ```
 
-Buka http://localhost:3000. Tanpa `DATABASE_URL`, aplikasi memakai Postgres lokal bawaan (PGlite) di folder `.data/`, jadi tidak perlu memasang database apa pun.
+Buka http://localhost:5173/admin/. `bun run dev` menjalankan migrasi ke database D1 lokal (di folder `.wrangler/`) lalu menyalakan Vite. API berjalan di runtime Workers yang sama dengan production (workerd), jadi tidak perlu memasang database apa pun.
 
-Untuk mencoba scan dari HP di jaringan yang sama, kamera butuh HTTPS. Pakai `npx next dev --experimental-https` atau tunnel (mis. Cloudflare Tunnel).
+Untuk mencoba scan dari HP di jaringan yang sama, kamera butuh HTTPS. Pakai tunnel, misalnya `bunx cloudflared tunnel --url http://localhost:5173`.
 
-## Deploy (gratis): Vercel + Supabase
+## Deploy ke Cloudflare (gratis)
 
-1. **Supabase:** buat project baru. Di **Connect**, salin connection string **Transaction pooler** (port 6543).
-2. **Migrasi database** (sekali di awal, dan setiap ada migrasi baru):
+Aplikasi berjalan sebagai satu Cloudflare Worker: file app (hasil build Vite) dilayani sebagai static assets, API di `/api/*`, dan datanya di Cloudflare D1.
+
+1. Masuk ke akun Cloudflare: `bunx wrangler login`
+2. Buat database di Asia Pasifik (dekat Indonesia):
    ```bash
-   DATABASE_URL="postgres://...pooler.supabase.com:6543/postgres" npm run db:migrate
+   bunx wrangler d1 create jimpitan-natura --location apac
    ```
-   Kalau migrasi lewat transaction pooler gagal, pakai connection string **Session pooler** (port 5432) khusus untuk perintah ini.
-3. **Vercel:** import repo ini, lalu isi Environment Variables:
-   - `DATABASE_URL`: connection string transaction pooler tadi
-   - `AUTH_SECRET`: hasil `openssl rand -base64 32`
-   - `APP_URL`: alamat aplikasi, mis. `https://jimpitan-natura.vercel.app`
-   - `NEXT_PUBLIC_TIMEZONE`: `Asia/Jakarta` (atau `Asia/Makassar` / `Asia/Jayapura`)
-4. Deploy, buka alamatnya, lalu ikuti langkah di **Cara pakai**.
+   Salin `database_id` yang muncul ke `wrangler.jsonc`.
+3. Jalankan migrasi (sekali di awal, dan setiap ada migrasi baru):
+   ```bash
+   bun run db:migrate:remote
+   ```
+4. Simpan kunci sesi (acak, minimal 32 karakter):
+   ```bash
+   openssl rand -base64 32 | bunx wrangler secret put AUTH_SECRET
+   ```
+5. Deploy: `bun run deploy`. Alamatnya mis. `https://jimpitan-natura.<akun>.workers.dev`.
+6. Isi `APP_URL` di `wrangler.jsonc` dengan alamat tetap aplikasi (atau domain sendiri), deploy ulang, baru cetak stiker QR.
 
-Migrasi juga mengaktifkan Row Level Security di semua tabel, supaya data tidak bisa dibaca lewat API publik Supabase. Aplikasi ini konek langsung sebagai pemilik tabel, jadi tidak terpengaruh.
+Paket gratis Workers dan D1 cukup untuk satu perumahan. Worker memakai Smart Placement supaya berjalan dekat database.
 
 ## Teknologi
 
-- [Next.js 16](https://nextjs.org) (App Router, Server Actions) + React 19 + Tailwind CSS 4
-- [Drizzle ORM](https://orm.drizzle.team) + PostgreSQL (`postgres-js` di production, [PGlite](https://pglite.dev) untuk lokal/tes)
+- [Vite](https://vite.dev) + React 19 + [React Router](https://reactrouter.com) + [TanStack Query](https://tanstack.com/query) + Tailwind CSS 4: tiga SPA dalam satu build
+- [Hono](https://hono.dev) di [Cloudflare Workers](https://developers.cloudflare.com/workers/) untuk API; klien memanggilnya lewat `hono/client` sehingga ikut dicek TypeScript
+- [Cloudflare D1](https://developers.cloudflare.com/d1/) (SQLite) + [Drizzle ORM](https://orm.drizzle.team)
 - Pemindai QR: `BarcodeDetector` bawaan browser bila ada, [jsQR](https://github.com/cozmo/jsQR) sebagai cadangan (iPhone)
 - Tampilan 3D: [three.js](https://threejs.org) (dimuat terpisah saat dibutuhkan)
-- Login: PIN di-hash dengan scrypt, sesi berupa JWT di cookie httpOnly ([jose](https://github.com/panva/jose))
+- Login: PIN di-hash dengan PBKDF2 (WebCrypto), sesi berupa JWT di cookie httpOnly ([jose](https://github.com/panva/jose))
 - Offline: service worker (`public/sw.js`) + antrean di `localStorage`
+
+Catatan D1: maksimal 100 parameter per query (insert banyak baris dipecah otomatis) dan tidak ada transaksi interaktif (pakai `db.batch`).
 
 ### Struktur
 
 ```
+index.html, petugas/index.html, admin/index.html   Halaman awal tiap app
 src/
-  app/
-    (main)/ronda/        Halaman Ronda: scanner, kotak per rumah, antrean offline
-    (main)/riwayat/      Riwayat per malam + koreksi admin
-    (main)/rekap/        Rekap bulanan + unduh CSV
-    (main)/jadwal/       Jadwal ronda mingguan + impor (admin)
-    (main)/admin/        Data rumah, cetak QR, denah, petugas, pengaturan
-    r/[token]/           Halaman rumah (tujuan QR)
-    api/ronda, api/setoran  Data malam ini & sinkronisasi antrean
-    api/denah/gambar     Gambar latar denah (unggah: admin, lihat: petugas)
-  components/            Komponen UI, pemindai QR, denah 2D & 3D
-  site-plan/             Denah Cluster Natura sebagai kode
-  lib/                   Logika bersama (tanggal ronda, rekap, format, QR, geometri denah)
-  server/                Database, skema, login, query
-drizzle/                 Migrasi SQL
+  apps/warga/       Halaman warga (/) dan halaman rumah (/r/:kode)
+  apps/petugas/     App petugas: Ronda (scanner, antrean offline), riwayat, jadwal, akun
+  apps/admin/       Dashboard admin
+  features/         Bagian yang dipakai beberapa app: masuk, riwayat, jadwal
+  components/       Komponen UI, pemindai QR, denah 2D & 3D
+  client/           Klien API, cache data, status login
+  server/           Worker + API Hono (routes/), skema & query D1, login
+  site-plan/        Denah Cluster Natura sebagai kode
+  lib/              Logika bersama (tanggal ronda, rekap, jadwal, format, QR, geometri denah)
+drizzle/            Migrasi SQL (dijalankan wrangler)
+test/               Tes Vitest; tes API memakai D1 lokal (Miniflare)
 ```
 
 ### Perintah
 
 | Perintah | Fungsi |
 | --- | --- |
-| `npm run dev` | Server development |
-| `npm run build` / `npm start` | Build & jalankan production |
-| `npm test` | Tes (Vitest, memakai PGlite in-memory) |
-| `npm run lint` / `npm run typecheck` | ESLint / TypeScript |
-| `npm run db:generate` | Buat migrasi baru setelah mengubah `src/server/schema.ts` |
-| `npm run db:migrate` | Jalankan migrasi ke `DATABASE_URL` |
+| `bun run dev` | Server development (Vite + Worker + D1 lokal) |
+| `bun run build` / `bun run preview` | Build production / jalankan hasil build secara lokal |
+| `bun run deploy` | Build lalu deploy ke Cloudflare |
+| `bun run test` | Tes (Vitest). Bukan `bun test`, itu test runner bawaan Bun. |
+| `bun run lint` / `bun run typecheck` | ESLint / TypeScript |
+| `bun run db:generate` | Buat migrasi baru setelah mengubah `src/server/schema.ts` |
+| `bun run db:migrate:local` / `db:migrate:remote` | Jalankan migrasi ke D1 lokal / Cloudflare |
 
 ## Ide pengembangan berikutnya
 
 - Buku kas: pengeluaran (konsumsi ronda, kegiatan sosial) dan saldo
-- Jadwal regu ronda + pengingat
+- Pengingat jadwal jaga untuk petugas
 - Mencatat lokasi GPS saat scan sebagai bukti kunjungan
-- Jimpitan beras (satuan selain rupiah)
 - Ekspor Excel/PDF yang lebih rapi

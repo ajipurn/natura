@@ -1,11 +1,11 @@
-import "server-only";
-import { and, eq, lte } from "drizzle-orm";
+import { and, eq, lte, sql, type SQL } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { z } from "zod";
 import { rondaDate } from "@/lib/dates";
 import type { EntryInput, EntryResult } from "@/lib/types";
 import type { SessionUser } from "./auth";
-import { getDb, type Db } from "./db";
-import { getHousesByIds } from "./queries";
+import { chunk, rowsPerInsert, type Db } from "./db";
+import { getHouseIds } from "./queries";
 import { collections, patrols } from "./schema";
 
 const MAX_CLOCK_SKEW_MS = 10 * 60 * 1000;
@@ -23,19 +23,10 @@ export const entrySchema = z.object({
 });
 
 export const entriesSchema = z.object({
-  entries: z.array(entrySchema).max(1000),
+  entries: z.array(entrySchema).max(500),
 });
 
-async function ensurePatrol(db: Db, date: string): Promise<number> {
-  const [row] = await db
-    .insert(patrols)
-    .values({ date })
-    .onConflictDoUpdate({ target: patrols.date, set: { date } })
-    .returning({ id: patrols.id });
-  return row.id;
-}
-
-type WriteInput = {
+export type CollectionWrite = {
   date: string;
   houseId: number;
   status: EntryInput["status"];
@@ -45,56 +36,97 @@ type WriteInput = {
   recordedAt: Date;
 };
 
-/**
- * Simpan (atau hapus) catatan satu rumah untuk satu malam.
- * Catatan yang lebih baru menang, jadi sinkron yang telat dari HP lain tidak menimpa koreksi terbaru.
- */
-export async function writeCollection(input: WriteInput, now = new Date()) {
-  const db = await getDb();
-  const patrolId = await ensurePatrol(db, input.date);
+const patrolIdFor = (date: string): SQL<number> => sql`(select ${patrols.id} from ${patrols} where ${patrols.date} = ${date})`;
 
-  if (input.status === "none") {
-    await db
-      .delete(collections)
-      .where(
-        and(
-          eq(collections.patrolId, patrolId),
-          eq(collections.houseId, input.houseId),
-          lte(collections.recordedAt, input.recordedAt),
-        ),
-      );
-    return;
+/**
+ * Pernyataan SQL untuk menyimpan (atau menghapus) catatan beberapa rumah. Catatan yang lebih baru
+ * menang, jadi sinkron yang telat dari HP lain tidak menimpa koreksi terbaru. Semua dijalankan
+ * dalam satu batch D1 (satu perjalanan ke database).
+ */
+function writeStatements(db: Db, writes: CollectionWrite[], now: Date): BatchItem<"sqlite">[] {
+  if (writes.length === 0) return [];
+  const statements: BatchItem<"sqlite">[] = [];
+
+  const dates = [...new Set(writes.map((w) => w.date))];
+  for (const part of chunk(dates, rowsPerInsert(2))) {
+    statements.push(
+      db
+        .insert(patrols)
+        .values(part.map((date) => ({ date })))
+        .onConflictDoNothing({ target: patrols.date }),
+    );
   }
 
-  const values = {
-    status: input.status,
-    amount: input.status === "filled" ? input.amount : 0,
-    method: input.method,
-    collectedBy: input.userId,
-    recordedAt: input.recordedAt,
-    syncedAt: now,
-  };
-  await db
-    .insert(collections)
-    .values({ patrolId, houseId: input.houseId, ...values })
-    .onConflictDoUpdate({
-      target: [collections.patrolId, collections.houseId],
-      set: values,
-      setWhere: lte(collections.recordedAt, input.recordedAt),
-    });
+  for (const w of writes.filter((w) => w.status === "none")) {
+    statements.push(
+      db
+        .delete(collections)
+        .where(
+          and(
+            eq(collections.patrolId, patrolIdFor(w.date)),
+            eq(collections.houseId, w.houseId),
+            lte(collections.recordedAt, w.recordedAt),
+          ),
+        ),
+    );
+  }
+
+  const upserts = writes.filter((w) => w.status !== "none");
+  for (const part of chunk(upserts, rowsPerInsert(8))) {
+    statements.push(
+      db
+        .insert(collections)
+        .values(
+          part.map((w) => ({
+            patrolId: patrolIdFor(w.date),
+            houseId: w.houseId,
+            status: w.status as "filled" | "empty",
+            amount: w.status === "filled" ? w.amount : 0,
+            method: w.method,
+            collectedBy: w.userId,
+            recordedAt: w.recordedAt,
+            syncedAt: now,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [collections.patrolId, collections.houseId],
+          set: {
+            status: sql`excluded.status`,
+            amount: sql`excluded.amount`,
+            method: sql`excluded.method`,
+            collectedBy: sql`excluded.collected_by`,
+            recordedAt: sql`excluded.recorded_at`,
+            syncedAt: sql`excluded.synced_at`,
+          },
+          setWhere: sql`${collections.recordedAt} <= excluded.recorded_at`,
+        }),
+    );
+  }
+  return statements;
+}
+
+async function runBatch(db: Db, statements: BatchItem<"sqlite">[]) {
+  if (statements.length === 0) return;
+  await db.batch(statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
+}
+
+/** Simpan (atau hapus) catatan satu rumah untuk satu malam (koreksi admin, catat dari halaman rumah). */
+export async function writeCollection(db: Db, input: CollectionWrite, now = new Date()) {
+  await runBatch(db, writeStatements(db, [input], now));
 }
 
 /** Terapkan catatan yang dikirim HP petugas (bisa dari antrean offline). */
 export async function applyEntries(
+  db: Db,
   user: SessionUser,
   entries: EntryInput[],
   now = new Date(),
 ): Promise<EntryResult[]> {
-  const known = new Set(
-    (await getHousesByIds([...new Set(entries.map((e) => e.houseId))])).map((h) => h.id),
-  );
-
+  const known = await getHouseIds(db);
   const results: EntryResult[] = [];
+  // Per malam + rumah cukup simpan catatan terbaru; yang lebih lama toh akan kalah.
+  const latest = new Map<string, CollectionWrite>();
+
   for (const entry of entries) {
     const at = new Date(entry.recordedAt);
     const fail = (error: string) => results.push({ clientId: entry.clientId, ok: false, error });
@@ -109,8 +141,10 @@ export async function applyEntries(
       fail("Rumah tidak ditemukan (mungkin sudah dihapus).");
     } else {
       const date = rondaDate(at);
-      await writeCollection(
-        {
+      const key = `${date}:${entry.houseId}`;
+      const previous = latest.get(key);
+      if (!previous || previous.recordedAt.getTime() <= at.getTime()) {
+        latest.set(key, {
           date,
           houseId: entry.houseId,
           status: entry.status,
@@ -118,11 +152,12 @@ export async function applyEntries(
           method: entry.method,
           userId: user.id,
           recordedAt: at,
-        },
-        now,
-      );
+        });
+      }
       results.push({ clientId: entry.clientId, ok: true, date });
     }
   }
+
+  await runBatch(db, writeStatements(db, [...latest.values()], now));
   return results;
 }

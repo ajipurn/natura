@@ -10,16 +10,6 @@ export type HouseDTO = {
   ownerName: string | null;
   token: string;
   status: HouseStatus;
-  /** Posisi di denah (0–1), null kalau belum ditaruh. */
-  mapX: number | null;
-  mapY: number | null;
-};
-
-export type SiteMapInfo = {
-  /** URL gambar latar (sudah termasuk versi), null kalau denah tanpa gambar. */
-  imageUrl: string | null;
-  width: number;
-  height: number;
 };
 
 export type CollectionDTO = {
@@ -49,7 +39,6 @@ export type RondaSnapshot = {
   user: { id: number; name: string; role: Role };
   houses: HouseDTO[];
   collections: CollectionDTO[];
-  siteMap: SiteMapInfo;
   schedule: ScheduleDTO[];
 };
 
@@ -66,3 +55,14 @@ export type EntryInput = {
 export type EntryResult =
   | { clientId: string; ok: true; date: string }
   | { clientId: string; ok: false; error: string };
+
+/** Satu sel rekap bulanan (rumah × malam). */
+export type MonthCell = { status: CollectionStatus; amount: number };
+
+export type MonthRecap = {
+  houses: HouseDTO[];
+  /** Malam-malam ronda di bulan itu (YYYY-MM-DD, urut). */
+  dates: string[];
+  /** Kunci `${houseId}:${date}`. */
+  cells: Record<string, MonthCell>;
+};
