@@ -20,7 +20,7 @@ export type ScheduleEntry = {
 };
 
 /** Nama malamnya, mengikuti kebiasaan jadwal: Sabtu = "malam Minggu". */
-const NIGHT_OF = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"] as const;
+export const NIGHT_OF = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"] as const;
 
 /** "Ahad (malam Senin)", "Sabtu (malam Minggu)" */
 export function dayLabel(day: number): string {

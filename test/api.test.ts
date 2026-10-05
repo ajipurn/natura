@@ -445,12 +445,22 @@ describe("halaman warga", () => {
     await admin.post("/api/admin/pengumuman", { title: "Kerja bakti", body: "Minggu pagi jam 7.", pinned: true });
     await admin.put("/api/admin/kontak", { contacts: [{ name: "Pak RT", role: "Ketua RT", phone: "0812-3456-7890" }] });
 
+    // Rumah tanpa akun dan tanpa nama warga di jadwal: tidak ikut ditampilkan ke warga.
+    await admin.post("/api/admin/rumah", { block: "ZZ", numbers: "1" });
+    const zz1 = ((await admin.get("/api/admin/rumah")).data.houses as { id: number; block: string }[]).find((h) => h.block === "ZZ")!.id;
+    const slots = (await admin.get("/api/jadwal")).data.schedule as Slot[];
+    await admin.put("/api/admin/jadwal/slot", { slots: [...slots.map(toInput), { day: 1, houseId: zz1 }] });
+
     const info = await warga.get("/api/warga");
     expect(info.data).toMatchObject({
       communityName: "Natura",
       announcements: [{ title: "Kerja bakti", pinned: true }],
       contacts: [{ name: "Pak RT", phone: "0812-3456-7890" }],
     });
+    const wargaSchedule = info.data.schedule as { houseId: number | null; name: string | null }[];
+    expect(wargaSchedule.length).toBeGreaterThan(0);
+    expect(wargaSchedule.some((s) => s.houseId === zz1)).toBe(false);
+    expect(wargaSchedule.every((s) => s.name)).toBe(true);
     const rekap = await warga.get("/api/warga/rekap");
     expect(rekap.data).toMatchObject({ nights: 1, total: 1000 });
     // Rekap warga tanpa nama KK.

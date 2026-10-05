@@ -27,8 +27,7 @@ import { Alert, Button, Card, Input, PageTitle, SectionTitle, buttonClass, cx } 
 import { addDays, daysInMonth, formatDateLong, formatDateShort, formatMonth, shiftMonth } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
-import type { GuardColor } from "@/lib/guard-color";
-import { DAY_NAMES, dayLabel, slotHouseLabel } from "@/lib/schedule";
+import { DAY_NAMES, NIGHT_OF, slotHouseLabel } from "@/lib/schedule";
 import { HouseHistoryDialog } from "./house-history";
 import { houseMonthText, useMyHouse } from "./my-house";
 
@@ -184,7 +183,11 @@ function WargaContent() {
                     <li key={c.id} className="flex items-center gap-3 px-4 py-3">
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium">{c.name}</p>
-                        <p className="truncate text-sm text-muted">{c.role ? `${c.role} · ` : ""}{c.phone}</p>
+                        {/* Boleh turun baris (nomornya tetap utuh): nomor yang terpotong tidak bisa dibaca. */}
+                        <p className="text-sm text-muted">
+                          {c.role ? `${c.role} · ` : ""}
+                          <span className="whitespace-nowrap tabular-nums">{c.phone}</span>
+                        </p>
                       </div>
                       <a href={`tel:${phoneDigits(c.phone)}`} className={buttonClass("secondary", "sm")} aria-label={`Telepon ${c.name}`}>
                         <Phone className="size-4" />
@@ -196,7 +199,7 @@ function WargaContent() {
                         className={buttonClass("secondary", "sm")}
                         aria-label={`WhatsApp ${c.name}`}
                       >
-                        <MessageCircle className="size-4" />
+                        <MessageCircle className="size-4" /> WA
                       </a>
                     </li>
                   ))}
@@ -210,13 +213,25 @@ function WargaContent() {
   );
 }
 
-type Guard = { id: number; day: number; position: number; name: string | null; block: string; number: string; color: GuardColor | null };
+type Guard = { id: number; day: number; position: number; houseId: number | null; name: string; block: string; number: string };
 
-/** Jadwal jaga per malam: pilih malamnya, mulai dari malam ini; warna chip sama dengan tabel jadwal. */
+/** "2026-10-05" → "5 Okt" */
+const dayMonth = (isoDate: string) => formatDateShort(isoDate).split(", ")[1];
+const listFormat = new Intl.ListFormat("id", { type: "conjunction" });
+
+/**
+ * Jadwal jaga per malam: pilih malamnya, mulai dari malam ini. Kalau warga sudah memilih rumahnya
+ * (di Status per rumah), malam dan chip rumahnya ditandai bintang.
+ */
 function GuardSchedule({ schedule, tonight, date }: { schedule: Guard[]; tonight: number; date: string }) {
   const [offset, setOffset] = useState(0);
+  const [myHouse] = useMyHouse();
   const day = (tonight + offset) % 7;
   const guards = schedule.filter((s) => s.day === day).sort((a, b) => a.position - b.position);
+  const isMine = (g: Guard) => myHouse !== null && g.houseId === myHouse;
+  const myGuard = schedule.find(isMine);
+  // Malam jaga rumah saya, urut mulai malam ini.
+  const myDays = [0, 1, 2, 3, 4, 5, 6].map((i) => (tonight + i) % 7).filter((d) => schedule.some((s) => s.day === d && isMine(s)));
 
   return (
     <Card className="p-0">
@@ -227,20 +242,25 @@ function GuardSchedule({ schedule, tonight, date }: { schedule: Guard[]; tonight
           onValueChange={(v) => setOffset(Number(v))}
           options={[0, 1, 2, 3, 4, 5, 6].map((i) => {
             const d = (tonight + i) % 7;
-            const count = schedule.filter((s) => s.day === d).length;
             return {
               value: String(i),
               label: (
                 <>
-                  <span className="block text-[11px] font-medium opacity-80">
-                    {i === 0 ? "Malam ini" : formatDateShort(addDays(date, i)).split(", ")[1]}
+                  <span className="flex items-center justify-center gap-0.5 text-[11px] font-medium">
+                    <span className="opacity-80">{i === 0 ? "Malam ini" : dayMonth(addDays(date, i))}</span>
+                    {/* Di baris tanggal, bukan di pojok: tab di HP sempit, bintang di pojok menimpa teks. */}
+                    {myDays.includes(d) && (
+                      <Star
+                        className="size-2.5 shrink-0 fill-current text-primary group-data-pressed:text-primary-fg"
+                        role="img"
+                        aria-label="rumah saya jaga"
+                      />
+                    )}
                   </span>
                   <span className="block">{DAY_NAMES[d]}</span>
-                  <span className={cx("block text-[11px] font-normal", offset === i ? "opacity-80" : "text-muted")}>{count} org</span>
                 </>
               ),
-              // Tiga baris (tanggal, hari, jumlah petugas): tingginya mengikuti isi.
-              className: "h-auto min-w-14 shrink-0 py-1.5 text-center leading-tight sm:min-w-0",
+              className: "group h-auto min-w-14 shrink-0 py-1.5 text-center leading-tight sm:min-w-0",
             };
           })}
           // Tanpa garis tepi: menyatu dengan kepala kartu. Di HP bisa digeser, di layar lebar 7 kolom.
@@ -248,17 +268,30 @@ function GuardSchedule({ schedule, tonight, date }: { schedule: Guard[]; tonight
         />
       </div>
       <div className="p-4">
-        <p className="text-sm text-muted">
-          <span className="font-semibold text-fg">{dayLabel(day)}</span> · {formatDateShort(addDays(date, offset))}
+        <p className="text-sm">
+          <span className="font-semibold">
+            {DAY_NAMES[day]}, {dayMonth(addDays(date, offset))}
+          </span>
+          <span className="text-muted"> · malam {NIGHT_OF[day]}</span>
         </p>
         {guards.length === 0 ? (
-          <p className="mt-3 text-muted">Belum ada jadwal untuk malam ini.</p>
+          <p className="mt-3 text-muted">Belum ada penjaga di jadwal {offset === 0 ? "malam ini" : "malam itu"}.</p>
         ) : (
           <ul className="mt-3 flex flex-wrap gap-1.5">
+            {/* Warna jadwal admin tidak dipakai di sini: warga tidak tahu artinya. */}
             {guards.map((g) => (
-              <GuardChip key={g.id} name={g.name} house={slotHouseLabel(g)} color={g.color} />
+              <GuardChip key={g.id} name={g.name} house={slotHouseLabel(g)} color={null} mine={isMine(g)} />
             ))}
           </ul>
+        )}
+        {myGuard && (
+          <p className="mt-4 flex items-center gap-1.5 border-t border-line pt-3 text-sm text-muted">
+            <Star className="size-4 shrink-0 fill-current text-primary" aria-hidden />
+            <span>
+              Giliran jaga rumah saya ({slotHouseLabel(myGuard)}):{" "}
+              <span className="font-medium text-fg">{listFormat.format(myDays.map((d) => DAY_NAMES[d]))}</span>
+            </span>
+          </p>
         )}
       </div>
     </Card>
@@ -300,7 +333,18 @@ function MonthRecap({ today }: { today: string }) {
         <QueryState query={recap} loading={<p className="py-8 text-center text-muted">Memuat…</p>}>
           {(data) =>
             data.nights === 0 ? (
-              <p className="py-6 text-center text-muted">Belum ada ronda di bulan ini.</p>
+              <div className="pb-1 pt-4 text-center text-sm text-muted">
+                {month === thisMonth ? (
+                  <>
+                    <p>Belum ada ronda tercatat bulan ini. Rekapnya muncul setelah petugas mencatat malam pertama.</p>
+                    <Button variant="ghost" size="sm" className="mt-2" onClick={() => setMonth(shiftMonth(month, -1))}>
+                      Lihat {formatMonth(shiftMonth(month, -1))}
+                    </Button>
+                  </>
+                ) : (
+                  <p>Tidak ada ronda tercatat di bulan ini.</p>
+                )}
+              </div>
             ) : (
               <>
                 <div className="mt-4 grid grid-cols-3 gap-2 text-center">

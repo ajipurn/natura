@@ -62,15 +62,11 @@ export const wargaRoutes = new Hono<AppEnv>()
       communityName: settingsRow.communityName,
       date,
       tonight: scheduleDay(date),
-      schedule: schedule.map((s) => ({
-        id: s.id,
-        day: s.day,
-        position: s.position,
-        block: s.block,
-        number: s.number,
-        name: s.name ?? s.ownerName,
-        color: s.color,
-      })),
+      // Baris rumah yang belum ada nama warganya tidak ditampilkan ke warga (juga tidak dihitung).
+      schedule: schedule.flatMap((s) => {
+        const name = s.name ?? s.ownerName;
+        return name ? [{ id: s.id, day: s.day, position: s.position, houseId: s.houseId, block: s.block, number: s.number, name }] : [];
+      }),
       announcements: announcementRows,
       contacts: contactRows,
     });
