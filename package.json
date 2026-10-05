@@ -12,7 +12,9 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "db:migrate:remote": "wrangler d1 migrations apply DB --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "seed": "bun scripts/seed.ts",
+    "seed:remote": "bun scripts/seed.ts --remote"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.1",

@@ -34,7 +34,7 @@ Ronda yang lewat tengah malam tetap dihitung malam sebelumnya: jam 00.00–11.59
 ## Cara pakai
 
 1. Buka `/admin/` pertama kali, lalu isi nama lingkungan, nominal jimpitan, dan akun admin.
-2. Ikuti daftar **Yang perlu disiapkan** di Ringkasan:
+2. Jalankan seed awal (`bun run seed`, atau `bun run seed:remote` untuk Cloudflare). Lihat [Seed awal](#seed-awal). Setelah itu rumah, jadwal, nama KK, dan akun petugas sudah terisi; sisanya tinggal mengikuti daftar **Yang perlu disiapkan** di Ringkasan. Tanpa seed, semuanya juga bisa diisi lewat dashboard:
    - **Denah → Daftarkan rumah dari denah.** Semua kavling berpenghuni langsung jadi data rumah. Nama KK bisa diisi di **Rumah & QR**.
    - **Petugas:** buat akun tiap petugas beserta PIN-nya.
    - **Jadwal ronda:** tempel tabel jadwal (judul hari seperti "AHAD (MALAM SENIN)", isi "NAMA (BLOK-NO)").
@@ -44,6 +44,17 @@ Ronda yang lewat tengah malam tetap dihitung malam sebelumnya: jam 00.00–11.59
 5. Selesai ronda, tekan **Bagikan rekap** dan kirim ke grup WA.
 
 > Kamera hanya bisa dipakai lewat **HTTPS** (atau `localhost`). Isi `APP_URL` sebelum mencetak stiker, karena alamat di QR tidak bisa diubah setelah ditempel. Kalau stiker rusak atau hilang, buat QR baru untuk rumah itu di Rumah & QR.
+
+### Seed awal
+
+`bun run seed` mengisi database dengan data Cluster Natura:
+
+- semua kavling berpenghuni di denah menjadi data rumah (76 rumah),
+- jadwal ronda dari `scripts/jadwal-natura.tsv` (salinan tabel jadwal; ubah file ini kalau jadwal berganti),
+- nama KK dari jadwal, hanya untuk rumah yang nama KK-nya masih kosong,
+- akun petugas untuk setiap nama di jadwal, dengan PIN 4 angka acak. Nama kembar dibedakan rumahnya, mis. "Wawan (AD-5)".
+
+Jalankan setelah admin pertama dibuat di `/admin/setup`. PIN akun baru disimpan di `petugas-pin.csv` (atau `petugas-pin-remote.csv` untuk Cloudflare). File itu tidak ikut di-commit; bagikan PIN lewat chat pribadi lalu hapus filenya. Seed aman dijalankan ulang: rumah, nama KK, dan akun yang sudah ada tidak diubah, hanya jadwal yang diganti dengan isi file.
 
 ### Mengubah denah
 
@@ -59,7 +70,7 @@ cp .dev.vars.example .dev.vars
 bun run dev
 ```
 
-Buka http://localhost:5173/admin/. `bun run dev` menjalankan migrasi ke database D1 lokal (di folder `.wrangler/`) lalu menyalakan Vite. API berjalan di runtime Workers yang sama dengan production (workerd), jadi tidak perlu memasang database apa pun.
+Buka http://localhost:5173/admin/, buat admin pertama, lalu jalankan `bun run seed` di terminal lain. `bun run dev` menjalankan migrasi ke database D1 lokal (di folder `.wrangler/`) lalu menyalakan Vite. API berjalan di runtime Workers yang sama dengan production (workerd), jadi tidak perlu memasang database apa pun.
 
 Untuk mencoba scan dari HP di jaringan yang sama, kamera butuh HTTPS. Pakai tunnel, misalnya `bunx cloudflared tunnel --url http://localhost:5173`.
 
@@ -82,7 +93,8 @@ Aplikasi berjalan sebagai satu Cloudflare Worker: file app (hasil build Vite) di
    openssl rand -base64 32 | bunx wrangler secret put AUTH_SECRET
    ```
 5. Deploy: `bun run deploy`. Alamatnya mis. `https://jimpitan-natura.<akun>.workers.dev`.
-6. Isi `APP_URL` di `wrangler.jsonc` dengan alamat tetap aplikasi (atau domain sendiri), deploy ulang, baru cetak stiker QR.
+6. Buka `/admin/setup` di alamat itu untuk membuat admin, lalu isi data awal: `bun run seed:remote`.
+7. Isi `APP_URL` di `wrangler.jsonc` dengan alamat tetap aplikasi (atau domain sendiri), deploy ulang, baru cetak stiker QR.
 
 Paket gratis Workers dan D1 cukup untuk satu perumahan. Worker memakai Smart Placement supaya berjalan dekat database.
 
@@ -113,6 +125,7 @@ src/
   site-plan/        Denah Cluster Natura sebagai kode
   lib/              Logika bersama (tanggal ronda, rekap, jadwal, format, QR, geometri denah)
 drizzle/            Migrasi SQL (dijalankan wrangler)
+scripts/            Seed awal dan data jadwal ronda
 test/               Tes Vitest; tes API memakai D1 lokal (Miniflare)
 ```
 
@@ -127,6 +140,7 @@ test/               Tes Vitest; tes API memakai D1 lokal (Miniflare)
 | `bun run lint` / `bun run typecheck` | ESLint / TypeScript |
 | `bun run db:generate` | Buat migrasi baru setelah mengubah `src/server/schema.ts` |
 | `bun run db:migrate:local` / `db:migrate:remote` | Jalankan migrasi ke D1 lokal / Cloudflare |
+| `bun run seed` / `seed:remote` | Isi rumah, jadwal, nama KK, dan akun petugas ke D1 lokal / Cloudflare |
 
 ## Ide pengembangan berikutnya
 
