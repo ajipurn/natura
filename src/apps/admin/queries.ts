@@ -6,6 +6,9 @@ export const housesQuery = queryOptions({
   queryFn: () => call(api.admin.rumah.$get()),
 });
 
+/** Data rumah dipakai di banyak layar (ronda, jadwal, ringkasan, petugas): segarkan semuanya setelah diubah. */
+export const HOUSE_REFRESH = [["admin"], ["ronda"], ["jadwal"], ["auth", "users"]];
+
 export const usersQuery = queryOptions({
   queryKey: ["admin", "petugas"],
   queryFn: () => call(api.admin.petugas.$get()),

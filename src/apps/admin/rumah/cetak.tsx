@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Printer, TriangleAlert } from "lucide-react";
-import QRCode from "qrcode";
 import { Link, useSearchParams } from "react-router";
+import { QrSvg } from "@/components/qr-svg";
 import { QueryState } from "@/components/query-state";
 import { PageHeader, buttonClass, cx } from "@/components/ui";
 import { compareHouses } from "@/lib/houses";
@@ -67,7 +67,7 @@ export function CetakPage() {
                   className="flex break-inside-avoid flex-col items-center rounded-2xl border border-line bg-white p-4 text-center text-black print:h-[68mm] print:justify-center print:rounded-none print:border-dashed print:border-gray-400 print:p-[4mm]"
                 >
                   <p className="text-[11px] font-medium uppercase tracking-wide text-gray-600">Jimpitan {communityName}</p>
-                  <QrSvg text={houseUrl(origin, house.token)} />
+                  <QrSvg text={houseUrl(origin, house.token)} className="my-2 w-full max-w-44 print:w-[42mm] print:max-w-none" />
                   <p className="text-2xl font-black leading-tight">
                     Blok {house.block} · No. {house.number}
                   </p>
@@ -79,21 +79,6 @@ export function CetakPage() {
         );
       }}
     </QueryState>
-  );
-}
-
-function QrSvg({ text }: { text: string }) {
-  const svg = useQuery({
-    queryKey: ["qr", text],
-    // Koreksi galat "Q" supaya tetap terbaca walau stiker kotor/tergores.
-    queryFn: () => QRCode.toString(text, { type: "svg", margin: 0, errorCorrectionLevel: "Q" }),
-    staleTime: Infinity,
-  });
-  return (
-    <div
-      className="my-2 aspect-square w-full max-w-44 print:w-[42mm] print:max-w-none [&>svg]:size-full"
-      dangerouslySetInnerHTML={{ __html: svg.data ?? "" }}
-    />
   );
 }
 

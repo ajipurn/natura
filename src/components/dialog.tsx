@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cx } from "./ui";
 
 /**
@@ -27,11 +27,15 @@ export function Dialog({
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
-  useEffect(() => {
+  // Isi baru dirender setelah dialog terbuka: autoFocus React memanggil focus() saat isi dipasang,
+  // dan itu gagal kalau dialognya belum tampil (fokus jatuh ke tombol Tutup).
+  const [shown, setShown] = useState(false);
+  useLayoutEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
     if (open && !dialog.open) dialog.showModal();
     if (!open && dialog.open) dialog.close();
+    setShown(open);
   }, [open]);
 
   return (
@@ -47,7 +51,7 @@ export function Dialog({
         className,
       )}
     >
-      {open && (
+      {open && shown && (
         <>
           <header className="flex items-start gap-3 border-b border-line px-5 pb-3 pt-4">
             <div className="min-w-0 flex-1">

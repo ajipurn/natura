@@ -1,100 +1,316 @@
 import { useQuery } from "@tanstack/react-query";
-import { Printer, Search, UserRound } from "lucide-react";
-import { useState } from "react";
-import { Link } from "react-router";
+import { Home, LayoutGrid, Map as MapIcon, Plus, Printer, Search, UserRound } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router";
+import { Legend, LegendItem } from "@/components/map-legend";
 import { QueryState } from "@/components/query-state";
-import { Card, PageHeader, SectionTitle, buttonClass, cx, inputClass } from "@/components/ui";
+import { SitePlanMap } from "@/components/site-plan-map";
+import { Card, PageHeader, buttonClass, cx, inputClass } from "@/components/ui";
+import type { MarkerState } from "@/lib/house-state";
 import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
+import { matchPlan } from "@/lib/site-plan";
+import { SITE_PLAN } from "@/site-plan";
 import { housesQuery, usersQuery } from "../queries";
-import { AddHousesForm, EditHouseForm } from "./house-forms";
+import { AddHouseDialog, EditHouseDialog, type AdminHouse } from "./house-dialog";
+import { RegisterPlanHouses } from "./register-plan-houses";
+
+type Filter = "semua" | "dihuni" | "kosong" | "petugas" | "tanpa-nama";
+type View = "daftar" | "denah";
+type NewHouse = { block: string; number: string };
+
+const FILTERS: { value: Filter; label: string; match: (h: AdminHouse, hasAccount: boolean) => boolean }[] = [
+  { value: "semua", label: "Semua", match: () => true },
+  { value: "dihuni", label: "Dihuni", match: (h) => h.status === "active" },
+  { value: "kosong", label: "Kosong/mudik", match: (h) => h.status === "vacant" },
+  { value: "petugas", label: "Rumah petugas", match: (_, hasAccount) => hasAccount },
+  { value: "tanpa-nama", label: "Tanpa nama", match: (h) => !h.ownerName },
+];
+
+const VIEWS = [
+  { value: "daftar", label: "Daftar", icon: LayoutGrid },
+  { value: "denah", label: "Denah", icon: MapIcon },
+] as const;
 
 export function RumahPage() {
   const query = useQuery(housesQuery);
   const users = useQuery(usersQuery).data?.users ?? [];
+  const [params, setParams] = useSearchParams();
+  const view: View = params.get("tampilan") === "denah" ? "denah" : "daftar";
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<Filter>("semua");
+  // `?ubah=12` (mis. dari Peta ronda) langsung membuka dialog ubah rumah itu.
+  const [editing, setEditing] = useState<number | null>(() => Number(params.get("ubah")) || null);
+  const [adding, setAdding] = useState<NewHouse | null>(null);
 
   return (
     <QueryState query={query}>
-      {({ houses }) => {
+      {({ houses, origin }) => {
         // Akun petugas per rumah: nama warga rumah itu diambil dari akunnya.
         const accounts = new Map<number, string[]>();
         for (const u of users) if (u.houseId) accounts.set(u.houseId, [...(accounts.get(u.houseId) ?? []), u.name]);
-        const shown = search.trim() ? searchHouses(houses, search, houses.length) : houses;
-        const groups = groupByBlock(shown);
+        const counts = Object.fromEntries(
+          FILTERS.map((f) => [f.value, houses.filter((h) => f.match(h, accounts.has(h.id))).length]),
+        ) as Record<Filter, number>;
+        const match = FILTERS.find((f) => f.value === filter)!.match;
+        const found = search.trim() ? searchHouses(houses, search, houses.length) : houses;
+        const shown = found.filter((h) => match(h, accounts.has(h.id)));
+        const narrowed = Boolean(search.trim()) || filter !== "semua";
+        const editingHouse = editing === null ? undefined : houses.find((h) => h.id === editing);
+        const blockCount = new Set(houses.map((h) => h.block)).size;
+
         return (
           <>
             <PageHeader
               title="Data rumah"
-              subtitle={`${houses.length} rumah · ${groupByBlock(houses).length} blok`}
+              subtitle={houses.length ? `${houses.length} rumah · ${blockCount} blok` : undefined}
               action={
-                houses.length > 0 && (
-                  <Link to="/admin/rumah/cetak" className={buttonClass("primary", "sm")}>
-                    <Printer className="size-4" /> Cetak QR
-                  </Link>
-                )
+                <div className="flex shrink-0 gap-2">
+                  {houses.length > 0 && (
+                    <Link to="/admin/rumah/cetak" className={buttonClass("secondary", "sm")} title="Cetak QR">
+                      <Printer className="size-4" /> <span className="max-sm:sr-only">Cetak QR</span>
+                    </Link>
+                  )}
+                  <button type="button" onClick={() => setAdding({ block: "", number: "" })} className={buttonClass("primary", "sm")}>
+                    <Plus className="size-4" /> Tambah
+                  </button>
+                </div>
               }
             />
 
-            <div className="grid gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
-              <Card className="lg:sticky lg:top-6">
-                <h2 className="mb-3 font-semibold">Tambah rumah</h2>
-                <AddHousesForm />
+            {houses.length === 0 ? (
+              <Card className="flex flex-col items-center gap-3 px-6 py-12 text-center">
+                <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Home className="size-6" />
+                </span>
+                <div>
+                  <p className="font-semibold">Belum ada rumah</p>
+                  <p className="mt-1 max-w-sm text-sm text-muted">
+                    Tambahkan rumah per blok, misalnya nomor 1-20 sekaligus, atau daftarkan semua kavling dari denah.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-start justify-center gap-2">
+                  <button type="button" onClick={() => setAdding({ block: "", number: "" })} className={buttonClass("primary", "sm")}>
+                    <Plus className="size-4" /> Tambah rumah
+                  </button>
+                  <RegisterPlanHouses count={matchPlan(SITE_PLAN, houses).missing.length} />
+                </div>
               </Card>
-
-              <div>
-                {houses.length > 0 && (
-                  <label className="relative block">
+            ) : (
+              <>
+                <div className="mb-3 flex items-center gap-2">
+                  <label className="relative block min-w-0 flex-1 sm:max-w-sm">
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted" />
                     <input
                       type="search"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Cari nomor atau nama KK…"
+                      placeholder="Cari nomor atau nama…"
                       aria-label="Cari rumah"
                       className={cx(inputClass, "pl-10")}
                     />
                   </label>
+                  <div role="tablist" aria-label="Tampilan" className="ml-auto flex shrink-0 rounded-xl border border-line bg-card p-0.5">
+                    {VIEWS.map(({ value, label, icon: Icon }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        role="tab"
+                        aria-selected={view === value}
+                        title={label}
+                        onClick={() => setParams(value === "denah" ? { tampilan: "denah" } : {}, { replace: true })}
+                        className={cx(
+                          "flex h-9.5 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold",
+                          view === value ? "bg-primary text-primary-fg" : "text-muted hover:text-fg",
+                        )}
+                      >
+                        <Icon className="size-4" /> <span className="max-sm:sr-only">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div role="tablist" aria-label="Saring rumah" className="-mx-4 mb-5 flex gap-1.5 overflow-x-auto px-4 lg:mx-0 lg:px-0">
+                  {FILTERS.map((f) => (
+                    <button
+                      key={f.value}
+                      type="button"
+                      role="tab"
+                      aria-selected={filter === f.value}
+                      onClick={() => setFilter(f.value)}
+                      className={cx(
+                        "shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium",
+                        filter === f.value ? "border-primary bg-primary text-primary-fg" : "border-line bg-card text-muted hover:text-fg",
+                      )}
+                    >
+                      {f.label} <span className="opacity-70">{counts[f.value]}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {view === "denah" ? (
+                  <HouseMap
+                    houses={houses}
+                    highlight={narrowed ? new Set(shown.map((h) => h.id)) : null}
+                    onOpen={setEditing}
+                    onAdd={setAdding}
+                  />
+                ) : shown.length === 0 ? (
+                  <Card className="text-center text-muted">{search.trim() ? "Tidak ada rumah yang cocok." : "Tidak ada rumah di sini."}</Card>
+                ) : (
+                  <div className="space-y-6">
+                    {groupByBlock(shown).map(([block, list]) => (
+                      <BlockSection key={block} block={block} houses={list} accounts={accounts} onOpen={setEditing} />
+                    ))}
+                  </div>
                 )}
-                {shown.length === 0 && search && <p className="py-6 text-center text-muted">Tidak ada rumah yang cocok.</p>}
-                {groups.map(([block, list]) => (
-                  <section key={block}>
-                    <SectionTitle>
-                      Blok {block} · {list.length} rumah
-                    </SectionTitle>
-                    <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
-                      {list.map((h) => (
-                        <li key={h.id}>
-                          <details className="group px-4 py-3">
-                            <summary className="flex cursor-pointer list-none items-center gap-3">
-                              <span className="w-14 shrink-0 font-bold">{houseLabel(h)}</span>
-                              <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-muted">
-                                <span className="truncate">{h.ownerName ?? "—"}</span>
-                                {accounts.has(h.id) && (
-                                  <UserRound className="size-4 shrink-0 text-primary" aria-label="Punya akun petugas" />
-                                )}
-                              </span>
-                              {h.status === "vacant" && (
-                                <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs text-warn">mudik</span>
-                              )}
-                              <span className="text-sm font-semibold text-muted group-open:hidden">Ubah</span>
-                              <span className="hidden text-sm font-semibold text-muted group-open:inline">Tutup</span>
-                            </summary>
-                            <EditHouseForm
-                              house={h}
-                              accounts={accounts.get(h.id) ?? []}
-                              canDelete={h.collectionCount === 0}
-                            />
-                          </details>
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                ))}
-              </div>
-            </div>
+              </>
+            )}
+
+            <AddHouseDialog initial={adding} onClose={() => setAdding(null)} houses={houses} />
+            <EditHouseDialog
+              house={editingHouse}
+              accounts={(editingHouse && accounts.get(editingHouse.id)) ?? []}
+              origin={origin}
+              onClose={() => {
+                setEditing(null);
+                if (params.has("ubah")) setParams(view === "denah" ? { tampilan: "denah" } : {}, { replace: true });
+              }}
+            />
           </>
         );
       }}
     </QueryState>
+  );
+}
+
+function BlockSection({
+  block,
+  houses,
+  accounts,
+  onOpen,
+}: {
+  block: string;
+  houses: AdminHouse[];
+  accounts: Map<number, string[]>;
+  onOpen: (id: number) => void;
+}) {
+  const vacant = houses.filter((h) => h.status === "vacant").length;
+  return (
+    <section>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h2 className="flex items-baseline gap-2">
+          <span className="font-bold">Blok {block}</span>
+          <span className="text-sm text-muted">
+            {houses.length} rumah{vacant ? ` · ${vacant} mudik` : ""}
+          </span>
+        </h2>
+        <Link
+          to={`/admin/rumah/cetak?blok=${encodeURIComponent(block)}`}
+          className={cx(buttonClass("ghost", "sm"), "-mr-2")}
+          title={`Cetak QR blok ${block}`}
+        >
+          <Printer className="size-4" /> <span className="max-sm:sr-only">Cetak QR blok</span>
+        </Link>
+      </div>
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+        {houses.map((h) => (
+          <li key={h.id}>
+            <HouseTile house={h} hasAccount={accounts.has(h.id)} onOpen={() => onOpen(h.id)} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function HouseTile({ house, hasAccount, onOpen }: { house: AdminHouse; hasAccount: boolean; onOpen: () => void }) {
+  const vacant = house.status === "vacant";
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={cx(
+        "flex size-full flex-col gap-1 rounded-xl border px-3 py-2.5 text-left transition hover:border-primary/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        // Rumah kosong/mudik: garis putus-putus tanpa latar, seperti kavling kosong.
+        vacant ? "border-dashed border-muted/40" : "border-line bg-card",
+      )}
+    >
+      <span className="flex items-center justify-between gap-2">
+        <span className={cx("text-base font-bold tabular-nums", vacant && "text-muted")}>{houseLabel(house)}</span>
+        {vacant && <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-medium text-warn">mudik</span>}
+      </span>
+      <span className="flex min-w-0 items-center gap-1.5 text-sm">
+        {hasAccount && <UserRound className="size-3.5 shrink-0 text-primary" aria-label="Rumah petugas" />}
+        {house.ownerName ? (
+          <span className={cx("truncate", vacant ? "text-muted" : "text-fg/80")}>{house.ownerName}</span>
+        ) : (
+          <span className="italic text-muted/70">Belum ada nama</span>
+        )}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Rumah di denah: ketuk rumah untuk mengubahnya, ketuk kavling bergaris oranye (belum terdaftar)
+ * untuk menambahkannya. `highlight` = hasil cari/saring; rumah lain diredupkan.
+ */
+function HouseMap({
+  houses,
+  highlight,
+  onOpen,
+  onAdd,
+}: {
+  houses: AdminHouse[];
+  highlight: Set<number> | null;
+  onOpen: (id: number) => void;
+  onAdd: (house: NewHouse) => void;
+}) {
+  const { missing, notOnPlan } = useMemo(() => matchPlan(SITE_PLAN, houses), [houses]);
+  const markers = useMemo(
+    () => Object.fromEntries(houses.map((h) => [h.id, h.status === "vacant" ? "vacant" : "neutral"])) as Record<number, MarkerState>,
+    [houses],
+  );
+  const offPlan = highlight ? notOnPlan.filter((h) => highlight.has(h.id)) : notOnPlan;
+
+  return (
+    <div className="space-y-3">
+      <RegisterPlanHouses count={missing.length} banner />
+      {highlight?.size === 0 && <p className="text-sm text-muted">Tidak ada rumah yang cocok.</p>}
+      <SitePlanMap
+        plan={SITE_PLAN}
+        houses={houses}
+        markers={markers}
+        highlight={highlight}
+        highlightMissing
+        onHouseClick={(h) => onOpen(h.id)}
+        onMissingClick={(lot) => onAdd({ block: lot.block, number: lot.number ?? "" })}
+      />
+      <Legend>
+        <LegendItem swatch="border-fg/40 bg-card">Terdaftar</LegendItem>
+        <LegendItem swatch="border-dashed border-muted bg-card">Kosong/mudik</LegendItem>
+        {missing.length > 0 && <LegendItem swatch="border-dashed border-warn bg-card">Belum terdaftar ({missing.length})</LegendItem>}
+        <LegendItem swatch="border-line bg-[repeating-linear-gradient(45deg,var(--line)_0_2px,transparent_2px_5px)]">Belum dibangun</LegendItem>
+        <span className="sm:ml-auto">
+          Ketuk rumah untuk mengubah data atau QR-nya{missing.length > 0 && ", kavling oranye untuk menambahkannya"}.
+        </span>
+      </Legend>
+      {offPlan.length > 0 && (
+        <div className="rounded-xl border border-line bg-card px-3 py-2.5 text-sm">
+          <p className="text-muted">{offPlan.length} rumah terdaftar tidak ada di denah (blok/nomornya tidak cocok dengan kavling):</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {offPlan.map((h) => (
+              <button
+                key={h.id}
+                type="button"
+                onClick={() => onOpen(h.id)}
+                className="rounded-full border border-line px-2.5 py-0.5 font-semibold hover:border-primary/50"
+              >
+                {houseLabel(h)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

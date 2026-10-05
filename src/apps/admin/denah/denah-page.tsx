@@ -1,111 +1,48 @@
-import { useQuery } from "@tanstack/react-query";
-import { Box, Map as MapIcon } from "lucide-react";
-import { lazy, Suspense, useState } from "react";
-import { Link } from "react-router";
-import { QueryState } from "@/components/query-state";
-import { Card, PageHeader, SectionTitle, cx } from "@/components/ui";
-import { houseLabel } from "@/lib/houses";
-import { matchPlan } from "@/lib/site-plan";
+import { CalendarRange, Moon, Settings2 } from "lucide-react";
+import { useSearchParams } from "react-router";
+import { PageHeader, cx } from "@/components/ui";
 import { SITE_PLAN } from "@/site-plan";
-import { housesQuery } from "../queries";
-import { PlanCalibration } from "./plan-calibration";
-import { RegisterPlanHouses } from "./register-plan-houses";
+import { AturDenah } from "./atur-denah";
+import { MonthMap } from "./month-map";
+import { TonightMap } from "./tonight-map";
 
-const SiteMap3D = lazy(() => import("@/components/site-map-3d"));
+const MODES = [
+  { value: "malam", label: "Malam ini", icon: Moon },
+  { value: "bulan", label: "Bulanan", icon: CalendarRange },
+  { value: "atur", label: "Atur denah", icon: Settings2 },
+] as const;
 
+type Mode = (typeof MODES)[number]["value"];
+
+/**
+ * Peta ronda: memantau jimpitan di denah (malam ini dan per bulan). Data rumahnya diubah di
+ * Rumah & QR; tab "Atur denah" untuk kecocokan denah, kalibrasi GPS, dan pratinjau 3D.
+ */
 export function DenahPage() {
-  const query = useQuery(housesQuery);
-  const [view, setView] = useState<"2d" | "3d">("2d");
-  const builtCount = SITE_PLAN.lots.filter((l) => l.built).length;
-  const emptyCount = SITE_PLAN.lots.length - builtCount;
+  const [params, setParams] = useSearchParams();
+  const mode: Mode = MODES.find((m) => m.value === params.get("mode"))?.value ?? "malam";
 
   return (
     <>
-      <PageHeader title="Denah" subtitle={`${SITE_PLAN.name} · ${SITE_PLAN.lots.length} kavling`} />
-      <QueryState query={query}>
-        {({ houses }) => {
-          const { lotHouse, missing, notOnPlan } = matchPlan(SITE_PLAN, houses);
-          return (
-            <>
-              <Card className="space-y-3">
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <Stat label="Rumah terdaftar" value={`${lotHouse.size}/${builtCount}`} />
-                  <Stat label="Belum terdaftar" value={missing.length} tone={missing.length ? "warn" : undefined} />
-                  <Stat label="Belum dibangun" value={emptyCount} />
-                </div>
-                {missing.length > 0 && (
-                  <p className="text-sm text-muted">
-                    Kavling berpenghuni yang belum ada data rumahnya (bergaris oranye di denah):{" "}
-                    <span className="font-medium text-fg">
-                      {missing.map((lot) => houseLabel({ block: lot.block, number: lot.number! })).join(", ")}
-                    </span>
-                  </p>
-                )}
-                <RegisterPlanHouses count={missing.length} />
-              </Card>
-
-              {notOnPlan.length > 0 && (
-                <Card className="mt-4 border-warn/40 bg-warn-soft text-sm text-warn">
-                  <p className="font-semibold">{notOnPlan.length} rumah terdaftar tidak ada di denah</p>
-                  <p className="mt-1">
-                    {notOnPlan.map(houseLabel).join(", ")}. Periksa blok/nomornya di{" "}
-                    <Link to="/admin/rumah" className="font-semibold underline">
-                      Data rumah
-                    </Link>
-                    . Rumah ini tetap muncul di tampilan Daftar.
-                  </p>
-                </Card>
-              )}
-
-              <div className="mt-6 flex items-center justify-between gap-3">
-                <SectionTitle>Pratinjau</SectionTitle>
-                <div role="tablist" aria-label="Tampilan" className="flex rounded-xl border border-line bg-card p-0.5">
-                  {(
-                    [
-                      ["2d", "Denah", MapIcon],
-                      ["3d", "3D", Box],
-                    ] as const
-                  ).map(([value, label, Icon]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      role="tab"
-                      aria-selected={view === value}
-                      onClick={() => setView(value)}
-                      className={cx(
-                        "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold",
-                        view === value ? "bg-primary text-primary-fg" : "text-muted",
-                      )}
-                    >
-                      <Icon className="size-4" /> {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {view === "2d" ? (
-                <PlanCalibration houses={houses} />
-              ) : (
-                <Suspense fallback={<p className="py-20 text-center text-muted">Memuat tampilan 3D…</p>}>
-                  <SiteMap3D plan={SITE_PLAN} houses={houses} markers={{}} />
-                </Suspense>
-              )}
-              <p className="mt-2 text-xs text-muted">
-                Kavling berarsir = kavling yang belum dibangun (dicoret di denah asli). Bentuk denah diatur di kode{" "}
-                <code className="rounded bg-idle-soft px-1">src/site-plan/natura.ts</code>.
-              </p>
-            </>
-          );
-        }}
-      </QueryState>
+      <PageHeader title="Peta ronda" subtitle={`${SITE_PLAN.name} · ${SITE_PLAN.lots.length} kavling`} />
+      <div role="tablist" aria-label="Tampilan peta" className="mb-4 flex rounded-xl border border-line bg-card p-0.5 sm:w-fit">
+        {MODES.map(({ value, label, icon: Icon }) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={mode === value}
+            onClick={() => setParams(value === "malam" ? {} : { mode: value }, { replace: true })}
+            className={cx(
+              "flex h-9.5 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-semibold",
+              mode === value ? "bg-primary text-primary-fg" : "text-muted hover:text-fg",
+            )}
+          >
+            <Icon className="size-4 max-sm:hidden" /> {label}
+          </button>
+        ))}
+      </div>
+      {mode === "malam" ? <TonightMap /> : mode === "bulan" ? <MonthMap /> : <AturDenah />}
     </>
-  );
-}
-
-function Stat({ label, value, tone }: { label: string; value: number | string; tone?: "warn" }) {
-  return (
-    <div>
-      <p className={cx("text-2xl font-bold", tone === "warn" && "text-warn")}>{value}</p>
-      <p className="text-xs text-muted">{label}</p>
-    </div>
   );
 }

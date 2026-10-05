@@ -29,6 +29,7 @@ const NAV: { group: string; items: { to: string; label: string; icon: LucideIcon
     group: "Ronda",
     items: [
       { to: "/admin", label: "Ringkasan", icon: LayoutDashboard, end: true },
+      { to: "/admin/denah", label: "Peta ronda", icon: MapIcon },
       { to: "/admin/riwayat", label: "Riwayat", icon: History },
       { to: "/admin/audit", label: "Audit catatan", icon: ShieldCheck },
       { to: "/admin/rekap", label: "Rekap bulanan", icon: Table2 },
@@ -39,7 +40,6 @@ const NAV: { group: string; items: { to: string; label: string; icon: LucideIcon
     group: "Data",
     items: [
       { to: "/admin/rumah", label: "Rumah & QR", icon: Home },
-      { to: "/admin/denah", label: "Denah", icon: MapIcon },
       { to: "/admin/petugas", label: "Petugas", icon: Users },
     ],
   },

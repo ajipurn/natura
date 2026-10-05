@@ -187,7 +187,7 @@ function todoItems(todo: {
     items.push({ to: "/admin/jadwal", icon: CalendarClock, text: `${todo.pendingRequests} permintaan ubah jadwal menunggu keputusan` });
   }
   if (todo.planMissing > 0) {
-    items.push({ to: "/admin/denah", icon: MapIcon, text: `Daftarkan ${todo.planMissing} rumah dari denah` });
+    items.push({ to: "/admin/rumah?tampilan=denah", icon: MapIcon, text: `Daftarkan ${todo.planMissing} rumah dari denah` });
   }
   if (todo.onlyOneUser) items.push({ to: "/admin/petugas", icon: Users, text: "Tambahkan petugas ronda" });
   if (todo.noSchedule) items.push({ to: "/admin/jadwal", icon: CalendarDays, text: "Impor jadwal ronda" });
