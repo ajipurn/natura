@@ -435,7 +435,7 @@ function RecapBody({
   return (
     <>
       <Card className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
-        <div className="shrink-0 sm:w-56">
+        <div className="shrink-0 sm:w-56 sm:self-start">
           <p className="text-xs text-muted">Terkumpul {formatMonth(data.month)}</p>
           <p className="text-3xl font-bold leading-tight tracking-tight tabular-nums">
             {formatRupiah(grandTotal)}
