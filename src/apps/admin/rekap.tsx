@@ -649,7 +649,8 @@ function RecapBody({
                                     setTargetOpen(true);
                                   }}
                                   aria-label={`${houseLabel(r.house)}, ${formatDateShort(date)}: ${cellText(cell, vacant)}`}
-                                  className="flex w-full cursor-pointer justify-center rounded-md transition hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                  // Seukuran kotaknya supaya cincin sorotan pas di kotak, bukan selebar kolom.
+                                  className={cx(cellBox, "cursor-pointer transition hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary")}
                                 >
                                   {content}
                                 </button>
@@ -770,7 +771,8 @@ function cellText(cell: MonthCell | undefined, vacant: boolean) {
   return vacant ? "mudik" : "tidak dicek";
 }
 
-const cellBox = "mx-auto flex h-6 w-full max-w-7 items-center justify-center rounded-[5px]";
+/** Kotak persegi selebar kolom, paling besar 24px (kolom tanggal bisa lebih lebar atau lebih sempit). */
+const cellBox = "mx-auto flex aspect-square w-full max-w-6 items-center justify-center rounded-[5px]";
 
 /**
  * Satu kotak rumah × malam. "Ada" dengan nominal awal cukup hijau polos; angkanya hanya ditulis kalau
@@ -820,7 +822,7 @@ function Cell({
 }
 
 function Legend({ editing, defaultAmount }: { editing: boolean; defaultAmount: number }) {
-  const swatch = "inline-flex h-5 w-4 items-center justify-center rounded-[4px]";
+  const swatch = "inline-flex size-5 items-center justify-center rounded-[4px]";
   return (
     <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted">
       <span className="flex items-center gap-1.5">
@@ -828,7 +830,7 @@ function Legend({ editing, defaultAmount }: { editing: boolean; defaultAmount: n
         Ada ({formatRupiah(defaultAmount)})
       </span>
       <span className="flex items-center gap-1.5">
-        <span className={cx(swatch, "w-5 bg-filled-soft text-[9px] font-semibold text-filled ring-1 ring-inset ring-filled/15")}>
+        <span className={cx(swatch, "bg-filled-soft text-[9px] font-semibold text-filled ring-1 ring-inset ring-filled/15")}>
           1rb
         </span>
         Nominal lain
