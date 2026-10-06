@@ -65,7 +65,7 @@ export function HouseChips<H extends HouseRef & { id: number }>({
   return (
     <section>
       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-        {title} <span className="font-normal">· {houses.length}</span>
+        {title} <span className="font-normal">| {houses.length}</span>
       </h3>
       {houses.length === 0 ? (
         <p className="text-sm text-muted">{empty}</p>
@@ -209,7 +209,7 @@ export function HousePanel({
             </ul>
             <p className="mt-2 text-xs text-muted">
               {filled + empty > 0
-                ? `Kosong ${Math.round((empty / (filled + empty)) * 100)}% dari ${filled + empty} malam yang dicek · ${formatRupiah(total)}`
+                ? `Kosong ${Math.round((empty / (filled + empty)) * 100)}% dari ${filled + empty} malam yang dicek | ${formatRupiah(total)}`
                 : "Belum pernah dicek bulan ini."}
             </p>
           </>
@@ -273,7 +273,7 @@ function TonightStatus({
         )}
         <span className="truncate">
           {formatTime(collection.recordedAt)}
-          {collection.collectorName && ` · ${collection.collectorName}`}
+          {collection.collectorName && ` | ${collection.collectorName}`}
         </span>
       </span>
     </div>

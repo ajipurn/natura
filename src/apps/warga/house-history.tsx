@@ -10,7 +10,11 @@ import { scheduleDay } from "@/lib/schedule";
 
 const WEEKDAYS = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
 
-type Night = { date: string; status: "filled" | "empty" | null; amount: number | null };
+type Night = {
+  date: string;
+  status: "filled" | "empty" | null;
+  amount: number | null;
+};
 
 /** Riwayat jimpitan satu rumah (± 3 bulan), sebagai kalender per bulan. Tanpa nama warga. */
 export function HouseHistoryDialog({
@@ -41,7 +45,8 @@ export function HouseHistoryDialog({
             onClick={() => onMyHouse(isMine ? null : houseId)}
             aria-pressed={isMine}
           >
-            <Star className={cx("size-4", isMine && "fill-current")} /> {isMine ? "Rumah saya" : "Tandai sebagai rumah saya"}
+            <Star className={cx("size-4", isMine && "fill-current")} />{" "}
+            {isMine ? "Rumah saya" : "Tandai sebagai rumah saya"}
           </Button>
         )
       }
@@ -54,25 +59,42 @@ export function HouseHistoryDialog({
 function HistoryBody({ houseId }: { houseId: number }) {
   const query = useQuery({
     queryKey: ["warga", "rumah", houseId],
-    queryFn: () => call(api.warga.rumah[":id"].$get({ param: { id: String(houseId) } })),
+    queryFn: () =>
+      call(api.warga.rumah[":id"].$get({ param: { id: String(houseId) } })),
   });
   return (
-    <QueryState query={query} loading={<p className="py-10 text-center text-muted">Memuat riwayat…</p>}>
+    <QueryState
+      query={query}
+      loading={<p className="py-10 text-center text-muted">Memuat riwayat…</p>}
+    >
       {({ house, history, today }) => {
         const byDate = new Map((history as Night[]).map((n) => [n.date, n]));
         // Bulan-bulan yang punya malam ronda, terbaru dulu.
-        const months = [...new Set(history.map((n) => n.date.slice(0, 7)))].sort().reverse().slice(0, 3);
+        const months = [...new Set(history.map((n) => n.date.slice(0, 7)))]
+          .sort()
+          .reverse()
+          .slice(0, 3);
         return (
           <div className="space-y-5">
             {house.status === "vacant" && (
               <p className="rounded-xl bg-warn-soft px-3 py-2 text-sm text-warn">
-                Ditandai rumah kosong/mudik: tidak dihitung bolong walau wadahnya kosong.
+                Ditandai rumah kosong/mudik: tidak dihitung bolong walau
+                wadahnya kosong.
               </p>
             )}
             {months.length === 0 ? (
-              <p className="py-6 text-center text-muted">Belum ada malam ronda sejak rumah ini terdaftar.</p>
+              <p className="py-6 text-center text-muted">
+                Belum ada malam ronda sejak rumah ini terdaftar.
+              </p>
             ) : (
-              months.map((month) => <MonthCalendar key={month} month={month} byDate={byDate} today={today} />)
+              months.map((month) => (
+                <MonthCalendar
+                  key={month}
+                  month={month}
+                  byDate={byDate}
+                  today={today}
+                />
+              ))
             )}
             <Legend />
           </div>
@@ -82,9 +104,19 @@ function HistoryBody({ houseId }: { houseId: number }) {
   );
 }
 
-function MonthCalendar({ month, byDate, today }: { month: string; byDate: Map<string, Night>; today: string }) {
+function MonthCalendar({
+  month,
+  byDate,
+  today,
+}: {
+  month: string;
+  byDate: Map<string, Night>;
+  today: string;
+}) {
   const days = daysInMonth(month);
-  const nights = days.map((d) => byDate.get(d)).filter((n): n is Night => n !== undefined);
+  const nights = days
+    .map((d) => byDate.get(d))
+    .filter((n): n is Night => n !== undefined);
   const filled = nights.filter((n) => n.status === "filled");
   const checked = nights.filter((n) => n.status !== null).length;
   const unchecked = nights.length - checked;
@@ -100,11 +132,15 @@ function MonthCalendar({ month, byDate, today }: { month: string; byDate: Map<st
       </div>
       <p className="text-sm text-muted">
         Ada isinya {filled.length} dari {checked} malam dicek
-        {unchecked > 0 && ` · ${unchecked} malam tidak dicek`}
+        {unchecked > 0 && ` | ${unchecked} malam tidak dicek`}
       </p>
       <div className="mt-2 grid grid-cols-7 gap-1 text-center" role="list">
         {WEEKDAYS.map((d) => (
-          <span key={d} aria-hidden className="text-[11px] font-medium text-muted">
+          <span
+            key={d}
+            aria-hidden
+            className="text-[11px] font-medium text-muted"
+          >
             {d}
           </span>
         ))}
@@ -113,7 +149,7 @@ function MonthCalendar({ month, byDate, today }: { month: string; byDate: Map<st
         ))}
         {days.map((date) => {
           const night = byDate.get(date);
-          const state = !night ? "none" : night.status ?? "unchecked";
+          const state = !night ? "none" : (night.status ?? "unchecked");
           const text =
             state === "filled"
               ? `ada ${formatRupiah(night?.amount ?? 0)}`
@@ -130,16 +166,26 @@ function MonthCalendar({ month, byDate, today }: { month: string; byDate: Map<st
               title={`${formatDateShort(date)}: ${text}`}
               className={cx(
                 "flex aspect-square flex-col items-center justify-center rounded-lg border text-sm leading-none",
-                state === "filled" && "border-filled/40 bg-filled-soft font-semibold text-filled",
-                state === "empty" && "border-empty/40 bg-empty-soft font-semibold text-empty",
-                state === "unchecked" && "border-dashed border-muted/60 text-muted",
+                state === "filled" &&
+                  "border-filled/40 bg-filled-soft font-semibold text-filled",
+                state === "empty" &&
+                  "border-empty/40 bg-empty-soft font-semibold text-empty",
+                state === "unchecked" &&
+                  "border-dashed border-muted/60 text-muted",
                 state === "none" && "border-transparent text-muted/50",
-                date === today && "ring-2 ring-primary ring-offset-1 ring-offset-card",
+                date === today &&
+                  "ring-2 ring-primary ring-offset-1 ring-offset-card",
               )}
             >
               {Number(date.slice(8))}
-              {state === "filled" && <span className="mt-0.5 text-[10px] font-medium">{formatAmountShort(night?.amount ?? 0)}</span>}
-              {state === "empty" && <span className="mt-0.5 text-[10px] font-medium">kosong</span>}
+              {state === "filled" && (
+                <span className="mt-0.5 text-[10px] font-medium">
+                  {formatAmountShort(night?.amount ?? 0)}
+                </span>
+              )}
+              {state === "empty" && (
+                <span className="mt-0.5 text-[10px] font-medium">kosong</span>
+              )}
             </span>
           );
         })}

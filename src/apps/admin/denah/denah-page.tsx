@@ -9,9 +9,24 @@ import { TonightMap } from "./tonight-map";
 
 // Di HP ikonnya disembunyikan supaya ketiga labelnya muat.
 const MODES = [
-  { value: "malam", label: "Malam ini", icon: Moon, className: "max-sm:[&>svg]:hidden" },
-  { value: "bulan", label: "Bulanan", icon: CalendarRange, className: "max-sm:[&>svg]:hidden" },
-  { value: "atur", label: "Atur denah", icon: Settings2, className: "max-sm:[&>svg]:hidden" },
+  {
+    value: "malam",
+    label: "Malam ini",
+    icon: Moon,
+    className: "max-sm:[&>svg]:hidden",
+  },
+  {
+    value: "bulan",
+    label: "Bulanan",
+    icon: CalendarRange,
+    className: "max-sm:[&>svg]:hidden",
+  },
+  {
+    value: "atur",
+    label: "Atur denah",
+    icon: Settings2,
+    className: "max-sm:[&>svg]:hidden",
+  },
 ] as const;
 
 type Mode = (typeof MODES)[number]["value"];
@@ -22,20 +37,32 @@ type Mode = (typeof MODES)[number]["value"];
  */
 export function DenahPage() {
   const [params, setParams] = useSearchParams();
-  const mode: Mode = MODES.find((m) => m.value === params.get("mode"))?.value ?? "malam";
+  const mode: Mode =
+    MODES.find((m) => m.value === params.get("mode"))?.value ?? "malam";
 
   return (
     <>
-      <PageHeader title="Peta ronda" subtitle={`${SITE_PLAN.name} · ${SITE_PLAN.lots.length} kavling`} />
+      <PageHeader
+        title="Peta ronda"
+        subtitle={`${SITE_PLAN.name} | ${SITE_PLAN.lots.length} kavling`}
+      />
       <SegmentedControl
         aria-label="Tampilan peta"
         fill
         value={mode}
-        onValueChange={(next) => setParams(next === "malam" ? {} : { mode: next }, { replace: true })}
+        onValueChange={(next) =>
+          setParams(next === "malam" ? {} : { mode: next }, { replace: true })
+        }
         options={MODES}
         className="mb-4 sm:w-fit"
       />
-      {mode === "malam" ? <TonightMap /> : mode === "bulan" ? <MonthMap /> : <AturDenah />}
+      {mode === "malam" ? (
+        <TonightMap />
+      ) : mode === "bulan" ? (
+        <MonthMap />
+      ) : (
+        <AturDenah />
+      )}
     </>
   );
 }

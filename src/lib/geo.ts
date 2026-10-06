@@ -57,7 +57,7 @@ export function fitGeoTransform(anchors: readonly GeoAnchor[]): GeoTransform | n
     lng: anchors.reduce((s, a) => s + a.lng, 0) / anchors.length,
   };
   const rows = anchors.map((a) => toMeters(a, origin));
-  // Persamaan normal untuk [e, n, 1]·k = x (dan = y).
+  // Persamaan normal untuk [e, n, 1]|k = x (dan = y).
   const ata = [
     [0, 0, 0],
     [0, 0, 0],

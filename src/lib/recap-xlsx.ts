@@ -38,7 +38,7 @@ const num = (value: number, style: Omit<NonNullable<XlsxCell>, "value" | "type">
 export function buildRecapSheets(recap: MonthRecap, communityName: string): XlsxSheet[] {
   const { rows, dateTotals, grandTotal } = summarizeMonth(recap);
   const month = recap.dates[0]?.slice(0, 7);
-  const title = `Rekap jimpitan ${communityName}${month ? ` · ${formatMonth(month)}` : ""}`;
+  const title = `Rekap jimpitan ${communityName}${month ? ` | ${formatMonth(month)}` : ""}`;
   const dateCount = recap.dates.length;
   const lead = 4; // Blok, No, Nama KK, Status
   const tail = 4; // Ada, Kosong, Tidak dicek, Total

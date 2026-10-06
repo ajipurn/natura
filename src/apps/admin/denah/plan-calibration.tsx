@@ -5,7 +5,14 @@ import { api, call } from "@/client/api";
 import { invalidate } from "@/client/query";
 import { PlanWithLocation } from "@/components/plan-with-location";
 import { Alert, Button, Card, Input, cx } from "@/components/ui";
-import { fitGeoTransform, formatLatLng, MAX_ANCHORS, MIN_ANCHORS, parseLatLng, type GeoAnchor } from "@/lib/geo";
+import {
+  fitGeoTransform,
+  formatLatLng,
+  MAX_ANCHORS,
+  MIN_ANCHORS,
+  parseLatLng,
+  type GeoAnchor,
+} from "@/lib/geo";
 import type { PlanPoint } from "@/lib/site-plan";
 import type { HouseDTO } from "@/lib/types";
 import { SITE_PLAN } from "@/site-plan";
@@ -27,7 +34,8 @@ export function PlanCalibration({ houses }: { houses: HouseDTO[] }) {
   const [coords, setCoords] = useState("");
   const [gpsNote, setGpsNote] = useState<string | null>(null);
   const save = useMutation({
-    mutationFn: (next: GeoAnchor[]) => call(api.admin.denah.lokasi.$put({ json: { anchors: next } })),
+    mutationFn: (next: GeoAnchor[]) =>
+      call(api.admin.denah.lokasi.$put({ json: { anchors: next } })),
     onSuccess: async () => {
       await invalidate(["admin", "denah-lokasi"], ["ronda"]);
       closeForm();
@@ -49,11 +57,18 @@ export function PlanCalibration({ houses }: { houses: HouseDTO[] }) {
     setGpsNote("Mencari lokasi…");
     navigator.geolocation.getCurrentPosition(
       (p) => {
-        setCoords(formatLatLng({ lat: p.coords.latitude, lng: p.coords.longitude }));
+        setCoords(
+          formatLatLng({ lat: p.coords.latitude, lng: p.coords.longitude }),
+        );
         const accuracy = Math.round(p.coords.accuracy);
-        setGpsNote(accuracy > 20 ? `Akurasi ±${accuracy} m, kurang tepat. Tunggu sebentar lalu coba lagi.` : `Akurasi ±${accuracy} m.`);
+        setGpsNote(
+          accuracy > 20
+            ? `Akurasi ±${accuracy} m, kurang tepat. Tunggu sebentar lalu coba lagi.`
+            : `Akurasi ±${accuracy} m.`,
+        );
       },
-      () => setGpsNote("Lokasi tidak didapat. Izinkan lokasi dan nyalakan GPS."),
+      () =>
+        setGpsNote("Lokasi tidak didapat. Izinkan lokasi dan nyalakan GPS."),
       { enableHighAccuracy: true, timeout: 30_000, maximumAge: 0 },
     );
   }
@@ -76,7 +91,11 @@ export function PlanCalibration({ houses }: { houses: HouseDTO[] }) {
             </p>
           </div>
           {!adding && anchors.length < MAX_ANCHORS && (
-            <Button onClick={() => setAdding(true)} variant="secondary" size="sm">
+            <Button
+              onClick={() => setAdding(true)}
+              variant="secondary"
+              size="sm"
+            >
               <Plus className="size-4" /> Tambah titik acuan
             </Button>
           )}
@@ -91,16 +110,28 @@ export function PlanCalibration({ houses }: { houses: HouseDTO[] }) {
                   <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-fg">
                     {i + 1}
                   </span>
-                  <span className="min-w-0 flex-1 truncate font-mono text-xs">{formatLatLng(a)}</span>
+                  <span className="min-w-0 flex-1 truncate font-mono text-xs">
+                    {formatLatLng(a)}
+                  </span>
                   {residual !== undefined && (
-                    <span className={cx("shrink-0 text-xs", residual > OK_RESIDUAL ? "font-semibold text-warn" : "text-muted")}>
-                      selisih ±{Math.round(residual)} m{residual > OK_RESIDUAL && " · mungkin salah"}
+                    <span
+                      className={cx(
+                        "shrink-0 text-xs",
+                        residual > OK_RESIDUAL
+                          ? "font-semibold text-warn"
+                          : "text-muted",
+                      )}
+                    >
+                      selisih ±{Math.round(residual)} m
+                      {residual > OK_RESIDUAL && " | mungkin salah"}
                     </span>
                   )}
                   <Button
                     variant="plain"
                     disabled={save.isPending}
-                    onClick={() => save.mutate(anchors.filter((_, j) => j !== i))}
+                    onClick={() =>
+                      save.mutate(anchors.filter((_, j) => j !== i))
+                    }
                     className="shrink-0 rounded-lg p-1.5 text-muted hover:text-empty"
                     aria-label={`Hapus titik acuan ${i + 1}`}
                   >
@@ -117,12 +148,18 @@ export function PlanCalibration({ houses }: { houses: HouseDTO[] }) {
             className="space-y-3 rounded-xl border border-primary/40 bg-primary/5 p-3"
             onSubmit={(e) => {
               e.preventDefault();
-              if (pick && parsed) save.mutate([...anchors, { x: pick[0], y: pick[1], ...parsed }]);
+              if (pick && parsed)
+                save.mutate([
+                  ...anchors,
+                  { x: pick[0], y: pick[1], ...parsed },
+                ]);
             }}
           >
             <p className="text-sm">
               <strong>1.</strong>{" "}
-              {pick ? "Titik di denah sudah dipilih (ketuk lagi untuk mengganti)." : "Ketuk titik di denah yang mudah dikenali di lapangan: pojok kavling, gerbang, atau ujung taman."}
+              {pick
+                ? "Titik di denah sudah dipilih (ketuk lagi untuk mengganti)."
+                : "Ketuk titik di denah yang mudah dikenali di lapangan: pojok kavling, gerbang, atau ujung taman."}
             </p>
             <label className="block text-sm">
               <span>
@@ -137,22 +174,35 @@ export function PlanCalibration({ houses }: { houses: HouseDTO[] }) {
                 className="mt-1 font-mono"
               />
               <span className="mt-1 block text-xs text-muted">
-                Di Google Maps: klik kanan titik yang sama, lalu klik angka koordinatnya untuk menyalin. Atau berdiri di
-                titik itu dan tekan Pakai lokasi saya.
+                Di Google Maps: klik kanan titik yang sama, lalu klik angka
+                koordinatnya untuk menyalin. Atau berdiri di titik itu dan tekan
+                Pakai lokasi saya.
               </span>
             </label>
             {gpsNote && <p className="text-xs text-muted">{gpsNote}</p>}
-            {coords.trim() && !parsed && <p className="text-xs text-empty">Format koordinat belum benar.</p>}
+            {coords.trim() && !parsed && (
+              <p className="text-xs text-empty">
+                Format koordinat belum benar.
+              </p>
+            )}
             {save.isError && <Alert>{save.error.message}</Alert>}
             <div className="flex flex-wrap gap-2">
-              <Button onClick={fillFromMyPosition} variant="secondary" size="sm">
+              <Button
+                onClick={fillFromMyPosition}
+                variant="secondary"
+                size="sm"
+              >
                 <LocateFixed className="size-4" /> Pakai lokasi saya
               </Button>
               <span className="flex-1" />
               <Button onClick={closeForm} variant="ghost" size="sm">
                 Batal
               </Button>
-              <Button type="submit" disabled={!pick || !parsed || save.isPending} size="sm">
+              <Button
+                type="submit"
+                disabled={!pick || !parsed || save.isPending}
+                size="sm"
+              >
                 {save.isPending ? "Menyimpan…" : "Simpan titik"}
               </Button>
             </div>

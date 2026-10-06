@@ -12,7 +12,15 @@ import {
   Search,
   ShieldAlert,
 } from "lucide-react";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Link } from "react-router";
 import { QrScanner } from "@/components/qr-scanner";
 import { ShareRecap } from "@/components/share-recap";
@@ -34,7 +42,11 @@ import { HouseList, type ListFilter } from "./house-list";
 import { HouseSearch } from "./house-search";
 import { HouseSheet } from "./house-sheet";
 import { TonightGuards } from "./tonight-guards";
-import { useRondaStore, type MergedCollection, type SyncStatus } from "./use-ronda-store";
+import {
+  useRondaStore,
+  type MergedCollection,
+  type SyncStatus,
+} from "./use-ronda-store";
 
 type Toast = { text: string; tone: "ok" | "error" };
 type View = "list" | "map" | "3d";
@@ -62,7 +74,10 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   const store = useRondaStore();
   const [scannerOpen, setScannerOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [active, setActive] = useState<{ house: HouseDTO; method: CollectionMethod } | null>(null);
+  const [active, setActive] = useState<{
+    house: HouseDTO;
+    method: CollectionMethod;
+  } | null>(null);
   const [filter, setFilter] = useState<ListFilter>("belum");
   const [view, setView] = useState<View>("list");
   const [toast, setToast] = useState<Toast | null>(null);
@@ -70,9 +85,18 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
 
   const snapshot = store.snapshot;
   const houses = useMemo(() => snapshot?.houses ?? [], [snapshot]);
-  const byToken = useMemo(() => new Map(houses.map((h) => [h.token, h])), [houses]);
-  const collectionList = useMemo(() => [...store.collections.values()], [store.collections]);
-  const summary = useMemo(() => summarize(houses, collectionList), [houses, collectionList]);
+  const byToken = useMemo(
+    () => new Map(houses.map((h) => [h.token, h])),
+    [houses],
+  );
+  const collectionList = useMemo(
+    () => [...store.collections.values()],
+    [store.collections],
+  );
+  const summary = useMemo(
+    () => summarize(houses, collectionList),
+    [houses, collectionList],
+  );
   // Catatan terbaru malam ini (dari siapa pun), untuk baris "Terakhir".
   const lastEntry = useMemo(() => {
     const entry = collectionList.reduce<MergedCollection | null>(
@@ -83,16 +107,22 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
     return entry && house ? { entry, house } : null;
   }, [collectionList, houses]);
   // Rumah yang tampil di denah (cocok blok+nomor dengan kavling di denah).
-  const placedCount = useMemo(() => matchPlan(SITE_PLAN, houses).lotHouse.size, [houses]);
+  const placedCount = useMemo(
+    () => matchPlan(SITE_PLAN, houses).lotHouse.size,
+    [houses],
+  );
   const markers = useMemo(() => {
     const result: Record<number, MarkerState> = {};
     for (const h of houses) {
-      result[h.id] = store.collections.get(h.id)?.status ?? (h.status === "vacant" ? "vacant" : "unchecked");
+      result[h.id] =
+        store.collections.get(h.id)?.status ??
+        (h.status === "vacant" ? "vacant" : "unchecked");
     }
     return result;
   }, [houses, store.collections]);
   const pendingIds = useMemo(
-    () => new Set(collectionList.filter((c) => c.pending).map((c) => c.houseId)),
+    () =>
+      new Set(collectionList.filter((c) => c.pending).map((c) => c.houseId)),
     [collectionList],
   );
 
@@ -120,7 +150,9 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   }
 
   // Hanya yang dijadwalkan jaga malam ini yang bisa scan/catat, admin juga (server juga memeriksa).
-  const mySchedule = (snapshot?.schedule ?? []).filter((e) => e.userId === snapshot?.user.id);
+  const mySchedule = (snapshot?.schedule ?? []).filter(
+    (e) => e.userId === snapshot?.user.id,
+  );
   const onDuty = mySchedule.some((e) => e.day === scheduleDay(store.date));
   const canRecord = onDuty;
 
@@ -134,7 +166,9 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
     const house = token ? byToken.get(token) : undefined;
     if (!house) {
       showToast(
-        token ? "QR rumah tidak dikenal. Coba lagi atau ketik manual." : "Ini bukan QR jimpitan.",
+        token
+          ? "QR rumah tidak dikenal. Coba lagi atau ketik manual."
+          : "Ini bukan QR jimpitan.",
         "error",
       );
       if (token) store.sync();
@@ -168,7 +202,9 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
         <Card className="text-center">
           <CloudOff className="mx-auto size-10 text-muted" />
           <p className="mt-3 font-semibold">Data rumah belum terunduh</p>
-          <p className="mt-1 text-sm text-muted">Sambungkan internet sekali supaya halaman ini bisa dipakai offline.</p>
+          <p className="mt-1 text-sm text-muted">
+            Sambungkan internet sekali supaya halaman ini bisa dipakai offline.
+          </p>
           <Button onClick={() => store.sync()} className="mt-4">
             <RefreshCw className="size-5" /> Coba lagi
           </Button>
@@ -178,7 +214,14 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   }
 
   const viewSwitch = (
-    <SegmentedControl aria-label="Tampilan" compact value={view} onValueChange={changeView} options={VIEWS} className="shrink-0" />
+    <SegmentedControl
+      aria-label="Tampilan"
+      compact
+      value={view}
+      onValueChange={changeView}
+      options={VIEWS}
+      className="shrink-0"
+    />
   );
   const allDone = summary.unchecked.length === 0 && summary.checked > 0;
   const recap = (
@@ -200,11 +243,19 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
           <div className="rounded-2xl border border-line bg-card p-3 shadow-sm lg:shadow-none">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h1 className="text-base font-bold leading-tight">Ronda malam ini</h1>
-                <p className="truncate text-xs text-muted">{formatDateLong(store.date)}</p>
+                <h1 className="text-base font-bold leading-tight">
+                  Ronda malam ini
+                </h1>
+                <p className="truncate text-xs text-muted">
+                  {formatDateLong(store.date)}
+                </p>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
-                <SyncChip status={store.status} pendingCount={store.pendingCount} onRetry={() => store.sync()} />
+                <SyncChip
+                  status={store.status}
+                  pendingCount={store.pendingCount}
+                  onRetry={() => store.sync()}
+                />
                 {/* Ronda di luar malam hari: mode gelap cukup sekali ketuk dari sini. */}
                 <ThemeButton />
               </div>
@@ -213,9 +264,14 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
               <>
                 <div className="mt-2 flex items-baseline justify-between">
                   <p className="text-sm text-muted">
-                    <strong className="text-2xl text-fg">{summary.checked}</strong> / {summary.expected} dicek
+                    <strong className="text-2xl text-fg">
+                      {summary.checked}
+                    </strong>{" "}
+                    / {summary.expected} dicek
                   </p>
-                  <p className="text-xl font-bold">{formatRupiah(summary.total)}</p>
+                  <p className="text-xl font-bold">
+                    {formatRupiah(summary.total)}
+                  </p>
                 </div>
                 <div
                   className="mt-2 flex h-2 overflow-hidden rounded-full bg-idle-soft"
@@ -225,16 +281,34 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                   aria-valuenow={summary.checked}
                   aria-label="Progres ronda"
                 >
-                  <div className="h-full bg-filled transition-all" style={{ width: `${percent(summary.filled.length, summary.expected)}%` }} />
-                  <div className="h-full bg-empty transition-all" style={{ width: `${percent(summary.empty.length, summary.expected)}%` }} />
+                  <div
+                    className="h-full bg-filled transition-all"
+                    style={{
+                      width: `${percent(summary.filled.length, summary.expected)}%`,
+                    }}
+                  />
+                  <div
+                    className="h-full bg-empty transition-all"
+                    style={{
+                      width: `${percent(summary.empty.length, summary.expected)}%`,
+                    }}
+                  />
                 </div>
                 {/* Titik warnanya sama dengan bilah progres dan kotak rumah. */}
                 <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted">
-                  <LegendItem swatch="bg-filled">Ada {summary.filled.length}</LegendItem>
-                  <LegendItem swatch="bg-empty">Kosong {summary.empty.length}</LegendItem>
-                  <LegendItem swatch="border border-line bg-idle-soft">Belum {summary.unchecked.length}</LegendItem>
+                  <LegendItem swatch="bg-filled">
+                    Ada {summary.filled.length}
+                  </LegendItem>
+                  <LegendItem swatch="bg-empty">
+                    Kosong {summary.empty.length}
+                  </LegendItem>
+                  <LegendItem swatch="border border-line bg-idle-soft">
+                    Belum {summary.unchecked.length}
+                  </LegendItem>
                   {summary.vacant.length > 0 && (
-                    <LegendItem swatch="border border-dashed border-muted/60">Mudik {summary.vacant.length}</LegendItem>
+                    <LegendItem swatch="border border-dashed border-muted/60">
+                      Mudik {summary.vacant.length}
+                    </LegendItem>
                   )}
                 </p>
               </>
@@ -245,23 +319,35 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
         <div className="mt-1 space-y-3 lg:mt-0">
           <StatusNotice status={store.status} />
           {/* Data lama di HP (sebelum ada jadwal) belum punya `schedule`. */}
-          <TonightGuards schedule={snapshot.schedule ?? []} date={store.date} userId={snapshot.user.id} />
+          <TonightGuards
+            schedule={snapshot.schedule ?? []}
+            date={store.date}
+            userId={snapshot.user.id}
+          />
           {!canRecord && (
-            <div className="flex gap-3 rounded-2xl border border-warn/40 bg-warn-soft p-3 text-sm text-warn" role="note">
+            <div
+              className="flex gap-3 rounded-2xl border border-warn/40 bg-warn-soft p-3 text-sm text-warn"
+              role="note"
+            >
               <ShieldAlert className="size-5 shrink-0" aria-hidden />
               <div>
                 <p className="font-semibold">Bukan jadwal jagamu malam ini</p>
                 <p className="mt-0.5">
-                  Scan dan catat jimpitan hanya untuk petugas yang jaga {dayLabel(scheduleDay(store.date))}.
+                  Scan dan catat jimpitan hanya untuk petugas yang jaga{" "}
+                  {dayLabel(scheduleDay(store.date))}.
                   {mySchedule.length > 0
                     ? ` Jadwalmu: ${[...new Set(mySchedule.map((e) => e.day))]
                         .sort()
                         .map((d) => DAY_NAMES[d])
                         .join(", ")}.`
                     : " Kamu belum dijadwalkan."}
-                  {isAdmin && " Sebagai admin, catatan malam ini tetap bisa dikoreksi lewat Riwayat di dashboard."}
+                  {isAdmin &&
+                    " Sebagai admin, catatan malam ini tetap bisa dikoreksi lewat Riwayat di dashboard."}
                 </p>
-                <Link to="/petugas/jadwal" className="mt-1 inline-block font-semibold underline">
+                <Link
+                  to="/petugas/jadwal"
+                  className="mt-1 inline-block font-semibold underline"
+                >
                   Lihat jadwal atau minta ubah jadwal
                 </Link>
               </div>
@@ -269,13 +355,19 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
           )}
           {store.rejections.length > 0 && (
             <Alert>
-              <span className="block font-semibold">Beberapa catatan ditolak server:</span>
+              <span className="block font-semibold">
+                Beberapa catatan ditolak server:
+              </span>
               {store.rejections.map((r) => (
                 <span key={r.clientId} className="block">
                   {r.label}: {r.error}
                 </span>
               ))}
-              <Button variant="plain" onClick={store.dismissRejections} className="mt-1 font-semibold underline">
+              <Button
+                variant="plain"
+                onClick={store.dismissRejections}
+                className="mt-1 font-semibold underline"
+              >
                 Tutup
               </Button>
             </Alert>
@@ -285,12 +377,20 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
               house={lastEntry.house}
               entry={lastEntry.entry}
               mine={lastEntry.entry.collectorName === snapshot.user.name}
-              onEdit={canRecord ? () => setActive({ house: lastEntry.house, method: "manual" }) : undefined}
+              onEdit={
+                canRecord
+                  ? () =>
+                      setActive({ house: lastEntry.house, method: "manual" })
+                  : undefined
+              }
             />
           )}
           {canRecord && houses.length > 0 && (
             <div className="hidden gap-2 lg:flex">
-              <ActionButtons onSearch={() => setSearchOpen(true)} onScan={() => setScannerOpen(true)} />
+              <ActionButtons
+                onSearch={() => setSearchOpen(true)}
+                onScan={() => setScannerOpen(true)}
+              />
             </div>
           )}
         </div>
@@ -300,9 +400,14 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
         {houses.length === 0 ? (
           <Card className="text-center">
             <p className="font-semibold">Belum ada data rumah</p>
-            <p className="mt-1 text-sm text-muted">Admin perlu menambahkan rumah dan mencetak QR-nya dulu.</p>
+            <p className="mt-1 text-sm text-muted">
+              Admin perlu menambahkan rumah dan mencetak QR-nya dulu.
+            </p>
             {isAdmin && (
-              <a href="/admin/rumah" className={cx(buttonClass("primary"), "mt-4")}>
+              <a
+                href="/admin/rumah"
+                className={cx(buttonClass("primary"), "mt-4")}
+              >
                 Tambah rumah
               </a>
             )}
@@ -328,7 +433,8 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                     value,
                     label: (
                       <>
-                        {label} <span className="text-xs font-normal">{count}</span>
+                        {label}{" "}
+                        <span className="text-xs font-normal">{count}</span>
                       </>
                     ),
                     className: "px-1",
@@ -336,7 +442,9 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                   className="min-w-0 flex-1"
                 />
               ) : (
-                <p className="text-sm font-semibold">{view === "map" ? "Denah" : "Denah 3D"}</p>
+                <p className="text-sm font-semibold">
+                  {view === "map" ? "Denah" : "Denah 3D"}
+                </p>
               )}
               {viewSwitch}
             </div>
@@ -346,9 +454,14 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                 <Card className="text-center">
                   <MapIcon className="mx-auto size-10 text-muted" />
                   <p className="mt-2 font-semibold">Rumah belum terdaftar</p>
-                  <p className="mt-1 text-sm text-muted">Admin perlu mendaftarkan rumah dari denah dulu.</p>
+                  <p className="mt-1 text-sm text-muted">
+                    Admin perlu mendaftarkan rumah dari denah dulu.
+                  </p>
                   {isAdmin && (
-                    <a href="/admin/rumah?tampilan=denah" className={cx(buttonClass("primary"), "mt-4")}>
+                    <a
+                      href="/admin/rumah?tampilan=denah"
+                      className={cx(buttonClass("primary"), "mt-4")}
+                    >
                       Buka Rumah & QR di admin
                     </a>
                   )}
@@ -365,7 +478,10 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                       anchors={snapshot.planAnchors ?? []}
                       calibrateHint={
                         isAdmin ? (
-                          <a href="/admin/denah?mode=atur" className="font-semibold underline">
+                          <a
+                            href="/admin/denah?mode=atur"
+                            className="font-semibold underline"
+                          >
                             Atur di Admin → Peta ronda
                           </a>
                         ) : (
@@ -375,12 +491,18 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                     />
                   ) : (
                     <Suspense fallback={<Loading3D />}>
-                      <SiteMap3D houses={houses} plan={SITE_PLAN} markers={markers} onHouseClick={openHouse} />
+                      <SiteMap3D
+                        houses={houses}
+                        plan={SITE_PLAN}
+                        markers={markers}
+                        onHouseClick={openHouse}
+                      />
                     </Suspense>
                   )}
                   {placedCount < houses.length && (
                     <p className="mt-2 text-sm text-muted">
-                      {houses.length - placedCount} rumah belum ada di denah — lihat tampilan Daftar.
+                      {houses.length - placedCount} rumah belum ada di denah —
+                      lihat tampilan Daftar.
                     </p>
                   )}
                 </>
@@ -388,12 +510,25 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
             ) : filter === "belum" && summary.unchecked.length === 0 ? (
               <Card className="text-center">
                 <CheckCircle2 className="mx-auto size-10 text-filled" />
-                <p className="mt-2 font-semibold">{allDone ? "Semua rumah sudah dicek" : "Tidak ada rumah yang perlu dicek"}</p>
-                {allDone && <p className="mt-1 text-sm text-muted">Kirim rekapnya ke grup warga.</p>}
+                <p className="mt-2 font-semibold">
+                  {allDone
+                    ? "Semua rumah sudah dicek"
+                    : "Tidak ada rumah yang perlu dicek"}
+                </p>
+                {allDone && (
+                  <p className="mt-1 text-sm text-muted">
+                    Kirim rekapnya ke grup warga.
+                  </p>
+                )}
                 {allDone && <div className="mt-4">{recap}</div>}
               </Card>
             ) : (
-              <HouseList houses={houses} collections={store.collections} filter={filter} onOpen={openHouse} />
+              <HouseList
+                houses={houses}
+                collections={store.collections}
+                filter={filter}
+                onOpen={openHouse}
+              />
             )}
 
             {/* Rekap bisa dibagikan kapan saja; saat semua selesai tombolnya ada di kartu di atas. */}
@@ -414,7 +549,10 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
           {/* Bar aksi menempel tepat di atas navigasi bawah (tingginya h-14, lihat PetugasLayout). */}
           <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] z-20 border-t border-line bg-card/95 px-4 py-2 backdrop-blur lg:hidden">
             <div className="mx-auto flex max-w-3xl gap-2">
-              <ActionButtons onSearch={() => setSearchOpen(true)} onScan={() => setScannerOpen(true)} />
+              <ActionButtons
+                onSearch={() => setSearchOpen(true)}
+                onScan={() => setScannerOpen(true)}
+              />
             </div>
           </div>
         </>
@@ -458,7 +596,9 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
           role="status"
           className={cx(
             "fixed inset-x-4 top-[max(env(safe-area-inset-top),16px)] z-[60] mx-auto max-w-sm rounded-2xl px-4 py-3 text-center font-semibold shadow-lg",
-            toast.tone === "ok" ? "bg-filled text-white dark:text-black" : "bg-empty text-white dark:text-black",
+            toast.tone === "ok"
+              ? "bg-filled text-white dark:text-black"
+              : "bg-empty text-white dark:text-black",
           )}
         >
           {toast.text}
@@ -468,17 +608,32 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
-const percent = (part: number, whole: number) => (whole ? (part / whole) * 100 : 0);
+const percent = (part: number, whole: number) =>
+  whole ? (part / whole) * 100 : 0;
 
-function ActionButtons({ onSearch, onScan }: { onSearch: () => void; onScan: () => void }) {
+function ActionButtons({
+  onSearch,
+  onScan,
+}: {
+  onSearch: () => void;
+  onScan: () => void;
+}) {
   return (
     <>
       {/* Ukuran teks, ikon, dan bayangannya sama; tepi Cari dipertegas supaya tidak tampak lebih kecil
           di samping tombol yang berwarna penuh. */}
-      <Button onClick={onSearch} variant="secondary" className="h-12 shrink-0 border-fg/15 px-4 text-lg shadow-sm">
+      <Button
+        onClick={onSearch}
+        variant="secondary"
+        className="h-12 shrink-0 border-fg/15 px-4 text-lg shadow-sm"
+      >
         <Search className="size-5" /> Cari
       </Button>
-      <Button onClick={onScan} variant="primary" className="h-12 flex-1 text-lg">
+      <Button
+        onClick={onScan}
+        variant="primary"
+        className="h-12 flex-1 text-lg"
+      >
         <ScanLine className="size-5" /> Scan QR
       </Button>
     </>
@@ -503,18 +658,24 @@ function LastEntry({
       <p className="min-w-0 flex-1 truncate">
         <span className="text-muted">Terakhir: </span>
         <strong>{houseLabel(house)}</strong>{" "}
-        <span className={entry.status === "filled" ? "text-filled" : "text-empty"}>
+        <span
+          className={entry.status === "filled" ? "text-filled" : "text-empty"}
+        >
           {entry.status === "filled" ? formatRupiah(entry.amount) : "kosong"}
         </span>
         <span className="text-muted">
           {" "}
-          · {formatTime(entry.recordedAt)}
-          {!mine && entry.collectorName && ` · ${entry.collectorName}`}
-          {entry.pending && " · belum terkirim"}
+          | {formatTime(entry.recordedAt)}
+          {!mine && entry.collectorName && ` | ${entry.collectorName}`}
+          {entry.pending && " | belum terkirim"}
         </span>
       </p>
       {onEdit && (
-        <Button variant="plain" onClick={onEdit} className="shrink-0 font-semibold text-primary">
+        <Button
+          variant="plain"
+          onClick={onEdit}
+          className="shrink-0 font-semibold text-primary"
+        >
           Ubah
         </Button>
       )}
@@ -548,11 +709,17 @@ function SyncChip({
       onClick={onRetry}
       className={cx(
         "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold",
-        pendingCount > 0 || offline ? "bg-warn-soft text-warn" : "bg-filled-soft text-filled",
+        pendingCount > 0 || offline
+          ? "bg-warn-soft text-warn"
+          : "bg-filled-soft text-filled",
       )}
       title="Kirim ulang sekarang"
     >
-      {offline ? <CloudOff className="size-4" /> : <CloudUpload className="size-4" />}
+      {offline ? (
+        <CloudOff className="size-4" />
+      ) : (
+        <CloudUpload className="size-4" />
+      )}
       {label}
     </Button>
   );
@@ -565,8 +732,14 @@ function StatusNotice({ status }: { status: SyncStatus }) {
       <ShieldAlert className="mt-0.5 size-5 shrink-0" />
       <div>
         <p className="font-semibold">Sesi login habis</p>
-        <p>Catatan tetap aman di HP ini dan akan terkirim setelah kamu masuk lagi.</p>
-        <Link to="/petugas/masuk?next=/petugas" className="mt-2 inline-flex items-center gap-1 font-semibold underline">
+        <p>
+          Catatan tetap aman di HP ini dan akan terkirim setelah kamu masuk
+          lagi.
+        </p>
+        <Link
+          to="/petugas/masuk?next=/petugas"
+          className="mt-2 inline-flex items-center gap-1 font-semibold underline"
+        >
           <LogIn className="size-4" /> Masuk lagi
         </Link>
       </div>
@@ -574,10 +747,19 @@ function StatusNotice({ status }: { status: SyncStatus }) {
   );
 }
 
-function LegendItem({ swatch, children }: { swatch: string; children: ReactNode }) {
+function LegendItem({
+  swatch,
+  children,
+}: {
+  swatch: string;
+  children: ReactNode;
+}) {
   return (
     <span className="inline-flex items-center gap-1">
-      <span aria-hidden className={cx("size-2 shrink-0 rounded-full", swatch)} />
+      <span
+        aria-hidden
+        className={cx("size-2 shrink-0 rounded-full", swatch)}
+      />
       {children}
     </span>
   );

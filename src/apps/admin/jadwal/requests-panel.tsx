@@ -25,7 +25,8 @@ type Request = {
   decidedBy: string | null;
 };
 
-const when = (at: string) => `${formatDateShort(new Date(at).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }))} ${formatTime(at)}`;
+const when = (at: string) =>
+  `${formatDateShort(new Date(at).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }))} ${formatTime(at)}`;
 
 /**
  * Permintaan ubah jadwal dari petugas. Saat ada perubahan jadwal yang belum disimpan, keputusan
@@ -42,13 +43,22 @@ export function RequestsPanel({ locked }: { locked: boolean }) {
     <Card className={cx("mb-4", pending.length > 0 && "border-warn/50")}>
       <h2 className="flex items-center gap-2 font-semibold">
         <CalendarClock className="size-5 text-warn" /> Permintaan ubah jadwal
-        {pending.length > 0 && <span className="rounded-full bg-warn px-2 py-0.5 text-xs font-bold text-card">{pending.length}</span>}
+        {pending.length > 0 && (
+          <span className="rounded-full bg-warn px-2 py-0.5 text-xs font-bold text-card">
+            {pending.length}
+          </span>
+        )}
       </h2>
       {locked && pending.length > 0 && (
-        <p className="mt-1 text-sm text-muted">Simpan atau batalkan perubahan jadwal dulu sebelum memutuskan permintaan.</p>
+        <p className="mt-1 text-sm text-muted">
+          Simpan atau batalkan perubahan jadwal dulu sebelum memutuskan
+          permintaan.
+        </p>
       )}
       {pending.length === 0 ? (
-        <p className="mt-1 text-sm text-muted">Tidak ada permintaan yang menunggu.</p>
+        <p className="mt-1 text-sm text-muted">
+          Tidak ada permintaan yang menunggu.
+        </p>
       ) : (
         <ul className="mt-2 divide-y divide-line">
           {pending.map((r) => (
@@ -57,18 +67,28 @@ export function RequestsPanel({ locked }: { locked: boolean }) {
         </ul>
       )}
       {decided.length > 0 && (
-        <Collapsible title={`Sudah diproses (${decided.length})`} className="mt-2 text-sm" triggerClassName="font-semibold text-muted">
+        <Collapsible
+          title={`Sudah diproses (${decided.length})`}
+          className="mt-2 text-sm"
+          triggerClassName="font-semibold text-muted"
+        >
           <ul className="mt-2 space-y-1.5">
             {decided.map((r) => (
               <li key={r.id}>
-                <span className={cx("mr-1.5 rounded-full px-2 py-0.5 text-xs font-semibold", REQUEST_STATUS[r.status].tone)}>
+                <span
+                  className={cx(
+                    "mr-1.5 rounded-full px-2 py-0.5 text-xs font-semibold",
+                    REQUEST_STATUS[r.status].tone,
+                  )}
+                >
                   {REQUEST_STATUS[r.status].label}
                 </span>
-                <strong>{r.userName}</strong> {requestChange(r.fromDay, r.toDay)}
+                <strong>{r.userName}</strong>{" "}
+                {requestChange(r.fromDay, r.toDay)}
                 <span className="text-muted">
-                  {r.decidedAt && ` · ${when(r.decidedAt)}`}
+                  {r.decidedAt && ` | ${when(r.decidedAt)}`}
                   {r.decidedBy && ` oleh ${r.decidedBy}`}
-                  {r.response && ` · “${r.response}”`}
+                  {r.response && ` | “${r.response}”`}
                 </span>
               </li>
             ))}
@@ -79,12 +99,23 @@ export function RequestsPanel({ locked }: { locked: boolean }) {
   );
 }
 
-function PendingRequest({ request: r, locked }: { request: Request; locked: boolean }) {
+function PendingRequest({
+  request: r,
+  locked,
+}: {
+  request: Request;
+  locked: boolean;
+}) {
   const [rejecting, setRejecting] = useState(false);
   const [response, setResponse] = useState("");
   const decide = useMutation({
     mutationFn: (keputusan: "setujui" | "tolak") =>
-      call(api.admin.permintaan[":id"][":keputusan"].$post({ param: { id: String(r.id), keputusan }, json: { response } })),
+      call(
+        api.admin.permintaan[":id"][":keputusan"].$post({
+          param: { id: String(r.id), keputusan },
+          json: { response },
+        }),
+      ),
     onSuccess: () => invalidate(["admin"], ["jadwal"], ["ronda"]),
   });
 
@@ -94,22 +125,35 @@ function PendingRequest({ request: r, locked }: { request: Request; locked: bool
         <div className="min-w-0">
           <p>
             <strong>{r.userName}</strong>
-            {r.house && <span className="text-muted"> · {r.house}</span>}
+            {r.house && <span className="text-muted"> | {r.house}</span>}
           </p>
-          <p className="font-semibold text-primary">{requestChange(r.fromDay, r.toDay)}</p>
+          <p className="font-semibold text-primary">
+            {requestChange(r.fromDay, r.toDay)}
+          </p>
           <p className="text-xs text-muted">
             Dikirim {when(r.createdAt)}
-            {r.days.length > 0 && ` · sekarang jaga ${r.days.map((d) => DAY_NAMES[d]).join(", ")}`}
+            {r.days.length > 0 &&
+              ` | sekarang jaga ${r.days.map((d) => DAY_NAMES[d]).join(", ")}`}
           </p>
           {r.note && <p className="mt-1 text-sm">“{r.note}”</p>}
         </div>
         {!rejecting && (
           <div className="flex gap-2">
-            <Button disabled={locked || decide.isPending} onClick={() => setRejecting(true)} variant="secondary" size="sm">
+            <Button
+              disabled={locked || decide.isPending}
+              onClick={() => setRejecting(true)}
+              variant="secondary"
+              size="sm"
+            >
               <X className="size-4" /> Tolak
             </Button>
-            <Button disabled={locked || decide.isPending} onClick={() => decide.mutate("setujui")} size="sm">
-              <Check className="size-4" /> {decide.isPending ? "Menyimpan…" : "Setujui"}
+            <Button
+              disabled={locked || decide.isPending}
+              onClick={() => decide.mutate("setujui")}
+              size="sm"
+            >
+              <Check className="size-4" />{" "}
+              {decide.isPending ? "Menyimpan…" : "Setujui"}
             </Button>
           </div>
         )}
@@ -134,7 +178,12 @@ function PendingRequest({ request: r, locked }: { request: Request; locked: bool
           <Button onClick={() => setRejecting(false)} variant="ghost" size="sm">
             Batal
           </Button>
-          <Button type="submit" disabled={locked || decide.isPending} variant="danger" size="sm">
+          <Button
+            type="submit"
+            disabled={locked || decide.isPending}
+            variant="danger"
+            size="sm"
+          >
             Tolak permintaan
           </Button>
         </form>

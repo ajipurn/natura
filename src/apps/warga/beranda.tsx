@@ -16,7 +16,13 @@ import {
   Star,
   Wallet,
 } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { useSearchParams } from "react-router";
 import { api, call, errorMessage } from "@/client/api";
 import { useAuth } from "@/client/auth";
@@ -26,15 +32,34 @@ import { GuardChip } from "@/components/guard-chip";
 import { ErrorCard, LoadingCards, QueryState } from "@/components/query-state";
 import { ThemeButton } from "@/components/theme-toggle";
 import { SegmentedControl } from "@/components/toggle-group";
-import { Alert, Button, Card, Input, PageTitle, SectionTitle, buttonClass, cx } from "@/components/ui";
-import { addDays, daysInMonth, formatDateLong, formatDateShort, formatMonth, shiftMonth } from "@/lib/dates";
+import {
+  Alert,
+  Button,
+  Card,
+  Input,
+  PageTitle,
+  SectionTitle,
+  buttonClass,
+  cx,
+} from "@/components/ui";
+import {
+  addDays,
+  daysInMonth,
+  formatDateLong,
+  formatDateShort,
+  formatMonth,
+  shiftMonth,
+} from "@/lib/dates";
 import { formatRupiah, phoneDigits, whatsappNumber } from "@/lib/format";
 import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
 import { DAY_NAMES, NIGHT_OF, slotHouseLabel } from "@/lib/schedule";
 import { HouseHistoryDialog } from "./house-history";
 import { houseMonthText, useMyHouse } from "./my-house";
 
-const accessQuery = { queryKey: ["warga", "akses"], queryFn: () => call(api.warga.akses.$get()) };
+const accessQuery = {
+  queryKey: ["warga", "akses"],
+  queryFn: () => call(api.warga.akses.$get()),
+};
 
 /** Halaman informasi untuk warga, dibuka dengan kode dari pengurus. */
 export function BerandaPage() {
@@ -46,7 +71,8 @@ export function BerandaPage() {
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-primary">
-            Jimpitan{access.data?.communityName ? ` ${access.data.communityName}` : ""}
+            Jimpitan
+            {access.data?.communityName ? ` ${access.data.communityName}` : ""}
           </p>
           <h1 className="text-3xl font-bold tracking-tight">Info warga</h1>
         </div>
@@ -57,7 +83,10 @@ export function BerandaPage() {
       </header>
       <div className="mt-5">
         {access.isError ? (
-          <ErrorCard message={errorMessage(access.error)} onRetry={() => void access.refetch()} />
+          <ErrorCard
+            message={errorMessage(access.error)}
+            onRetry={() => void access.refetch()}
+          />
         ) : !access.data ? (
           <LoadingCards />
         ) : access.data.access ? (
@@ -68,7 +97,9 @@ export function BerandaPage() {
           <Card className="text-center">
             <KeyRound className="mx-auto size-10 text-muted" />
             <p className="mt-2 font-semibold">Halaman warga belum dibuka</p>
-            <p className="mt-1 text-sm text-muted">Pengurus belum membuat kode warga.</p>
+            <p className="mt-1 text-sm text-muted">
+              Pengurus belum membuat kode warga.
+            </p>
           </Card>
         )}
       </div>
@@ -84,15 +115,29 @@ function AppLink() {
   const user = useAuth().data?.user;
   if (!user) {
     return (
-      <a href="/petugas/" aria-label="Masuk petugas / pengurus" title="Masuk petugas / pengurus" className={buttonClass("secondary", "sm")}>
+      <a
+        href="/petugas/"
+        aria-label="Masuk petugas / pengurus"
+        title="Masuk petugas / pengurus"
+        className={buttonClass("secondary", "sm")}
+      >
         <LogIn className="size-4" /> Masuk
       </a>
     );
   }
   const admin = user.role === "admin";
   return (
-    <a href={admin ? "/admin/" : "/petugas/"} title={`Masuk sebagai ${user.name}`} className={buttonClass("secondary", "sm")}>
-      {admin ? <LayoutDashboard className="size-4" /> : <ScanLine className="size-4" />} {admin ? "Dashboard" : "App petugas"}
+    <a
+      href={admin ? "/admin/" : "/petugas/"}
+      title={`Masuk sebagai ${user.name}`}
+      className={buttonClass("secondary", "sm")}
+    >
+      {admin ? (
+        <LayoutDashboard className="size-4" />
+      ) : (
+        <ScanLine className="size-4" />
+      )}{" "}
+      {admin ? "Dashboard" : "App petugas"}
     </a>
   );
 }
@@ -102,7 +147,8 @@ function CodeForm() {
   const [code, setCode] = useState(params.get("kode") ?? "");
   const tried = useRef(false);
   const enter = useMutation({
-    mutationFn: (value: string) => call(api.warga.masuk.$post({ json: { code: value } })),
+    mutationFn: (value: string) =>
+      call(api.warga.masuk.$post({ json: { code: value } })),
     onSuccess: () => invalidate(["warga"]),
   });
 
@@ -126,7 +172,9 @@ function CodeForm() {
         <p className="flex items-center gap-2 font-semibold">
           <KeyRound className="size-5 text-primary" /> Masukkan kode warga
         </p>
-        <p className="text-sm text-muted">Kodenya dibagikan pengurus di grup warga.</p>
+        <p className="text-sm text-muted">
+          Kodenya dibagikan pengurus di grup warga.
+        </p>
         <Input
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
@@ -149,7 +197,10 @@ function CodeForm() {
 }
 
 function WargaContent() {
-  const info = useQuery({ queryKey: ["warga", "info"], queryFn: () => call(api.warga.$get()) });
+  const info = useQuery({
+    queryKey: ["warga", "info"],
+    queryFn: () => call(api.warga.$get()),
+  });
 
   return (
     <QueryState query={info}>
@@ -165,13 +216,27 @@ function WargaContent() {
                 </SectionTitle>
                 <div className="space-y-3">
                   {announcements.map((a) => (
-                    <Card key={a.id} className={cx(a.pinned && "border-primary/50")}>
+                    <Card
+                      key={a.id}
+                      className={cx(a.pinned && "border-primary/50")}
+                    >
                       <div className="flex items-start justify-between gap-2">
                         <h3 className="font-semibold">{a.title}</h3>
-                        {a.pinned && <Pin className="size-4 shrink-0 text-primary" aria-label="Disematkan" />}
+                        {a.pinned && (
+                          <Pin
+                            className="size-4 shrink-0 text-primary"
+                            aria-label="Disematkan"
+                          />
+                        )}
                       </div>
-                      <p className="text-xs text-muted">{formatDateLong(toLocalDate(a.createdAt))}</p>
-                      {a.body && <p className="mt-2 whitespace-pre-line text-sm">{a.body}</p>}
+                      <p className="text-xs text-muted">
+                        {formatDateLong(toLocalDate(a.createdAt))}
+                      </p>
+                      {a.body && (
+                        <p className="mt-2 whitespace-pre-line text-sm">
+                          {a.body}
+                        </p>
+                      )}
                     </Card>
                   ))}
                 </div>
@@ -196,16 +261,25 @@ function WargaContent() {
                 </SectionTitle>
                 <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
                   {contacts.map((c) => (
-                    <li key={c.id} className="flex items-center gap-3 px-4 py-3">
+                    <li
+                      key={c.id}
+                      className="flex items-center gap-3 px-4 py-3"
+                    >
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium">{c.name}</p>
                         {/* Boleh turun baris (nomornya tetap utuh): nomor yang terpotong tidak bisa dibaca. */}
                         <p className="text-sm text-muted">
-                          {c.role ? `${c.role} · ` : ""}
-                          <span className="whitespace-nowrap tabular-nums">{c.phone}</span>
+                          {c.role ? `${c.role} | ` : ""}
+                          <span className="whitespace-nowrap tabular-nums">
+                            {c.phone}
+                          </span>
                         </p>
                       </div>
-                      <a href={`tel:${phoneDigits(c.phone)}`} className={buttonClass("secondary", "sm")} aria-label={`Telepon ${c.name}`}>
+                      <a
+                        href={`tel:${phoneDigits(c.phone)}`}
+                        className={buttonClass("secondary", "sm")}
+                        aria-label={`Telepon ${c.name}`}
+                      >
                         <Phone className="size-4" />
                       </a>
                       <a
@@ -229,7 +303,15 @@ function WargaContent() {
   );
 }
 
-type Guard = { id: number; day: number; position: number; houseId: number | null; name: string; block: string; number: string };
+type Guard = {
+  id: number;
+  day: number;
+  position: number;
+  houseId: number | null;
+  name: string;
+  block: string;
+  number: string;
+};
 
 /** "2026-10-05" → "5 Okt" */
 const dayMonth = (isoDate: string) => formatDateShort(isoDate).split(", ")[1];
@@ -239,15 +321,27 @@ const listFormat = new Intl.ListFormat("id", { type: "conjunction" });
  * Jadwal jaga per malam: pilih malamnya, mulai dari malam ini. Kalau warga sudah memilih rumahnya
  * (di Status per rumah), malam dan chip rumahnya ditandai bintang.
  */
-function GuardSchedule({ schedule, tonight, date }: { schedule: Guard[]; tonight: number; date: string }) {
+function GuardSchedule({
+  schedule,
+  tonight,
+  date,
+}: {
+  schedule: Guard[];
+  tonight: number;
+  date: string;
+}) {
   const [offset, setOffset] = useState(0);
   const [myHouse] = useMyHouse();
   const day = (tonight + offset) % 7;
-  const guards = schedule.filter((s) => s.day === day).sort((a, b) => a.position - b.position);
+  const guards = schedule
+    .filter((s) => s.day === day)
+    .sort((a, b) => a.position - b.position);
   const isMine = (g: Guard) => myHouse !== null && g.houseId === myHouse;
   const myGuard = schedule.find(isMine);
   // Malam jaga rumah saya, urut mulai malam ini.
-  const myDays = [0, 1, 2, 3, 4, 5, 6].map((i) => (tonight + i) % 7).filter((d) => schedule.some((s) => s.day === d && isMine(s)));
+  const myDays = [0, 1, 2, 3, 4, 5, 6]
+    .map((i) => (tonight + i) % 7)
+    .filter((d) => schedule.some((s) => s.day === d && isMine(s)));
 
   return (
     <Card className="p-0">
@@ -263,7 +357,9 @@ function GuardSchedule({ schedule, tonight, date }: { schedule: Guard[]; tonight
               label: (
                 <>
                   <span className="flex items-center justify-center gap-0.5 text-[11px] font-medium">
-                    <span className="opacity-80">{i === 0 ? "Malam ini" : dayMonth(addDays(date, i))}</span>
+                    <span className="opacity-80">
+                      {i === 0 ? "Malam ini" : dayMonth(addDays(date, i))}
+                    </span>
                     {/* Di baris tanggal, bukan di pojok: tab di HP sempit, bintang di pojok menimpa teks. */}
                     {myDays.includes(d) && (
                       <Star
@@ -276,7 +372,8 @@ function GuardSchedule({ schedule, tonight, date }: { schedule: Guard[]; tonight
                   <span className="block">{DAY_NAMES[d]}</span>
                 </>
               ),
-              className: "group h-auto min-w-14 shrink-0 py-1.5 text-center leading-tight sm:min-w-0",
+              className:
+                "group h-auto min-w-14 shrink-0 py-1.5 text-center leading-tight sm:min-w-0",
             };
           })}
           // Tanpa garis tepi: menyatu dengan kepala kartu. Di HP bisa digeser, di layar lebar 7 kolom.
@@ -288,24 +385,38 @@ function GuardSchedule({ schedule, tonight, date }: { schedule: Guard[]; tonight
           <span className="font-semibold">
             {DAY_NAMES[day]}, {dayMonth(addDays(date, offset))}
           </span>
-          <span className="text-muted"> · malam {NIGHT_OF[day]}</span>
+          <span className="text-muted"> | malam {NIGHT_OF[day]}</span>
         </p>
         {guards.length === 0 ? (
-          <p className="mt-3 text-muted">Belum ada penjaga di jadwal {offset === 0 ? "malam ini" : "malam itu"}.</p>
+          <p className="mt-3 text-muted">
+            Belum ada penjaga di jadwal{" "}
+            {offset === 0 ? "malam ini" : "malam itu"}.
+          </p>
         ) : (
           <ul className="mt-3 flex flex-wrap gap-1.5">
             {/* Warna jadwal admin tidak dipakai di sini: warga tidak tahu artinya. */}
             {guards.map((g) => (
-              <GuardChip key={g.id} name={g.name} house={slotHouseLabel(g)} color={null} mine={isMine(g)} />
+              <GuardChip
+                key={g.id}
+                name={g.name}
+                house={slotHouseLabel(g)}
+                color={null}
+                mine={isMine(g)}
+              />
             ))}
           </ul>
         )}
         {myGuard && (
           <p className="mt-4 flex items-center gap-1.5 border-t border-line pt-3 text-sm text-muted">
-            <Star className="size-4 shrink-0 fill-current text-primary" aria-hidden />
+            <Star
+              className="size-4 shrink-0 fill-current text-primary"
+              aria-hidden
+            />
             <span>
               Giliran jaga rumah saya ({slotHouseLabel(myGuard)}):{" "}
-              <span className="font-medium text-fg">{listFormat.format(myDays.map((d) => DAY_NAMES[d]))}</span>
+              <span className="font-medium text-fg">
+                {listFormat.format(myDays.map((d) => DAY_NAMES[d]))}
+              </span>
             </span>
           </p>
         )}
@@ -332,7 +443,12 @@ function MonthRecap({ today }: { today: string }) {
       </SectionTitle>
       <Card>
         <div className="flex items-center justify-between gap-2">
-          <Button variant="secondary" size="icon" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Bulan sebelumnya">
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={() => setMonth(shiftMonth(month, -1))}
+            aria-label="Bulan sebelumnya"
+          >
             <ChevronLeft className="size-5" />
           </Button>
           <p className="font-semibold">{formatMonth(month)}</p>
@@ -346,14 +462,25 @@ function MonthRecap({ today }: { today: string }) {
             <ChevronRight className="size-5" />
           </Button>
         </div>
-        <QueryState query={recap} loading={<p className="py-8 text-center text-muted">Memuat…</p>}>
+        <QueryState
+          query={recap}
+          loading={<p className="py-8 text-center text-muted">Memuat…</p>}
+        >
           {(data) =>
             data.nights === 0 ? (
               <div className="pb-1 pt-4 text-center text-sm text-muted">
                 {month === thisMonth ? (
                   <>
-                    <p>Belum ada ronda tercatat bulan ini. Rekapnya muncul setelah petugas mencatat malam pertama.</p>
-                    <Button variant="ghost" size="sm" className="mt-2" onClick={() => setMonth(shiftMonth(month, -1))}>
+                    <p>
+                      Belum ada ronda tercatat bulan ini. Rekapnya muncul
+                      setelah petugas mencatat malam pertama.
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => setMonth(shiftMonth(month, -1))}
+                    >
                       Lihat {formatMonth(shiftMonth(month, -1))}
                     </Button>
                   </>
@@ -366,7 +493,10 @@ function MonthRecap({ today }: { today: string }) {
                 <div className="mt-4 grid grid-cols-3 gap-2 text-center">
                   <Stat label="Terkumpul" value={formatRupiah(data.total)} />
                   <Stat label="Malam ronda" value={String(data.nights)} />
-                  <Stat label="Rata-rata/malam" value={formatRupiah(data.average)} />
+                  <Stat
+                    label="Rata-rata/malam"
+                    value={formatRupiah(data.average)}
+                  />
                 </div>
                 <BarChart
                   className="mt-5"
@@ -386,26 +516,45 @@ function MonthRecap({ today }: { today: string }) {
                       };
                     })}
                 />
-                <p className="mt-1 text-center text-xs text-muted">Jimpitan per malam (tanggal)</p>
+                <p className="mt-1 text-center text-xs text-muted">
+                  Jimpitan per malam (tanggal)
+                </p>
               </>
             )
           }
         </QueryState>
       </Card>
-      {recap.data && recap.data.nights > 0 && <HouseStatus perHouse={recap.data.perHouse} month={recap.data.month} />}
+      {recap.data && recap.data.nights > 0 && (
+        <HouseStatus perHouse={recap.data.perHouse} month={recap.data.month} />
+      )}
     </>
   );
 }
 
-type HouseRow = { id: number; block: string; number: string; status: "active" | "vacant"; filled: number; empty: number };
+type HouseRow = {
+  id: number;
+  block: string;
+  number: string;
+  status: "active" | "vacant";
+  filled: number;
+  empty: number;
+};
 
 /** Status tiap rumah bulan ini, tanpa nama warga. Ketuk rumah untuk melihat riwayatnya. */
-function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string }) {
+function HouseStatus({
+  perHouse,
+  month,
+}: {
+  perHouse: HouseRow[];
+  month: string;
+}) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<HouseRow | null>(null);
   const [myHouse, setMyHouse] = useMyHouse();
   const mine = perHouse.find((h) => h.id === myHouse);
-  const shown = query.trim() ? searchHouses(perHouse, query, perHouse.length) : perHouse;
+  const shown = query.trim()
+    ? searchHouses(perHouse, query, perHouse.length)
+    : perHouse;
 
   return (
     <>
@@ -416,8 +565,9 @@ function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string 
       </SectionTitle>
       <Card className="space-y-4">
         <p className="text-sm text-muted">
-          Berapa malam wadah jimpitan ada isinya di {formatMonth(month)}, dari malam-malam rumah itu dicek petugas. Ketuk
-          rumah untuk melihat riwayatnya.
+          Berapa malam wadah jimpitan ada isinya di {formatMonth(month)}, dari
+          malam-malam rumah itu dicek petugas. Ketuk rumah untuk melihat
+          riwayatnya.
         </p>
         {mine && (
           <Button
@@ -425,12 +575,21 @@ function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string 
             onClick={() => setOpen(mine)}
             className="flex w-full items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2.5 text-left"
           >
-            <Star className="size-5 shrink-0 fill-current text-primary" aria-hidden />
+            <Star
+              className="size-5 shrink-0 fill-current text-primary"
+              aria-hidden
+            />
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold">Rumah saya · {houseLabel(mine)}</span>
-              <span className="block text-sm text-muted">{houseMonthText(mine)}</span>
+              <span className="block text-sm font-semibold">
+                Rumah saya | {houseLabel(mine)}
+              </span>
+              <span className="block text-sm text-muted">
+                {houseMonthText(mine)}
+              </span>
             </span>
-            <span className="shrink-0 text-sm font-semibold text-primary">Riwayat</span>
+            <span className="shrink-0 text-sm font-semibold text-primary">
+              Riwayat
+            </span>
           </Button>
         )}
         <label className="relative block">
@@ -445,7 +604,9 @@ function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string 
           />
         </label>
         {shown.length === 0 ? (
-          <p className="py-4 text-center text-sm text-muted">Tidak ada rumah yang cocok.</p>
+          <p className="py-4 text-center text-sm text-muted">
+            Tidak ada rumah yang cocok.
+          </p>
         ) : (
           <div className="space-y-4">
             {groupByBlock(shown).map(([block, list]) => (
@@ -471,12 +632,19 @@ function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string 
                                 : ratio >= 0.5
                                   ? "border-warn/40 bg-warn-soft text-warn hover:border-warn"
                                   : "border-empty/40 bg-empty-soft text-empty hover:border-empty",
-                            h.id === myHouse && "ring-2 ring-primary ring-offset-1 ring-offset-card",
+                            h.id === myHouse &&
+                              "ring-2 ring-primary ring-offset-1 ring-offset-card",
                           )}
                         >
-                          <span className="block text-sm font-bold">{h.number}</span>
+                          <span className="block text-sm font-bold">
+                            {h.number}
+                          </span>
                           <span className="block text-[11px]">
-                            {h.status === "vacant" ? "mudik" : checked ? `${h.filled}/${checked}` : "–"}
+                            {h.status === "vacant"
+                              ? "mudik"
+                              : checked
+                                ? `${h.filled}/${checked}`
+                                : "–"}
                           </span>
                         </Button>
                       </li>

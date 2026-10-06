@@ -15,12 +15,24 @@ export function QuickRecord({
   current: { status: "filled" | "empty"; amount: number } | null;
 }) {
   const record = useMutation({
-    mutationFn: ({ status, amount }: { status: "filled" | "empty" | "none"; amount: number }) =>
-      call(api.rumah[":token"].catat.$post({ param: { token }, json: { status, amount } })),
+    mutationFn: ({
+      status,
+      amount,
+    }: {
+      status: "filled" | "empty" | "none";
+      amount: number;
+    }) =>
+      call(
+        api.rumah[":token"].catat.$post({
+          param: { token },
+          json: { status, amount },
+        }),
+      ),
     onSuccess: () => invalidate(["rumah", token]),
   });
   const pending = record.isPending;
-  const submit = (status: "filled" | "empty" | "none", amount: number) => record.mutate({ status, amount });
+  const submit = (status: "filled" | "empty" | "none", amount: number) =>
+    record.mutate({ status, amount });
 
   return (
     <div className="mt-4 space-y-3">
@@ -28,11 +40,17 @@ export function QuickRecord({
         <p
           className={cx(
             "rounded-xl px-3 py-2 text-sm",
-            current.status === "filled" ? "bg-filled-soft text-filled" : "bg-empty-soft text-empty",
+            current.status === "filled"
+              ? "bg-filled-soft text-filled"
+              : "bg-empty-soft text-empty",
           )}
         >
           Malam ini sudah dicatat:{" "}
-          <strong>{current.status === "filled" ? `Ada · ${formatRupiah(current.amount)}` : "Kosong"}</strong>
+          <strong>
+            {current.status === "filled"
+              ? `Ada | ${formatRupiah(current.amount)}`
+              : "Kosong"}
+          </strong>
         </p>
       )}
       <Button
@@ -41,7 +59,8 @@ export function QuickRecord({
         onClick={() => submit("filled", defaultAmount)}
         className="flex h-16 w-full items-center justify-center gap-2 rounded-2xl bg-filled text-xl font-bold text-white disabled:opacity-60 dark:text-black"
       >
-        <Check className="size-7" strokeWidth={3} /> Ada · {formatRupiah(defaultAmount)}
+        <Check className="size-7" strokeWidth={3} /> Ada |{" "}
+        {formatRupiah(defaultAmount)}
       </Button>
       <Button
         variant="plain"
@@ -52,7 +71,13 @@ export function QuickRecord({
         Kosong
       </Button>
       {current && (
-        <Button variant="ghost" size="sm" disabled={pending} onClick={() => submit("none", 0)} className="w-full">
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={pending}
+          onClick={() => submit("none", 0)}
+          className="w-full"
+        >
           Hapus catatan malam ini
         </Button>
       )}
