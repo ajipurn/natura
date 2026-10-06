@@ -73,15 +73,25 @@ export const rondaRoutes = new Hono<AppEnv>()
     return c.json({ success: "Permintaan dibatalkan." });
   })
 
-  .get("/riwayat", requireUser, async (c) => {
-    const [patrols, houseRows] = await Promise.all([listPatrols(c.var.db, 90), listHouses(c.var.db)]);
-    return c.json({
-      patrols,
-      /** Rumah dihuni saat ini, untuk menghitung yang belum dicek tiap malam (perkiraan). */
-      activeHouses: houseRows.filter((h) => h.status === "active").length,
-      today: rondaDate(new Date()),
-    });
-  })
+  /** Malam ronda terbaru, atau semua malam satu bulan (?bulan=YYYY-MM, untuk kalender). */
+  .get(
+    "/riwayat",
+    requireUser,
+    validator("query", (value: Record<string, string | string[]>) => {
+      const bulan = typeof value.bulan === "string" && isMonth(value.bulan) ? value.bulan : undefined;
+      return { bulan };
+    }),
+    async (c) => {
+      const { bulan } = c.req.valid("query");
+      const [patrols, houseRows] = await Promise.all([listPatrols(c.var.db, 90, bulan), listHouses(c.var.db)]);
+      return c.json({
+        patrols,
+        /** Rumah dihuni saat ini, untuk menghitung yang belum dicek tiap malam (perkiraan). */
+        activeHouses: houseRows.filter((h) => h.status === "active").length,
+        today: rondaDate(new Date()),
+      });
+    },
+  )
 
   .get(
     "/riwayat/:date",
@@ -105,7 +115,7 @@ export const rondaRoutes = new Hono<AppEnv>()
     const month = c.req.valid("query").bulan;
     const db = c.var.db;
     const [recap, settings] = await Promise.all([getMonthRecap(db, month), getSettings(db)]);
-    return c.json({ month, communityName: settings.communityName, ...recap });
+    return c.json({ month, communityName: settings.communityName, defaultAmount: settings.defaultAmount, ...recap });
   });
 
 export { monthQuery };

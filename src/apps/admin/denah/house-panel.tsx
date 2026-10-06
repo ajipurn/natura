@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { Hand, Pencil, ScanLine, Table2, X } from "lucide-react";
-import { useEffect, useRef, type ReactNode } from "react";
+import { Hand, PenLine, Pencil, ScanLine, Table2, X } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { ScrollArea } from "@/components/scroll-area";
 import { Button, Card, buttonClass, cx } from "@/components/ui";
+import { CorrectionDialog } from "@/features/riwayat/correction-form";
 import { formatDateShort, formatMonth, formatTime } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { houseLabel, type HouseRef } from "@/lib/houses";
@@ -99,9 +100,15 @@ export function HousePanel({
 }: {
   house: HouseDTO;
   month: string;
-  tonight?: { date: string; collection: CollectionDTO | null };
+  /** Mode malam ini: catatan rumah ini malam ini, bisa diisi/diubah admin. */
+  tonight?: {
+    date: string;
+    collection: CollectionDTO | null;
+    defaultAmount: number;
+  };
   onClose: () => void;
 }) {
+  const [correcting, setCorrecting] = useState(false);
   // Mode malam ini: ikut diperbarui seperti denahnya, supaya kotak malam ini tidak tertinggal.
   const recap = useQuery({
     ...recapQuery(month),
@@ -160,6 +167,25 @@ export function HousePanel({
         <section>
           <PanelHeading>Malam ini</PanelHeading>
           <TonightStatus house={house} collection={tonight.collection} />
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-2.5"
+            onClick={() => setCorrecting(true)}
+          >
+            <PenLine className="size-4" />
+            {tonight.collection ? "Ubah catatan" : "Isi catatan"}
+          </Button>
+          <CorrectionDialog
+            target={{
+              house,
+              date: tonight.date,
+              current: tonight.collection ?? undefined,
+            }}
+            open={correcting}
+            onClose={() => setCorrecting(false)}
+            defaultAmount={tonight.defaultAmount}
+          />
         </section>
       )}
 

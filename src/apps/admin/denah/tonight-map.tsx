@@ -22,7 +22,7 @@ export function TonightMap() {
 
   return (
     <QueryState query={query}>
-      {({ houses, collections }) => {
+      {({ houses, collections, settings }) => {
         const summary = summarize(houses, collections);
         const byHouse = new Map(collections.map((c) => [c.houseId, c]));
         const markers: Record<number, MarkerState> = Object.fromEntries(
@@ -96,7 +96,7 @@ export function TonightMap() {
                     key={house.id}
                     house={house}
                     month={date.slice(0, 7)}
-                    tonight={{ date, collection: byHouse.get(house.id) ?? null }}
+                    tonight={{ date, collection: byHouse.get(house.id) ?? null, defaultAmount: settings.defaultAmount }}
                     onClose={() => setSelected(null)}
                   />
                 ) : (

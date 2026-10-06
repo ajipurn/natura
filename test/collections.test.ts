@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getAudit } from "@/server/audit";
-import { applyEntries, writeCollection } from "@/server/collections";
+import { applyEntries, writeCollections } from "@/server/collections";
 import type { Db } from "@/server/db";
 import { getCollectionsForDate, getMonthRecap, listPatrols } from "@/server/queries";
 import { collectionLogs, houses, rondaSchedule, users } from "@/server/schema";
@@ -212,15 +212,17 @@ describe("dua petugas mencatat rumah yang sama", () => {
 
   it("koreksi admin tidak kena aturan ini", async () => {
     await applyEntries(db, petugas, [entry({ houseId: house, amount: 500, recordedAt: at(9) })], NOW);
-    await writeCollection(db, {
-      date: "2026-10-04",
-      houseId: house,
-      status: "empty",
-      amount: 0,
-      method: "manual",
-      userId: sari.id,
-      recordedAt: new Date(at(10)),
-    });
+    await writeCollections(db, [
+      {
+        date: "2026-10-04",
+        houseId: house,
+        status: "empty",
+        amount: 0,
+        method: "manual",
+        userId: sari.id,
+        recordedAt: new Date(at(10)),
+      },
+    ]);
     expect(await saved(house)).toMatchObject({ status: "empty", collectorName: "Sari" });
   });
 

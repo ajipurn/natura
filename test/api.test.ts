@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
-import { rondaDate } from "@/lib/dates";
+import { addDays, rondaDate } from "@/lib/dates";
 import { scheduleDay, slotHouseLabel } from "@/lib/schedule";
 import { houses } from "@/server/schema";
 import type { Db } from "@/server/db";
@@ -157,6 +157,42 @@ describe("rumah, ronda, riwayat", () => {
 
     const dash = await admin.get("/api/admin/ringkasan");
     expect(dash.data).toMatchObject({ tonight: { filled: 1, total: 1000 }, monthSummary: { nights: 1, total: 1000 } });
+  });
+
+  it("admin mengisi dan mengubah catatan banyak rumah sekaligus, untuk malam mana pun yang sudah lewat", async () => {
+    const [a, b, c] = ((await admin.get("/api/admin/rumah")).data.houses as { id: number }[]).map((h) => h.id);
+    const date = "2025-03-15";
+    const fill = await admin.put(`/api/admin/riwayat/${date}`, {
+      entries: [
+        { houseId: a, status: "filled", amount: 500 },
+        { houseId: b, status: "filled", amount: 500 },
+        { houseId: c, status: "empty", amount: 0 },
+        // Rumah yang muncul dua kali memakai isian terakhirnya.
+        { houseId: b, status: "filled", amount: 2000 },
+      ],
+    });
+    expect(fill.data.success).toBe("3 rumah tersimpan.");
+    await admin.put(`/api/admin/riwayat/${date}/${a}`, { status: "none", amount: 0 });
+
+    const rekap = (await admin.get("/api/rekap?bulan=2025-03")).data;
+    expect(rekap).toMatchObject({ dates: [date], defaultAmount: 500 });
+    expect(rekap.cells).toEqual({
+      [`${b}:${date}`]: { status: "filled", amount: 2000 },
+      [`${c}:${date}`]: { status: "empty", amount: 0 },
+    });
+    // Kalender riwayat: semua malam satu bulan, juga yang di luar 90 malam terbaru.
+    const calendar = (await admin.get("/api/riwayat?bulan=2025-03")).data;
+    expect(calendar.patrols).toMatchObject([{ date, filled: 1, empty: 1, total: 2000 }]);
+    expect((await admin.get("/api/riwayat?bulan=2025-04")).data.patrols).toEqual([]);
+    const audit = (await admin.get(`/api/admin/audit?tanggal=${date}`)).data as { logs: { method: string }[] };
+    expect(audit.logs.map((l) => l.method)).toEqual(["koreksi", "koreksi", "koreksi", "koreksi"]);
+
+    const tomorrow = addDays(rondaDate(new Date()), 1);
+    const one = (status: string, amount: number, houseId = a) => ({ entries: [{ houseId, status, amount }] });
+    expect((await admin.put(`/api/admin/riwayat/${tomorrow}`, one("empty", 0))).data).toEqual({ error: "Tanggalnya belum lewat." });
+    expect((await admin.put(`/api/admin/riwayat/${date}`, one("filled", 0))).data).toEqual({ error: "Isi nominal yang benar." });
+    expect((await admin.put(`/api/admin/riwayat/${date}`, one("empty", 0, 999_999))).status).toBe(404);
+    expect((await admin.put(`/api/admin/riwayat/${date}`, { entries: [] })).status).toBe(400);
   });
 });
 

@@ -3,8 +3,16 @@ import { api, call } from "@/client/api";
 
 export const patrolsQuery = queryOptions({
   queryKey: ["riwayat"],
-  queryFn: () => call(api.riwayat.$get()),
+  // Tanpa `bulan`: 90 malam terbaru.
+  queryFn: () => call(api.riwayat.$get({ query: { bulan: undefined } })),
 });
+
+/** Semua malam ronda satu bulan ("YYYY-MM"), untuk kalender. */
+export const monthPatrolsQuery = (month: string) =>
+  queryOptions({
+    queryKey: ["riwayat", "bulan", month],
+    queryFn: () => call(api.riwayat.$get({ query: { bulan: month } })),
+  });
 
 export const patrolQuery = (date: string) =>
   queryOptions({

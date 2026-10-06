@@ -1,5 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ChevronLeft, ChevronRight, Hand, LayoutList, Map as MapIcon, Pencil, ScanLine, Search, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Hand,
+  LayoutList,
+  ListChecks,
+  Map as MapIcon,
+  Pencil,
+  ScanLine,
+  Search,
+  Users,
+} from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { ErrorCard, QueryState } from "@/components/query-state";
@@ -8,14 +21,27 @@ import { ShareRecap } from "@/components/share-recap";
 import { SitePlanMap } from "@/components/site-plan-map";
 import { ChipGroup, SegmentedControl } from "@/components/toggle-group";
 import { Button, Card, Input, PageTitle, cx } from "@/components/ui";
-import { addDays, formatDateLong, formatDateShort, formatTime, isIsoDate, rondaDate } from "@/lib/dates";
+import {
+  addDays,
+  formatDateLong,
+  formatDateShort,
+  formatTime,
+  isIsoDate,
+  rondaDate,
+} from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import type { MarkerState } from "@/lib/house-state";
 import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
 import { buildRecapText, summarize } from "@/lib/recap";
 import type { CollectionDTO, HouseDTO } from "@/lib/types";
 import { SITE_PLAN } from "@/site-plan";
-import { CorrectionForm } from "./correction-form";
+import {
+  BulkFillForm,
+  CorrectionDialog,
+  CorrectionForm,
+  type CorrectionTarget,
+} from "./correction-form";
+import { NightPicker } from "./night-picker";
 import { patrolQuery } from "./queries";
 
 type Filter = "semua" | "ada" | "kosong" | "belum";
@@ -26,10 +52,17 @@ const VIEWS = [
   { value: "denah", label: "Denah", icon: MapIcon },
 ] as const;
 
-const percent = (part: number, whole: number) => (whole ? (part / whole) * 100 : 0);
+const percent = (part: number, whole: number) =>
+  whole ? (part / whole) * 100 : 0;
 
-/** Detail satu malam ronda (alamat `${basePath}/:tanggal`). Admin bisa mengoreksi catatan. */
-export function PatrolDetail({ basePath, canCorrect }: { basePath: string; canCorrect: boolean }) {
+/** Detail satu malam ronda (alamat `${basePath}/:tanggal`). Admin bisa mengisi dan mengoreksi catatan. */
+export function PatrolDetail({
+  basePath,
+  canCorrect,
+}: {
+  basePath: string;
+  canCorrect: boolean;
+}) {
   const date = useParams().tanggal ?? "";
   const valid = isIsoDate(date);
   const query = useQuery({ ...patrolQuery(date), enabled: valid });
@@ -37,8 +70,14 @@ export function PatrolDetail({ basePath, canCorrect }: { basePath: string; canCo
 
   return (
     <>
-      <nav aria-label="Navigasi riwayat" className="mb-3 flex items-center justify-between gap-2 text-sm">
-        <Link to={basePath} className="flex items-center gap-1.5 font-semibold text-muted hover:text-fg">
+      <nav
+        aria-label="Navigasi riwayat"
+        className="mb-3 flex items-center justify-between gap-2 text-sm"
+      >
+        <Link
+          to={basePath}
+          className="flex items-center gap-1.5 font-semibold text-muted hover:text-fg"
+        >
           <ArrowLeft className="size-4" /> Riwayat
         </Link>
         {valid && (
@@ -49,19 +88,36 @@ export function PatrolDetail({ basePath, canCorrect }: { basePath: string; canCo
               aria-label={`Malam sebelumnya, ${formatDateShort(addDays(date, -1))}`}
             >
               <ChevronLeft className="size-4" />
-              <span className="hidden sm:inline">{formatDateShort(addDays(date, -1))}</span>
+              <span className="hidden sm:inline">
+                {formatDateShort(addDays(date, -1))}
+              </span>
             </Link>
+            <NightPicker
+              basePath={basePath}
+              selected={date}
+              label="Pilih tanggal lain"
+              variant="ghost"
+              size="icon-sm"
+              triggerClassName="text-muted hover:text-fg"
+            >
+              <CalendarDays className="size-4" />
+            </NightPicker>
             {date < tonight ? (
               <Link
                 to={`${basePath}/${addDays(date, 1)}`}
                 className="flex h-8 items-center gap-1 rounded-lg px-2 text-muted hover:bg-idle-soft hover:text-fg"
                 aria-label={`Malam berikutnya, ${formatDateShort(addDays(date, 1))}`}
               >
-                <span className="hidden sm:inline">{formatDateShort(addDays(date, 1))}</span>
+                <span className="hidden sm:inline">
+                  {formatDateShort(addDays(date, 1))}
+                </span>
                 <ChevronRight className="size-4" />
               </Link>
             ) : (
-              <span aria-hidden className="flex h-8 items-center px-2 text-muted/40">
+              <span
+                aria-hidden
+                className="flex h-8 items-center px-2 text-muted/40"
+              >
                 <ChevronRight className="size-4" />
               </span>
             )}
@@ -80,7 +136,8 @@ export function PatrolDetail({ basePath, canCorrect }: { basePath: string; canCo
               collections={collections}
               communityName={settings.communityName}
               defaultAmount={settings.defaultAmount}
-              canCorrect={canCorrect}
+              // Malam yang belum tiba belum bisa diisi.
+              canCorrect={canCorrect && date <= tonight}
             />
           )}
         </QueryState>
@@ -110,19 +167,35 @@ function NightDetail({
   const [search, setSearch] = useState("");
   const [view, setView] = useState<View>("daftar");
   const [editing, setEditing] = useState<number | null>(null);
+  const [bulkFilling, setBulkFilling] = useState(false);
+  // Rumah yang diketuk di denah (dikoreksi lewat dialog).
+  const [mapTarget, setMapTarget] = useState<CorrectionTarget | null>(null);
+  const [mapTargetOpen, setMapTargetOpen] = useState(false);
 
   const summary = summarize(houses, collections);
   const byHouse = new Map(collections.map((c) => [c.houseId, c]));
   const markers: Record<number, MarkerState> = Object.fromEntries(
-    houses.map((h) => [h.id, byHouse.get(h.id)?.status ?? (h.status === "vacant" ? "vacant" : "unchecked")]),
+    houses.map((h) => [
+      h.id,
+      byHouse.get(h.id)?.status ??
+        (h.status === "vacant" ? "vacant" : "unchecked"),
+    ]),
   );
-  const stateOf = (h: HouseDTO) => byHouse.get(h.id)?.status ?? (h.status === "vacant" ? "vacant" : "none");
-  const matched = search.trim() ? new Set(searchHouses(houses, search, houses.length).map((h) => h.id)) : null;
+  const stateOf = (h: HouseDTO) =>
+    byHouse.get(h.id)?.status ?? (h.status === "vacant" ? "vacant" : "none");
+  const matched = search.trim()
+    ? new Set(searchHouses(houses, search, houses.length).map((h) => h.id))
+    : null;
   const shown = houses
     .filter((h) => !matched || matched.has(h.id))
     .filter((h) => {
       const s = stateOf(h);
-      return filter === "semua" || (filter === "ada" && s === "filled") || (filter === "kosong" && s === "empty") || (filter === "belum" && s === "none");
+      return (
+        filter === "semua" ||
+        (filter === "ada" && s === "filled") ||
+        (filter === "kosong" && s === "empty") ||
+        (filter === "belum" && s === "none")
+      );
     });
 
   const filters: { value: Filter; label: string; count: number }[] = [
@@ -138,7 +211,11 @@ function NightDetail({
       <header className="mb-4">
         <h1 className="flex flex-wrap items-center gap-x-2 text-2xl font-bold tracking-tight">
           {formatDateLong(date)}
-          {isTonight && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-sm font-semibold text-primary">Malam ini</span>}
+          {isTonight && (
+            <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-sm font-semibold text-primary">
+              Malam ini
+            </span>
+          )}
         </h1>
         <p className="mt-0.5 text-sm text-muted">Jimpitan {communityName}</p>
       </header>
@@ -147,36 +224,98 @@ function NightDetail({
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
           <div>
             <p className="text-xs text-muted">Terkumpul</p>
-            <p className="text-3xl font-bold tabular-nums">{formatRupiah(summary.total)}</p>
+            <p className="text-3xl font-bold tabular-nums">
+              {formatRupiah(summary.total)}
+            </p>
           </div>
           <dl className="grid grid-cols-3 gap-4 text-center sm:gap-6">
-            <Stat label="Ada" value={summary.filled.length} className="text-filled" />
-            <Stat label="Kosong" value={summary.empty.length} className="text-empty" />
+            <Stat
+              label="Ada"
+              value={summary.filled.length}
+              className="text-filled"
+            />
+            <Stat
+              label="Kosong"
+              value={summary.empty.length}
+              className="text-empty"
+            />
             <Stat label="Belum dicek" value={summary.unchecked.length} />
           </dl>
         </div>
-        <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-idle-soft" aria-hidden>
-          <div className="h-full bg-filled" style={{ width: `${percent(summary.filled.length, summary.expected)}%` }} />
-          <div className="h-full bg-empty" style={{ width: `${percent(summary.empty.length, summary.expected)}%` }} />
+        <div
+          className="mt-3 flex h-2 overflow-hidden rounded-full bg-idle-soft"
+          aria-hidden
+        >
+          <div
+            className="h-full bg-filled"
+            style={{
+              width: `${percent(summary.filled.length, summary.expected)}%`,
+            }}
+          />
+          <div
+            className="h-full bg-empty"
+            style={{
+              width: `${percent(summary.empty.length, summary.expected)}%`,
+            }}
+          />
         </div>
         <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
           <span>
             {summary.checked} dari {summary.expected} rumah dicek
-            {summary.vacant.length > 0 && ` · ${summary.vacant.length} mudik`}
+            {summary.vacant.length > 0 && ` | ${summary.vacant.length} mudik`}
           </span>
           {summary.collectors.length > 0 && (
             <span className="flex items-center gap-1.5">
-              <Users className="size-4" aria-hidden /> {summary.collectors.join(", ")}
+              <Users className="size-4" aria-hidden />{" "}
+              {summary.collectors.join(", ")}
             </span>
           )}
         </p>
         {summary.checked > 0 ? (
-          <ShareRecap className="mt-4" text={buildRecapText({ communityName, date, houses, collections })} />
+          <ShareRecap
+            className="mt-4"
+            text={buildRecapText({ communityName, date, houses, collections })}
+          />
         ) : (
           <p className="mt-4 rounded-xl bg-idle-soft px-3 py-2.5 text-sm text-muted">
-            Belum ada catatan untuk malam ini.{canCorrect && " Catatan bisa diisi per rumah lewat tombol koreksi di bawah."}
+            Belum ada catatan untuk malam ini.
+            {canCorrect &&
+              " Isi semua rumah sekaligus, lalu ubah yang berbeda lewat tombol koreksi di daftar."}
           </p>
         )}
+        {canCorrect &&
+          summary.unchecked.length > 0 &&
+          (bulkFilling ? (
+            <section
+              aria-label="Isi yang belum dicek"
+              className="mt-4 max-w-xl border-t border-line pt-3"
+            >
+              <p className="text-sm font-semibold">
+                Isi {summary.unchecked.length} rumah yang belum dicek
+              </p>
+              <p className="mb-2.5 text-xs text-muted">
+                Semuanya dicatat sama.
+                {summary.vacant.length > 0 && " Rumah mudik tidak ikut."} Rumah
+                yang berbeda bisa dikoreksi sesudahnya.
+              </p>
+              <BulkFillForm
+                date={date}
+                houseIds={summary.unchecked.map((h) => h.id)}
+                defaultAmount={defaultAmount}
+                onDone={() => setBulkFilling(false)}
+              />
+            </section>
+          ) : (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-3"
+              onClick={() => setBulkFilling(true)}
+            >
+              <ListChecks className="size-4" /> Isi yang belum dicek (
+              {summary.unchecked.length})
+            </Button>
+          ))}
       </Card>
 
       {houses.length === 0 ? (
@@ -205,58 +344,136 @@ function NightDetail({
                   className="pl-10"
                 />
               </label>
-              <SegmentedControl aria-label="Tampilan" iconOnly value={view} onValueChange={setView} options={VIEWS} className="shrink-0" />
+              <SegmentedControl
+                aria-label="Tampilan"
+                iconOnly
+                value={view}
+                onValueChange={setView}
+                options={VIEWS}
+                className="shrink-0"
+              />
             </div>
           </div>
 
           {view === "denah" ? (
-            <SitePlanMap
-              className="mt-4"
-              plan={SITE_PLAN}
-              houses={houses}
-              markers={markers}
-              highlight={matched || filter !== "semua" ? new Set(shown.map((h) => h.id)) : null}
-            />
+            <>
+              {canCorrect && (
+                <p className="mt-4 flex items-center gap-1.5 text-sm text-muted">
+                  <Pencil className="size-4 shrink-0" aria-hidden />
+                  Ketuk rumah di denah untuk mengisi atau mengubah catatannya.
+                </p>
+              )}
+              <SitePlanMap
+                className={canCorrect ? "mt-2" : "mt-4"}
+                plan={SITE_PLAN}
+                houses={houses}
+                markers={markers}
+                selectedId={mapTargetOpen ? mapTarget?.house.id : null}
+                onHouseClick={
+                  canCorrect
+                    ? (h) => {
+                        const c = byHouse.get(h.id);
+                        setMapTarget({
+                          house: h,
+                          date,
+                          current: c,
+                          note: c
+                            ? `Dicatat ${formatTime(c.recordedAt)}${c.collectorName ? ` oleh ${c.collectorName}` : ""}.`
+                            : undefined,
+                        });
+                        setMapTargetOpen(true);
+                      }
+                    : undefined
+                }
+                highlight={
+                  matched || filter !== "semua"
+                    ? new Set(shown.map((h) => h.id))
+                    : null
+                }
+              />
+              <CorrectionDialog
+                target={mapTarget}
+                open={mapTargetOpen}
+                onClose={() => setMapTargetOpen(false)}
+                defaultAmount={defaultAmount}
+              />
+            </>
           ) : shown.length === 0 ? (
-            <p className="mt-6 text-center text-muted">Tidak ada rumah yang cocok.</p>
+            <p className="mt-6 text-center text-muted">
+              Tidak ada rumah yang cocok.
+            </p>
           ) : (
             groupByBlock(shown).map(([block, list]) => (
-              <section key={block} className="mt-5" aria-label={`Blok ${block}`}>
+              <section
+                key={block}
+                className="mt-5"
+                aria-label={`Blok ${block}`}
+              >
                 <h2 className="mb-2 text-sm font-semibold">
-                  Blok {block} <span className="font-normal text-muted">· {list.length} rumah</span>
+                  Blok {block}{" "}
+                  <span className="font-normal text-muted">
+                    | {list.length} rumah
+                  </span>
                 </h2>
                 <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
                   {list.map((h) => {
                     const c = byHouse.get(h.id);
                     const isEditing = editing === h.id;
                     return (
-                      <li key={h.id} className={cx("px-4 py-2.5", isEditing && "bg-idle-soft/50")}>
+                      <li
+                        key={h.id}
+                        className={cx(
+                          "px-4 py-2.5",
+                          isEditing && "bg-idle-soft/50",
+                        )}
+                      >
                         <div className="flex items-center gap-3">
-                          <span className="w-14 shrink-0 font-bold">{houseLabel(h)}</span>
+                          <span className="w-14 shrink-0 font-bold">
+                            {houseLabel(h)}
+                          </span>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm">{h.ownerName ?? <span className="text-muted">—</span>}</p>
+                            <p className="truncate text-sm">
+                              {h.ownerName ?? (
+                                <span className="text-muted">—</span>
+                              )}
+                            </p>
                             {c && (
                               <p className="flex items-center gap-1 text-xs text-muted">
                                 {c.method === "scan" ? (
-                                  <ScanLine className="size-3.5" role="img" aria-label="scan QR" />
+                                  <ScanLine
+                                    className="size-3.5"
+                                    role="img"
+                                    aria-label="scan QR"
+                                  />
                                 ) : (
-                                  <Hand className="size-3.5" role="img" aria-label="manual" />
+                                  <Hand
+                                    className="size-3.5"
+                                    role="img"
+                                    aria-label="manual"
+                                  />
                                 )}
                                 {formatTime(c.recordedAt)}
-                                {c.collectorName && ` · ${c.collectorName}`}
+                                {c.collectorName && ` | ${c.collectorName}`}
                               </p>
                             )}
                           </div>
-                          <StatusBadge status={stateOf(h)} amount={c?.amount ?? 0} />
+                          <StatusBadge
+                            status={stateOf(h)}
+                            amount={c?.amount ?? 0}
+                          />
                           {canCorrect && (
                             <Button
                               variant="ghost"
                               size="icon-sm"
-                              onClick={() => setEditing(isEditing ? null : h.id)}
+                              onClick={() =>
+                                setEditing(isEditing ? null : h.id)
+                              }
                               aria-expanded={isEditing}
                               aria-label={`Koreksi ${houseLabel(h)}`}
                               title="Koreksi"
-                              className={cx(isEditing && "bg-idle-soft text-fg")}
+                              className={cx(
+                                isEditing && "bg-idle-soft text-fg",
+                              )}
                             >
                               <Pencil className="size-4" />
                             </Button>
@@ -285,17 +502,33 @@ function NightDetail({
   );
 }
 
-function Stat({ label, value, className }: { label: string; value: number; className?: string }) {
+function Stat({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: number;
+  className?: string;
+}) {
   return (
     // Angka di atas label, tapi urutan dt → dd tetap untuk pembaca layar.
     <div className="flex flex-col-reverse">
       <dt className="text-xs text-muted">{label}</dt>
-      <dd className={cx("text-2xl font-bold tabular-nums", className)}>{value}</dd>
+      <dd className={cx("text-2xl font-bold tabular-nums", className)}>
+        {value}
+      </dd>
     </div>
   );
 }
 
-function StatusBadge({ status, amount }: { status: "filled" | "empty" | "vacant" | "none"; amount: number }) {
+function StatusBadge({
+  status,
+  amount,
+}: {
+  status: "filled" | "empty" | "vacant" | "none";
+  amount: number;
+}) {
   const styles = {
     filled: "bg-filled-soft text-filled",
     empty: "bg-empty-soft text-empty",
@@ -308,5 +541,14 @@ function StatusBadge({ status, amount }: { status: "filled" | "empty" | "vacant"
     vacant: "Mudik",
     none: "Belum dicek",
   }[status];
-  return <span className={cx("shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold", styles)}>{label}</span>;
+  return (
+    <span
+      className={cx(
+        "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold",
+        styles,
+      )}
+    >
+      {label}
+    </span>
+  );
 }

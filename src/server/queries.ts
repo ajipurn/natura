@@ -173,7 +173,9 @@ export type PatrolSummary = {
   collectors: string | null;
 };
 
-export async function listPatrols(db: Db, limit = 90): Promise<PatrolSummary[]> {
+/** Malam-malam ronda terbaru, atau semua malam di satu bulan ("YYYY-MM") kalau `month` diisi. */
+export async function listPatrols(db: Db, limit = 90, month?: string): Promise<PatrolSummary[]> {
+  const days = month ? daysInMonth(month) : null;
   const rows = await db
     .select({
       date: patrols.date,
@@ -187,9 +189,10 @@ export async function listPatrols(db: Db, limit = 90): Promise<PatrolSummary[]> 
     .leftJoin(collections, eq(collections.patrolId, patrols.id))
     .leftJoin(houses, eq(houses.id, collections.houseId))
     .leftJoin(users, eq(users.id, collections.collectedBy))
+    .where(days ? and(gte(patrols.date, days[0]), lte(patrols.date, days[days.length - 1])) : undefined)
     .groupBy(patrols.id)
     .orderBy(desc(patrols.date))
-    .limit(limit);
+    .limit(days ? days.length : limit);
   return rows.map((r) => {
     const names = [...(r.collectors ?? [])].sort((a, b) => a.localeCompare(b, "id"));
     return { ...r, collectors: names.length ? names.join(", ") : null };

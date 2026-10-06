@@ -11,7 +11,7 @@ import { parseSchedule } from "@/lib/schedule";
 import { matchPlan } from "@/lib/site-plan";
 import { SITE_PLAN } from "@/site-plan";
 import { requireAdmin } from "../auth";
-import { MAX_AMOUNT, writeCollection } from "../collections";
+import { MAX_AMOUNT, writeCollections } from "../collections";
 import { runBatch, type Executor } from "../db";
 import type { AppEnv } from "../env";
 import { body, idParam, pinField, trimmed } from "../http";
@@ -91,6 +91,13 @@ const contactsSchema = z.object({
     )
     .max(20, "Maksimal 20 kontak."),
 });
+
+/** Koreksi catatan satu rumah oleh admin. `none` = hapus catatannya (belum dicek). */
+const correctionSchema = z.object({
+  status: z.enum(["filled", "empty", "none"], "Status tidak valid."),
+  amount: z.number().int().min(0).max(MAX_AMOUNT),
+});
+const MAX_BULK_CORRECTIONS = 500;
 
 const MAX_SCHEDULE_TEXT = 50_000;
 const MAX_SCHEDULE_ENTRIES = 1000;
@@ -449,15 +456,35 @@ export const adminRoutes = new Hono<AppEnv>()
       if (!isIsoDate(value.date) || !Number.isSafeInteger(houseId) || houseId <= 0) return c.json({ error: "Data tidak valid." }, 400);
       return { date: value.date, houseId };
     }),
-    body(z.object({ status: z.enum(["filled", "empty", "none"], "Status tidak valid."), amount: z.number().int().min(0).max(MAX_AMOUNT) })),
+    body(correctionSchema),
     async (c) => {
       const { date, houseId } = c.req.valid("param");
-      const { status, amount } = c.req.valid("json");
-      if (status === "filled" && amount <= 0) return c.json({ error: "Isi nominal yang benar." }, 400);
-      if (date > rondaDate(new Date())) return c.json({ error: "Tanggalnya belum lewat." }, 400);
-      if (!(await getHouseIds(c.var.db)).has(houseId)) return c.json({ error: "Rumah tidak ditemukan." }, 404);
-      await writeCollection(c.var.db, { date, houseId, status, amount, method: "manual", userId: c.var.user.id, recordedAt: new Date() });
+      const error = await saveCorrections(c.var.db, c.var.user.id, date, [{ houseId, ...c.req.valid("json") }]);
+      if (error) return c.json({ error: error.message }, error.status);
       return c.json({ success: "Tersimpan." });
+    },
+  )
+
+  /** Isi atau ubah catatan banyak rumah sekaligus untuk satu malam (mis. dari catatan kertas). */
+  .put(
+    "/riwayat/:date",
+    validator("param", (value: Record<string, string>, c) =>
+      isIsoDate(value.date) ? { date: value.date } : c.json({ error: "Tanggal tidak valid." }, 400),
+    ),
+    body(
+      z.object({
+        entries: z
+          .array(correctionSchema.extend({ houseId: z.number().int().positive() }))
+          .min(1, "Pilih rumahnya dulu.")
+          .max(MAX_BULK_CORRECTIONS, "Terlalu banyak rumah sekaligus."),
+      }),
+    ),
+    async (c) => {
+      const { date } = c.req.valid("param");
+      const entries = c.req.valid("json").entries;
+      const error = await saveCorrections(c.var.db, c.var.user.id, date, entries);
+      if (error) return c.json({ error: error.message }, error.status);
+      return c.json({ success: `${new Set(entries.map((e) => e.houseId)).size} rumah tersimpan.` });
     },
   )
 
@@ -534,3 +561,26 @@ function nameTakenError(name: string) {
   return `Nama "${name}" sudah dipakai. Nama kembar boleh asal rumahnya diisi dan berbeda.`;
 }
 
+/**
+ * Simpan koreksi admin untuk satu malam (tanggal mana pun yang sudah lewat, semua rumah). Rumah yang
+ * muncul dua kali memakai isian terakhirnya. Mengembalikan galat kalau ada isian yang salah.
+ */
+async function saveCorrections(
+  db: Db,
+  userId: number,
+  date: string,
+  entries: { houseId: number; status: "filled" | "empty" | "none"; amount: number }[],
+): Promise<{ message: string; status: 400 | 404 } | null> {
+  if (date > rondaDate(new Date())) return { message: "Tanggalnya belum lewat.", status: 400 };
+  if (entries.some((e) => e.status === "filled" && e.amount <= 0)) return { message: "Isi nominal yang benar.", status: 400 };
+  const known = await getHouseIds(db);
+  if (entries.some((e) => !known.has(e.houseId))) return { message: "Rumah tidak ditemukan.", status: 404 };
+  const recordedAt = new Date();
+  const latest = new Map(entries.map((e) => [e.houseId, e]));
+  await writeCollections(
+    db,
+    [...latest.values()].map((e) => ({ date, ...e, method: "manual" as const, userId, recordedAt })),
+    recordedAt,
+  );
+  return null;
+}

@@ -179,11 +179,14 @@ function writeStatements(db: Executor, writes: CollectionWrite[], now: Date, gua
   return statements;
 }
 
-/** Koreksi admin: simpan (atau hapus) catatan satu rumah untuk satu malam, dan catat di jejak audit. */
-export async function writeCollection(db: Db, input: CollectionWrite, now = new Date()) {
+/** Koreksi admin: simpan (atau hapus) catatan beberapa rumah sekaligus, dan catat di jejak audit. */
+export async function writeCollections(db: Db, inputs: CollectionWrite[], now = new Date()) {
   await runBatch(db, (tx) => [
-    ...writeStatements(tx, [input], now, false),
-    ...logStatements(tx, [{ ...input, clientId: null, method: "koreksi", onDuty: null }]),
+    ...writeStatements(tx, inputs, now, false),
+    ...logStatements(
+      tx,
+      inputs.map((input) => ({ ...input, clientId: null, method: "koreksi" as const, onDuty: null })),
+    ),
   ]);
 }
 
@@ -215,7 +218,7 @@ export async function applyEntries(
       fail("Rumah tidak ditemukan (mungkin sudah dihapus).");
     } else if (!duty.has(scheduleDay(rondaDate(at)))) {
       // Hanya yang dijadwalkan jaga malam itu yang boleh scan/catat, admin juga. Admin tetap bisa
-      // mengoreksi lewat Riwayat di dashboard (`writeCollection`).
+      // mengoreksi lewat Riwayat di dashboard (`writeCollections`).
       fail(`Bukan jadwal jagamu: ${dayLabel(scheduleDay(rondaDate(at)))}.`);
     } else {
       const date = rondaDate(at);
