@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Download,
   FileSpreadsheet,
   FileText,
   Pencil,
@@ -11,6 +13,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
+import { Menu } from "@/components/menu";
 import { QueryState } from "@/components/query-state";
 import { ScrollArea } from "@/components/scroll-area";
 import { Select } from "@/components/select";
@@ -93,7 +96,7 @@ export function RekapPage() {
   const [exporting, setExporting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [sheetsOpen, setSheetsOpen] = useState(false);
-  const ready =query.data && query.data.month === month;
+  const ready = query.data && query.data.month === month;
 
   async function exportXlsx() {
     if (!query.data) return;
@@ -111,32 +114,39 @@ export function RekapPage() {
         title="Rekap bulanan"
         subtitle="Jimpitan per rumah per malam ronda"
         action={
-          <div className="flex shrink-0 gap-2">
-            <Button
-              disabled={!ready || exporting}
-              onClick={exportXlsx}
-              variant="secondary"
-              size="sm"
-            >
-              <FileSpreadsheet className="size-4" />{" "}
-              {exporting ? "Menyiapkan…" : "Excel"}
-            </Button>
-            <Button
-              disabled={!ready}
-              onClick={() => query.data && downloadCsv(month, query.data)}
-              variant="secondary"
-              size="sm"
-            >
-              <FileText className="size-4" /> CSV
-            </Button>
-            <Button
-              onClick={() => setSheetsOpen(true)}
-              variant="secondary"
-              size="sm"
-            >
-              <Sheet className="size-4" /> Sheets
-            </Button>
-          </div>
+          <Menu
+            label="Unduh rekap"
+            className="shrink-0"
+            trigger={
+              <>
+                <Download className="size-4" />
+                {exporting ? "Menyiapkan…" : "Unduh"}
+                <ChevronDown className="-mr-1 size-4 text-muted" />
+              </>
+            }
+            items={[
+              {
+                label: "Excel (.xlsx)",
+                hint: "Berwarna, lembar per rumah dan per malam",
+                icon: <FileSpreadsheet className="mt-0.5 size-4 shrink-0 text-filled" />,
+                onSelect: exportXlsx,
+                disabled: !ready || exporting,
+              },
+              {
+                label: "CSV",
+                hint: "Tabel polos untuk aplikasi lain",
+                icon: <FileText className="mt-0.5 size-4 shrink-0 text-muted" />,
+                onSelect: () => query.data && downloadCsv(month, query.data),
+                disabled: !ready,
+              },
+              {
+                label: "Google Sheets",
+                hint: "Link IMPORTDATA yang ikut terbarui",
+                icon: <Sheet className="mt-0.5 size-4 shrink-0 text-primary" />,
+                onSelect: () => setSheetsOpen(true),
+              },
+            ]}
+          />
         }
       />
       <SheetsLinkDialog
@@ -201,8 +211,9 @@ export function RekapPage() {
 }
 
 /**
- * Tabel rekap. Saat `editing`, tabelnya memuat semua tanggal bulan itu sampai malam ini (juga malam
- * tanpa catatan) dan tiap kotak bisa diketuk untuk mengisi atau mengubah catatan rumah itu.
+ * Tabel rekap: semua tanggal bulan itu seperti kalender. Malam tanpa catatan tampil pudar, malam
+ * yang belum tiba kosong. Saat `editing`, tiap kotak sampai malam ini bisa diketuk untuk mengisi
+ * atau mengubah catatan rumah itu.
  */
 function RecapBody({
   data,
@@ -219,14 +230,15 @@ function RecapBody({
   const [target, setTarget] = useState<CorrectionTarget | null>(null);
   const [targetOpen, setTargetOpen] = useState(false);
   const headRef = useRef<HTMLDivElement>(null);
-  const dates = editing
-    ? daysInMonth(data.month).filter((d) => d <= tonight)
-    : data.dates;
+  const dates = daysInMonth(data.month);
   const patrolDates = new Set(data.dates);
   const { rows, dateTotals, grandTotal } = summarizeMonth({ ...data, dates });
   const nights = data.dates.length;
-  // Kolom Rumah mengisi sisa lebar, tapi tidak lebih sempit dari ini (lihat `RecapCols`).
-  const minWidth = `calc(11rem + ${dates.length} * ${DATE_COL} + ${ADA_COL} + ${TOTAL_COL})`;
+  const maxNight = Math.max(...dateTotals, 1);
+  // Malam yang belum tiba (selalu di akhir bulan) diberi kolom sempit.
+  const future = dates.filter((d) => d > tonight).length;
+  // Kolom tanggal berbagi sisa lebar, tapi tidak lebih sempit dari ini (lihat `RecapCols`).
+  const minWidth = `calc(var(--rumah-col) + ${dates.length - future} * ${DATE_COL} + ${future} * ${FUTURE_COL} + ${ADA_COL} + ${TOTAL_COL})`;
 
   const stats = rows.map((r) => ({
     ...r,
@@ -361,14 +373,14 @@ function RecapBody({
         </div>
       </div>
 
-      <Legend editing={editing} />
+      <Legend editing={editing} defaultAmount={data.defaultAmount} />
 
       {visible.length === 0 ? (
         <Card className="mt-3 text-center text-muted">
           Tidak ada rumah yang cocok.
         </Card>
       ) : (
-        <div className="mt-3 rounded-2xl border border-line bg-card">
+        <div className="mt-3 rounded-2xl border border-line bg-card [--rumah-col:10rem] sm:[--rumah-col:12rem]">
           {/*
            * Judul kolom menempel di atas saat halaman digulir (di bawah header HP, lihat layout.tsx).
            * Tabel terpisah karena wadah geser-mendatar di bawah menghalangi `sticky` vertikal; strip
@@ -383,34 +395,52 @@ function RecapBody({
               className="w-full table-fixed border-collapse text-sm"
               style={{ minWidth }}
             >
-              <RecapCols dates={dates.length} />
+              <RecapCols dates={dates.length} future={future} />
               <thead>
                 <tr className="text-xs text-muted">
                   <th className="sticky left-0 z-10 bg-card px-3 py-2 text-left font-semibold">
                     Rumah
                   </th>
-                  {dates.map((d) => (
-                    <th key={d} className="px-0.5 py-1.5 font-medium">
-                      <Link
-                        to={`/admin/riwayat/${d}`}
-                        title={`Buka riwayat ${formatDateShort(d)}`}
-                        aria-label={`Buka riwayat ${formatDateShort(d)}`}
-                        className={cx(
-                          "flex flex-col items-center rounded-md py-0.5 leading-tight hover:bg-idle-soft hover:text-fg",
-                          // Malam tanpa catatan (hanya tampil saat mengisi).
-                          !patrolDates.has(d) && "opacity-50",
-                        )}
-                      >
+                  {dates.map((d) => {
+                    const label = (
+                      <>
                         <span className="text-[10px]">
                           {formatDateShort(d).split(",")[0]}
                         </span>
                         <span className="font-semibold">
                           {Number(d.slice(8))}
                         </span>
-                      </Link>
-                    </th>
-                  ))}
-                  <th className="whitespace-nowrap px-3 py-2 text-right font-semibold">
+                      </>
+                    );
+                    return (
+                      <th key={d} className="px-px py-1.5 font-medium">
+                        {d > tonight ? (
+                          <span className="flex flex-col items-center py-0.5 leading-tight text-muted/40">
+                            <span className="text-[10px]">
+                              {formatDateShort(d).slice(0, 1)}
+                            </span>
+                            <span className="text-[10px]">
+                              {Number(d.slice(8))}
+                            </span>
+                          </span>
+                        ) : (
+                          <Link
+                            to={`/admin/riwayat/${d}`}
+                            title={`Buka riwayat ${formatDateShort(d)}${patrolDates.has(d) ? "" : " (belum ada catatan)"}`}
+                            aria-label={`Buka riwayat ${formatDateShort(d)}`}
+                            className={cx(
+                              "flex flex-col items-center rounded-md py-0.5 leading-tight hover:bg-idle-soft hover:text-fg",
+                              !patrolDates.has(d) && "opacity-50",
+                              d === tonight && "bg-primary/10 text-primary opacity-100",
+                            )}
+                          >
+                            {label}
+                          </Link>
+                        )}
+                      </th>
+                    );
+                  })}
+                  <th className="whitespace-nowrap px-2 py-2 text-right font-semibold">
                     Ada
                   </th>
                   <th className="whitespace-nowrap px-3 py-2 text-right font-semibold">
@@ -432,7 +462,7 @@ function RecapBody({
                 className="w-full table-fixed border-collapse text-sm"
                 style={{ minWidth }}
               >
-                <RecapCols dates={dates.length} />
+                <RecapCols dates={dates.length} future={future} />
                 {/* Judul kolom untuk pembaca layar; yang terlihat ada di strip di atas. */}
                 <thead className="sr-only">
                   <tr>
@@ -487,22 +517,38 @@ function RecapBody({
                           </span>
                         </th>
                         {r.cells.map((cell, i) => {
+                          const date = dates[i];
                           const vacant = r.house.status === "vacant";
-                          const content = (
-                            <Cell cell={cell} vacant={vacant} date={dates[i]} />
+                          const recorded = patrolDates.has(date);
+                          const future = date > tonight;
+                          const content = future ? null : (
+                            <Cell
+                              cell={cell}
+                              vacant={vacant}
+                              recorded={recorded}
+                              date={date}
+                              defaultAmount={data.defaultAmount}
+                            />
                           );
                           return (
-                            <td key={dates[i]} className="px-0.5 py-1 text-center">
-                              {editing ? (
+                            <td
+                              key={date}
+                              className={cx(
+                                "px-px py-1 text-center",
+                                // Malam tanpa catatan sama sekali: kolomnya diberi warna latar tipis.
+                                !recorded && !future && "bg-idle-soft/25",
+                              )}
+                            >
+                              {editing && !future ? (
                                 // Tombol biasa (bukan Base UI Button): jumlahnya bisa ribuan dalam satu tabel.
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setTarget({ house: r.house, date: dates[i], current: cell });
+                                    setTarget({ house: r.house, date, current: cell });
                                     setTargetOpen(true);
                                   }}
-                                  aria-label={`${houseLabel(r.house)}, ${formatDateShort(dates[i])}: ${cellText(cell, vacant)}`}
-                                  className="inline-flex cursor-pointer rounded-md align-middle transition hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                  aria-label={`${houseLabel(r.house)}, ${formatDateShort(date)}: ${cellText(cell, vacant)}`}
+                                  className="flex w-full cursor-pointer justify-center rounded-md transition hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                 >
                                   {content}
                                 </button>
@@ -512,7 +558,7 @@ function RecapBody({
                             </td>
                           );
                         })}
-                        <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
+                        <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">
                           {r.filledCount}
                           <span className="text-muted">
                             /{r.filledCount + r.empty}
@@ -534,11 +580,22 @@ function RecapBody({
                       Total
                     </th>
                     {dateTotals.map((t, i) => (
+                      // Kolomnya sempit untuk angka: tinggi batang = terkumpul malam itu, angkanya di judul.
                       <td
                         key={dates[i]}
-                        className="px-0.5 py-2 text-center text-[10px] text-muted"
+                        title={t > 0 ? `${formatDateShort(dates[i])}: ${formatRupiah(t)}` : undefined}
+                        className="px-px py-2 align-bottom"
                       >
-                        {t > 0 ? formatAmountShort(t) : "–"}
+                        {t > 0 && (
+                          <>
+                            <span
+                              aria-hidden
+                              className="mx-auto block w-full max-w-5 rounded-sm bg-filled/70"
+                              style={{ height: `${Math.max(3, (t / maxNight) * 28)}px` }}
+                            />
+                            <span className="sr-only">{formatRupiah(t)}</span>
+                          </>
+                        )}
                       </td>
                     ))}
                     <td />
@@ -563,20 +620,23 @@ function RecapBody({
   );
 }
 
-const DATE_COL = "2rem";
-const ADA_COL = "4.5rem";
-const TOTAL_COL = "8rem";
+const DATE_COL = "1.375rem";
+const FUTURE_COL = "1rem";
+const ADA_COL = "3.5rem";
+const TOTAL_COL = "7rem";
 
 /**
- * Lebar kolom tetap (`table-fixed`), sama untuk strip judul dan isi tabel supaya kolomnya sejajar.
- * Kolom Rumah tanpa lebar: mengisi sisanya.
+ * Lebar kolom (`table-fixed`), sama untuk strip judul dan isi tabel supaya kolomnya sejajar.
+ * Kolom Rumah selebar `--rumah-col`; kolom tanggal berbagi sisa lebar (tidak lebih sempit dari
+ * `DATE_COL`), jadi kotaknya tidak terpisah jauh dari nama rumah. `future` kolom terakhir (malam
+ * yang belum tiba) dibuat sempit.
  */
-function RecapCols({ dates }: { dates: number }) {
+function RecapCols({ dates, future }: { dates: number; future: number }) {
   return (
     <colgroup>
-      <col />
+      <col style={{ width: "var(--rumah-col)" }} />
       {Array.from({ length: dates }, (_, i) => (
-        <col key={i} style={{ width: DATE_COL }} />
+        <col key={i} style={i >= dates - future ? { width: FUTURE_COL } : undefined} />
       ))}
       <col style={{ width: ADA_COL }} />
       <col style={{ width: TOTAL_COL }} />
@@ -590,32 +650,39 @@ function cellText(cell: MonthCell | undefined, vacant: boolean) {
   return vacant ? "mudik" : "tidak dicek";
 }
 
+const cellBox = "mx-auto flex h-6 w-full max-w-7 items-center justify-center rounded-[5px]";
+
+/**
+ * Satu kotak rumah × malam. "Ada" dengan nominal awal cukup hijau polos; angkanya hanya ditulis kalau
+ * nominalnya lain, supaya yang tidak biasa menonjol. `recorded` = malam itu ada catatannya.
+ */
 function Cell({
   cell,
   vacant,
+  recorded,
   date,
+  defaultAmount,
 }: {
   cell: MonthCell | undefined;
   vacant: boolean;
+  recorded: boolean;
   date: string;
+  defaultAmount: number;
 }) {
-  const title = `${formatDateShort(date)}: ${cellText(cell, vacant)}`;
+  const title = `${formatDateShort(date)}: ${recorded || cell ? cellText(cell, vacant) : "belum ada catatan"}`;
   if (cell?.status === "filled") {
     return (
       <span
         title={title}
-        className="inline-flex size-7 items-center justify-center rounded-md bg-filled-soft align-middle text-[10px] font-semibold text-filled"
+        className={cx(cellBox, "bg-filled-soft text-[9px] font-semibold leading-none text-filled ring-1 ring-inset ring-filled/15")}
       >
-        {formatAmountShort(cell.amount)}
+        {cell.amount !== defaultAmount && formatAmountShort(cell.amount)}
       </span>
     );
   }
   if (cell?.status === "empty") {
     return (
-      <span
-        title={title}
-        className="inline-flex size-7 items-center justify-center rounded-md bg-empty-soft align-middle text-sm font-bold text-empty"
-      >
+      <span title={title} className={cx(cellBox, "bg-empty-soft text-xs font-bold text-empty")}>
         ×
       </span>
     );
@@ -624,33 +691,41 @@ function Cell({
     <span
       title={title}
       className={cx(
-        "inline-flex size-7 rounded-md border border-dashed align-middle",
-        vacant ? "border-line/60" : "border-muted/50",
+        cellBox,
+        "border border-dashed",
+        !recorded ? "border-line/70" : vacant ? "border-line" : "border-muted/40",
       )}
     />
   );
 }
 
-function Legend({ editing }: { editing: boolean }) {
+function Legend({ editing, defaultAmount }: { editing: boolean; defaultAmount: number }) {
+  const swatch = "inline-flex h-5 w-4 items-center justify-center rounded-[4px]";
   return (
-    <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+    <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted">
       <span className="flex items-center gap-1.5">
-        <span className="inline-flex size-5 items-center justify-center rounded bg-filled-soft text-[9px] font-semibold text-filled">
-          500
-        </span>
-        Ada isinya
+        <span className={cx(swatch, "bg-filled-soft ring-1 ring-inset ring-filled/15")} />
+        Ada ({formatRupiah(defaultAmount)})
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="inline-flex size-5 items-center justify-center rounded bg-empty-soft text-xs font-bold text-empty">
-          ×
+        <span className={cx(swatch, "w-5 bg-filled-soft text-[9px] font-semibold text-filled ring-1 ring-inset ring-filled/15")}>
+          1rb
         </span>
+        Nominal lain
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className={cx(swatch, "bg-empty-soft text-xs font-bold text-empty")}>×</span>
         Kosong
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="inline-block size-5 rounded border border-dashed border-muted/50" />
+        <span className={cx(swatch, "border border-dashed border-muted/40")} />
         Tidak dicek
       </span>
-      <span className={cx(editing && "font-semibold text-fg")}>
+      <span className="flex items-center gap-1.5">
+        <span className={cx(swatch, "border border-dashed border-line/70 bg-idle-soft/40")} />
+        Malam tanpa catatan
+      </span>
+      <span className={cx("basis-full sm:basis-auto", editing && "font-semibold text-fg")}>
         {editing
           ? "Ketuk kotak untuk mengisi atau mengubah catatan. Ketuk tanggal untuk mengisi satu malam sekaligus."
           : "Ketuk tanggal untuk membuka riwayat malam itu."}
