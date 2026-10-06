@@ -1,24 +1,21 @@
-import { CalendarRange, Moon, Settings2 } from "lucide-react";
+import { CalendarRange, Moon } from "lucide-react";
 import { useSearchParams } from "react-router";
 import { SegmentedControl } from "@/components/toggle-group";
 import { PageHeader } from "@/components/ui";
 import { SITE_PLAN } from "@/site-plan";
-import { AturDenah } from "./atur-denah";
 import { MonthMap } from "./month-map";
 import { TonightMap } from "./tonight-map";
 
-// Di HP ikonnya disembunyikan supaya ketiga labelnya muat.
 const MODES = [
-  { value: "malam", label: "Malam ini", icon: Moon, className: "max-sm:[&>svg]:hidden" },
-  { value: "bulan", label: "Bulanan", icon: CalendarRange, className: "max-sm:[&>svg]:hidden" },
-  { value: "atur", label: "Atur denah", icon: Settings2, className: "max-sm:[&>svg]:hidden" },
+  { value: "malam", label: "Malam ini", icon: Moon },
+  { value: "bulan", label: "Bulanan", icon: CalendarRange },
 ] as const;
 
 type Mode = (typeof MODES)[number]["value"];
 
 /**
- * Peta ronda: memantau jimpitan di denah (malam ini dan per bulan). Data rumahnya diubah di
- * Rumah & QR; tab "Atur denah" untuk kecocokan denah, kalibrasi GPS, dan pratinjau 3D.
+ * Peta ronda: memantau jimpitan di denah (malam ini dan per bulan). Data rumah, kecocokannya dengan
+ * denah, dan lokasi GPS diatur di Rumah & QR (tampilan Denah).
  */
 export function DenahPage() {
   const [params, setParams] = useSearchParams();
@@ -35,7 +32,7 @@ export function DenahPage() {
         options={MODES}
         className="mb-4 sm:w-fit"
       />
-      {mode === "malam" ? <TonightMap /> : mode === "bulan" ? <MonthMap /> : <AturDenah />}
+      {mode === "bulan" ? <MonthMap /> : <TonightMap />}
     </>
   );
 }

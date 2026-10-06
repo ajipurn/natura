@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Copy, Dices, KeyRound, LockOpen, Send } from "lucide-react";
 import { useState, type FormEvent } from "react";
+import { Link } from "react-router";
 import { api, call } from "@/client/api";
 import { invalidate } from "@/client/query";
 import { RadioCards, SwitchField, type RadioCardOption } from "@/components/choice";
@@ -12,7 +13,7 @@ import { scheduleQuery } from "@/features/jadwal/queries";
 import { formatTime } from "@/lib/dates";
 import { groupByBlock, houseLabel } from "@/lib/houses";
 import { randomPin } from "@/lib/random-pin";
-import { DAY_NAMES, dayLabel } from "@/lib/schedule";
+import { DAY_NAMES } from "@/lib/schedule";
 import type { Role } from "@/lib/types";
 import { housesQuery, usersQuery } from "../queries";
 
@@ -67,9 +68,8 @@ function CreateForm({ onDone }: { onDone: () => void }) {
   const [pin, setPin] = useState(randomPin);
   const [role, setRole] = useState<Role>("petugas");
   const [houseId, setHouseId] = useState<number | null>(null);
-  const [days, setDays] = useState<number[]>([]);
   const create = useMutation({
-    mutationFn: () => call(api.admin.petugas.$post({ json: { name: name.trim(), pin, role, houseId, days } })),
+    mutationFn: () => call(api.admin.petugas.$post({ json: { name: name.trim(), pin, role, houseId } })),
     onSuccess: () => invalidate(...REFRESH),
   });
 
@@ -120,8 +120,7 @@ function CreateForm({ onDone }: { onDone: () => void }) {
           // Rumah tanpa akun yang sudah punya nama KK: namanya dipakai untuk akun baru.
           if (ownerName && !name.trim()) setName(ownerName);
         }}
-        days={days}
-        onDays={setDays}
+        days={[]}
       />
       <RoleField role={role} onRole={setRole} />
       {create.isError && <Alert>{create.error.message}</Alert>}
@@ -179,10 +178,9 @@ function EditForm({ petugas, isSelf, onDone }: { petugas: Petugas; isSelf: boole
   const [role, setRole] = useState<Role>(petugas.role);
   const [active, setActive] = useState(petugas.active);
   const [houseId, setHouseId] = useState(petugas.houseId);
-  const [days, setDays] = useState(petugas.days);
   const param = { id: String(petugas.id) };
   const save = useMutation({
-    mutationFn: () => call(api.admin.petugas[":id"].$patch({ param, json: { name: name.trim(), role, active, houseId, days } })),
+    mutationFn: () => call(api.admin.petugas[":id"].$patch({ param, json: { name: name.trim(), role, active, houseId } })),
     onSuccess: async () => {
       await invalidate(...REFRESH);
       onDone();
@@ -207,8 +205,7 @@ function EditForm({ petugas, isSelf, onDone }: { petugas: Petugas; isSelf: boole
           userId={petugas.id}
           houseId={houseId}
           onHouse={(id) => setHouseId(id)}
-          days={days}
-          onDays={setDays}
+          days={petugas.days}
         />
         <RoleField role={role} onRole={setRole} disabled={isSelf} />
         <SwitchField
@@ -296,7 +293,8 @@ function ResetPin({ petugas, locked }: { petugas: Petugas; locked: string | null
 
 /**
  * Rumah petugas dan malam jaganya. Rumah yang dipilih memakai nama akun ini sebagai nama warganya,
- * dan jadwal rumah itu (kalau sudah ada) jadi jadwal petugas ini.
+ * dan jadwal rumah itu (kalau sudah ada) jadi jadwal petugas ini. Malam jaga hanya diubah di Jadwal
+ * ronda; di sini cukup terlihat.
  */
 function GuardFields({
   name,
@@ -304,29 +302,28 @@ function GuardFields({
   houseId,
   onHouse,
   days,
-  onDays,
 }: {
   name: string;
   userId?: number;
   houseId: number | null;
   onHouse: (id: number | null, ownerName: string | null) => void;
+  /** Malam jaga sekarang. */
   days: number[];
-  onDays: (days: number[]) => void;
 }) {
   const houses = useQuery(housesQuery).data?.houses ?? [];
   const users = useQuery(usersQuery).data?.users ?? [];
   const schedule = useQuery(scheduleQuery).data?.schedule ?? [];
-  const toggle = (day: number) => onDays(days.includes(day) ? days.filter((d) => d !== day) : [...days, day].sort());
   const houseDays = (id: number) => schedule.filter((s) => s.userId === null && s.houseId === id).map((s) => s.day);
   const house = houses.find((h) => h.id === houseId);
   const others = users.filter((u) => u.houseId === houseId && u.id !== userId);
   const scheduled = houseId ? [...new Set(houseDays(houseId))].sort() : [];
+  // Setelah disimpan: malam jaga sekarang ditambah jadwal rumah yang dipilih.
+  const nights = [...new Set([...days, ...scheduled])].sort();
 
   function pick(id: number | null) {
     const picked = houses.find((h) => h.id === id);
     const hasAccount = users.some((u) => u.houseId === id && u.id !== userId);
     onHouse(id, picked && !hasAccount ? picked.ownerName : null);
-    if (id) onDays([...new Set([...days, ...houseDays(id)])].sort());
   }
 
   return (
@@ -353,34 +350,17 @@ function GuardFields({
           </span>
         )}
       </div>
-      <fieldset>
-        <legend className="mb-1 block text-sm font-medium">Jaga malam</legend>
-        <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-7">
-          {DAY_NAMES.map((label, day) => {
-            const on = days.includes(day);
-            return (
-              <Button
-                key={day}
-                variant="plain"
-                aria-pressed={on}
-                title={dayLabel(day)}
-                onClick={() => toggle(day)}
-                className={cx(
-                  "h-10 rounded-xl border text-sm font-semibold transition",
-                  on ? "border-primary bg-primary text-primary-fg" : "border-line bg-card text-fg hover:border-primary/50",
-                )}
-              >
-                {label}
-              </Button>
-            );
-          })}
+      <div>
+        <p className="mb-1 text-sm font-medium">Jaga malam</p>
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-line px-3 py-2.5 text-sm">
+          <span className={cx(nights.length === 0 && "text-muted")}>
+            {nights.length ? nights.map((d) => DAY_NAMES[d]).join(", ") : "Belum dijadwalkan"}
+          </span>
+          <Link to="/admin/jadwal" className="font-semibold text-primary">
+            Atur di Jadwal ronda
+          </Link>
         </div>
-        <p className="mt-1 text-xs text-muted">
-          {days.length
-            ? `Jaga ${days.map((d) => DAY_NAMES[d]).join(", ")}. Malam baru ditaruh di urutan terakhir; urutannya bisa diatur di Jadwal ronda.`
-            : "Belum dijadwalkan."}
-        </p>
-      </fieldset>
+      </div>
     </>
   );
 }

@@ -50,10 +50,13 @@ const updateHouseSchema = z.object({
 const userName = trimmed(40, "Isi nama (maks. 40 karakter).").min(1, "Isi nama (maks. 40 karakter).");
 const role = z.enum(["admin", "petugas"]).catch("petugas");
 const day = z.number().int().min(0).max(6);
-/** Rumah dan malam jaga petugas. */
+/**
+ * Rumah dan malam jaga petugas. Malam jaga biasanya diatur di Jadwal ronda: tanpa `days`, malam
+ * jaganya tetap, ditambah jadwal rumah yang baru ditempati.
+ */
 const guardFields = {
   houseId: z.number().int().positive().nullable().default(null),
-  days: z.array(day).max(7).default([]),
+  days: z.array(day).max(7).optional(),
 };
 
 const guardColor = z.enum(GUARD_COLORS).nullable();
@@ -271,7 +274,8 @@ export const adminRoutes = new Hono<AppEnv>()
       .values({ name, pinHash: await hashPin(pin), role: newRole, houseId })
       .returning({ id: users.id });
     const slotsOfHouse = await houseSlots(db, houseId);
-    await runBatch(db, (tx) => [...moveIntoHouse(tx, houseId), ...userDaysStatements(tx, user.id, days, [], slotsOfHouse)]);
+    const nights = days ?? slotsOfHouse.map((s) => s.day);
+    await runBatch(db, (tx) => [...moveIntoHouse(tx, houseId), ...userDaysStatements(tx, user.id, nights, [], slotsOfHouse)]);
     return c.json({ success: `${name} ditambahkan. Beri tahu PIN-nya secara langsung.`, id: user.id });
   })
 
@@ -292,10 +296,12 @@ export const adminRoutes = new Hono<AppEnv>()
         db.selectDistinct({ day: rondaSchedule.dayOfWeek }).from(rondaSchedule).where(eq(rondaSchedule.userId, id)),
         houseSlots(db, houseId),
       ]);
+      const currentDays = current.map((r) => r.day);
+      const nights = days ?? [...currentDays, ...slotsOfHouse.map((s) => s.day)];
       await runBatch(db, (tx) => [
         tx.update(users).set({ name, role: newRole, active, houseId }).where(eq(users.id, id)),
         ...moveIntoHouse(tx, houseId),
-        ...userDaysStatements(tx, id, days, current.map((r) => r.day), slotsOfHouse),
+        ...userDaysStatements(tx, id, nights, currentDays, slotsOfHouse),
       ]);
       return c.json({ success: "Tersimpan." });
     },

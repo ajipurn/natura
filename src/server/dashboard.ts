@@ -1,4 +1,4 @@
-import { count, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { rondaDate } from "@/lib/dates";
 import { houseLabel } from "@/lib/houses";
 import { monthStats } from "@/lib/month-stats";
@@ -11,13 +11,13 @@ import { getCollectionsForDate, getMonthRecap, getSettings, listHouses, listPatr
 import { countOffDuty } from "./audit";
 import { countPendingRequests } from "./requests";
 import { listSchedule } from "./schedule";
-import { announcements, settings, users } from "./schema";
+import { settings, users } from "./schema";
 
 /** Data halaman Ringkasan admin. */
 export async function getDashboard(db: Db, now: Date) {
   const date = rondaDate(now);
   const month = date.slice(0, 7);
-  const [settingsRow, houseRows, tonightRows, recap, recent, schedule, [userCounts], [announcementCount], [codeRow], pendingRequests, offDuty] =
+  const [settingsRow, houseRows, tonightRows, recap, recent, schedule, [userCounts], [codeRow], pendingRequests, offDuty] =
     await Promise.all([
       getSettings(db),
       listHouses(db),
@@ -28,10 +28,8 @@ export async function getDashboard(db: Db, now: Date) {
       db
         .select({
           active: sql<number>`count(*) filter (where ${users.active})`.mapWith(Number),
-          admins: sql<number>`count(*) filter (where ${users.active} and ${users.role} = 'admin')`.mapWith(Number),
         })
         .from(users),
-      db.select({ value: count() }).from(announcements),
       db.select({ wargaCode: settings.wargaCode }).from(settings).where(eq(settings.id, 1)).limit(1),
       countPendingRequests(db),
       countOffDuty(db, date),
@@ -70,13 +68,6 @@ export async function getDashboard(db: Db, now: Date) {
     /** 30 malam terakhir, urut dari yang terlama. */
     trend: [...recent].reverse().map((p) => ({ date: p.date, filled: p.filled, empty: p.empty, total: p.total })),
     oftenEmpty,
-    counts: {
-      houses: houseRows.length,
-      vacant: houseRows.filter((h) => h.status === "vacant").length,
-      users: userCounts?.active ?? 0,
-      admins: userCounts?.admins ?? 0,
-      announcements: announcementCount?.value ?? 0,
-    },
     /** Hal yang belum disiapkan, untuk daftar "Yang perlu dilakukan". */
     todo: {
       noHouses: houseRows.length === 0,

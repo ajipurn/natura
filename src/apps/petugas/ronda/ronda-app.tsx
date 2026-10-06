@@ -365,8 +365,8 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                       anchors={snapshot.planAnchors ?? []}
                       calibrateHint={
                         isAdmin ? (
-                          <a href="/admin/denah?mode=atur" className="font-semibold underline">
-                            Atur di Admin → Peta ronda
+                          <a href="/admin/rumah?tampilan=denah&lokasi=1" className="font-semibold underline">
+                            Atur di Admin → Rumah & QR
                           </a>
                         ) : (
                           "Minta admin mengaturnya."

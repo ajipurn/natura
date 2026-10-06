@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Home, LayoutGrid, Map as MapIcon, Plus, Printer, Search, UserRound } from "lucide-react";
+import { ArrowLeft, Home, LayoutGrid, Map as MapIcon, MapPin, Plus, Printer, Search, UserRound } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Legend, LegendItem } from "@/components/map-legend";
@@ -8,12 +8,14 @@ import { ScrollArea } from "@/components/scroll-area";
 import { SitePlanMap } from "@/components/site-plan-map";
 import { ChipGroup, SegmentedControl } from "@/components/toggle-group";
 import { Button, Card, Input, PageHeader, buttonClass, cx } from "@/components/ui";
+import { fitGeoTransform } from "@/lib/geo";
 import type { MarkerState } from "@/lib/house-state";
 import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
 import { matchPlan } from "@/lib/site-plan";
 import { SITE_PLAN } from "@/site-plan";
-import { housesQuery, usersQuery } from "../queries";
+import { housesQuery, planAnchorsQuery, usersQuery } from "../queries";
 import { AddHouseDialog, EditHouseDialog, type AdminHouse } from "./house-dialog";
+import { PlanCalibration } from "./plan-calibration";
 import { RegisterPlanHouses } from "./register-plan-houses";
 
 type Filter = "semua" | "dihuni" | "kosong" | "petugas" | "tanpa-nama";
@@ -38,6 +40,8 @@ export function RumahPage() {
   const users = useQuery(usersQuery).data?.users ?? [];
   const [params, setParams] = useSearchParams();
   const view: View = params.get("tampilan") === "denah" ? "denah" : "daftar";
+  // `?tampilan=denah&lokasi=1`: atur titik acuan GPS di denah (untuk "Lokasi saya" di app petugas).
+  const calibrating = view === "denah" && params.get("lokasi") === "1";
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("semua");
   // `?ubah=12` (mis. dari Peta ronda) langsung membuka dialog ubah rumah itu.
@@ -97,6 +101,16 @@ export function RumahPage() {
                   <RegisterPlanHouses count={matchPlan(SITE_PLAN, houses).missing.length} />
                 </div>
               </Card>
+            ) : calibrating ? (
+              <>
+                <Link
+                  to="/admin/rumah?tampilan=denah"
+                  className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-fg"
+                >
+                  <ArrowLeft className="size-4" /> Kembali ke denah rumah
+                </Link>
+                <PlanCalibration houses={houses} />
+              </>
             ) : (
               <>
                 <div className="mb-3 flex items-center gap-2">
@@ -278,6 +292,7 @@ function HouseMap({
           Ketuk rumah untuk mengubah data atau QR-nya{missing.length > 0 && ", kavling oranye untuk menambahkannya"}.
         </span>
       </Legend>
+      <LocationStatus />
       {offPlan.length > 0 && (
         <div className="rounded-xl border border-line bg-card px-3 py-2.5 text-sm">
           <p className="text-muted">{offPlan.length} rumah terdaftar tidak ada di denah (blok/nomornya tidak cocok dengan kavling):</p>
@@ -295,6 +310,29 @@ function HouseMap({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Status "Lokasi saya" di denah app petugas, dengan tautan ke pengaturan titik acuannya. */
+function LocationStatus() {
+  const anchors = useQuery(planAnchorsQuery).data?.anchors;
+  if (!anchors) return null;
+  const active = Boolean(fitGeoTransform(anchors));
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl border border-line bg-card px-3 py-2.5 text-sm">
+      <p className="flex items-center gap-2">
+        <MapPin className="size-4 shrink-0 text-primary" />
+        <span>
+          <strong>Lokasi GPS di denah</strong>{" "}
+          <span className="text-muted">
+            · {active ? `aktif, ${anchors.length} titik acuan` : "belum diatur, petugas belum bisa memakai “Lokasi saya”"}
+          </span>
+        </span>
+      </p>
+      <Link to="/admin/rumah?tampilan=denah&lokasi=1" onClick={() => window.scrollTo(0, 0)} className={buttonClass("secondary", "sm")}>
+        Atur
+      </Link>
     </div>
   );
 }

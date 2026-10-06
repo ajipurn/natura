@@ -456,6 +456,25 @@ describe("satu sumber: nama warga di akun petugas", () => {
     expect(slotHouseLabel((await schedule()).find((s) => s.userId === budi)!)).toBe("YY-2");
   });
 
+  it("tanpa `days` (dialog petugas): malam jaga tetap, ditambah jadwal rumah yang ditempati", async () => {
+    await admin.post("/api/admin/rumah", { block: "ZW", numbers: "1-2" });
+    const [zw1, zw2] = [(await house("ZW-1")).id, (await house("ZW-2")).id];
+    // ZW-1 dijadwalkan Kamis sebelum punya akun: petugas baru di sana langsung jaga Kamis.
+    await admin.put("/api/admin/jadwal/slot", { slots: [...(await schedule()).map(toInput), { day: 4, houseId: zw1 }] });
+    const wati = (await admin.post("/api/admin/petugas", { name: "Wati", pin: "7531", role: "petugas", houseId: zw1 })).data.id as number;
+    const days = async () => (await schedule()).filter((s) => s.userId === wati).map((s) => s.day);
+    expect(await days()).toEqual([4]);
+
+    await admin.patch(`/api/admin/petugas/${wati}`, { name: "Bu Wati", role: "petugas", active: true, houseId: zw1 });
+    expect(await days()).toEqual([4]);
+
+    // Pindah ke rumah yang dijadwalkan Senin: Kamis tetap, Senin ikut.
+    await admin.put("/api/admin/jadwal/slot", { slots: [...(await schedule()).map(toInput), { day: 1, houseId: zw2 }] });
+    await admin.patch(`/api/admin/petugas/${wati}`, { name: "Bu Wati", role: "petugas", active: true, houseId: zw2 });
+    expect(await days()).toEqual([1, 4]);
+    expect((await schedule()).some((s) => s.houseId === zw2 && s.userId === null)).toBe(false);
+  });
+
   it("nama kembar boleh asal rumahnya beda; halaman masuk menampilkan rumahnya", async () => {
     const yy3 = (await house("YY-3")).id;
     const twin = await admin.post("/api/admin/petugas", { name: "Pak Bambang Santoso", pin: "7531", role: "petugas", houseId: yy3 });

@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   CalendarClock,
   CalendarDays,
-  Home,
   KeyRound,
   Map as MapIcon,
   ShieldAlert,
@@ -12,12 +11,11 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { BarChart } from "@/components/bar-chart";
 import { GuardChip } from "@/components/guard-chip";
 import { QueryState } from "@/components/query-state";
-import { Card, PageHeader, SectionTitle, cx } from "@/components/ui";
+import { Card, PageHeader, cx } from "@/components/ui";
 import { formatDateLong, formatDateShort, formatMonth } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { dayLabel, scheduleDay } from "@/lib/schedule";
@@ -31,7 +29,7 @@ export function RingkasanPage() {
       {(d) => {
         const t = d.tonight;
         const progress = t.expected ? Math.round((t.checked / t.expected) * 100) : 0;
-        const todo = todoItems(d.todo);
+        const todo = todoItems(d.todo, d.date);
         return (
           <>
             <PageHeader title="Ringkasan" subtitle={`Jimpitan ${d.communityName} · ${formatDateLong(d.date)}`} />
@@ -158,12 +156,6 @@ export function RingkasanPage() {
               </Card>
             </div>
 
-            <SectionTitle>Data</SectionTitle>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <LinkCard to="/admin/rumah" icon={Home} label="Rumah" value={`${d.counts.houses}`} hint={d.counts.vacant ? `${d.counts.vacant} kosong/mudik` : undefined} />
-              <LinkCard to="/admin/petugas" icon={Users} label="Petugas aktif" value={`${d.counts.users}`} hint={`${d.counts.admins} admin`} />
-              <LinkCard to="/admin/info" icon={KeyRound} label="Pengumuman" value={`${d.counts.announcements}`} hint={d.todo.noWargaCode ? "Halaman warga tertutup" : "Halaman warga terbuka"} />
-            </div>
           </>
         );
       }}
@@ -171,17 +163,24 @@ export function RingkasanPage() {
   );
 }
 
-function todoItems(todo: {
-  pendingRequests: number;
-  offDuty: number;
-  planMissing: number;
-  noSchedule: boolean;
-  noWargaCode: boolean;
-  onlyOneUser: boolean;
-}): { to: string; text: string; icon: LucideIcon }[] {
+function todoItems(
+  todo: {
+    pendingRequests: number;
+    offDuty: number;
+    planMissing: number;
+    noSchedule: boolean;
+    noWargaCode: boolean;
+    onlyOneUser: boolean;
+  },
+  date: string,
+): { to: string; text: string; icon: LucideIcon }[] {
   const items: { to: string; text: string; icon: LucideIcon }[] = [];
   if (todo.offDuty > 0) {
-    items.push({ to: "/admin/audit", icon: ShieldAlert, text: `${todo.offDuty} catatan malam ini oleh petugas yang tidak dijadwalkan` });
+    items.push({
+      to: `/admin/riwayat/${date}?tab=log`,
+      icon: ShieldAlert,
+      text: `${todo.offDuty} catatan malam ini oleh petugas yang tidak dijadwalkan`,
+    });
   }
   if (todo.pendingRequests > 0) {
     items.push({ to: "/admin/jadwal", icon: CalendarClock, text: `${todo.pendingRequests} permintaan ubah jadwal menunggu keputusan` });
@@ -202,19 +201,6 @@ function StatCard({ label, value, hint }: { label: string; value: string; hint?:
       <p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
       {hint && <p className="text-xs text-muted">{hint}</p>}
     </Card>
-  );
-}
-
-function LinkCard({ to, icon: Icon, label, value, hint }: { to: string; icon: LucideIcon; label: string; value: string; hint?: ReactNode }) {
-  return (
-    <Link to={to} className="flex items-center gap-3 rounded-2xl border border-line bg-card p-4 hover:border-primary/40">
-      <Icon className="size-6 text-primary" />
-      <div className="min-w-0">
-        <p className="text-sm text-muted">{label}</p>
-        <p className="text-xl font-bold">{value}</p>
-        {hint && <p className="truncate text-xs text-muted">{hint}</p>}
-      </div>
-    </Link>
   );
 }
 

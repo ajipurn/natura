@@ -16,6 +16,7 @@ const MARK_LABELS = { full: "semua rumah dicek", partial: "sebagian rumah dicek"
  */
 export function NightPicker({
   basePath,
+  search = "",
   selected,
   hint,
   label,
@@ -25,6 +26,8 @@ export function NightPicker({
   size = "sm",
 }: {
   basePath: string;
+  /** Ditambahkan ke alamat malam yang dipilih, mis. "?tab=log". */
+  search?: string;
   /** Malam yang sedang dibuka. */
   selected?: string;
   /** Keterangan di bawah kalender. */
@@ -51,7 +54,7 @@ export function NightPicker({
 
   function pick(date: string) {
     setOpen(false);
-    navigate(`${basePath}/${date}`);
+    navigate(`${basePath}/${date}${search}`);
   }
 
   return (

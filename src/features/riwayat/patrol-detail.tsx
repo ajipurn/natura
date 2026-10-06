@@ -5,16 +5,18 @@ import {
   ChevronLeft,
   ChevronRight,
   Hand,
+  Home,
   LayoutList,
   ListChecks,
   Map as MapIcon,
   Pencil,
   ScanLine,
+  ScrollText,
   Search,
   Users,
 } from "lucide-react";
-import { useState } from "react";
-import { Link, useParams } from "react-router";
+import { useState, type ComponentType } from "react";
+import { Link, useParams, useSearchParams } from "react-router";
 import { ErrorCard, QueryState } from "@/components/query-state";
 import { ScrollArea } from "@/components/scroll-area";
 import { ShareRecap } from "@/components/share-recap";
@@ -46,6 +48,19 @@ import { patrolQuery } from "./queries";
 
 type Filter = "semua" | "ada" | "kosong" | "belum";
 type View = "daftar" | "denah";
+type Tab = "rumah" | "log";
+
+/** Tab "Log catatan" (hanya admin); komponennya dari app admin. */
+export type NightLogSlot = {
+  /** Peringatan singkat di tab Rumah, dengan tautan ke tab log. */
+  Alerts: ComponentType<{ date: string; logTo: string }>;
+  Log: ComponentType<{ date: string }>;
+};
+
+const TABS = [
+  { value: "rumah", label: "Rumah", icon: Home },
+  { value: "log", label: "Log catatan", icon: ScrollText },
+] as const;
 
 const VIEWS = [
   { value: "daftar", label: "Daftar", icon: LayoutList },
@@ -55,18 +70,27 @@ const VIEWS = [
 const percent = (part: number, whole: number) =>
   whole ? (part / whole) * 100 : 0;
 
-/** Detail satu malam ronda (alamat `${basePath}/:tanggal`). Admin bisa mengisi dan mengoreksi catatan. */
+/**
+ * Detail satu malam ronda (alamat `${basePath}/:tanggal`). Admin bisa mengisi dan mengoreksi catatan,
+ * dan dengan `log` mendapat tab "Log catatan" (`?tab=log`).
+ */
 export function PatrolDetail({
   basePath,
   canCorrect,
+  log,
 }: {
   basePath: string;
   canCorrect: boolean;
+  log?: NightLogSlot;
 }) {
   const date = useParams().tanggal ?? "";
   const valid = isIsoDate(date);
   const query = useQuery({ ...patrolQuery(date), enabled: valid });
   const tonight = rondaDate(new Date());
+  const [params] = useSearchParams();
+  const tab: Tab = log && params.get("tab") === "log" ? "log" : "rumah";
+  // Pindah malam tetap di tab yang sama.
+  const search = tab === "log" ? "?tab=log" : "";
 
   return (
     <>
@@ -83,7 +107,7 @@ export function PatrolDetail({
         {valid && (
           <div className="flex items-center rounded-xl border border-line bg-card p-0.5">
             <Link
-              to={`${basePath}/${addDays(date, -1)}`}
+              to={`${basePath}/${addDays(date, -1)}${search}`}
               className="flex h-8 items-center gap-1 rounded-lg px-2 text-muted hover:bg-idle-soft hover:text-fg"
               aria-label={`Malam sebelumnya, ${formatDateShort(addDays(date, -1))}`}
             >
@@ -94,6 +118,7 @@ export function PatrolDetail({
             </Link>
             <NightPicker
               basePath={basePath}
+              search={search}
               selected={date}
               label="Pilih tanggal lain"
               variant="ghost"
@@ -104,7 +129,7 @@ export function PatrolDetail({
             </NightPicker>
             {date < tonight ? (
               <Link
-                to={`${basePath}/${addDays(date, 1)}`}
+                to={`${basePath}/${addDays(date, 1)}${search}`}
                 className="flex h-8 items-center gap-1 rounded-lg px-2 text-muted hover:bg-idle-soft hover:text-fg"
                 aria-label={`Malam berikutnya, ${formatDateShort(addDays(date, 1))}`}
               >
@@ -138,6 +163,9 @@ export function PatrolDetail({
               defaultAmount={settings.defaultAmount}
               // Malam yang belum tiba belum bisa diisi.
               canCorrect={canCorrect && date <= tonight}
+              log={log}
+              tab={tab}
+              logTo={`${basePath}/${date}?tab=log`}
             />
           )}
         </QueryState>
@@ -154,6 +182,9 @@ function NightDetail({
   communityName,
   defaultAmount,
   canCorrect,
+  log,
+  tab,
+  logTo,
 }: {
   date: string;
   isTonight: boolean;
@@ -162,7 +193,11 @@ function NightDetail({
   communityName: string;
   defaultAmount: number;
   canCorrect: boolean;
+  log?: NightLogSlot;
+  tab: Tab;
+  logTo: string;
 }) {
+  const [, setParams] = useSearchParams();
   const [filter, setFilter] = useState<Filter>("semua");
   const [search, setSearch] = useState("");
   const [view, setView] = useState<View>("daftar");
@@ -318,11 +353,28 @@ function NightDetail({
           ))}
       </Card>
 
-      {houses.length === 0 ? (
+      {log && (
+        <>
+          {tab === "rumah" && <log.Alerts date={date} logTo={logTo} />}
+          <SegmentedControl
+            aria-label="Isi detail malam"
+            value={tab}
+            onValueChange={(next) => setParams(next === "log" ? { tab: "log" } : {}, { replace: true })}
+            options={TABS}
+            className="mt-5 w-fit"
+          />
+        </>
+      )}
+
+      {log && tab === "log" ? (
+        <div className="mt-4">
+          <log.Log date={date} />
+        </div>
+      ) : houses.length === 0 ? (
         <p className="mt-6 text-center text-muted">Belum ada data rumah.</p>
       ) : (
         <>
-          <div className="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className={cx("flex flex-col gap-3 lg:flex-row lg:items-center", log ? "mt-4" : "mt-5")}>
             <ScrollArea className="-mx-4 overflow-x-auto lg:mx-0">
               <ChipGroup
                 aria-label="Saring rumah"

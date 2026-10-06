@@ -10,7 +10,6 @@ import {
   Menu,
   ScanLine,
   Settings,
-  ShieldCheck,
   Table2,
   Users,
   X,
@@ -26,33 +25,31 @@ import { Button, cx } from "@/components/ui";
 import type { SessionUser } from "@/server/auth";
 import { requestsQuery, settingsQuery } from "./queries";
 
-const NAV: { group: string; items: { to: string; label: string; icon: LucideIcon; end?: boolean }[] }[] = [
+type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean };
+
+/** "Ronda" untuk memantau sehari-hari, "Kelola" untuk data yang jarang berubah. Pengaturan di bawah. */
+const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: "Ronda",
     items: [
       { to: "/admin", label: "Ringkasan", icon: LayoutDashboard, end: true },
       { to: "/admin/denah", label: "Peta ronda", icon: MapIcon },
       { to: "/admin/riwayat", label: "Riwayat", icon: History },
-      { to: "/admin/audit", label: "Audit catatan", icon: ShieldCheck },
       { to: "/admin/rekap", label: "Rekap bulanan", icon: Table2 },
+    ],
+  },
+  {
+    group: "Kelola",
+    items: [
       { to: "/admin/jadwal", label: "Jadwal ronda", icon: CalendarDays },
-    ],
-  },
-  {
-    group: "Data",
-    items: [
-      { to: "/admin/rumah", label: "Rumah & QR", icon: Home },
       { to: "/admin/petugas", label: "Petugas", icon: Users },
-    ],
-  },
-  {
-    group: "Warga",
-    items: [
+      { to: "/admin/rumah", label: "Rumah & QR", icon: Home },
       { to: "/admin/info", label: "Info warga", icon: Megaphone },
-      { to: "/admin/pengaturan", label: "Pengaturan", icon: Settings },
     ],
   },
 ];
+
+const SETTINGS: NavItem = { to: "/admin/pengaturan", label: "Pengaturan", icon: Settings };
 
 /** Kerangka dashboard admin: menu samping di layar lebar, menu geser di HP. */
 export function AdminLayout({ user, children }: { user: SessionUser; children: ReactNode }) {
@@ -137,20 +134,10 @@ function Sidebar({ user }: { user: SessionUser }) {
             <div key={group} className="mb-4">
               <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted">{group}</p>
               <ul>
-                {items.map(({ to, label, icon: Icon, end }) => (
-                  <li key={to}>
-                    <NavLink
-                      to={to}
-                      end={end}
-                      className={({ isActive }) =>
-                        cx(
-                          "flex items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium",
-                          isActive ? "bg-primary/12 text-primary" : "text-fg hover:bg-idle-soft",
-                        )
-                      }
-                    >
-                      <Icon className="size-5" /> {label}
-                      {to === "/admin/jadwal" && pendingRequests > 0 && (
+                {items.map((item) => (
+                  <li key={item.to}>
+                    <SidebarLink item={item}>
+                      {item.to === "/admin/jadwal" && pendingRequests > 0 && (
                         <span
                           className="ml-auto rounded-full bg-warn px-2 py-0.5 text-xs font-bold text-card"
                           aria-label={`${pendingRequests} permintaan ubah jadwal`}
@@ -158,7 +145,7 @@ function Sidebar({ user }: { user: SessionUser }) {
                           {pendingRequests}
                         </span>
                       )}
-                    </NavLink>
+                    </SidebarLink>
                   </li>
                 ))}
               </ul>
@@ -167,6 +154,7 @@ function Sidebar({ user }: { user: SessionUser }) {
         </div>
       </ScrollArea>
       <div className="border-t border-line p-3">
+        <SidebarLink item={SETTINGS} />
         <ThemeSwitch />
         <a href="/petugas/" className="flex items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium hover:bg-idle-soft">
           <ScanLine className="size-5 text-primary" /> Buka app petugas
@@ -182,5 +170,23 @@ function Sidebar({ user }: { user: SessionUser }) {
         </Button>
       </div>
     </div>
+  );
+}
+
+function SidebarLink({ item: { to, label, icon: Icon, end }, children }: { item: NavItem; children?: ReactNode }) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        cx(
+          "flex items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium",
+          isActive ? "bg-primary/12 text-primary" : "text-fg hover:bg-idle-soft",
+        )
+      }
+    >
+      <Icon className="size-5" /> {label}
+      {children}
+    </NavLink>
   );
 }
