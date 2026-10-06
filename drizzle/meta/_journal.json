@@ -15,6 +15,13 @@
       "when": 1791275262369,
       "tag": "0001_settings_logo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791279121828,
+      "tag": "0002_settings_export_token",
+      "breakpoints": true
     }
   ]
 }

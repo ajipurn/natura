@@ -52,6 +52,8 @@ export const settings = pgTable("settings", {
   logo: text("logo"),
   /** Dinaikkan tiap logo diganti: bagian dari alamat gambarnya, supaya browser boleh menyimpannya lama. */
   logoVersion: integer("logo_version").notNull().default(0),
+  /** Token rahasia di link CSV rekap untuk Google Sheets (`/api/ekspor/<token>/rekap.csv`). Null = link mati. */
+  exportToken: text("export_token"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 

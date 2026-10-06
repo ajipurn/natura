@@ -113,6 +113,11 @@ function newWargaCode() {
   return newToken().slice(0, 8);
 }
 
+/** Token link CSV untuk Google Sheets: 128 bit acak (hex), karena link itu bisa dibuka tanpa login. */
+function newExportToken() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export const adminRoutes = new Hono<AppEnv>()
   .use(requireAdmin)
 
@@ -312,7 +317,13 @@ export const adminRoutes = new Hono<AppEnv>()
 
   .get("/pengaturan", async (c) => {
     const [row] = await c.var.db
-      .select({ communityName: settings.communityName, defaultAmount: settings.defaultAmount, wargaCode: settings.wargaCode, ...logoColumns })
+      .select({
+        communityName: settings.communityName,
+        defaultAmount: settings.defaultAmount,
+        wargaCode: settings.wargaCode,
+        exportToken: settings.exportToken,
+        ...logoColumns,
+      })
       .from(settings)
       .where(eq(settings.id, 1))
       .limit(1);
@@ -320,6 +331,7 @@ export const adminRoutes = new Hono<AppEnv>()
       communityName: row?.communityName ?? "",
       defaultAmount: row?.defaultAmount ?? 500,
       wargaCode: row?.wargaCode ?? null,
+      exportToken: row?.exportToken ?? null,
       logoUrl: logoUrl(row),
       ...appOrigin(c),
     });
@@ -356,6 +368,13 @@ export const adminRoutes = new Hono<AppEnv>()
       .set({ wargaCode: code, wargaCodeVersion: sql`${settings.wargaCodeVersion} + 1`, updatedAt: new Date() })
       .where(eq(settings.id, 1));
     return c.json({ wargaCode: code });
+  })
+
+  /** Buat token baru untuk link Google Sheets (link lama berhenti) atau matikan link-nya. */
+  .post("/pengaturan/link-ekspor", body(z.object({ enabled: z.boolean() })), async (c) => {
+    const token = c.req.valid("json").enabled ? newExportToken() : null;
+    await c.var.db.update(settings).set({ exportToken: token, updatedAt: new Date() }).where(eq(settings.id, 1));
+    return c.json({ exportToken: token });
   })
 
   /* ---------- Jadwal ronda ---------- */

@@ -3,6 +3,7 @@ import { csrf } from "hono/csrf";
 import type { AppEnv } from "./env";
 import { adminRoutes } from "./routes/admin";
 import { authRoutes } from "./routes/auth";
+import { eksporRoutes } from "./routes/ekspor";
 import { houseRoutes } from "./routes/house";
 import { logoRoutes } from "./routes/logo";
 import { rondaRoutes } from "./routes/ronda";
@@ -23,6 +24,7 @@ export const app = new Hono<AppEnv>()
   .route("/logo", logoRoutes)
   .route("/warga", wargaRoutes)
   .route("/admin", adminRoutes)
+  .route("/ekspor", eksporRoutes)
   .route("/", rondaRoutes);
 
 app.notFound((c) => c.json({ error: "Tidak ditemukan." }, 404));

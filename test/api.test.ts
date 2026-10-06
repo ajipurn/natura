@@ -516,6 +516,39 @@ describe("halaman warga", () => {
   });
 });
 
+describe("link Google Sheets", () => {
+  it("rekap CSV tanpa nama warga, hanya lewat token yang berlaku", async () => {
+    const sheets = apiClient(env);
+    expect((await admin.get("/api/admin/pengaturan")).data.exportToken).toBeNull();
+    expect((await sheets.get("/api/ekspor/apapun/rekap.csv")).status).toBe(404);
+    expect((await sheets.post("/api/admin/pengaturan/link-ekspor", { enabled: true })).status).toBe(401);
+
+    const token = (await admin.post("/api/admin/pengaturan/link-ekspor", { enabled: true })).data.exportToken as string;
+    expect(token).toMatch(/^[0-9a-f]{32}$/);
+    expect((await admin.get("/api/admin/pengaturan")).data.exportToken).toBe(token);
+
+    const march = await sheets.get(`/api/ekspor/${token}/rekap.csv?bulan=2025-03`);
+    expect(march.status).toBe(200);
+    const csv = march.data as unknown as string;
+    const lines = csv.split("\r\n");
+    expect(lines[0]).toBe("Blok,No,2025-03-15,Jumlah Ada,Total (Rp)");
+    expect(lines).toContain("AB,3,,0,0");
+    expect(lines.at(-1)).toBe("Total,,2000,,2000");
+    // Tanpa nama warga dan tanpa BOM (Google Sheets membacanya sebagai bagian sel A1).
+    expect(csv).not.toMatch(/Nama KK|Nino|\uFEFF/);
+    // Tanpa ?bulan: bulan berjalan.
+    expect((await sheets.get(`/api/ekspor/${token}/rekap.csv`)).data).toContain(rondaDate(new Date()));
+    expect((await sheets.get(`/api/ekspor/${token.slice(0, -1)}/rekap.csv`)).status).toBe(404);
+
+    // Link baru: link lama berhenti. Dimatikan: tidak ada link yang berlaku.
+    const next = (await admin.post("/api/admin/pengaturan/link-ekspor", { enabled: true })).data.exportToken as string;
+    expect((await sheets.get(`/api/ekspor/${token}/rekap.csv`)).status).toBe(404);
+    expect((await sheets.get(`/api/ekspor/${next}/rekap.csv`)).status).toBe(200);
+    await admin.post("/api/admin/pengaturan/link-ekspor", { enabled: false });
+    expect((await sheets.get(`/api/ekspor/${next}/rekap.csv`)).status).toBe(404);
+  });
+});
+
 describe("audit catatan", () => {
   it("catatan tercatat dengan pencatatnya; petugas di luar jadwal ditolak", async () => {
     const tonight = rondaDate(new Date());

@@ -7,6 +7,7 @@ import {
   FileText,
   Pencil,
   Search,
+  Sheet,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -34,6 +35,7 @@ import { buildRecapCsv } from "@/lib/recap-csv";
 import { buildRecapSheets } from "@/lib/recap-xlsx";
 import type { MonthCell, MonthRecap } from "@/lib/types";
 import { recapQuery } from "./queries";
+import { SheetsLinkDialog } from "./sheets-link";
 
 type Filter = "semua" | "kosong" | "tidak-dicek";
 type RecapData = MonthRecap & { month: string; defaultAmount: number };
@@ -56,8 +58,11 @@ function saveFile(blob: Blob, fileName: string) {
 }
 
 function downloadCsv(month: string, recap: MonthRecap) {
+  // BOM supaya Excel membaca UTF-8.
   saveFile(
-    new Blob([buildRecapCsv(recap)], { type: "text/csv;charset=utf-8" }),
+    new Blob(["\uFEFF", buildRecapCsv(recap)], {
+      type: "text/csv;charset=utf-8",
+    }),
     `jimpitan-${month}.csv`,
   );
 }
@@ -87,6 +92,7 @@ export function RekapPage() {
   });
   const [exporting, setExporting] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [sheetsOpen, setSheetsOpen] = useState(false);
   const ready =query.data && query.data.month === month;
 
   async function exportXlsx() {
@@ -123,8 +129,21 @@ export function RekapPage() {
             >
               <FileText className="size-4" /> CSV
             </Button>
+            <Button
+              onClick={() => setSheetsOpen(true)}
+              variant="secondary"
+              size="sm"
+            >
+              <Sheet className="size-4" /> Sheets
+            </Button>
           </div>
         }
+      />
+      <SheetsLinkDialog
+        open={sheetsOpen}
+        onClose={() => setSheetsOpen(false)}
+        month={month}
+        thisMonth={thisMonth}
       />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
