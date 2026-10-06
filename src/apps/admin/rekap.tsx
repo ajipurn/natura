@@ -231,6 +231,9 @@ function RecapBody({
   const [target, setTarget] = useState<CorrectionTarget | null>(null);
   const [targetOpen, setTargetOpen] = useState(false);
   const headRef = useRef<HTMLDivElement>(null);
+  const footRef = useRef<HTMLDivElement>(null);
+  // Sorotan kolom di bawah kursor: satu aturan CSS yang diganti langsung, tanpa render ulang tabel.
+  const hoverStyleRef = useRef<HTMLStyleElement>(null);
   const dates = daysInMonth(data.month);
   const patrolDates = new Set(data.dates);
   const { rows, dateTotals, grandTotal } = summarizeMonth({ ...data, dates });
@@ -307,7 +310,7 @@ function RecapBody({
     { value: "kosong", label: "Pernah kosong", match: (r) => r.empty > 0 },
     {
       value: "tidak-dicek",
-      label: "Ada yang tidak dicek",
+      label: "Pernah tidak dicek",
       match: (r) => r.unchecked > 0,
     },
   ];
@@ -455,7 +458,22 @@ function RecapBody({
           Tidak ada rumah yang cocok.
         </Card>
       ) : (
-        <div className="mt-3 rounded-2xl border border-line bg-card [--rumah-col:10rem] sm:[--rumah-col:12rem]">
+        <div
+          data-recap
+          className="mt-3 rounded-2xl border border-line bg-card [--rumah-col:5.75rem] sm:[--rumah-col:12rem]"
+          onMouseOver={(e) => {
+            const col = (e.target as HTMLElement).closest<HTMLElement>("[data-col]")?.dataset.col;
+            if (hoverStyleRef.current) {
+              hoverStyleRef.current.textContent = col
+                ? `[data-recap] [data-col="${col}"] { background-color: color-mix(in oklab, var(--primary) 9%, transparent); }`
+                : "";
+            }
+          }}
+          onMouseLeave={() => {
+            if (hoverStyleRef.current) hoverStyleRef.current.textContent = "";
+          }}
+        >
+          <style ref={hoverStyleRef} />
           {/*
            * Judul kolom menempel di atas saat halaman digulir (di bawah header HP, lihat layout.tsx).
            * Tabel terpisah karena wadah geser-mendatar di bawah menghalangi `sticky` vertikal; strip
@@ -473,10 +491,10 @@ function RecapBody({
               <RecapCols dates={dates.length} future={future} />
               <thead>
                 <tr className="text-xs text-muted">
-                  <th className="sticky left-0 z-10 bg-card px-3 py-2 text-left font-semibold">
+                  <th className="sticky left-0 z-10 bg-card px-2 py-2 text-left font-semibold sm:px-3">
                     Rumah
                   </th>
-                  {dates.map((d) => {
+                  {dates.map((d, i) => {
                     const label = (
                       <>
                         <span className="text-[10px]">
@@ -488,7 +506,7 @@ function RecapBody({
                       </>
                     );
                     return (
-                      <th key={d} className="px-px py-1.5 font-medium">
+                      <th key={d} data-col={i} className="px-px py-1.5 font-medium">
                         {d > tonight ? (
                           <span className="flex flex-col items-center py-0.5 leading-tight text-muted/40">
                             <span className="text-[10px]">
@@ -527,12 +545,13 @@ function RecapBody({
           </div>
           <div
             onScrollCapture={(e) => {
-              if (headRef.current && e.target instanceof HTMLElement) {
-                headRef.current.scrollLeft = e.target.scrollLeft;
+              if (!(e.target instanceof HTMLElement)) return;
+              for (const strip of [headRef.current, footRef.current]) {
+                if (strip) strip.scrollLeft = e.target.scrollLeft;
               }
             }}
           >
-            <ScrollArea className="overflow-x-auto rounded-b-[15px]">
+            <ScrollArea className="overflow-x-auto">
               <table
                 className="w-full table-fixed border-collapse text-sm"
                 style={{ minWidth }}
@@ -569,26 +588,30 @@ function RecapBody({
                       <tr
                         key={r.house.id}
                         className={cx(
-                          "border-b border-line last:border-0 hover:bg-idle-soft/50",
+                          "group border-b border-line last:border-0 hover:bg-idle-soft/50",
                           r.house.status === "vacant" && "text-muted",
                         )}
                       >
                         <th
                           scope="row"
-                          className="sticky left-0 z-10 bg-card px-3 py-1.5 text-left font-normal"
+                          // Latar harus pekat (kolom ini menempel di kiri): warna sorotan barisnya dicampur.
+                          className="sticky left-0 z-10 bg-card px-2 py-1 text-left font-normal group-hover:bg-[color-mix(in_oklab,var(--idle-soft)_50%,var(--card))] sm:px-3"
                         >
-                          <span className="flex items-baseline gap-2">
-                            <span className="font-semibold">
+                          {/* HP: label di atas, nama kecil di bawah. Layar lebar: satu baris. */}
+                          <span className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2">
+                            <span className="font-semibold leading-4 sm:leading-normal">
                               {houseLabel(r.house)}
                             </span>
-                            <span className="min-w-0 truncate text-xs text-muted">
-                              {r.house.ownerName ?? ""}
-                            </span>
-                            {r.house.status === "vacant" && (
-                              <span className="shrink-0 rounded-full bg-warn-soft px-1.5 text-[10px] font-semibold text-warn">
-                                mudik
+                            <span className="flex h-3 min-w-0 items-center gap-1 sm:contents">
+                              {r.house.status === "vacant" && (
+                                <span className="shrink-0 rounded-full bg-warn-soft px-1 text-[9px] font-semibold leading-3 text-warn sm:order-last sm:px-1.5 sm:text-[10px] sm:leading-normal">
+                                  mudik
+                                </span>
+                              )}
+                              <span className="min-h-3 min-w-0 truncate text-[10px] leading-3 text-muted sm:min-h-0 sm:text-xs sm:leading-normal">
+                                {r.house.ownerName ?? ""}
                               </span>
-                            )}
+                            </span>
                           </span>
                         </th>
                         {r.cells.map((cell, i) => {
@@ -608,10 +631,13 @@ function RecapBody({
                           return (
                             <td
                               key={date}
+                              data-col={i}
                               className={cx(
                                 "px-px py-1 text-center",
-                                // Malam tanpa catatan sama sekali: kolomnya diberi warna latar tipis.
-                                !recorded && !future && "bg-idle-soft/25",
+                                // Kolom malam ini disorot tipis; malam tanpa catatan diberi latar abu tipis.
+                                date === tonight
+                                  ? "bg-primary/5"
+                                  : !recorded && !future && "bg-idle-soft/25",
                               )}
                             >
                               {editing && !future ? (
@@ -646,41 +672,60 @@ function RecapBody({
                     ))}
                   </tbody>
                 ))}
-                <tfoot>
-                  <tr className="border-t-2 border-line font-semibold">
-                    <th
-                      scope="row"
-                      className="sticky left-0 z-10 bg-card px-3 py-2 text-left"
-                    >
-                      Total
-                    </th>
+                {/* Baris total untuk pembaca layar; yang terlihat ada di strip bawah. */}
+                <tfoot className="sr-only">
+                  <tr>
+                    <th scope="row">Total</th>
                     {dateTotals.map((t, i) => (
-                      // Kolomnya sempit untuk angka: tinggi batang = terkumpul malam itu, angkanya di judul.
-                      <td
-                        key={dates[i]}
-                        title={t > 0 ? `${formatDateShort(dates[i])}: ${formatRupiah(t)}` : undefined}
-                        className="px-px py-2 align-bottom"
-                      >
-                        {t > 0 && (
-                          <>
-                            <span
-                              aria-hidden
-                              className="mx-auto block w-full max-w-5 rounded-sm bg-filled/70"
-                              style={{ height: `${Math.max(3, (t / maxNight) * 28)}px` }}
-                            />
-                            <span className="sr-only">{formatRupiah(t)}</span>
-                          </>
-                        )}
-                      </td>
+                      <td key={dates[i]}>{t > 0 ? formatRupiah(t) : "–"}</td>
                     ))}
                     <td />
-                    <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                      {formatRupiah(grandTotal)}
-                    </td>
+                    <td>{formatRupiah(grandTotal)}</td>
                   </tr>
                 </tfoot>
               </table>
             </ScrollArea>
+          </div>
+          {/* Baris total menempel di bawah layar selama tabelnya terlihat, digeser bersama tabel. */}
+          <div
+            ref={footRef}
+            aria-hidden
+            className="sticky bottom-0 z-20 overflow-hidden rounded-b-[15px] border-t-2 border-line bg-card"
+          >
+            <table
+              role="presentation"
+              className="w-full table-fixed border-collapse text-sm"
+              style={{ minWidth }}
+            >
+              <RecapCols dates={dates.length} future={future} />
+              <tbody>
+                <tr className="font-semibold">
+                  <th className="sticky left-0 z-10 bg-card px-2 py-2 text-left sm:px-3">
+                    Total
+                  </th>
+                  {dateTotals.map((t, i) => (
+                    // Kolomnya sempit untuk angka: tinggi batang = terkumpul malam itu, angkanya di judul.
+                    <td
+                      key={dates[i]}
+                      data-col={i}
+                      title={t > 0 ? `${formatDateShort(dates[i])}: ${formatRupiah(t)}` : undefined}
+                      className="h-10 px-px py-1.5 align-bottom"
+                    >
+                      {t > 0 && (
+                        <span
+                          className="mx-auto block w-full max-w-5 rounded-sm bg-filled/70"
+                          style={{ height: `${Math.max(3, (t / maxNight) * 26)}px` }}
+                        />
+                      )}
+                    </td>
+                  ))}
+                  <td />
+                  <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                    {formatRupiah(grandTotal)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       )}

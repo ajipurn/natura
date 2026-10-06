@@ -75,15 +75,18 @@ export function BarChart({
         ))}
       </div>
       <figcaption className="sr-only">{caption}</figcaption>
-      <table className="sr-only">
-        <tbody>
-          {bars.map((b) => (
-            <tr key={b.key}>
-              <td>{b.title}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {/* `sr-only` di pembungkus: tabel tidak bisa lebih sempit dari isinya, jadi bisa melebarkan halaman. */}
+      <div className="sr-only">
+        <table>
+          <tbody>
+            {bars.map((b) => (
+              <tr key={b.key}>
+                <td>{b.title}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   );
 }
