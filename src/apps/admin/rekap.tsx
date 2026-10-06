@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Check,
   ChevronDown,
@@ -10,8 +10,9 @@ import {
   Pencil,
   Search,
   Sheet,
+  X,
 } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";
 import { BarChart } from "@/components/bar-chart";
 import { Menu } from "@/components/menu";
@@ -19,11 +20,11 @@ import { QueryState } from "@/components/query-state";
 import { ScrollArea } from "@/components/scroll-area";
 import { Select } from "@/components/select";
 import { ChipGroup } from "@/components/toggle-group";
-import { Button, Card, Input, PageHeader, cx } from "@/components/ui";
-import {
-  CorrectionDialog,
-  type CorrectionTarget,
-} from "@/features/riwayat/correction-form";
+import { api, call, errorMessage } from "@/client/api";
+import { invalidate } from "@/client/query";
+import { Alert, Button, Card, Input, PageHeader, cx } from "@/components/ui";
+import { AmountChoice } from "@/features/riwayat/correction-form";
+import { CORRECTION_REFRESH } from "@/features/riwayat/queries";
 import {
   daysInMonth,
   formatDateShort,
@@ -228,8 +229,36 @@ function RecapBody({
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("semua");
   const [sort, setSort] = useState<Sort>("rumah");
-  const [target, setTarget] = useState<CorrectionTarget | null>(null);
-  const [targetOpen, setTargetOpen] = useState(false);
+  // Kotak yang dipilih untuk diisi sekaligus ("idRumah:tanggal"), hanya saat `editing`.
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  // Pilihan tidak terbawa keluar dari mode isi atau ke bulan lain.
+  const selectionScope = `${editing}|${data.month}`;
+  const [scope, setScope] = useState(selectionScope);
+  if (scope !== selectionScope) {
+    setScope(selectionScope);
+    setSelected(new Set());
+  }
+  // Menyeret dengan mouse: pilihan saat mulai, memilih atau melepas, dan kotak awalnya (baris, kolom).
+  const drag = useRef<{ base: ReadonlySet<string>; on: boolean; row: number; col: number } | null>(null);
+  // Klik sesudah tekan-mouse di kotak sudah ditangani saat ditekan.
+  const skipClick = useRef(false);
+  useEffect(() => {
+    const stop = () => {
+      drag.current = null;
+      // Klik dikirim tepat sesudah tombol mouse dilepas; sesudahnya klik biasa berlaku lagi.
+      setTimeout(() => (skipClick.current = false));
+    };
+    window.addEventListener("pointerup", stop);
+    return () => window.removeEventListener("pointerup", stop);
+  }, []);
+  useEffect(() => {
+    if (!editing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelected(new Set());
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editing]);
   const headRef = useRef<HTMLDivElement>(null);
   const footRef = useRef<HTMLDivElement>(null);
   // Sorotan kolom di bawah kursor: satu aturan CSS yang diganti langsung, tanpa render ulang tabel.
@@ -336,6 +365,73 @@ function RecapBody({
         )
       : [[null, visible]];
 
+  const editableDates = dates.filter((d) => d <= tonight);
+  const cellKey = (houseId: number, date: string) => `${houseId}:${date}`;
+  function setCells(keys: string[], on: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const key of keys) {
+        if (on) next.add(key);
+        else next.delete(key);
+      }
+      return next;
+    });
+  }
+  /** Pilih semuanya, atau lepas semuanya kalau sudah terpilih semua. */
+  const toggleCells = (keys: string[]) => setCells(keys, !keys.every((k) => selected.has(k)));
+  const keyAt = (target: EventTarget) => (target as HTMLElement).closest<HTMLElement>("[data-cell]")?.dataset.cell;
+  // Urutan rumah seperti yang tampil, untuk memilih kotak di antara dua titik.
+  const rowOrder = groups.flatMap(([, list]) => list.map((r) => r.house.id));
+  const position = (key: string) => {
+    const [houseId, date] = key.split(":");
+    return { row: rowOrder.indexOf(Number(houseId)), col: editableDates.indexOf(date) };
+  };
+  /** Kotak di persegi panjang antara kotak awal seretan dan kotak di bawah mouse. */
+  function dragTo(key: string) {
+    const start = drag.current;
+    const end = position(key);
+    if (!start || end.row < 0 || end.col < 0) return;
+    const next = new Set(start.base);
+    for (let row = Math.min(start.row, end.row); row <= Math.max(start.row, end.row); row++) {
+      for (let col = Math.min(start.col, end.col); col <= Math.max(start.col, end.col); col++) {
+        const k = cellKey(rowOrder[row], editableDates[col]);
+        if (start.on) next.add(k);
+        else next.delete(k);
+      }
+    }
+    setSelected(next);
+  }
+  /**
+   * Satu penangan untuk semua kotak. Mouse: tekan lalu seret untuk memilih/melepas semua kotak di
+   * antaranya (mis. seminggu, atau beberapa rumah sekaligus), seperti di spreadsheet. Sentuh: ketuk
+   * satu per satu; menggeser tabel tidak ikut memilih.
+   */
+  const selectHandlers = {
+    onPointerDown: (e: React.PointerEvent) => {
+      const key = keyAt(e.target);
+      if (!key || e.pointerType !== "mouse" || e.button !== 0) return;
+      drag.current = { base: selected, on: !selected.has(key), ...position(key) };
+      skipClick.current = true;
+      dragTo(key);
+    },
+    onPointerOver: (e: React.PointerEvent) => {
+      const key = keyAt(e.target);
+      if (key && drag.current && e.buttons & 1) dragTo(key);
+    },
+    onClick: (e: React.MouseEvent) => {
+      const key = keyAt(e.target);
+      if (!key) return;
+      if (skipClick.current) {
+        skipClick.current = false;
+        return;
+      }
+      setCells([key], !selected.has(key));
+    },
+  };
+  const rowKeys = (houseId: number) => editableDates.map((d) => cellKey(houseId, d));
+  // Satu malam: rumah yang tampil dan dihuni (rumah mudik tidak dicek).
+  const columnKeys = (date: string) => visible.filter((r) => r.house.status === "active").map((r) => cellKey(r.house.id, date));
+
   return (
     <>
       <Card className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
@@ -420,7 +516,10 @@ function RecapBody({
           <Input
             type="search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setSelected(new Set());
+            }}
             placeholder="Cari rumah atau nama…"
             aria-label="Cari rumah"
             className="h-10 pl-10"
@@ -430,7 +529,10 @@ function RecapBody({
           <ChipGroup
             aria-label="Saring rumah"
             value={filter}
-            onValueChange={setFilter}
+            onValueChange={(next) => {
+              setFilter(next);
+              setSelected(new Set());
+            }}
             options={filters.map((f) => ({
               value: f.value,
               label: f.label,
@@ -507,7 +609,21 @@ function RecapBody({
                     );
                     return (
                       <th key={d} data-col={i} className="px-px py-1.5 font-medium">
-                        {d > tonight ? (
+                        {editing && d <= tonight ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleCells(columnKeys(d))}
+                            aria-pressed={columnKeys(d).every((k) => selected.has(k))}
+                            aria-label={`Pilih semua rumah ${formatDateShort(d)}`}
+                            title={`Pilih semua rumah ${formatDateShort(d)}`}
+                            className={cx(
+                              "flex w-full flex-col items-center rounded-md py-0.5 leading-tight hover:bg-primary/10 hover:text-primary",
+                              d === tonight && "bg-primary/10 text-primary",
+                            )}
+                          >
+                            {label}
+                          </button>
+                        ) : d > tonight ? (
                           <span className="flex flex-col items-center py-0.5 leading-tight text-muted/40">
                             <span className="text-[10px]">
                               {formatDateShort(d).slice(0, 1)}
@@ -553,8 +669,9 @@ function RecapBody({
           >
             <ScrollArea className="overflow-x-auto">
               <table
-                className="w-full table-fixed border-collapse text-sm"
+                className={cx("w-full table-fixed border-collapse text-sm", editing && "select-none")}
                 style={{ minWidth }}
+                {...(editing ? selectHandlers : {})}
               >
                 <RecapCols dates={dates.length} future={future} />
                 {/* Judul kolom untuk pembaca layar; yang terlihat ada di strip di atas. */}
@@ -598,6 +715,12 @@ function RecapBody({
                           className="sticky left-0 z-10 bg-card px-2 py-1 text-left font-normal group-hover:bg-[color-mix(in_oklab,var(--idle-soft)_50%,var(--card))] sm:px-3"
                         >
                           {/* HP: label di atas, nama kecil di bawah. Layar lebar: satu baris. */}
+                          <RowLabel
+                            editing={editing}
+                            selected={editableDates.length > 0 && rowKeys(r.house.id).every((k) => selected.has(k))}
+                            onSelect={() => toggleCells(rowKeys(r.house.id))}
+                            label={houseLabel(r.house)}
+                          >
                           <span className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2">
                             <span className="font-semibold leading-4 sm:leading-normal">
                               {houseLabel(r.house)}
@@ -613,6 +736,7 @@ function RecapBody({
                               </span>
                             </span>
                           </span>
+                          </RowLabel>
                         </th>
                         {r.cells.map((cell, i) => {
                           const date = dates[i];
@@ -641,16 +765,19 @@ function RecapBody({
                               )}
                             >
                               {editing && !future ? (
-                                // Tombol biasa (bukan Base UI Button): jumlahnya bisa ribuan dalam satu tabel.
+                                // Tombol biasa (bukan Base UI Button): jumlahnya bisa ribuan dalam satu tabel. Diketuk
+                                // atau diseret dipilih lewat `selectHandlers` di tabel.
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setTarget({ house: r.house, date, current: cell });
-                                    setTargetOpen(true);
-                                  }}
+                                  data-cell={cellKey(r.house.id, date)}
+                                  aria-pressed={selected.has(cellKey(r.house.id, date))}
                                   aria-label={`${houseLabel(r.house)}, ${formatDateShort(date)}: ${cellText(cell, vacant)}`}
                                   // Seukuran kotaknya supaya cincin sorotan pas di kotak, bukan selebar kolom.
-                                  className={cx(cellBox, "cursor-pointer transition hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary")}
+                                  className={cx(
+                                    cellBox,
+                                    "cursor-pointer transition hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                                    selected.has(cellKey(r.house.id, date)) && "bg-primary/15 ring-2 ring-primary hover:ring-primary",
+                                  )}
                                 >
                                   {content}
                                 </button>
@@ -731,12 +858,13 @@ function RecapBody({
         </div>
       )}
 
-      <CorrectionDialog
-        target={target}
-        open={targetOpen}
-        onClose={() => setTargetOpen(false)}
-        defaultAmount={data.defaultAmount}
-      />
+      {editing && (
+        <BulkBar
+          selected={selected}
+          defaultAmount={data.defaultAmount}
+          onClear={() => setSelected(new Set())}
+        />
+      )}
     </>
   );
 }
@@ -821,6 +949,121 @@ function Cell({
   );
 }
 
+/** Nama rumah di tabel; di mode isi jadi tombol untuk memilih semua malamnya (mis. warga yang bayar bulanan). */
+function RowLabel({
+  editing,
+  selected,
+  onSelect,
+  label,
+  children,
+}: {
+  editing: boolean;
+  selected: boolean;
+  onSelect: () => void;
+  label: string;
+  children: ReactNode;
+}) {
+  if (!editing) return <>{children}</>;
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      aria-label={`Pilih semua malam ${label}`}
+      title="Pilih semua malam bulan ini"
+      className={cx("-mx-1 block w-[calc(100%+0.5rem)] rounded-md px-1 text-left hover:bg-primary/10", selected && "bg-primary/10 text-primary")}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Bilah di bawah layar untuk mengisi semua kotak yang dipilih sekaligus: Ada (dengan nominal), Kosong,
+ * atau hapus catatannya. Muncul selama ada kotak yang dipilih.
+ */
+function BulkBar({
+  selected,
+  defaultAmount,
+  onClear,
+}: {
+  selected: ReadonlySet<string>;
+  defaultAmount: number;
+  onClear: () => void;
+}) {
+  const [amount, setAmount] = useState(String(defaultAmount));
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const save = useMutation({
+    mutationFn: (status: "filled" | "empty" | "none") =>
+      call(
+        api.admin.riwayat.$put({
+          json: {
+            entries: [...selected].map((key) => {
+              const [houseId, date] = key.split(":");
+              return { date, houseId: Number(houseId), status, amount: status === "filled" ? Number(amount) : 0 };
+            }),
+          },
+        }),
+      ),
+    onSuccess: async ({ success }) => {
+      await invalidate(...CORRECTION_REFRESH);
+      onClear();
+      setNotice(success);
+      clearTimeout(noticeTimer.current);
+      noticeTimer.current = setTimeout(() => setNotice(null), 3000);
+    },
+  });
+  useEffect(() => () => clearTimeout(noticeTimer.current), []);
+
+  const count = selected.size;
+  if (count === 0 && !notice) return null;
+  return (
+    <>
+      {/* Ruang di bawah tabel supaya baris terakhir dan total tidak tertutup bilah ini. */}
+      <div aria-hidden className="h-44 sm:h-32" />
+      <div className="fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] lg:pl-[calc(16rem+0.75rem)] print:hidden">
+        <div role="region" aria-label="Isi kotak terpilih" className="mx-auto max-w-3xl rounded-2xl border border-line bg-card p-3 shadow-lg">
+          {count === 0 ? (
+            <p role="status" className="flex items-center gap-2 text-sm font-semibold text-filled">
+              <Check className="size-4" /> {notice}
+            </p>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold">
+                  {count} kotak dipilih
+                  {Number(amount) > 0 && (
+                    <span className="font-normal text-muted"> · Ada = {formatRupiah(count * Number(amount))}</span>
+                  )}
+                </p>
+                <Button variant="ghost" size="icon-sm" onClick={onClear} aria-label="Batal pilih" title="Batal pilih (Esc)">
+                  <X className="size-4" />
+                </Button>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <AmountChoice value={amount} onChange={setAmount} defaultAmount={defaultAmount} />
+                <div className="flex flex-wrap gap-2 sm:ml-auto">
+                  <Button size="sm" disabled={save.isPending || !(Number(amount) > 0)} onClick={() => save.mutate("filled")}>
+                    Ada
+                  </Button>
+                  <Button variant="secondary" size="sm" disabled={save.isPending} onClick={() => save.mutate("empty")}>
+                    Kosong
+                  </Button>
+                  <Button variant="ghost" size="sm" disabled={save.isPending} onClick={() => save.mutate("none")}>
+                    Hapus catatan
+                  </Button>
+                </div>
+              </div>
+              {save.isError && <Alert>{errorMessage(save.error)}</Alert>}
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 function Legend({ editing, defaultAmount }: { editing: boolean; defaultAmount: number }) {
   const swatch = "inline-flex size-5 items-center justify-center rounded-[4px]";
   return (
@@ -849,7 +1092,7 @@ function Legend({ editing, defaultAmount }: { editing: boolean; defaultAmount: n
       </span>
       <span className={cx("basis-full sm:basis-auto", editing && "font-semibold text-fg")}>
         {editing
-          ? "Ketuk kotak untuk mengisi atau mengubah catatan. Ketuk tanggal untuk mengisi satu malam sekaligus."
+          ? "Ketuk kotak untuk memilih (dengan mouse bisa diseret). Ketuk nama rumah untuk sebulan, tanggal untuk semalam. Lalu pilih Ada, Kosong, atau Hapus di bawah."
           : "Ketuk tanggal untuk membuka riwayat malam itu."}
       </span>
     </p>

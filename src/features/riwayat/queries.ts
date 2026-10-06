@@ -19,3 +19,6 @@ export const patrolQuery = (date: string) =>
     queryKey: ["riwayat", date],
     queryFn: () => call(api.riwayat[":date"].$get({ param: { date } })),
   });
+
+/** Layar yang menampilkan catatan jimpitan: segarkan semuanya setelah admin mengoreksi. */
+export const CORRECTION_REFRESH = [["riwayat"], ["rekap"], ["admin", "ringkasan"], ["admin", "audit"]];

@@ -98,6 +98,8 @@ const correctionSchema = z.object({
   amount: z.number().int().min(0).max(MAX_AMOUNT),
 });
 const MAX_BULK_CORRECTIONS = 500;
+/** Kotak rekap sekaligus (rumah × malam): mis. 100 rumah sebulan penuh. */
+const MAX_RANGE_CORRECTIONS = 3100;
 
 const MAX_SCHEDULE_TEXT = 50_000;
 const MAX_SCHEDULE_ENTRIES = 1000;
@@ -478,7 +480,7 @@ export const adminRoutes = new Hono<AppEnv>()
     body(correctionSchema),
     async (c) => {
       const { date, houseId } = c.req.valid("param");
-      const error = await saveCorrections(c.var.db, c.var.user.id, date, [{ houseId, ...c.req.valid("json") }]);
+      const error = await saveCorrections(c.var.db, c.var.user.id, [{ date, houseId, ...c.req.valid("json") }]);
       if (error) return c.json({ error: error.message }, error.status);
       return c.json({ success: "Tersimpan." });
     },
@@ -501,9 +503,36 @@ export const adminRoutes = new Hono<AppEnv>()
     async (c) => {
       const { date } = c.req.valid("param");
       const entries = c.req.valid("json").entries;
-      const error = await saveCorrections(c.var.db, c.var.user.id, date, entries);
+      const error = await saveCorrections(c.var.db, c.var.user.id, entries.map((e) => ({ date, ...e })));
       if (error) return c.json({ error: error.message }, error.status);
       return c.json({ success: `${new Set(entries.map((e) => e.houseId)).size} rumah tersimpan.` });
+    },
+  )
+
+  /**
+   * Isi atau ubah banyak kotak rekap sekaligus, di beberapa rumah dan beberapa malam (mis. warga
+   * yang bayar mingguan/bulanan). Hanya malam sampai malam ini.
+   */
+  .put(
+    "/riwayat",
+    body(
+      z.object({
+        entries: z
+          .array(
+            correctionSchema.extend({
+              date: z.string().refine(isIsoDate, "Tanggal tidak valid."),
+              houseId: z.number().int().positive(),
+            }),
+          )
+          .min(1, "Pilih kotaknya dulu.")
+          .max(MAX_RANGE_CORRECTIONS, "Terlalu banyak kotak sekaligus. Simpan sebagian dulu."),
+      }),
+    ),
+    async (c) => {
+      const entries = c.req.valid("json").entries;
+      const error = await saveCorrections(c.var.db, c.var.user.id, entries);
+      if (error) return c.json({ error: error.message }, error.status);
+      return c.json({ success: `${new Set(entries.map((e) => `${e.date}:${e.houseId}`)).size} kotak tersimpan.` });
     },
   )
 
@@ -587,18 +616,19 @@ function nameTakenError(name: string) {
 async function saveCorrections(
   db: Db,
   userId: number,
-  date: string,
-  entries: { houseId: number; status: "filled" | "empty" | "none"; amount: number }[],
+  entries: { date: string; houseId: number; status: "filled" | "empty" | "none"; amount: number }[],
 ): Promise<{ message: string; status: 400 | 404 } | null> {
-  if (date > rondaDate(new Date())) return { message: "Tanggalnya belum lewat.", status: 400 };
+  const today = rondaDate(new Date());
+  if (entries.some((e) => e.date > today)) return { message: "Tanggalnya belum lewat.", status: 400 };
   if (entries.some((e) => e.status === "filled" && e.amount <= 0)) return { message: "Isi nominal yang benar.", status: 400 };
   const known = await getHouseIds(db);
   if (entries.some((e) => !known.has(e.houseId))) return { message: "Rumah tidak ditemukan.", status: 404 };
   const recordedAt = new Date();
-  const latest = new Map(entries.map((e) => [e.houseId, e]));
+  // Kotak yang sama dua kali: yang terakhir yang dipakai.
+  const latest = new Map(entries.map((e) => [`${e.date}:${e.houseId}`, e]));
   await writeCollections(
     db,
-    [...latest.values()].map((e) => ({ date, ...e, method: "manual" as const, userId, recordedAt })),
+    [...latest.values()].map((e) => ({ ...e, method: "manual" as const, userId, recordedAt })),
     recordedAt,
   );
   return null;

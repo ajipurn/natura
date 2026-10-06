@@ -10,11 +10,10 @@ import { formatDateLong } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { houseLabel } from "@/lib/houses";
 import type { CollectionStatus, HouseDTO } from "@/lib/types";
+import { CORRECTION_REFRESH } from "./queries";
 
 type Status = CollectionStatus | "none";
 
-/** Layar yang menampilkan catatan jimpitan: segarkan semuanya setelah admin mengoreksi. */
-const CORRECTION_REFRESH = [["riwayat"], ["rekap"], ["admin", "ringkasan"], ["admin", "audit"]];
 
 /** Warna pilihan yang aktif mengikuti statusnya (hijau Ada, merah Kosong). */
 const FILL_OPTIONS: [CollectionStatus, string, string][] = [
@@ -223,7 +222,7 @@ function StatusChoice<T extends Status>({
 }
 
 /** Nominal (Rp) dengan pilihan cepat. `value` berupa teks angka seperti yang diketik. */
-function AmountChoice({ value, onChange, defaultAmount }: { value: string; onChange: (value: string) => void; defaultAmount: number }) {
+export function AmountChoice({ value, onChange, defaultAmount }: { value: string; onChange: (value: string) => void; defaultAmount: number }) {
   const presets = [...new Set([defaultAmount, 1000, 2000, 5000])].filter((n) => n > 0).sort((a, b) => a - b);
   return (
     <div className="flex flex-wrap items-center gap-1.5">

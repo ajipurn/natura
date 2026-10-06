@@ -128,16 +128,26 @@ function writeStatements(db: Executor, writes: CollectionWrite[], now: Date, gua
       .onConflictDoNothing({ target: patrols.date }),
   ];
 
-  for (const w of writes.filter((w) => w.status === "none")) {
+  // Hapus satu perintah per malam (dan per pencatat/waktu catat, yang ikut menentukan syaratnya),
+  // bukan per rumah: koreksi massal admin di rekap bisa ratusan kotak sekaligus.
+  const removals = new Map<string, { date: string; userId: number; recordedAt: Date; houseIds: number[] }>();
+  for (const w of writes) {
+    if (w.status !== "none") continue;
+    const key = `${w.date}|${w.userId}|${w.recordedAt.getTime()}`;
+    const group = removals.get(key) ?? { date: w.date, userId: w.userId, recordedAt: w.recordedAt, houseIds: [] };
+    group.houseIds.push(w.houseId);
+    removals.set(key, group);
+  }
+  for (const r of removals.values()) {
     statements.push(
       db
         .delete(collections)
         .where(
           and(
-            eq(collections.patrolId, patrolIdFor(w.date)),
-            eq(collections.houseId, w.houseId),
-            lte(collections.recordedAt, w.recordedAt),
-            guard ? sql`not (${collections.status} = 'filled' and ${collections.collectedBy} is distinct from ${w.userId})` : undefined,
+            eq(collections.patrolId, patrolIdFor(r.date)),
+            inArray(collections.houseId, r.houseIds),
+            lte(collections.recordedAt, r.recordedAt),
+            guard ? sql`not (${collections.status} = 'filled' and ${collections.collectedBy} is distinct from ${r.userId})` : undefined,
           ),
         ),
     );
