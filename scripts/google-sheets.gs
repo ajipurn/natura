@@ -6,9 +6,13 @@
  *
  * - `rapikanRekap`: warna dan format untuk lembar yang sedang dibuka. Cukup sekali per lembar: format
  *   sel tetap ada saat IMPORTDATA memperbarui isinya.
- * - `pasangArsipBulanan`: jalankan sekali. Tiap pagi skrip memeriksa apakah bulan sudah berganti; kalau
- *   ya, lembar bulan berjalan disalin menjadi tab arsip bulan yang baru lewat (mis. "Oktober 2026")
- *   dengan rumus `?bulan=` untuk bulan itu, jadi isinya tetap ada dan ikut koreksi admin.
+ * - `arsipkanBulan`: tab per bulan. Jalankan sekali dari editor, lalu buat pemicunya di menu Pemicu
+ *   (ikon jam): fungsi `arsipkanBulan`, berbasis waktu, timer harian, jam 07.00–08.00. Lembar bulan
+ *   berjalan selalu bernama bulannya (mis. "Oktober 2026"). Saat bulan berganti, lembar itu disalin
+ *   menjadi tab arsip bulan yang baru lewat dengan rumus `?bulan=` untuk bulan itu, jadi isinya tetap
+ *   ada dan ikut koreksi admin, lalu lembar bulan berjalan memakai nama bulan yang baru. Pemicunya
+ *   tidak dibuat lewat kode (ScriptApp) karena izin itu diblokir di akun dengan Perlindungan Lanjutan
+ *   Google.
  *
  * Tata letaknya mengikuti CSV dari Natura (`buildSheetsCsv` di src/lib/recap-csv.ts): baris 1 judul,
  * baris 2 kepala kolom, baris 3 total, rumah mulai baris 4; kolom A–G rumah dan ringkasan, kolom H
@@ -58,28 +62,33 @@ function rapikanRekap() {
   ]);
 }
 
-/** Pasang (atau pasang ulang) pemeriksaan harian. Arsip pertama: bulan ini, dibuat saat bulan berganti. */
-function pasangArsipBulanan() {
-  currentSheet(); // berhenti dengan pesan yang jelas kalau lembar bulan berjalan belum ada
-  for (const trigger of ScriptApp.getProjectTriggers()) {
-    if (trigger.getHandlerFunction() === "arsipkanBulan") ScriptApp.deleteTrigger(trigger);
-  }
-  ScriptApp.newTrigger("arsipkanBulan").timeBased().everyDays(1).atHour(7).inTimezone(TIME_ZONE).create();
-  PropertiesService.getDocumentProperties().setProperty(LAST_ARCHIVED, shiftMonth(thisMonth(), -1));
-}
-
 /**
- * Dijalankan tiap pagi. Membuat tab arsip untuk bulan yang sudah lewat (juga yang terlewat kalau
- * pemeriksaan sempat gagal), tepat di kanan lembar bulan berjalan. Tab arsip yang dihapus tidak dibuat
- * lagi. Kalau link di lembar bulan berjalan diganti (link baru dari Natura), tab arsip ikut memakainya.
+ * Dijalankan tiap pagi oleh pemicu harian. Lembar bulan berjalan diberi nama bulannya (mis. "November
+ * 2026"), lalu tab arsip dibuat untuk bulan yang sudah lewat (juga yang terlewat kalau pemeriksaan
+ * sempat gagal), tepat di kanannya. Arsip pertama: bulan saat skrip ini pertama kali dijalankan. Tab
+ * arsip yang dihapus tidak dibuat lagi. Kalau link di lembar bulan berjalan diganti (link baru dari
+ * Natura), tab arsip ikut memakainya.
  */
 function arsipkanBulan() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   const { sheet: current, link } = currentSheet();
   const props = PropertiesService.getDocumentProperties();
   const lastMonth = shiftMonth(thisMonth(), -1);
+
+  // Ganti nama dulu: nama lamanya (bulan lalu) dipakai tab arsipnya.
+  const currentName = monthName(thisMonth());
+  if (current.getName() !== currentName) {
+    if (spreadsheet.getSheetByName(currentName)) {
+      throw new Error(`Sudah ada tab bernama "${currentName}". Ganti nama atau hapus tab itu supaya lembar bulan berjalan bisa memakai nama bulan.`);
+    }
+    current.setName(currentName);
+  }
+
   let month = props.getProperty(LAST_ARCHIVED);
-  if (!month) return; // pasangArsipBulanan belum dijalankan
+  if (!month) {
+    props.setProperty(LAST_ARCHIVED, lastMonth);
+    return;
+  }
 
   while (month < lastMonth) {
     month = shiftMonth(month, 1);
