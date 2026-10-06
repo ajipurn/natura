@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { ImageIcon, Trash2, Upload } from "lucide-react";
 import { useRef } from "react";
 import { api, call, errorMessage } from "@/client/api";
+import { refreshFavicon } from "@/client/favicon";
 import { resizeLogo } from "@/client/logo-image";
 import { invalidate } from "@/client/query";
 import { Alert, Button } from "@/components/ui";
@@ -12,8 +13,11 @@ export function LogoSettings({ logoUrl }: { logoUrl: string | null }) {
   const save = useMutation({
     mutationFn: async (file: File | null) =>
       call(api.admin.pengaturan.logo.$put({ json: { logo: file ? await resizeLogo(file) : null } })),
-    // Logo tampil di dashboard, stiker QR, halaman warga, dan halaman rumah.
-    onSuccess: () => invalidate(["admin"], ["warga"], ["rumah"]),
+    // Logo tampil di dashboard, stiker QR, halaman warga, halaman rumah, dan sebagai favicon.
+    onSuccess: () => {
+      refreshFavicon();
+      return invalidate(["admin"], ["warga"], ["rumah"]);
+    },
   });
 
   return (
