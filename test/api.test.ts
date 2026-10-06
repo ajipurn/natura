@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
-import { addDays, rondaDate } from "@/lib/dates";
+import { addDays, formatMonth, rondaDate } from "@/lib/dates";
 import { scheduleDay, slotHouseLabel } from "@/lib/schedule";
 import { houses } from "@/server/schema";
 import type { Db } from "@/server/db";
@@ -531,13 +531,13 @@ describe("link Google Sheets", () => {
     expect(march.status).toBe(200);
     const csv = march.data as unknown as string;
     const lines = csv.split("\r\n");
-    expect(lines[0]).toBe("Blok,No,2025-03-15,Jumlah Ada,Total (Rp)");
-    expect(lines).toContain("AB,3,,0,0");
-    expect(lines.at(-1)).toBe("Total,,2000,,2000");
+    expect(lines.slice(0, 2)).toEqual(["Rekap jimpitan Natura · Maret 2025", "Blok,No,Status,Total (Rp),Ada,Kosong,Tidak dicek,15"]);
+    expect(lines[2]).toMatch(/^Total,,,2000,1,1,\d+,2000$/);
+    expect(lines).toContain("AB,3,Dihuni,0,0,0,1,");
     // Tanpa nama warga dan tanpa BOM (Google Sheets membacanya sebagai bagian sel A1).
     expect(csv).not.toMatch(/Nama KK|Nino|\uFEFF/);
     // Tanpa ?bulan: bulan berjalan.
-    expect((await sheets.get(`/api/ekspor/${token}/rekap.csv`)).data).toContain(rondaDate(new Date()));
+    expect((await sheets.get(`/api/ekspor/${token}/rekap.csv`)).data).toMatch(`Rekap jimpitan Natura · ${formatMonth(rondaDate(new Date()).slice(0, 7))}`);
     expect((await sheets.get(`/api/ekspor/${token.slice(0, -1)}/rekap.csv`)).status).toBe(404);
 
     // Link baru: link lama berhenti. Dimatikan: tidak ada link yang berlaku.

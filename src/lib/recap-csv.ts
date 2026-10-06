@@ -1,3 +1,4 @@
+import { formatMonth } from "./dates";
 import { summarizeMonth } from "./month-summary";
 import type { MonthRecap } from "./types";
 
@@ -8,25 +9,63 @@ function csvCell(value: string | number): string {
   return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
+const toCsv = (lines: (string | number)[][]) => lines.map((row) => row.map(csvCell).join(",")).join("\r\n");
+
 /**
  * Rekap bulanan sebagai CSV (bisa dibuka di Excel / Google Sheets). Tanpa BOM; file unduhan
- * menambahkannya sendiri supaya Excel membaca UTF-8. `ownerNames: false` = tanpa kolom Nama KK
- * (untuk link Google Sheets).
+ * menambahkannya sendiri supaya Excel membaca UTF-8.
  */
-export function buildRecapCsv(recap: MonthRecap, { ownerNames = true } = {}): string {
+export function buildRecapCsv(recap: MonthRecap): string {
   const { rows, dateTotals, grandTotal } = summarizeMonth(recap);
-  const lines: (string | number)[][] = [
-    ["Blok", "No", ...(ownerNames ? ["Nama KK"] : []), ...recap.dates, "Jumlah Ada", "Total (Rp)"],
+  return toCsv([
+    ["Blok", "No", "Nama KK", ...recap.dates, "Jumlah Ada", "Total (Rp)"],
     ...rows.map(({ house, cells, filledCount, total }) => [
       house.block,
       house.number,
-      ...(ownerNames ? [house.ownerName ?? ""] : []),
+      house.ownerName ?? "",
       // Angka = nominal, K = kosong, kosong = belum dicek.
       ...cells.map((c) => (c?.status === "filled" ? c.amount : c?.status === "empty" ? "K" : "")),
       filledCount,
       total,
     ]),
-    [...(ownerNames ? ["", "", "Total"] : ["Total", ""]), ...dateTotals, "", grandTotal],
-  ];
-  return lines.map((row) => row.map(csvCell).join(",")).join("\r\n");
+    ["", "", "Total", ...dateTotals, "", grandTotal],
+  ]);
+}
+
+/**
+ * Rekap bulanan untuk link Google Sheets (`=IMPORTDATA(...)`), tanpa nama warga. Posisinya tetap
+ * supaya format yang dipasang sekali di Sheet tidak bergeser (lihat scripts/google-sheets-rapikan.gs):
+ * baris 1 judul, baris 2 kepala kolom, baris 3 total, rumah mulai baris 4; kolom A–G rumah dan
+ * ringkasan, kolom H dan seterusnya satu kolom per malam ronda (kepalanya angka tanggal; tanggal
+ * lengkap akan diubah Sheets menjadi nomor seri).
+ */
+export function buildSheetsCsv(recap: MonthRecap, month: string, communityName: string): string {
+  const { rows, dateTotals, grandTotal } = summarizeMonth(recap);
+  let filledTotal = 0;
+  let emptyTotal = 0;
+  let uncheckedTotal = 0;
+  const houseLines = rows.map(({ house, cells, filledCount, total }) => {
+    const empty = cells.filter((c) => c?.status === "empty").length;
+    // Rumah mudik tidak dihitung "tidak dicek".
+    const unchecked = house.status === "active" ? cells.filter((c) => !c).length : 0;
+    filledTotal += filledCount;
+    emptyTotal += empty;
+    uncheckedTotal += unchecked;
+    return [
+      house.block,
+      house.number,
+      house.status === "vacant" ? "Mudik" : "Dihuni",
+      total,
+      filledCount,
+      empty,
+      unchecked,
+      ...cells.map((c) => (c?.status === "filled" ? c.amount : c?.status === "empty" ? "kosong" : "")),
+    ];
+  });
+  return toCsv([
+    [`Rekap jimpitan ${communityName} · ${formatMonth(month)}`],
+    ["Blok", "No", "Status", "Total (Rp)", "Ada", "Kosong", "Tidak dicek", ...recap.dates.map((d) => Number(d.slice(8)))],
+    ["Total", "", "", grandTotal, filledTotal, emptyTotal, uncheckedTotal, ...dateTotals],
+    ...houseLines,
+  ]);
 }

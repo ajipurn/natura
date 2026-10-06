@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { timingSafeEqual } from "hono/utils/buffer";
-import { buildRecapCsv } from "@/lib/recap-csv";
+import { buildSheetsCsv } from "@/lib/recap-csv";
 import type { AppEnv } from "../env";
-import { getMonthRecap } from "../queries";
+import { getMonthRecap, getSettings } from "../queries";
 import { settings } from "../schema";
 import { monthQuery } from "./ronda";
 
@@ -18,6 +18,7 @@ export const eksporRoutes = new Hono<AppEnv>().get("/:token/rekap.csv", monthQue
   if (!row?.token || !(await timingSafeEqual(row.token, c.req.param("token")))) {
     return c.text("Link tidak berlaku. Minta link baru ke pengurus.", 404);
   }
-  const csv = buildRecapCsv(await getMonthRecap(db, c.req.valid("query").bulan), { ownerNames: false });
-  return c.body(csv, 200, { "Content-Type": "text/csv; charset=utf-8" });
+  const month = c.req.valid("query").bulan;
+  const [recap, { communityName }] = await Promise.all([getMonthRecap(db, month), getSettings(db)]);
+  return c.body(buildSheetsCsv(recap, month, communityName), 200, { "Content-Type": "text/csv; charset=utf-8" });
 });
