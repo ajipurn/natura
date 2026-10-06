@@ -488,7 +488,8 @@ describe("halaman warga", () => {
     await admin.post("/api/admin/rumah", { block: "ZZ", numbers: "1" });
     const zz1 = ((await admin.get("/api/admin/rumah")).data.houses as { id: number; block: string }[]).find((h) => h.block === "ZZ")!.id;
     const slots = (await admin.get("/api/jadwal")).data.schedule as Slot[];
-    await admin.put("/api/admin/jadwal/slot", { slots: [...slots.map(toInput), { day: 1, houseId: zz1 }] });
+    // Juga baris bernama yang putih (tidak ikut ronda): tidak ditampilkan ke warga.
+    await admin.put("/api/admin/jadwal/slot", { slots: [...slots.map(toInput), { day: 1, houseId: zz1 }, { day: 1, name: "Pak Putih" }] });
 
     const info = await warga.get("/api/warga");
     expect(info.data).toMatchObject({
@@ -499,6 +500,7 @@ describe("halaman warga", () => {
     const wargaSchedule = info.data.schedule as { houseId: number | null; name: string | null }[];
     expect(wargaSchedule.length).toBeGreaterThan(0);
     expect(wargaSchedule.some((s) => s.houseId === zz1)).toBe(false);
+    expect(wargaSchedule.some((s) => s.name === "Pak Putih")).toBe(false);
     expect(wargaSchedule.every((s) => s.name)).toBe(true);
     const rekap = await warga.get("/api/warga/rekap");
     expect(rekap.data).toMatchObject({ nights: 1, total: 1000 });
