@@ -1,3 +1,6 @@
+import { move } from "@dnd-kit/helpers";
+import { DragDropProvider, useDroppable } from "@dnd-kit/react";
+import { useSortable } from "@dnd-kit/react/sortable";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -12,7 +15,7 @@ import {
   UserRound,
   UsersRound,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useBlocker } from "react-router";
 import { api, call } from "@/client/api";
 import { invalidate } from "@/client/query";
@@ -33,7 +36,7 @@ import { housesQuery, usersQuery } from "../queries";
 import { AddSlotDialog } from "./add-slot-dialog";
 import { HouseNameDialog } from "./house-name-dialog";
 import { RequestsPanel } from "./requests-panel";
-import { moveSlot, newKey, sameSchedule, shiftSlot, toDraft, toSlots, type DraftSlot } from "./draft";
+import { applyKeysByDay, keysByDay, moveSlot, newKey, sameSchedule, shiftSlot, toDraft, toSlots, type DraftSlot } from "./draft";
 
 const NIGHT = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
 const COLOR_CHOICES: [GuardColor | null, string][] = [
@@ -111,8 +114,7 @@ function ScheduleEditor({
   const [draft, setDraft] = useState(initial);
   const [adding, setAdding] = useState<number | null>(null);
   const [naming, setNaming] = useState<HouseDTO | null>(null);
-  const [dragging, setDragging] = useState<string | null>(null);
-  const [dropDay, setDropDay] = useState<number | null>(null);
+  const beforeDrag = useRef(draft);
   const dirty = !sameSchedule(draft, base);
 
   // Data baru dari server (mis. setelah disimpan): pakai, kecuali sedang ada perubahan lokal.
@@ -154,15 +156,6 @@ function ScheduleEditor({
     unnamed: draft.filter((s) => !s.name && !s.ownerName).length,
     inactive: draft.filter((s) => s.userActive === false).length,
   };
-
-  function drop(e: DragEvent, day: number, beforeKey?: string) {
-    e.preventDefault();
-    e.stopPropagation();
-    const key = e.dataTransfer.getData("text/plain") || dragging;
-    if (key) setDraft((d) => moveSlot(d, key, day, beforeKey));
-    setDragging(null);
-    setDropDay(null);
-  }
 
   if (draft.length === 0 && !dirty) {
     return (
@@ -206,7 +199,7 @@ function ScheduleEditor({
           <span className="hidden sm:inline">
             Geser baris untuk mengurutkan atau memindah ke malam lain, atau pakai menu ⋯.
           </span>
-          <span className="sm:hidden">Pakai menu ⋯ untuk mengurutkan atau memindah ke malam lain.</span>
+          <span className="sm:hidden">Tekan lama lalu geser baris, atau pakai menu ⋯, untuk mengurutkan atau memindah ke malam lain.</span>
         </p>
         <ul aria-label="Arti warna" className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
           {COLOR_CHOICES.map(([color]) => (
@@ -243,71 +236,39 @@ function ScheduleEditor({
         ))}
       </nav>
 
-      {/* Layar lebar (rute ini `wide`, lihat AdminLayout): seminggu penuh dalam satu baris. */}
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 3xl:grid-cols-7">
-        {days.map((day) => {
-          const slots = draft.filter((s) => s.day === day);
-          return (
-            <section
-              key={day}
-              id={`malam-${day}`}
-              aria-label={dayLabel(day)}
-              onDragOver={(e) => {
-                if (!dragging) return;
-                e.preventDefault();
-                setDropDay(day);
-              }}
-              onDragLeave={(e) => {
-                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropDay(null);
-              }}
-              onDrop={(e) => drop(e, day)}
-              className={cx(
-                "flex scroll-mt-28 flex-col rounded-2xl border bg-card transition",
-                day === tonight ? "border-primary/60" : "border-line",
-                dropDay === day && "ring-2 ring-primary",
-              )}
-            >
-              <header className="px-4 pb-2 pt-3">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="flex min-w-0 items-center gap-2 font-semibold">
-                    <span className="truncate">{DAY_NAMES[day]}</span>
-                    {day === tonight && (
-                      <span className="shrink-0 whitespace-nowrap rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-fg">
-                        Malam ini
-                      </span>
-                    )}
-                  </h2>
-                  <span title={`${slots.length} orang`} className="inline-flex shrink-0 items-center gap-1 text-sm text-muted">
-                    <UsersRound aria-hidden className="size-3.5" />
-                    {slots.length}
-                    <span className="sr-only"> orang</span>
-                  </span>
-                </div>
-                {/* Satu baris di semua lebar, supaya baris pertama tiap malam sejajar. */}
-                <div className="mt-0.5 flex items-center justify-between gap-2 text-xs text-muted">
-                  <span className="truncate">malam {NIGHT[day]}</span>
-                  <ColorMix slots={slots} />
-                </div>
-              </header>
-              <ol className="flex-1 divide-y divide-line border-y border-line">
-                {slots.length === 0 && <li className="px-4 py-3 text-sm text-muted">Belum ada yang jaga.</li>}
+      {/*
+        Drag and drop (dnd kit): baris lain bergeser memberi tempat selama diseret, juga antar malam.
+        Draf diubah setiap kali target berubah, supaya React sendiri yang memindahkan baris antar malam
+        (kalau tidak, dnd kit memindahkan elemennya langsung di DOM dan React tidak bisa menghapusnya
+        lagi); dibatalkan (Esc) = kembali ke draf saat mulai diseret. Mouse: geser 5px; layar sentuh:
+        tekan lama.
+      */}
+      <DragDropProvider
+        onDragStart={() => {
+          beforeDrag.current = draft;
+        }}
+        onDragOver={(event) => {
+          setDraft((d) => {
+            const groups = keysByDay(d);
+            const moved = move(groups, event);
+            return moved === groups ? d : applyKeysByDay(d, moved);
+          });
+        }}
+        onDragEnd={(event) => {
+          if (event.canceled) setDraft(beforeDrag.current);
+        }}
+      >
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {days.map((day) => {
+            const slots = draft.filter((s) => s.day === day);
+            return (
+              <NightColumn key={day} day={day} tonight={day === tonight} slots={slots} onAdd={() => setAdding(day)}>
                 {slots.map((slot, i) => (
                   <SlotRow
                     key={slot.key}
                     slot={slot}
                     index={i}
                     count={slots.length}
-                    dragging={dragging === slot.key}
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData("text/plain", slot.key);
-                      e.dataTransfer.effectAllowed = "move";
-                      setDragging(slot.key);
-                    }}
-                    onDragEnd={() => {
-                      setDragging(null);
-                      setDropDay(null);
-                    }}
-                    onDrop={(e) => drop(e, day, slot.key)}
                     actions={[
                       ...(slot.houseId && !slot.name && !slot.ownerName
                         ? [
@@ -355,18 +316,11 @@ function ScheduleEditor({
                     ]}
                   />
                 ))}
-              </ol>
-              <Button
-                variant="plain"
-                onClick={() => setAdding(day)}
-                className="flex items-center gap-2 rounded-b-2xl px-4 py-2.5 text-sm font-semibold text-primary hover:bg-idle-soft"
-              >
-                <Plus className="size-4" /> Tambah
-              </Button>
-            </section>
-          );
-        })}
-      </div>
+              </NightColumn>
+            );
+          })}
+        </div>
+      </DragDropProvider>
 
       {(dirty || save.isError || save.isSuccess) && (
         <div className="sticky bottom-4 z-20 mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-card p-3 shadow-lg">
@@ -427,26 +381,73 @@ function ScheduleEditor({
   );
 }
 
-function SlotRow({
-  slot,
-  index,
-  count,
-  dragging,
-  onDragStart,
-  onDragEnd,
-  onDrop,
-  actions,
+/** Satu malam di jadwal: kepala kolom, baris-baris (bisa diseret), dan tombol tambah. */
+function NightColumn({
+  day,
+  tonight,
+  slots,
+  onAdd,
+  children,
 }: {
-  slot: DraftSlot;
-  index: number;
-  count: number;
-  dragging: boolean;
-  onDragStart: (e: DragEvent) => void;
-  onDragEnd: () => void;
-  onDrop: (e: DragEvent) => void;
-  actions: MenuItem[];
+  day: number;
+  tonight: boolean;
+  slots: DraftSlot[];
+  onAdd: () => void;
+  children: ReactNode;
 }) {
-  const [over, setOver] = useState(false);
+  // Malam juga tujuan seret, supaya baris bisa dipindah ke malam yang masih kosong. Prioritasnya di
+  // bawah baris (CollisionPriority.Low), jadi baris yang ditunjuk tetap menentukan posisinya.
+  const { ref, isDropTarget } = useDroppable({ id: String(day), type: "malam", accept: "slot", collisionPriority: 1 });
+  return (
+    <section
+      ref={ref}
+      id={`malam-${day}`}
+      aria-label={dayLabel(day)}
+      className={cx(
+        "flex scroll-mt-28 flex-col rounded-2xl border bg-card transition",
+        tonight ? "border-primary/60" : "border-line",
+        isDropTarget && "ring-2 ring-primary",
+      )}
+    >
+      <header className="px-4 pb-2 pt-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="flex min-w-0 items-center gap-2 font-semibold">
+            <span className="truncate">{DAY_NAMES[day]}</span>
+            {tonight && (
+              <span className="shrink-0 whitespace-nowrap rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-fg">
+                Malam ini
+              </span>
+            )}
+          </h2>
+          <span title={`${slots.length} orang`} className="inline-flex shrink-0 items-center gap-1 text-sm text-muted">
+            <UsersRound aria-hidden className="size-3.5" />
+            {slots.length}
+            <span className="sr-only"> orang</span>
+          </span>
+        </div>
+        {/* Satu baris di semua lebar, supaya baris pertama tiap malam sejajar. */}
+        <div className="mt-0.5 flex items-center justify-between gap-2 text-xs text-muted">
+          <span className="truncate">malam {NIGHT[day]}</span>
+          <ColorMix slots={slots} />
+        </div>
+      </header>
+      <ol className="flex-1 divide-y divide-line border-y border-line">
+        {slots.length === 0 && <li className="px-4 py-3 text-sm text-muted">Belum ada yang jaga.</li>}
+        {children}
+      </ol>
+      <Button
+        variant="plain"
+        onClick={onAdd}
+        className="flex items-center gap-2 rounded-b-2xl px-4 py-2.5 text-sm font-semibold text-primary hover:bg-idle-soft"
+      >
+        <Plus className="size-4" /> Tambah
+      </Button>
+    </section>
+  );
+}
+
+function SlotRow({ slot, index, count, actions }: { slot: DraftSlot; index: number; count: number; actions: MenuItem[] }) {
+  const { ref, isDragging } = useSortable({ id: slot.key, index, group: String(slot.day), type: "slot", accept: "slot" });
   const house = slotHouseLabel(slot);
   // Nama petugas (atau nama bebas), atau nama KK untuk baris rumah tanpa akun.
   const name = slot.name ?? slot.ownerName;
@@ -454,26 +455,15 @@ function SlotRow({
   const title = name ?? house;
   return (
     <li
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setOver(true);
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        setOver(false);
-        onDrop(e);
-      }}
+      ref={ref}
       aria-label={`${index + 1} dari ${count}: ${title}`}
       className={cx(
-        "flex items-center gap-2 px-2 py-1.5",
-        dragging && "opacity-40",
-        over && !dragging && "shadow-[inset_0_2px_0_var(--primary)]",
+        "flex cursor-grab touch-manipulation items-center gap-2 bg-card px-2 py-1.5 active:cursor-grabbing",
+        // Baris yang sedang diseret terangkat di atas kolom.
+        isDragging && "rounded-xl shadow-lg ring-1 ring-line",
       )}
     >
-      <GripVertical className="hidden size-4 shrink-0 cursor-grab text-muted sm:block" aria-hidden />
+      <GripVertical className="size-4 shrink-0 text-muted" aria-hidden />
       <span
         className={cx("h-8 w-1.5 shrink-0 rounded-full", guardColorClass(slot.color))}
         title={slot.color ? `Warna ${GUARD_COLOR_LABEL[slot.color].toLowerCase()}` : "Warna putih"}

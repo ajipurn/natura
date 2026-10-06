@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { moveSlot, sameSchedule, shiftSlot, toDraft, toSlots, type DraftSlot } from "@/apps/admin/jadwal/draft";
+import { applyKeysByDay, keysByDay, moveSlot, sameSchedule, shiftSlot, toDraft, toSlots, type DraftSlot } from "@/apps/admin/jadwal/draft";
 import type { ScheduleDTO } from "@/lib/types";
 
 const slot = (id: number, day: number, position: number, name: string, userId: number | null = null): ScheduleDTO => ({
@@ -28,6 +28,20 @@ describe("draf jadwal", () => {
     const moved = moveSlot(draft, "slot-2", 5);
     expect(names(moved, 5)).toEqual(["Widi"]);
     expect(toSlots(moved).map((s) => s.day)).toEqual([0, 1, 2, 5]);
+  });
+
+  it("drag and drop: urutan per malam, juga malam yang kosong", () => {
+    const draft = toDraft(schedule);
+    const groups = keysByDay(draft);
+    expect(groups).toEqual({ 0: ["slot-1", "slot-2"], 1: ["slot-3"], 2: ["slot-4"], 3: [], 4: [], 5: [], 6: [] });
+    // Tanpa perubahan: sama dengan yang tersimpan.
+    expect(sameSchedule(applyKeysByDay(draft, groups), draft)).toBe(true);
+    // Widi ke malam kosong (5), Tehe ke depan malam 1.
+    const moved = applyKeysByDay(draft, { ...groups, 0: ["slot-1"], 2: [], 1: ["slot-4", "slot-3"], 5: ["slot-2"] });
+    expect(names(moved, 0)).toEqual(["Yusuf"]);
+    expect(names(moved, 1)).toEqual(["Tehe", "Nino"]);
+    expect(names(moved, 5)).toEqual(["Widi"]);
+    expect(toSlots(moved).map((s) => s.day)).toEqual([0, 1, 1, 5]);
   });
 
   it("naik/turun hanya di malam yang sama", () => {

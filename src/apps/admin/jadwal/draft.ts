@@ -31,6 +31,24 @@ export function sameSchedule(a: DraftSlot[], b: DraftSlot[]) {
   return JSON.stringify(toSlots(a)) === JSON.stringify(toSlots(b));
 }
 
+/** Kunci baris per malam (urut), juga untuk malam yang kosong: bentuk yang dipakai `move` dari @dnd-kit/helpers. */
+export function keysByDay(draft: DraftSlot[]): Record<string, string[]> {
+  const groups: Record<string, string[]> = Object.fromEntries(Array.from({ length: 7 }, (_, day) => [String(day), []]));
+  for (const slot of draft) groups[slot.day].push(slot.key);
+  return groups;
+}
+
+/** Terapkan urutan per malam (hasil drag and drop) ke draf. */
+export function applyKeysByDay(draft: DraftSlot[], groups: Record<string, string[]>): DraftSlot[] {
+  const byKey = new Map(draft.map((s) => [s.key, s]));
+  return Object.entries(groups)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .flatMap(([day, keys]) => keys.flatMap((key) => {
+      const slot = byKey.get(key);
+      return slot ? [{ ...slot, day: Number(day) }] : [];
+    }));
+}
+
 /** Pindahkan satu baris ke malam `day`, sebelum baris `beforeKey` (atau paling akhir). */
 export function moveSlot(draft: DraftSlot[], key: string, day: number, beforeKey?: string): DraftSlot[] {
   const slot = draft.find((s) => s.key === key);
