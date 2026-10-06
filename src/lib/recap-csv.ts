@@ -34,7 +34,7 @@ export function buildRecapCsv(recap: MonthRecap): string {
 
 /**
  * Rekap bulanan untuk link Google Sheets (`=IMPORTDATA(...)`), tanpa nama warga. Posisinya tetap
- * supaya format yang dipasang sekali di Sheet tidak bergeser (lihat scripts/google-sheets-rapikan.gs):
+ * supaya format yang dipasang sekali di Sheet tidak bergeser (lihat scripts/google-sheets.gs):
  * baris 1 judul, baris 2 kepala kolom, baris 3 total, rumah mulai baris 4; kolom A–G rumah dan
  * ringkasan, kolom H dan seterusnya satu kolom per malam ronda (kepalanya angka tanggal; tanggal
  * lengkap akan diubah Sheets menjadi nomor seri).
