@@ -298,7 +298,7 @@ function RecapBody({
               ? `${Math.round((filledCells / checkedCells) * 100)}%`
               : "–"
           }
-          hint={`${emptyCells} kosong | ${uncheckedCells} tidak dicek`}
+          hint={`${emptyCells} kosong · ${uncheckedCells} tidak dicek`}
         />
       </div>
 
@@ -389,7 +389,7 @@ function RecapBody({
                       colSpan={dates.length + 3}
                       className="sticky left-0 px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-muted"
                     >
-                      Blok {block} | {list.length} rumah |{" "}
+                      Blok {block} · {list.length} rumah ·{" "}
                       {formatRupiah(list.reduce((s, r) => s + r.total, 0))}
                     </th>
                   </tr>

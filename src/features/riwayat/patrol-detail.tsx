@@ -262,7 +262,7 @@ function NightDetail({
         <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
           <span>
             {summary.checked} dari {summary.expected} rumah dicek
-            {summary.vacant.length > 0 && ` | ${summary.vacant.length} mudik`}
+            {summary.vacant.length > 0 && ` · ${summary.vacant.length} mudik`}
           </span>
           {summary.collectors.length > 0 && (
             <span className="flex items-center gap-1.5">
@@ -412,7 +412,7 @@ function NightDetail({
                 <h2 className="mb-2 text-sm font-semibold">
                   Blok {block}{" "}
                   <span className="font-normal text-muted">
-                    | {list.length} rumah
+                    · {list.length} rumah
                   </span>
                 </h2>
                 <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
@@ -453,7 +453,7 @@ function NightDetail({
                                   />
                                 )}
                                 {formatTime(c.recordedAt)}
-                                {c.collectorName && ` | ${c.collectorName}`}
+                                {c.collectorName && ` · ${c.collectorName}`}
                               </p>
                             )}
                           </div>
