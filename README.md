@@ -7,8 +7,8 @@ Satu aplikasi, tiga bagian:
 | Alamat | Untuk | Isi |
 | --- | --- | --- |
 | `/petugas/` | Petugas ronda (HP) | Scan QR, catat manual, denah 2D/3D, jaga malam ini, riwayat, jadwal. Tetap jalan tanpa sinyal. |
-| `/admin/` | Pengurus (laptop/HP) | Ringkasan, peta ronda, riwayat & koreksi (dengan log catatan), rekap bulanan, jadwal, petugas, data rumah & cetak QR, info warga, pengaturan. |
-| `/` | Warga | Pengumuman, jaga malam ini & jadwal seminggu, rekap jimpitan per bulan, status per rumah, kontak pengurus. Dibuka dengan **kode warga**. |
+| `/admin/` | Pengurus (laptop/HP) | Ringkasan, peta ronda, riwayat & koreksi (dengan log catatan), rekap bulanan, kas, jadwal, petugas, data rumah & cetak QR, info warga, pengaturan. |
+| `/` | Warga | Pengumuman, jaga malam ini & jadwal seminggu, rekap jimpitan per bulan, status per rumah, kas, kontak pengurus. Dibuka dengan **kode warga**. |
 
 Stiker QR berisi alamat `/r/<kode>`: dibuka pakai kamera HP biasa, warga melihat riwayat jimpitan rumah itu, dan petugas yang sudah masuk bisa langsung mencatat.
 
@@ -28,12 +28,13 @@ Stiker QR berisi alamat `/r/<kode>`: dibuka pakai kamera HP biasa, warga melihat
 - **Lokasi saya di denah:** petugas bisa menyalakan lokasi di tampilan Denah untuk melihat posisinya dan sedang di kavling/blok mana, lalu mematikannya lagi. Sebelumnya admin mengkalibrasi denah sekali di **Admin → Rumah & QR → Denah → Lokasi GPS** dengan minimal 3 titik acuan yang berjauhan: ketuk titiknya di denah, lalu isi koordinat dari Google Maps atau "Pakai lokasi saya". Selisih tiap titik ditampilkan supaya titik yang salah kelihatan. Lokasi hanya dipakai di HP, tidak dikirim ke server, dan butuh alamat https.
 - **Log catatan:** setiap scan QR, catat manual, dan koreksi admin tercatat lengkap (siapa, rumah mana, jam berapa, jam terkirim kalau HP sempat offline), lalu dicocokkan dengan jadwal jaga malam itu. Tab **Log catatan** di detail malam Riwayat menandai tiap catatan "Jaga" atau "Tidak dijadwalkan", menampilkan petugas jaga yang belum mencatat dan rumah yang dicatat lebih dari satu petugas. Tab Rumah dan Ringkasan memberi peringatan kalau ada yang perlu diperiksa.
 - **Data petugas dan rumah satu sumber:** nama warga di rumah yang dihuni petugas adalah nama akunnya, dan jadwal hanya menyimpan rujukan ke akun atau rumah. Nama yang diubah di **Petugas** atau di **Rumah & QR** langsung berubah di jadwal, denah, app petugas, dan halaman warga; petugas yang pindah rumah membawa jadwalnya. Nama boleh kembar asal rumahnya beda; di halaman masuk rumahnya ikut ditampilkan.
-- **Dashboard admin:** ringkasan malam ini, total bulan ini, grafik 30 malam terakhir, rumah yang sering kosong, dan daftar hal yang perlu diperhatikan.
+- **Dashboard admin:** ringkasan malam ini, total bulan ini, saldo kas, grafik 30 malam terakhir, rumah yang sering kosong, dan daftar hal yang perlu diperhatikan.
+- **Kas:** uang jimpitan disetor petugas jaga ke bendahara selesai keliling. Bendahara/admin mencatat setoran tiap malam di **Kas**, langsung dibandingkan dengan jimpitan yang tercatat malam itu (sesuai, kurang, atau lebih). Pengeluaran (mis. lampu pos ronda) dan pemasukan lain (mis. saldo awal) ikut dicatat, jadi saldo awal, saldo akhir bulan, dan saldo sekarang terlihat. Malam yang belum dicatat setorannya (sejak setoran pertama) diingatkan di Ringkasan. Ringkasan kas tampil di halaman warga tanpa nama pencatat, bisa dimatikan di Pengaturan.
 - **Riwayat per malam** (jam, petugas, scan/manual) dan koreksi oleh admin.
 - **Admin bisa mengisi dan mengubah catatan semua rumah untuk tanggal mana pun yang sudah lewat**, juga malam yang belum ada catatannya (mis. dari catatan kertas): buka tanggalnya di Riwayat, lalu ubah per rumah atau **isi semua yang belum dicek sekaligus** (Ada dengan nominal yang sama, atau Kosong). Di Rekap bulanan, tombol **Isi/ubah catatan** membuat setiap kotak rumah × tanggal bisa diketuk. Semua isian admin tercatat di Log catatan sebagai koreksi.
 - **Rekap bulanan** berupa tabel rumah × tanggal per blok seperti kalender sebulan (ada, nominal yang bukan nominal awal, kosong, tidak dicek; malam tanpa catatan tampil pudar), dengan pencarian, saringan, dan urutan. Bisa diunduh sebagai Excel (.xlsx, lembar per rumah dan per malam, berwarna) atau CSV.
 - **Rekap di Google Sheets:** tombol **Sheets** di Rekap bulanan membuat link rahasia yang ditempel di Google Sheets sebagai rumus `=IMPORTDATA(…)`. Sheet-nya terisi sendiri (blok, nomor, nominal tiap malam, tanpa nama warga) dan diperbarui Google kira-kira tiap jam. Pilih bulan berjalan (ikut berganti tiap awal bulan) atau satu bulan tertentu. Link bisa diganti atau dimatikan kapan saja. Google mengambil link dari servernya sendiri, jadi aplikasinya harus sudah online. `IMPORTDATA` hanya membawa isi sel. Apps Script [`scripts/google-sheets.gs`](scripts/google-sheets.gs) (tempel di Ekstensi → Apps Script) melengkapinya: `rapikanRekap` memasang warna dan format seperti file Excel (sekali per lembar; formatnya tetap ada saat isinya diperbarui), dan `arsipkanBulan` dengan pemicu harian (dibuat di menu Pemicu Apps Script) memberi lembar bulan berjalan nama bulannya serta membuat tab arsip otomatis tiap bulan berganti (mis. "Oktober 2026", salinan lembar bulan berjalan yang dikunci ke bulan itu).
-- **Halaman warga** dengan kode bersama dari pengurus: pengumuman, jadwal, rekap per bulan, status per rumah (tanpa nama), dan kontak (telepon/WhatsApp). Ganti kode kapan saja; akses lama otomatis tidak berlaku.
+- **Halaman warga** dengan kode bersama dari pengurus: pengumuman, jadwal, rekap per bulan, status per rumah (tanpa nama), kas, dan kontak (telepon/WhatsApp). Ganti kode kapan saja; akses lama otomatis tidak berlaku.
 - **Cetak stiker QR** di kertas A4, bisa difilter per blok.
 - **Login nama + PIN.** Akun terkunci 15 menit setelah 5 kali PIN salah. Login bertahan lama supaya petugas tidak perlu login tiap malam.
 - **Bisa dipasang di layar utama HP** (PWA). Mode gelap mengikuti pengaturan HP.
@@ -50,7 +51,7 @@ Semua waktu memakai WIB. Ronda yang lewat tengah malam tetap dihitung malam sebe
    - **Info warga:** buat kode warga, lalu kirim link-nya ke grup WA. Tambahkan pengumuman dan kontak pengurus.
 3. **Rumah & QR → Cetak QR**, cetak di kertas stiker (sebaiknya vinyl atau dilaminasi), lalu tempel dekat wadah jimpitan.
 4. Petugas membuka `/petugas/` sekali saat ada sinyal (supaya tersimpan untuk offline), lalu tekan **Scan QR** saat keliling.
-5. Selesai ronda, tekan **Bagikan rekap** dan kirim ke grup WA.
+5. Selesai ronda, tekan **Bagikan rekap** dan kirim ke grup WA, lalu setor uangnya ke bendahara. Bendahara mencatatnya di **Kas** (catat juga saldo awal kas sebagai pemasukan lain).
 
 > Kamera hanya bisa dipakai lewat **HTTPS** (atau `localhost`). Isi `APP_URL` sebelum mencetak stiker, karena alamat di QR tidak bisa diubah setelah ditempel. Kalau stiker rusak atau hilang, buat QR baru untuk rumah itu di Rumah & QR.
 
@@ -160,7 +161,6 @@ test/               Tes Vitest; tes API memakai PGlite (atau Postgres lewat TEST
 
 ## Ide pengembangan berikutnya
 
-- Buku kas: pengeluaran (konsumsi ronda, kegiatan sosial) dan saldo
 - Pengingat jadwal jaga untuk petugas
 - Mencatat lokasi GPS saat scan sebagai bukti kunjungan
 - Ekspor Excel/PDF yang lebih rapi

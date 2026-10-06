@@ -2,7 +2,7 @@ import { and, asc, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { z } from "zod";
-import { isIsoDate, rondaDate } from "@/lib/dates";
+import { isIsoDate, localDate, rondaDate } from "@/lib/dates";
 import { normalizeHouseField, parseNumberList } from "@/lib/houses";
 import { newToken } from "@/lib/qr";
 import { fitGeoTransform, MAX_ANCHORS, MIN_ANCHORS } from "@/lib/geo";
@@ -20,9 +20,11 @@ import { MAX_LOGO_DATA_URL, parseLogo } from "../logo";
 import { DEFAULT_SETTINGS, getHouseIds, getPlanAnchors, getSettings, listHouses, listHousesWithUsage, listUsers, logoColumns, logoUrl } from "../queries";
 import { countPendingRequests, decideRequest, listRequestsForAdmin } from "../requests";
 import { clearSchedule, houseSlots, replaceSlots, saveSchedule, userDaysStatements } from "../schedule";
-import { announcements, collections, contacts, houses, rondaSchedule, settings, users } from "../schema";
+import { announcements, cashDeposits, cashEntries, collections, contacts, houses, rondaSchedule, settings, users } from "../schema";
 import { getAudit } from "../audit";
 import { getDashboard } from "../dashboard";
+import { getCashMonth, MAX_CASH } from "../kas";
+import { monthQuery } from "./ronda";
 
 const BLOCK_PATTERN = /^[0-9A-Z][0-9A-Z .\-/]{0,9}$/;
 const NUMBER_PATTERN = /^[0-9A-Z][0-9A-Z\-/]{0,9}$/;
@@ -75,6 +77,17 @@ const slotSchema = z
 const settingsSchema = z.object({
   communityName: trimmed(80, "Isi nama lingkungan (maks. 80 karakter).").min(1, "Isi nama lingkungan (maks. 80 karakter)."),
   defaultAmount: z.number("Nominal jimpitan tidak valid.").int().positive("Nominal jimpitan tidak valid.").max(MAX_AMOUNT, "Nominal jimpitan tidak valid."),
+  cashPublic: z.boolean().optional(),
+});
+
+const cashAmount = (message: string) => z.number(message).int(message).max(MAX_CASH, "Jumlahnya terlalu besar.");
+const cashNote = z.string().trim().max(200, "Catatan maks. 200 karakter.").optional().transform((v) => v || null);
+
+const cashEntrySchema = z.object({
+  date: z.string().refine(isIsoDate, "Tanggal tidak valid."),
+  direction: z.enum(["in", "out"], "Pilih pemasukan atau pengeluaran."),
+  amount: cashAmount("Isi jumlah yang benar.").positive("Isi jumlah yang benar."),
+  description: trimmed(200, "Isi keterangan (maks. 200 karakter).").min(1, "Isi keterangan (maks. 200 karakter)."),
 });
 
 const announcementSchema = z.object({
@@ -330,6 +343,7 @@ export const adminRoutes = new Hono<AppEnv>()
         defaultAmount: settings.defaultAmount,
         wargaCode: settings.wargaCode,
         exportToken: settings.exportToken,
+        cashPublic: settings.cashPublic,
         ...logoColumns,
       })
       .from(settings)
@@ -340,6 +354,7 @@ export const adminRoutes = new Hono<AppEnv>()
       defaultAmount: row?.defaultAmount ?? 500,
       wargaCode: row?.wargaCode ?? null,
       exportToken: row?.exportToken ?? null,
+      cashPublic: row?.cashPublic ?? true,
       logoUrl: logoUrl(row),
       ...appOrigin(c),
     });
@@ -541,6 +556,65 @@ export const adminRoutes = new Hono<AppEnv>()
       return c.json({ success: `${new Set(entries.map((e) => `${e.date}:${e.houseId}`)).size} kotak tersimpan.` });
     },
   )
+
+  /* ---------- Kas: setoran ke bendahara, pemasukan lain, pengeluaran ---------- */
+
+  .get("/kas", monthQuery, async (c) => c.json(await getCashMonth(c.var.db, c.req.valid("query").bulan, rondaDate(new Date()))))
+
+  /** Catat atau ubah setoran satu malam ronda (uang yang diterima bendahara dari petugas jaga). */
+  .put(
+    "/kas/setoran/:date",
+    validator("param", (value: Record<string, string>, c) =>
+      isIsoDate(value.date) ? { date: value.date } : c.json({ error: "Tanggal tidak valid." }, 400),
+    ),
+    body(z.object({ amount: cashAmount("Isi jumlah setoran.").min(0, "Isi jumlah setoran."), note: cashNote })),
+    async (c) => {
+      const { date } = c.req.valid("param");
+      if (date > rondaDate(new Date())) return c.json({ error: "Malamnya belum tiba." }, 400);
+      const { amount, note } = c.req.valid("json");
+      const values = { amount, note, recordedBy: c.var.user.id, updatedAt: new Date() };
+      await c.var.db
+        .insert(cashDeposits)
+        .values({ date, ...values })
+        .onConflictDoUpdate({ target: cashDeposits.date, set: values });
+      return c.json({ success: "Setoran tersimpan." });
+    },
+  )
+
+  .delete(
+    "/kas/setoran/:date",
+    validator("param", (value: Record<string, string>, c) =>
+      isIsoDate(value.date) ? { date: value.date } : c.json({ error: "Tanggal tidak valid." }, 400),
+    ),
+    async (c) => {
+      await c.var.db.delete(cashDeposits).where(eq(cashDeposits.date, c.req.valid("param").date));
+      return c.json({ success: "Setoran dihapus." });
+    },
+  )
+
+  .post("/kas/transaksi", body(cashEntrySchema), async (c) => {
+    const entry = c.req.valid("json");
+    if (entry.date > localDate(new Date())) return c.json({ error: "Tanggalnya belum lewat." }, 400);
+    await c.var.db.insert(cashEntries).values({ ...entry, recordedBy: c.var.user.id });
+    return c.json({ success: entry.direction === "out" ? "Pengeluaran dicatat." : "Pemasukan dicatat." });
+  })
+
+  .patch("/kas/transaksi/:id", idParam(), body(cashEntrySchema), async (c) => {
+    const entry = c.req.valid("json");
+    if (entry.date > localDate(new Date())) return c.json({ error: "Tanggalnya belum lewat." }, 400);
+    const updated = await c.var.db
+      .update(cashEntries)
+      .set({ ...entry, recordedBy: c.var.user.id })
+      .where(eq(cashEntries.id, c.req.valid("param").id))
+      .returning({ id: cashEntries.id });
+    if (updated.length === 0) return c.json({ error: "Catatan kas tidak ditemukan." }, 404);
+    return c.json({ success: "Tersimpan." });
+  })
+
+  .delete("/kas/transaksi/:id", idParam(), async (c) => {
+    await c.var.db.delete(cashEntries).where(eq(cashEntries.id, c.req.valid("param").id));
+    return c.json({ success: "Catatan kas dihapus." });
+  })
 
   /* ---------- Info warga: pengumuman & kontak ---------- */
 

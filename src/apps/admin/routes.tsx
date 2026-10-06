@@ -7,6 +7,7 @@ import { PatrolList } from "@/features/riwayat/patrol-list";
 import { DenahPage } from "./denah/denah-page";
 import { InfoPage } from "./info-page";
 import { JadwalPage } from "./jadwal/jadwal-page";
+import { KasPage } from "./kas/kas-page";
 import { AdminLayout } from "./layout";
 import { PengaturanPage } from "./pengaturan/pengaturan-page";
 import { PetugasPage } from "./petugas/petugas-page";
@@ -40,6 +41,7 @@ export const router = createBrowserRouter([
       // Audit catatan sekarang tab "Log catatan" di detail malam Riwayat.
       { path: "audit", element: <AuditRedirect /> },
       { path: "rekap", element: <RekapPage /> },
+      { path: "kas", element: <KasPage /> },
       { path: "jadwal", element: <JadwalPage /> },
       { path: "rumah", element: <RumahPage /> },
       { path: "rumah/cetak", element: <CetakPage /> },

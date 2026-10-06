@@ -9,6 +9,7 @@ import {
   TrendingUp,
   TriangleAlert,
   Users,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { Link } from "react-router";
@@ -63,7 +64,12 @@ export function RingkasanPage() {
                 value={formatRupiah(d.monthSummary.total)}
                 hint={`${d.monthSummary.nights} malam ronda`}
               />
-              <StatCard label="Rata-rata per malam" value={formatRupiah(d.monthSummary.average)} hint="bulan ini" />
+              <StatCard
+                label="Saldo kas"
+                value={formatRupiah(d.cash.balance)}
+                hint={d.cash.undeposited ? `${d.cash.undeposited} malam belum disetor` : "Semua malam sudah disetor"}
+                to="/admin/kas"
+              />
             </div>
 
             <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_20rem]">
@@ -167,6 +173,7 @@ function todoItems(
   todo: {
     pendingRequests: number;
     offDuty: number;
+    undeposited: number;
     planMissing: number;
     noSchedule: boolean;
     noWargaCode: boolean;
@@ -182,6 +189,9 @@ function todoItems(
       text: `${todo.offDuty} catatan malam ini oleh petugas yang tidak dijadwalkan`,
     });
   }
+  if (todo.undeposited > 0) {
+    items.push({ to: "/admin/kas", icon: Wallet, text: `${todo.undeposited} malam belum dicatat setorannya ke bendahara` });
+  }
   if (todo.pendingRequests > 0) {
     items.push({ to: "/admin/jadwal", icon: CalendarClock, text: `${todo.pendingRequests} permintaan ubah jadwal menunggu keputusan` });
   }
@@ -194,13 +204,20 @@ function todoItems(
   return items;
 }
 
-function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <Card>
+function StatCard({ label, value, hint, to }: { label: string; value: string; hint?: string; to?: string }) {
+  const body = (
+    <>
       <p className="text-sm text-muted">{label}</p>
       <p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
       {hint && <p className="text-xs text-muted">{hint}</p>}
-    </Card>
+    </>
+  );
+  return to ? (
+    <Link to={to} className="rounded-2xl border border-line bg-card p-4 hover:border-primary/40">
+      {body}
+    </Link>
+  ) : (
+    <Card>{body}</Card>
   );
 }
 

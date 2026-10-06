@@ -36,6 +36,8 @@ export const logMethodEnum = pgEnum("log_method", ["scan", "manual", "koreksi"])
 /** Warna sel di tabel jadwal asli; null = putih. */
 export const guardColorEnum = pgEnum("guard_color", ["green", "yellow", "orange"]);
 export const requestStatusEnum = pgEnum("request_status", ["pending", "approved", "rejected", "cancelled"]);
+/** `in` = pemasukan lain (mis. saldo awal, sumbangan), `out` = pengeluaran. */
+export const cashDirectionEnum = pgEnum("cash_direction", ["in", "out"]);
 
 /** Satu baris saja (id = 1). */
 export const settings = pgTable("settings", {
@@ -54,6 +56,8 @@ export const settings = pgTable("settings", {
   logoVersion: integer("logo_version").notNull().default(0),
   /** Token rahasia di link CSV rekap untuk Google Sheets (`/api/ekspor/<token>/rekap.csv`). Null = link mati. */
   exportToken: text("export_token"),
+  /** Ringkasan kas (saldo, pemasukan, pengeluaran) tampil di halaman warga. */
+  cashPublic: boolean("cash_public").notNull().default(true),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 
@@ -215,6 +219,40 @@ export const contacts = pgTable("contacts", {
   phone: text("phone").notNull(),
   position: integer("position").notNull(),
 }).enableRLS();
+
+/**
+ * Setoran jimpitan ke bendahara: satu per malam ronda (uangnya disetor selesai keliling malam itu),
+ * dicatat bendahara/admin. Jumlah yang tercatat petugas malam itu dihitung dari `collections`.
+ */
+export const cashDeposits = pgTable(
+  "cash_deposits",
+  {
+    id: serial("id").primaryKey(),
+    /** Tanggal malam ronda yang uangnya disetor. */
+    date: date("date", { mode: "string" }).notNull().unique(),
+    amount: integer("amount").notNull(),
+    note: text("note"),
+    recordedBy: integer("recorded_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check("cash_deposits_amount", sql`${t.amount} >= 0`)],
+).enableRLS();
+
+/** Kas selain setoran jimpitan: pengeluaran dan pemasukan lain. */
+export const cashEntries = pgTable(
+  "cash_entries",
+  {
+    id: serial("id").primaryKey(),
+    date: date("date", { mode: "string" }).notNull(),
+    direction: cashDirectionEnum("direction").notNull(),
+    amount: integer("amount").notNull(),
+    description: text("description").notNull(),
+    recordedBy: integer("recorded_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("cash_entries_date_idx").on(t.date), check("cash_entries_amount", sql`${t.amount} > 0`)],
+).enableRLS();
 
 export type User = typeof users.$inferSelect;
 export type House = typeof houses.$inferSelect;

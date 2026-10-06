@@ -7,6 +7,7 @@ import { scheduleDay } from "@/lib/schedule";
 import { endWargaAccess, hasWargaAccess, requireWarga, startWargaAccess } from "../auth";
 import type { AppEnv } from "../env";
 import { body, idParam } from "../http";
+import { getCashPublic } from "../kas";
 import { getHouseHistory, getMonthRecap, getSettings, logoColumns, logoUrl } from "../queries";
 import { listSchedule } from "../schedule";
 import { announcements, contacts, houses, settings } from "../schema";
@@ -44,11 +45,11 @@ export const wargaRoutes = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
 
-  /** Info umum: jadwal ronda, pengumuman, kontak. */
+  /** Info umum: jadwal ronda, pengumuman, kontak, dan ringkasan kas (kalau ditampilkan pengurus). */
   .get("/", requireWarga, async (c) => {
     const db = c.var.db;
     const date = rondaDate(new Date());
-    const [settingsRow, schedule, announcementRows, contactRows] = await Promise.all([
+    const [settingsRow, schedule, announcementRows, contactRows, cash] = await Promise.all([
       getSettings(db),
       listSchedule(db),
       db
@@ -57,6 +58,7 @@ export const wargaRoutes = new Hono<AppEnv>()
         .orderBy(desc(announcements.pinned), desc(announcements.createdAt))
         .limit(30),
       db.select({ id: contacts.id, name: contacts.name, role: contacts.role, phone: contacts.phone }).from(contacts).orderBy(asc(contacts.position)),
+      getCashPublic(db, date),
     ]);
     return c.json({
       communityName: settingsRow.communityName,
@@ -72,6 +74,7 @@ export const wargaRoutes = new Hono<AppEnv>()
       }),
       announcements: announcementRows,
       contacts: contactRows,
+      cash,
     });
   })
 

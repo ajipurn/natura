@@ -52,6 +52,16 @@ export const auditQuery = (date: string) =>
     refetchInterval: 60_000,
   });
 
+/** Kas satu bulan: setoran per malam, pemasukan lain, pengeluaran, dan saldo. */
+export const cashQuery = (month: string) =>
+  queryOptions({
+    queryKey: ["admin", "kas", month],
+    queryFn: () => call(api.admin.kas.$get({ query: { bulan: month } })),
+  });
+
+/** Catatan kas tampil di halaman Kas dan Ringkasan. */
+export const CASH_REFRESH = [["admin", "kas"], ["admin", "ringkasan"]];
+
 /** Titik acuan kalibrasi denah ↔ GPS. */
 export const planAnchorsQuery = queryOptions({
   queryKey: ["admin", "denah-lokasi"],

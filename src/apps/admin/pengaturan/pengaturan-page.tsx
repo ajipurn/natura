@@ -15,7 +15,11 @@ export function PengaturanPage() {
           <Card className="max-w-xl">
             <LogoSettings logoUrl={settings.logoUrl} />
             <div className="mt-5 border-t border-line pt-5">
-              <SettingsForm communityName={settings.communityName} defaultAmount={settings.defaultAmount} />
+              <SettingsForm
+                communityName={settings.communityName}
+                defaultAmount={settings.defaultAmount}
+                cashPublic={settings.cashPublic}
+              />
             </div>
           </Card>
         )}

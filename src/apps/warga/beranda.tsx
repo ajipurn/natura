@@ -9,6 +9,7 @@ import {
   Megaphone,
   MessageCircle,
   Phone,
+  PiggyBank,
   Pin,
   ScanLine,
   Search,
@@ -31,6 +32,7 @@ import { addDays, daysInMonth, formatDateLong, formatDateShort, formatMonth, shi
 import { formatRupiah, phoneDigits, whatsappNumber } from "@/lib/format";
 import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
 import { DAY_NAMES, NIGHT_OF, slotHouseLabel } from "@/lib/schedule";
+import type { CashPublic } from "@/server/kas";
 import { HouseHistoryDialog } from "./house-history";
 import { houseMonthText, useMyHouse } from "./my-house";
 
@@ -158,7 +160,7 @@ function WargaContent() {
 
   return (
     <QueryState query={info}>
-      {({ announcements, schedule, tonight, date, contacts }) => {
+      {({ announcements, schedule, tonight, date, contacts, cash }) => {
         return (
           <div className="space-y-2">
             {announcements.length > 0 && (
@@ -190,7 +192,7 @@ function WargaContent() {
             </SectionTitle>
             <GuardSchedule schedule={schedule} tonight={tonight} date={date} />
 
-            <MonthRecap today={date} />
+            <MonthRecap today={date}>{cash && <CashCard cash={cash} />}</MonthRecap>
 
             {contacts.length > 0 && (
               <>
@@ -319,7 +321,8 @@ function GuardSchedule({ schedule, tonight, date }: { schedule: Guard[]; tonight
   );
 }
 
-function MonthRecap({ today }: { today: string }) {
+/** Rekap jimpitan per bulan, lalu `children` (kas), lalu status per rumah. */
+function MonthRecap({ today, children }: { today: string; children?: ReactNode }) {
   const thisMonth = today.slice(0, 7);
   const [month, setMonth] = useState(thisMonth);
   const recap = useQuery({
@@ -397,7 +400,47 @@ function MonthRecap({ today }: { today: string }) {
           }
         </QueryState>
       </Card>
+      {children}
       {recap.data && recap.data.nights > 0 && <HouseStatus perHouse={recap.data.perHouse} month={recap.data.month} />}
+    </>
+  );
+}
+
+/** Kas jimpitan dari pengurus: saldo, jumlah bulan ini, dan rincian selain setoran (tanpa nama pencatat). */
+function CashCard({ cash }: { cash: CashPublic }) {
+  const monthName = formatMonth(cash.month).split(" ")[0];
+  return (
+    <>
+      <SectionTitle>
+        <span className="inline-flex items-center gap-1.5">
+          <PiggyBank className="size-4" /> Kas jimpitan
+        </span>
+      </SectionTitle>
+      <Card>
+        <p className="text-xs text-muted">Saldo kas sekarang</p>
+        <p className="text-3xl font-bold tabular-nums">{formatRupiah(cash.balance)}</p>
+        <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+          <Stat label={`Setoran ${monthName}`} value={formatRupiah(cash.deposits)} />
+          <Stat label="Pemasukan lain" value={formatRupiah(cash.income)} />
+          <Stat label="Pengeluaran" value={formatRupiah(cash.expenses)} />
+        </div>
+        {cash.entries.length > 0 && (
+          <ul aria-label={`Rincian ${formatMonth(cash.month)}`} className="mt-4 divide-y divide-line border-t border-line">
+            {cash.entries.map((e) => (
+              <li key={e.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                <span className="min-w-0">
+                  <span className="block truncate">{e.description}</span>
+                  <span className="block text-xs text-muted">{formatDateShort(e.date)}</span>
+                </span>
+                <span className={cx("shrink-0 font-semibold tabular-nums", e.direction === "out" ? "text-empty" : "text-filled")}>
+                  {e.direction === "out" ? "−" : "+"}
+                  {formatRupiah(e.amount)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
     </>
   );
 }

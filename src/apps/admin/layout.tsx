@@ -12,6 +12,7 @@ import {
   Settings,
   Table2,
   Users,
+  Wallet,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -36,6 +37,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { to: "/admin/denah", label: "Peta ronda", icon: MapIcon },
       { to: "/admin/riwayat", label: "Riwayat", icon: History },
       { to: "/admin/rekap", label: "Rekap bulanan", icon: Table2 },
+      { to: "/admin/kas", label: "Kas", icon: Wallet },
     ],
   },
   {

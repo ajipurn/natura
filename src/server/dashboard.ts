@@ -9,6 +9,7 @@ import { SITE_PLAN } from "@/site-plan";
 import type { Db } from "./db";
 import { getCollectionsForDate, getMonthRecap, getSettings, listHouses, listPatrols } from "./queries";
 import { countOffDuty } from "./audit";
+import { getCashOverview } from "./kas";
 import { countPendingRequests } from "./requests";
 import { listSchedule } from "./schedule";
 import { settings, users } from "./schema";
@@ -17,7 +18,7 @@ import { settings, users } from "./schema";
 export async function getDashboard(db: Db, now: Date) {
   const date = rondaDate(now);
   const month = date.slice(0, 7);
-  const [settingsRow, houseRows, tonightRows, recap, recent, schedule, [userCounts], [codeRow], pendingRequests, offDuty] =
+  const [settingsRow, houseRows, tonightRows, recap, recent, schedule, [userCounts], [codeRow], pendingRequests, offDuty, cash] =
     await Promise.all([
       getSettings(db),
       listHouses(db),
@@ -33,6 +34,7 @@ export async function getDashboard(db: Db, now: Date) {
       db.select({ wargaCode: settings.wargaCode }).from(settings).where(eq(settings.id, 1)).limit(1),
       countPendingRequests(db),
       countOffDuty(db, date),
+      getCashOverview(db, date),
     ]);
 
   const tonight = summarize(houseRows, tonightRows);
@@ -68,6 +70,8 @@ export async function getDashboard(db: Db, now: Date) {
     /** 30 malam terakhir, urut dari yang terlama. */
     trend: [...recent].reverse().map((p) => ({ date: p.date, filled: p.filled, empty: p.empty, total: p.total })),
     oftenEmpty,
+    /** Saldo kas sekarang dan banyaknya malam yang belum dicatat setorannya. */
+    cash,
     /** Hal yang belum disiapkan, untuk daftar "Yang perlu dilakukan". */
     todo: {
       noHouses: houseRows.length === 0,
@@ -79,6 +83,8 @@ export async function getDashboard(db: Db, now: Date) {
       pendingRequests,
       /** Catatan malam ini oleh petugas yang tidak dijadwalkan jaga. */
       offDuty,
+      /** Malam sebelum malam ini yang belum dicatat setorannya. */
+      undeposited: cash.undeposited,
     },
   };
 }
