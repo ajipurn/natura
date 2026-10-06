@@ -11,8 +11,9 @@ import {
   Search,
   Sheet,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";
+import { BarChart } from "@/components/bar-chart";
 import { Menu } from "@/components/menu";
 import { QueryState } from "@/components/query-state";
 import { ScrollArea } from "@/components/scroll-area";
@@ -254,6 +255,22 @@ function RecapBody({
   const uncheckedCells = stats.reduce((s, r) => s + r.unchecked, 0);
   const checkedCells = filledCells + emptyCells;
 
+  // Ringkasan per malam. Malam ini yang belum dicatat belum dihitung terlewat.
+  const due = dates.filter((d) => d < tonight || (d === tonight && patrolDates.has(d)));
+  const missingNights = due.length - nights;
+  const activeRows = rows.filter((r) => r.house.status === "active");
+  const checkedPerDate = dates.map((_, i) => activeRows.filter((r) => r.cells[i]).length);
+  // Malam yang dicek kurang dari separuh rumah (mis. baru mulai diisi) tidak ikut rata-rata.
+  const halfChecked = (i: number) => checkedPerDate[i] * 2 >= activeRows.length;
+  const countedNights = dates.flatMap((d, i) => (patrolDates.has(d) && halfChecked(i) ? [i] : []));
+  const partialNights = nights - countedNights.length;
+  const average = countedNights.length
+    ? countedNights.reduce((sum, i) => sum + dateTotals[i], 0) / countedNights.length
+    : nights
+      ? grandTotal / nights
+      : null;
+  const best = dates.reduce<number | null>((top, _, i) => (dateTotals[i] > (top === null ? 0 : dateTotals[top]) ? i : top), null);
+
   if (rows.length === 0) {
     return (
       <Card className="py-10 text-center text-muted">
@@ -318,14 +335,72 @@ function RecapBody({
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        <Stat label="Terkumpul" value={formatRupiah(grandTotal)} />
-        <Stat label="Malam ronda" value={String(nights)} />
+      <Card className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
+        <div className="shrink-0 sm:w-56">
+          <p className="text-xs text-muted">Terkumpul {formatMonth(data.month)}</p>
+          <p className="text-3xl font-bold leading-tight tracking-tight tabular-nums">
+            {formatRupiah(grandTotal)}
+          </p>
+          {best !== null && (
+            <p className="mt-1 text-xs text-muted">
+              Tertinggi {formatRupiah(dateTotals[best])} pada{" "}
+              {formatDateShort(dates[best])}
+            </p>
+          )}
+        </div>
+        <BarChart
+          size="sm"
+          labelEvery={7}
+          className="min-w-0 flex-1"
+          caption={`Jimpitan terkumpul per malam, ${formatMonth(data.month)}`}
+          bars={dates.map((d, i) => ({
+            key: d,
+            label: String(Number(d.slice(8))),
+            value: dateTotals[i],
+            highlight: d === tonight && patrolDates.has(d),
+            faint: patrolDates.has(d) && !halfChecked(i),
+            blank: d > tonight,
+            title:
+              d > tonight
+                ? `${formatDateShort(d)}: belum tiba`
+                : patrolDates.has(d)
+                  ? `${formatDateShort(d)}: ${formatRupiah(dateTotals[i])} · ${checkedPerDate[i]} dari ${activeRows.length} rumah dicek`
+                  : `${formatDateShort(d)}: belum ada catatan`,
+          }))}
+        />
+      </Card>
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
         <Stat
-          label="Rata-rata per malam"
-          value={nights ? formatRupiah(Math.round(grandTotal / nights)) : "–"}
+          label="Malam tercatat"
+          value={
+            <>
+              {nights}
+              <span className="text-sm font-medium text-muted"> dari {due.length}</span>
+            </>
+          }
+          hint={
+            missingNights > 0 ? (
+              <span className="text-warn">{missingNights} malam belum ada catatan</span>
+            ) : due.length > 0 ? (
+              "Semua malam tercatat"
+            ) : undefined
+          }
         />
         <Stat
+          label="Rata-rata per malam"
+          value={average === null ? "–" : formatRupiah(Math.round(average))}
+          hint={
+            countedNights.length === 0 && nights > 0
+              ? "Semua malam baru sebagian dicek"
+              : partialNights > 0
+                ? `Tanpa ${partialNights} malam yang belum separuh dicek`
+                : nights > 0
+                  ? `Dari ${nights} malam`
+                  : undefined
+          }
+        />
+        <Stat
+          className="col-span-2 sm:col-span-1"
           label="Wadah ada isinya"
           value={
             checkedCells
@@ -738,13 +813,15 @@ function Stat({
   label,
   value,
   hint,
+  className,
 }: {
   label: string;
-  value: string;
-  hint?: string;
+  value: ReactNode;
+  hint?: ReactNode;
+  className?: string;
 }) {
   return (
-    <Card className="p-3">
+    <Card className={cx("p-3", className)}>
       <p className="text-xs text-muted">{label}</p>
       <p className="whitespace-nowrap text-xl font-bold leading-tight">
         {value}
