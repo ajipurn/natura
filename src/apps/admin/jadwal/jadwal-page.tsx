@@ -22,32 +22,15 @@ import { Alert, Button, Card, PageHeader, cx } from "@/components/ui";
 import { ScheduleImportForm } from "@/features/jadwal/import-form";
 import { scheduleQuery } from "@/features/jadwal/queries";
 import { rondaDate } from "@/lib/dates";
-import {
-  GUARD_COLOR_LABEL,
-  GUARD_COLORS,
-  type GuardColor,
-} from "@/lib/guard-color";
-import {
-  DAY_NAMES,
-  dayLabel,
-  scheduleDay,
-  slotHouseLabel,
-} from "@/lib/schedule";
+import { GUARD_COLOR_LABEL, GUARD_COLORS, type GuardColor } from "@/lib/guard-color";
+import { DAY_NAMES, dayLabel, scheduleDay, slotHouseLabel } from "@/lib/schedule";
 import { houseKey } from "@/lib/site-plan";
 import type { HouseDTO, ScheduleDTO } from "@/lib/types";
 import type { Petugas } from "../petugas/petugas-dialog";
 import { housesQuery, usersQuery } from "../queries";
 import { AddSlotDialog } from "./add-slot-dialog";
 import { RequestsPanel } from "./requests-panel";
-import {
-  moveSlot,
-  newKey,
-  sameSchedule,
-  shiftSlot,
-  toDraft,
-  toSlots,
-  type DraftSlot,
-} from "./draft";
+import { moveSlot, newKey, sameSchedule, shiftSlot, toDraft, toSlots, type DraftSlot } from "./draft";
 
 const NIGHT = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
 const COLOR_CHOICES: [GuardColor | null, string][] = [
@@ -70,11 +53,7 @@ export function JadwalPage() {
         title="Jadwal ronda"
         subtitle={`Malam ini: ${dayLabel(tonight)}`}
         action={
-          <Button
-            onClick={() => setImportOpen(true)}
-            variant="secondary"
-            size="sm"
-          >
+          <Button onClick={() => setImportOpen(true)} variant="secondary" size="sm">
             <FileSpreadsheet className="size-4" /> Impor
           </Button>
         }
@@ -141,8 +120,7 @@ function ScheduleEditor({
   }
 
   const save = useMutation({
-    mutationFn: () =>
-      call(api.admin.jadwal.slot.$put({ json: { slots: toSlots(draft) } })),
+    mutationFn: () => call(api.admin.jadwal.slot.$put({ json: { slots: toSlots(draft) } })),
     onSuccess: async () => {
       setBase(draft);
       await invalidate(["jadwal"], ["admin"], ["ronda"]);
@@ -153,10 +131,7 @@ function ScheduleEditor({
   const blocker = useBlocker(dirty);
   useEffect(() => {
     if (blocker.state !== "blocked") return;
-    if (
-      window.confirm("Perubahan jadwal belum disimpan. Tinggalkan halaman ini?")
-    )
-      blocker.proceed();
+    if (window.confirm("Perubahan jadwal belum disimpan. Tinggalkan halaman ini?")) blocker.proceed();
     else blocker.reset();
   }, [blocker]);
   useEffect(() => {
@@ -189,9 +164,7 @@ function ScheduleEditor({
         <Card className="text-center">
           <CalendarDays className="mx-auto size-10 text-muted" />
           <p className="mt-2 font-semibold">Belum ada jadwal ronda</p>
-          <p className="mt-1 text-sm text-muted">
-            Impor tabel jadwal dari spreadsheet, atau isi langsung per malam.
-          </p>
+          <p className="mt-1 text-sm text-muted">Impor tabel jadwal dari spreadsheet, atau isi langsung per malam.</p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Button onClick={onImport}>
               <FileSpreadsheet className="size-5" /> Impor dari spreadsheet
@@ -220,14 +193,11 @@ function ScheduleEditor({
     <div>
       <RequestsPanel locked={dirty} />
       <p className="mb-3 text-sm text-muted">
-        {stats.total} baris | {stats.linked} terhubung ke akun petugas.{" "}
+        {stats.total} baris · {stats.linked} terhubung ke akun petugas.{" "}
         <span className="hidden sm:inline">
-          Geser baris untuk mengurutkan atau memindah ke malam lain, atau pakai
-          menu ⋯.
+          Geser baris untuk mengurutkan atau memindah ke malam lain, atau pakai menu ⋯.
         </span>
-        <span className="sm:hidden">
-          Pakai menu ⋯ untuk mengurutkan atau memindah ke malam lain.
-        </span>
+        <span className="sm:hidden">Pakai menu ⋯ untuk mengurutkan atau memindah ke malam lain.</span>
       </p>
       {stats.inactive > 0 && (
         <p className="mb-3 flex gap-2 rounded-xl bg-warn-soft px-3 py-2 text-sm text-warn">
@@ -247,15 +217,10 @@ function ScheduleEditor({
             href={`#malam-${day}`}
             className={cx(
               "shrink-0 rounded-full border px-3 py-1 text-sm font-medium",
-              day === tonight
-                ? "border-primary bg-primary text-primary-fg"
-                : "border-line bg-card",
+              day === tonight ? "border-primary bg-primary text-primary-fg" : "border-line bg-card",
             )}
           >
-            {DAY_NAMES[day]}{" "}
-            <span className="opacity-70">
-              {draft.filter((s) => s.day === day).length}
-            </span>
+            {DAY_NAMES[day]} <span className="opacity-70">{draft.filter((s) => s.day === day).length}</span>
           </a>
         ))}
       </nav>
@@ -274,8 +239,7 @@ function ScheduleEditor({
                 setDropDay(day);
               }}
               onDragLeave={(e) => {
-                if (!e.currentTarget.contains(e.relatedTarget as Node | null))
-                  setDropDay(null);
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropDay(null);
               }}
               onDrop={(e) => drop(e, day)}
               className={cx(
@@ -286,26 +250,17 @@ function ScheduleEditor({
             >
               <header className="flex items-baseline justify-between gap-2 px-4 pb-2 pt-3">
                 <h2 className="font-semibold">
-                  {DAY_NAMES[day]}{" "}
-                  <span className="text-sm font-normal text-muted">
-                    (malam {NIGHT[day]})
-                  </span>
+                  {DAY_NAMES[day]} <span className="text-sm font-normal text-muted">(malam {NIGHT[day]})</span>
                   {day === tonight && (
                     <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-fg">
                       Malam ini
                     </span>
                   )}
                 </h2>
-                <span className="shrink-0 text-sm text-muted">
-                  {slots.length} orang
-                </span>
+                <span className="shrink-0 text-sm text-muted">{slots.length} orang</span>
               </header>
               <ol className="flex-1 divide-y divide-line border-y border-line">
-                {slots.length === 0 && (
-                  <li className="px-4 py-3 text-sm text-muted">
-                    Belum ada yang jaga.
-                  </li>
-                )}
+                {slots.length === 0 && <li className="px-4 py-3 text-sm text-muted">Belum ada yang jaga.</li>}
                 {slots.map((slot, i) => (
                   <SlotRow
                     key={slot.key}
@@ -328,15 +283,13 @@ function ScheduleEditor({
                         label: "Naikkan",
                         icon: <ArrowUp className="size-4" />,
                         disabled: i === 0,
-                        onSelect: () =>
-                          setDraft((d) => shiftSlot(d, slot.key, -1)),
+                        onSelect: () => setDraft((d) => shiftSlot(d, slot.key, -1)),
                       },
                       {
                         label: "Turunkan",
                         icon: <ArrowDown className="size-4" />,
                         disabled: i === slots.length - 1,
-                        onSelect: () =>
-                          setDraft((d) => shiftSlot(d, slot.key, 1)),
+                        onSelect: () => setDraft((d) => shiftSlot(d, slot.key, 1)),
                       },
                       { heading: "Pindah ke" },
                       ...days
@@ -344,34 +297,19 @@ function ScheduleEditor({
                         .map((target) => ({
                           label: dayLabel(target),
                           icon: <ArrowRightLeft className="size-4" />,
-                          onSelect: () =>
-                            setDraft((d) => moveSlot(d, slot.key, target)),
+                          onSelect: () => setDraft((d) => moveSlot(d, slot.key, target)),
                         })),
                       { heading: "Warna" },
                       ...COLOR_CHOICES.map(([color, label]) => ({
                         label: slot.color === color ? `${label} ✓` : label,
-                        icon: (
-                          <span
-                            aria-hidden
-                            className={cx(
-                              "size-4 rounded-full",
-                              guardColorClass(color),
-                            )}
-                          />
-                        ),
-                        onSelect: () =>
-                          setDraft((d) =>
-                            d.map((s) =>
-                              s.key === slot.key ? { ...s, color } : s,
-                            ),
-                          ),
+                        icon: <span aria-hidden className={cx("size-4 rounded-full", guardColorClass(color))} />,
+                        onSelect: () => setDraft((d) => d.map((s) => (s.key === slot.key ? { ...s, color } : s))),
                       })),
                       {
                         label: "Hapus dari jadwal",
                         icon: <Trash2 className="size-4" />,
                         danger: true,
-                        onSelect: () =>
-                          setDraft((d) => d.filter((s) => s.key !== slot.key)),
+                        onSelect: () => setDraft((d) => d.filter((s) => s.key !== slot.key)),
                       },
                     ]}
                   />
@@ -393,9 +331,7 @@ function ScheduleEditor({
         <div className="sticky bottom-4 z-20 mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-card p-3 shadow-lg">
           {dirty ? (
             <>
-              <p className="min-w-0 flex-1 text-sm font-medium">
-                Ada perubahan yang belum disimpan.
-              </p>
+              <p className="min-w-0 flex-1 text-sm font-medium">Ada perubahan yang belum disimpan.</p>
               <Button
                 disabled={save.isPending}
                 onClick={() => {
@@ -407,18 +343,12 @@ function ScheduleEditor({
               >
                 Batalkan
               </Button>
-              <Button
-                disabled={save.isPending}
-                onClick={() => save.mutate()}
-                size="sm"
-              >
+              <Button disabled={save.isPending} onClick={() => save.mutate()} size="sm">
                 {save.isPending ? "Menyimpan…" : "Simpan jadwal"}
               </Button>
             </>
           ) : (
-            <p className="min-w-0 flex-1 text-sm text-filled">
-              {save.data?.success}
-            </p>
+            <p className="min-w-0 flex-1 text-sm text-filled">{save.data?.success}</p>
           )}
           {save.isError && (
             <div className="w-full">
@@ -433,15 +363,11 @@ function ScheduleEditor({
         onClose={() => setAdding(null)}
         users={users}
         houses={houses}
-        slotsOfDay={
-          adding === null ? [] : draft.filter((s) => s.day === adding)
-        }
+        slotsOfDay={adding === null ? [] : draft.filter((s) => s.day === adding)}
         onAdd={(slot) => {
           const key = newKey();
           // Ditaruh di urutan terakhir malam itu.
-          setDraft((d) =>
-            moveSlot([...d, { ...slot, day: adding!, key }], key, adding!),
-          );
+          setDraft((d) => moveSlot([...d, { ...slot, day: adding!, key }], key, adding!));
           setAdding(null);
         }}
       />
@@ -493,47 +419,18 @@ function SlotRow({
         over && !dragging && "shadow-[inset_0_2px_0_var(--primary)]",
       )}
     >
-      <GripVertical
-        className="hidden size-4 shrink-0 cursor-grab text-muted sm:block"
-        aria-hidden
-      />
+      <GripVertical className="hidden size-4 shrink-0 cursor-grab text-muted sm:block" aria-hidden />
       <span
-        className={cx(
-          "h-8 w-1.5 shrink-0 rounded-full",
-          guardColorClass(slot.color),
-        )}
-        title={
-          slot.color
-            ? `Warna ${GUARD_COLOR_LABEL[slot.color].toLowerCase()}`
-            : "Warna putih"
-        }
+        className={cx("h-8 w-1.5 shrink-0 rounded-full", guardColorClass(slot.color))}
+        title={slot.color ? `Warna ${GUARD_COLOR_LABEL[slot.color].toLowerCase()}` : "Warna putih"}
       />
-      <span className="w-5 shrink-0 text-right text-xs text-muted">
-        {index + 1}
-      </span>
+      <span className="w-5 shrink-0 text-right text-xs text-muted">{index + 1}</span>
       <span className="min-w-0 flex-1">
-        <span
-          className={cx(
-            "block truncate font-medium",
-            slot.userActive === false && "line-through",
-          )}
-        >
-          {title}
-        </span>
+        <span className={cx("block truncate font-medium", slot.userActive === false && "line-through")}>{title}</span>
         <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
-          {slot.name ? (
-            house || "tanpa rumah"
-          ) : (
-            <span>
-              {slot.ownerName ? `KK: ${slot.ownerName}` : "belum ada nama KK"}
-            </span>
-          )}
-          {!slot.userId && (
-            <span title="Belum punya akun petugas">| tanpa akun</span>
-          )}
-          {slot.userActive === false && (
-            <span className="text-warn">| nonaktif</span>
-          )}
+          {slot.name ? house || "tanpa rumah" : <span>{slot.ownerName ? `KK: ${slot.ownerName}` : "belum ada nama KK"}</span>}
+          {!slot.userId && <span title="Belum punya akun petugas">· tanpa akun</span>}
+          {slot.userActive === false && <span className="text-warn">· nonaktif</span>}
         </span>
       </span>
       <Menu label={`Aksi untuk ${title}`} items={actions} />

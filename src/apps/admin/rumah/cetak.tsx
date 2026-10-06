@@ -18,9 +18,7 @@ export function CetakPage() {
         const blocks = [...new Set(allHouses.map((h) => h.block))];
         const blok = params.get("blok");
         const selected = blok && blocks.includes(blok) ? blok : null;
-        const houses = (
-          selected ? allHouses.filter((h) => h.block === selected) : allHouses
-        ).sort(compareHouses);
+        const houses = (selected ? allHouses.filter((h) => h.block === selected) : allHouses).sort(compareHouses);
         const isLocal = /\/\/(localhost|127\.|192\.168\.|10\.)/.test(origin);
 
         return (
@@ -38,24 +36,14 @@ export function CetakPage() {
               />
 
               <div className="mb-4 flex flex-wrap gap-2">
-                <BlockChip
-                  to="/admin/rumah/cetak"
-                  active={!selected}
-                  label="Semua blok"
-                />
+                <BlockChip to="/admin/rumah/cetak" active={!selected} label="Semua blok" />
                 {blocks.map((b) => (
-                  <BlockChip
-                    key={b}
-                    to={`/admin/rumah/cetak?blok=${encodeURIComponent(b)}`}
-                    active={selected === b}
-                    label={`Blok ${b}`}
-                  />
+                  <BlockChip key={b} to={`/admin/rumah/cetak?blok=${encodeURIComponent(b)}`} active={selected === b} label={`Blok ${b}`} />
                 ))}
               </div>
 
               <p className="text-sm text-muted">
-                QR berisi alamat{" "}
-                <code className="rounded bg-idle-soft px-1">{origin}/r/…</code>
+                QR berisi alamat <code className="rounded bg-idle-soft px-1">{origin}/r/…</code>
               </p>
               {(isLocal || !fromEnv) && (
                 <p className="mt-2 flex gap-2 rounded-xl bg-warn-soft p-3 text-sm text-warn">
@@ -68,8 +56,7 @@ export function CetakPage() {
                 </p>
               )}
               <p className="mb-6 mt-2 text-sm text-muted">
-                Saran: cetak di kertas stiker vinyl atau laminasi supaya tahan
-                hujan. Tempel dekat wadah jimpitan.
+                Saran: cetak di kertas stiker vinyl atau laminasi supaya tahan hujan. Tempel dekat wadah jimpitan.
               </p>
             </div>
 
@@ -83,9 +70,7 @@ export function CetakPage() {
                     {logoUrl && (
                       <img src={logoUrl} alt="" className="h-7 w-auto max-w-16 object-contain print:h-[7mm] print:max-w-[18mm]" />
                     )}
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-gray-600">
-                      Jimpitan {communityName}
-                    </p>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-gray-600">Jimpitan {communityName}</p>
                   </div>
                   {/* Dengan logo, baris judulnya lebih tinggi: QR sedikit diperkecil supaya stiker tetap 68 mm. */}
                   <QrSvg
@@ -93,11 +78,9 @@ export function CetakPage() {
                     className={cx("my-2 w-full max-w-44 print:w-[42mm] print:max-w-none", logoUrl && "print:w-[38mm]")}
                   />
                   <p className="text-2xl font-black leading-tight">
-                    Blok {house.block} | No. {house.number}
+                    Blok {house.block} · No. {house.number}
                   </p>
-                  <p className="text-[10px] text-gray-500">
-                    Scan untuk lihat riwayat jimpitan
-                  </p>
+                  <p className="text-[10px] text-gray-500">Scan untuk lihat riwayat jimpitan</p>
                 </div>
               ))}
             </div>
@@ -108,23 +91,13 @@ export function CetakPage() {
   );
 }
 
-function BlockChip({
-  to,
-  active,
-  label,
-}: {
-  to: string;
-  active: boolean;
-  label: string;
-}) {
+function BlockChip({ to, active, label }: { to: string; active: boolean; label: string }) {
   return (
     <Link
       to={to}
       className={cx(
         "rounded-full border px-3 py-1 text-sm",
-        active
-          ? "border-primary bg-primary text-primary-fg"
-          : "border-line text-muted",
+        active ? "border-primary bg-primary text-primary-fg" : "border-line text-muted",
       )}
     >
       {label}

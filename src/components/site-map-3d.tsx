@@ -3,10 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "@/client/theme";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import {
-  CSS2DObject,
-  CSS2DRenderer,
-} from "three/addons/renderers/CSS2DRenderer.js";
+import { CSS2DObject, CSS2DRenderer } from "three/addons/renderers/CSS2DRenderer.js";
 import type { MarkerState } from "@/lib/house-state";
 import { planProjection, type WorldPoint } from "@/lib/site-map-3d";
 import {
@@ -34,13 +31,9 @@ const WALL_COLOR = "#f8fafc";
 const MIN_LABEL_PX = 16;
 /** Geser jari lebih dari ini = memutar kamera, bukan mengetuk rumah. */
 const TAP_TOLERANCE_PX = 8;
-const HOUSE_LABEL_CLASS =
-  "rounded border border-line bg-card/90 px-1 text-[10px] font-bold leading-tight text-fg shadow-sm";
+const HOUSE_LABEL_CLASS = "rounded border border-line bg-card/90 px-1 text-[10px] font-bold leading-tight text-fg shadow-sm";
 
-type SceneApi = {
-  setMarkers: (markers: Record<number, MarkerState>) => void;
-  resetView: () => void;
-};
+type SceneApi = { setMarkers: (markers: Record<number, MarkerState>) => void; resetView: () => void };
 type HouseMeshes = { body: THREE.Mesh; roof: THREE.Mesh };
 type Bounds = { minX: number; maxX: number; minZ: number; maxZ: number };
 
@@ -52,11 +45,7 @@ type BuildContext = {
   wallMat: THREE.Material;
   neutralRoofMat: THREE.Material;
   /** Label HTML yang menempel pada objek 3D. */
-  attachLabel: (
-    el: HTMLElement,
-    parent: THREE.Object3D,
-    position: THREE.Vector3,
-  ) => void;
+  attachLabel: (el: HTMLElement, parent: THREE.Object3D, position: THREE.Vector3) => void;
 };
 
 type BuiltScene = {
@@ -99,10 +88,7 @@ export default function SiteMap3D({
   });
 
   // Data snapshot diperbarui berkala; adegan hanya dibangun ulang kalau rumahnya berubah.
-  const layoutKey = useMemo(
-    () => JSON.stringify(houses.map((h) => [h.id, h.block, h.number])),
-    [houses],
-  );
+  const layoutKey = useMemo(() => JSON.stringify(houses.map((h) => [h.id, h.block, h.number])), [houses]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -113,25 +99,18 @@ export default function SiteMap3D({
       renderer = new THREE.WebGLRenderer({ antialias: true });
     } catch {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- WebGL hanya bisa dicek di browser
-      setError(
-        "HP ini tidak mendukung tampilan 3D. Pakai tampilan Denah atau Daftar.",
-      );
+      setError("HP ini tidak mendukung tampilan 3D. Pakai tampilan Denah atau Daftar.");
       return;
     }
     const css = getComputedStyle(document.documentElement);
-    const cssColor = (name: string, fallback: string) =>
-      css.getPropertyValue(name).trim() || fallback;
+    const cssColor = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.domElement.style.touchAction = "none";
     container.appendChild(renderer.domElement);
 
     const labelRenderer = new CSS2DRenderer();
-    Object.assign(labelRenderer.domElement.style, {
-      position: "absolute",
-      inset: "0",
-      pointerEvents: "none",
-    });
+    Object.assign(labelRenderer.domElement.style, { position: "absolute", inset: "0", pointerEvents: "none" });
     container.appendChild(labelRenderer.domElement);
 
     const scene = new THREE.Scene();
@@ -142,10 +121,7 @@ export default function SiteMap3D({
     scene.add(sun);
 
     const disposables: { dispose: () => void }[] = [];
-    const track = <T extends { dispose: () => void }>(item: T) => (
-      disposables.push(item),
-      item
-    );
+    const track = <T extends { dispose: () => void }>(item: T) => (disposables.push(item), item);
     const labels: HTMLElement[] = [];
 
     let frame = 0;
@@ -166,10 +142,7 @@ export default function SiteMap3D({
     const wallMat = material(WALL_COLOR, false);
     const ghostWallMat = material(WALL_COLOR, true);
     const roofMats = Object.fromEntries(
-      Object.entries(ROOF_COLORS).map(([state, color]) => [
-        state,
-        material(color, state === "vacant"),
-      ]),
+      Object.entries(ROOF_COLORS).map(([state, color]) => [state, material(color, state === "vacant")]),
     ) as Record<MarkerState, THREE.MeshLambertMaterial>;
 
     const ctx: BuildContext = {
@@ -188,14 +161,8 @@ export default function SiteMap3D({
     };
     const built = buildPlanScene(ctx, plan);
     const { meshes, houseLabels, bounds, footprint } = built;
-    const pickables = [...meshes.values()].flatMap(({ body, roof }) => [
-      body,
-      roof,
-    ]);
-    const maxDim = Math.max(
-      bounds.maxX - bounds.minX,
-      bounds.maxZ - bounds.minZ,
-    );
+    const pickables = [...meshes.values()].flatMap(({ body, roof }) => [body, roof]);
+    const maxDim = Math.max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ);
 
     const camera = new THREE.PerspectiveCamera(45, 1, 0.5, maxDim * 10);
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -206,11 +173,7 @@ export default function SiteMap3D({
     controls.screenSpacePanning = false; // geser sejajar tanah
 
     // Sudut pandang awal: miring dari depan, mundur sampai keempat sudut denah masuk layar.
-    const center = new THREE.Vector3(
-      (bounds.minX + bounds.maxX) / 2,
-      0,
-      (bounds.minZ + bounds.maxZ) / 2,
-    );
+    const center = new THREE.Vector3((bounds.minX + bounds.maxX) / 2, 0, (bounds.minZ + bounds.maxZ) / 2);
     const viewDirection = new THREE.Vector3(0, 0.9, 0.45).normalize();
     const corners = [
       [bounds.minX, bounds.minZ],
@@ -227,10 +190,7 @@ export default function SiteMap3D({
       controls.target.copy(center);
       let distance = maxDim * 0.5;
       for (let i = 0; i < 60; i++) {
-        camera.position
-          .copy(viewDirection)
-          .multiplyScalar(distance)
-          .add(center);
+        camera.position.copy(viewDirection).multiplyScalar(distance).add(center);
         camera.lookAt(controls.target);
         camera.updateMatrixWorld();
         if (fitsOnScreen() || distance >= controls.maxDistance) break;
@@ -246,14 +206,11 @@ export default function SiteMap3D({
       controls.update();
       // Ukuran rumah di layar menentukan apakah nomor rumah ditampilkan.
       const distance = camera.position.distanceTo(controls.target);
-      const pixelsPerUnit =
-        renderer.domElement.clientHeight /
-        (2 * distance * Math.tan((camera.fov * Math.PI) / 360));
+      const pixelsPerUnit = renderer.domElement.clientHeight / (2 * distance * Math.tan((camera.fov * Math.PI) / 360));
       const visible = footprint * pixelsPerUnit >= MIN_LABEL_PX;
       if (visible !== labelsVisible) {
         labelsVisible = visible;
-        for (const el of houseLabels)
-          el.style.visibility = visible ? "visible" : "hidden";
+        for (const el of houseLabels) el.style.visibility = visible ? "visible" : "hidden";
       }
       renderer.render(scene, camera);
       labelRenderer.render(scene, camera);
@@ -276,24 +233,17 @@ export default function SiteMap3D({
     // Ketuk rumah (bukan geser) → buka lembar catat.
     const raycaster = new THREE.Raycaster();
     let down: { x: number; y: number } | null = null;
-    const onPointerDown = (e: PointerEvent) =>
-      (down = { x: e.clientX, y: e.clientY });
+    const onPointerDown = (e: PointerEvent) => (down = { x: e.clientX, y: e.clientY });
     const onPointerUp = (e: PointerEvent) => {
-      if (
-        !down ||
-        Math.hypot(e.clientX - down.x, e.clientY - down.y) > TAP_TOLERANCE_PX
-      )
-        return;
+      if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > TAP_TOLERANCE_PX) return;
       const rect = renderer.domElement.getBoundingClientRect();
       const pointer = new THREE.Vector2(
         ((e.clientX - rect.left) / rect.width) * 2 - 1,
         -((e.clientY - rect.top) / rect.height) * 2 + 1,
       );
       raycaster.setFromCamera(pointer, camera);
-      const id = raycaster.intersectObjects(pickables, false)[0]?.object
-        .userData.houseId as number | undefined;
-      const house =
-        id == null ? undefined : housesRef.current.find((h) => h.id === id);
+      const id = raycaster.intersectObjects(pickables, false)[0]?.object.userData.houseId as number | undefined;
+      const house = id == null ? undefined : housesRef.current.find((h) => h.id === id);
       if (house) onHouseClickRef.current?.(house);
     };
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
@@ -339,12 +289,7 @@ export default function SiteMap3D({
   const [aspectW, aspectH] = [plan.viewBox[2], plan.viewBox[3]];
 
   return (
-    <div
-      className={cx(
-        "overflow-hidden rounded-2xl border border-line bg-card",
-        className,
-      )}
-    >
+    <div className={cx("overflow-hidden rounded-2xl border border-line bg-card", className)}>
       <div
         ref={containerRef}
         className="relative max-h-[60vh] min-h-72 w-full"
@@ -352,16 +297,10 @@ export default function SiteMap3D({
         role="img"
         aria-label={`Denah 3D, ${houseCount} rumah. Ketuk rumah untuk mencatat.`}
       >
-        {error && (
-          <p className="absolute inset-0 flex items-center justify-center p-6 text-center text-muted">
-            {error}
-          </p>
-        )}
+        {error && <p className="absolute inset-0 flex items-center justify-center p-6 text-center text-muted">{error}</p>}
       </div>
       <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-1.5">
-        <p className="text-xs text-muted">
-          Geser untuk memutar | cubit untuk zoom | dua jari untuk menggeser
-        </p>
+        <p className="text-xs text-muted">Geser untuk memutar · cubit untuk zoom · dua jari untuk menggeser</p>
         <Button
           variant="secondary"
           size="icon"
@@ -396,23 +335,15 @@ function buildPlanScene(ctx: BuildContext, plan: SitePlan): BuiltScene {
     return s;
   };
   // Lempeng setebal `depth` dengan permukaan atas di ketinggian `top`.
-  const slab = (
-    points: WorldPoint[],
-    depth: number,
-    top: number,
-    material: THREE.Material,
-  ) => {
-    const geometry = track(
-      new THREE.ExtrudeGeometry(shape(points), { depth, bevelEnabled: false }),
-    );
+  const slab = (points: WorldPoint[], depth: number, top: number, material: THREE.Material) => {
+    const geometry = track(new THREE.ExtrudeGeometry(shape(points), { depth, bevelEnabled: false }));
     geometry.rotateX(Math.PI / 2); // bentuk di bidang x–z, tebal ke bawah
     geometry.translate(0, top, 0);
     const mesh = new THREE.Mesh(geometry, material);
     scene.add(mesh);
     return mesh;
   };
-  const flat = (color: string) =>
-    track(new THREE.MeshLambertMaterial({ color }));
+  const flat = (color: string) => track(new THREE.MeshLambertMaterial({ color }));
 
   const roadMat = flat(cssColor("--idle-soft", "#e2e8f0"));
   const parkMat = flat(cssColor("--park", "#dcebd3"));
@@ -422,13 +353,7 @@ function buildPlanScene(ctx: BuildContext, plan: SitePlan): BuiltScene {
 
   slab(world(plan.area), 1.5, 0, roadMat);
   for (const green of plan.greens) slab(world(green), 0.3, 0.3, parkMat);
-  for (const channel of plan.channels)
-    slab(
-      world(ribbonPolygon(channel.points, channel.width)),
-      0.1,
-      0.06,
-      waterMat,
-    );
+  for (const channel of plan.channels) slab(world(ribbonPolygon(channel.points, channel.width)), 0.1, 0.06, waterMat);
 
   const { lotHouse } = matchPlan(plan, ctx.houses);
   const meshes = new Map<number, HouseMeshes>();
@@ -439,12 +364,7 @@ function buildPlanScene(ctx: BuildContext, plan: SitePlan): BuiltScene {
     const house = lotHouse.get(lot);
     if (!house) {
       // Kavling belum dibangun (dicoret) lebih rendah; kavling berpenghuni yang belum terdaftar sedikit lebih tinggi.
-      slab(
-        world(shrinkPolygon(lot.points, 0.92)),
-        0.3,
-        lot.built ? 0.5 : 0.3,
-        lot.built ? yardMat : emptyLotMat,
-      );
+      slab(world(shrinkPolygon(lot.points, 0.92)), 0.3, lot.built ? 0.5 : 0.3, lot.built ? yardMat : emptyLotMat);
       continue;
     }
 
@@ -456,15 +376,8 @@ function buildPlanScene(ctx: BuildContext, plan: SitePlan): BuiltScene {
     const yard = 0.3;
 
     slab(world(shrinkPolygon(lot.points, 0.95)), yard, yard, yardMat);
-    const body = slab(
-      world(shrinkPolygon(lot.points, 0.78)),
-      wallHeight,
-      yard + wallHeight,
-      ctx.wallMat,
-    );
-    const roofGeometry = track(
-      hipRoof(world(shrinkPolygon(lot.points, 0.86)), yard + wallHeight, rise),
-    );
+    const body = slab(world(shrinkPolygon(lot.points, 0.78)), wallHeight, yard + wallHeight, ctx.wallMat);
+    const roofGeometry = track(hipRoof(world(shrinkPolygon(lot.points, 0.86)), yard + wallHeight, rise));
     const roof = new THREE.Mesh(roofGeometry, ctx.neutralRoofMat);
     scene.add(roof);
     body.userData.houseId = roof.userData.houseId = house.id;
@@ -473,11 +386,7 @@ function buildPlanScene(ctx: BuildContext, plan: SitePlan): BuiltScene {
     const center = project(polygonCentroid(lot.points));
     const label = houseLabelElement(lot.label ?? house.number, house.id);
     houseLabels.push(label);
-    ctx.attachLabel(
-      label,
-      scene,
-      new THREE.Vector3(center.x, yard + wallHeight + rise + 0.8, center.z),
-    );
+    ctx.attachLabel(label, scene, new THREE.Vector3(center.x, yard + wallHeight + rise + 0.8, center.z));
   }
 
   // Nama blok selalu terlihat sebagai penunjuk arah.
@@ -485,8 +394,7 @@ function buildPlanScene(ctx: BuildContext, plan: SitePlan): BuiltScene {
     const el = document.createElement("div");
     el.textContent = blockLabel.text;
     el.setAttribute("aria-hidden", "true");
-    el.className =
-      "text-sm font-black tracking-wide text-muted [text-shadow:0_0_3px_var(--bg)]";
+    el.className = "text-sm font-black tracking-wide text-muted [text-shadow:0_0_3px_var(--bg)]";
     const at = project(blockLabel.at);
     ctx.attachLabel(el, scene, new THREE.Vector3(at.x, 0.4, at.z));
   }
@@ -507,11 +415,7 @@ function buildPlanScene(ctx: BuildContext, plan: SitePlan): BuiltScene {
 }
 
 /** Atap limas untuk alas poligon apa pun: tiap sisi naik ke puncak di titik tengah. */
-function hipRoof(
-  points: WorldPoint[],
-  baseY: number,
-  rise: number,
-): THREE.BufferGeometry {
+function hipRoof(points: WorldPoint[], baseY: number, rise: number): THREE.BufferGeometry {
   const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
   const cz = points.reduce((s, p) => s + p.z, 0) / points.length;
   const positions: number[] = [];
@@ -520,10 +424,7 @@ function hipRoof(
     positions.push(a.x, baseY, a.z, b.x, baseY, b.z, cx, baseY + rise, cz);
   });
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute(
-    "position",
-    new THREE.Float32BufferAttribute(positions, 3),
-  );
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.computeVertexNormals();
   return geometry;
 }

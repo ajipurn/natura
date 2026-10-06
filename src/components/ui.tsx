@@ -17,10 +17,7 @@ type ButtonSize = "md" | "lg" | "sm" | "icon" | "icon-sm";
  * Tampilan tombol. Untuk tombol pakai `Button`; kelas ini untuk `<Link>`/`<a>` yang tampil seperti
  * tombol (Base UI tidak merender tautan sebagai Button supaya semantik tautannya tetap).
  */
-export function buttonClass(
-  variant: ButtonVariant = "primary",
-  size: ButtonSize = "md",
-) {
+export function buttonClass(variant: ButtonVariant = "primary", size: ButtonSize = "md") {
   const icon = size === "icon" || size === "icon-sm";
   return cx(
     "inline-flex select-none items-center justify-center gap-2 rounded-xl font-semibold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-50 data-disabled:pointer-events-none data-disabled:opacity-50",
@@ -46,51 +43,24 @@ type ButtonProps = Omit<ComponentProps<typeof BaseButton>, "className"> & {
 
 /** Tombol (Base UI Button). Untuk mengirim form tulis `type="submit"`; bawaannya `type="button"`. */
 export function Button({ variant, size, className, ...props }: ButtonProps) {
-  return (
-    <BaseButton
-      className={
-        variant === "plain"
-          ? className
-          : cx(buttonClass(variant, size), className)
-      }
-      {...props}
-    />
-  );
+  return <BaseButton className={variant === "plain" ? className : cx(buttonClass(variant, size), className)} {...props} />;
 }
 
 export const inputClass =
   "h-11 w-full rounded-xl border border-line bg-card px-3 text-base text-fg placeholder:text-muted/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50";
 
 /** Kolom isian (Base UI Input). Di dalam `Field`, label dan keterangannya otomatis tersambung. */
-export function Input({
-  className,
-  ...props
-}: Omit<ComponentProps<typeof BaseInput>, "className"> & {
-  className?: string;
-}) {
+export function Input({ className, ...props }: Omit<ComponentProps<typeof BaseInput>, "className"> & { className?: string }) {
   return <BaseInput className={cx(inputClass, className)} {...props} />;
 }
 
 /** Isian beberapa baris (Base UI Field.Control sebagai `<textarea>`). */
-export function Textarea({
-  className,
-  ...props
-}: Omit<ComponentProps<"textarea">, "className"> & { className?: string }) {
-  return (
-    <BaseField.Control
-      render={<textarea {...props} />}
-      className={cx(inputClass, "h-auto py-2", className)}
-    />
-  );
+export function Textarea({ className, ...props }: Omit<ComponentProps<"textarea">, "className"> & { className?: string }) {
+  return <BaseField.Control render={<textarea {...props} />} className={cx(inputClass, "h-auto py-2", className)} />;
 }
 
 export function Card({ className, ...props }: ComponentProps<"div">) {
-  return (
-    <div
-      className={cx("rounded-2xl border border-line bg-card p-4", className)}
-      {...props}
-    />
-  );
+  return <div className={cx("rounded-2xl border border-line bg-card p-4", className)} {...props} />;
 }
 
 export function PageHeader({
@@ -131,26 +101,14 @@ export function Field({
 }) {
   return (
     <BaseField.Root className={cx("block", className)}>
-      <BaseField.Label className="mb-1 block text-sm font-medium">
-        {label}
-      </BaseField.Label>
+      <BaseField.Label className="mb-1 block text-sm font-medium">{label}</BaseField.Label>
       {children}
-      {hint && (
-        <BaseField.Description className="mt-1 block text-xs text-muted">
-          {hint}
-        </BaseField.Description>
-      )}
+      {hint && <BaseField.Description className="mt-1 block text-xs text-muted">{hint}</BaseField.Description>}
     </BaseField.Root>
   );
 }
 
-export function Alert({
-  tone = "error",
-  children,
-}: {
-  tone?: "error" | "success" | "info";
-  children: ReactNode;
-}) {
+export function Alert({ tone = "error", children }: { tone?: "error" | "success" | "info"; children: ReactNode }) {
   return (
     <p
       role={tone === "error" ? "alert" : "status"}
@@ -167,14 +125,10 @@ export function Alert({
 }
 
 export function SectionTitle({ children }: { children: ReactNode }) {
-  return (
-    <h2 className="mb-2 mt-6 text-sm font-semibold uppercase tracking-wide text-muted">
-      {children}
-    </h2>
-  );
+  return <h2 className="mb-2 mt-6 text-sm font-semibold uppercase tracking-wide text-muted">{children}</h2>;
 }
 
 /** Judul tab browser (React memindahkan <title> ke <head>). */
 export function PageTitle({ title }: { title: string }) {
-  return <title>{`${title} | Jimpitan`}</title>;
+  return <title>{`${title} · Jimpitan`}</title>;
 }

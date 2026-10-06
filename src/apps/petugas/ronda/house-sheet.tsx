@@ -89,7 +89,7 @@ export function HouseSheet({
                 Sudah dicatat {otherName} pukul{" "}
                 {formatTime(existing.recordedAt)}:{" "}
                 {existing.status === "filled"
-                  ? `Ada | ${formatRupiah(existing.amount)}`
+                  ? `Ada · ${formatRupiah(existing.amount)}`
                   : "Kosong"}
               </p>
               <p className="mt-0.5">
@@ -115,7 +115,7 @@ export function HouseSheet({
               : ""}:{" "}
             <strong>
               {existing.status === "filled"
-                ? `Ada | ${formatRupiah(existing.amount)}`
+                ? `Ada · ${formatRupiah(existing.amount)}`
                 : "Kosong"}
             </strong>
             {existing.pending && " (belum terkirim)"}
@@ -177,7 +177,7 @@ export function HouseSheet({
                 disabled={amount <= 0}
                 className="flex h-16 items-center justify-center gap-2 rounded-2xl bg-filled text-xl font-bold text-white shadow-sm active:scale-[0.98] disabled:opacity-50 dark:text-black"
               >
-                <Check className="size-7" strokeWidth={3} /> Ada |{" "}
+                <Check className="size-7" strokeWidth={3} /> Ada ·{" "}
                 {formatRupiah(amount)}
               </Button>
               <Button

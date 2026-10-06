@@ -36,32 +36,20 @@ export function AturDenah() {
             <>
               <Card className="space-y-3">
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <Stat
-                    label="Rumah terdaftar"
-                    value={`${lotHouse.size}/${builtCount}`}
-                  />
-                  <Stat
-                    label="Belum terdaftar"
-                    value={missing.length}
-                    tone={missing.length ? "warn" : undefined}
-                  />
+                  <Stat label="Rumah terdaftar" value={`${lotHouse.size}/${builtCount}`} />
+                  <Stat label="Belum terdaftar" value={missing.length} tone={missing.length ? "warn" : undefined} />
                   <Stat label="Belum dibangun" value={emptyCount} />
                 </div>
                 {(missing.length > 0 || notOnPlan.length > 0) && (
                   <p className="text-sm text-muted">
                     {[
-                      missing.length > 0 &&
-                        `${missing.length} kavling berpenghuni belum terdaftar`,
-                      notOnPlan.length > 0 &&
-                        `${notOnPlan.length} rumah terdaftar tidak cocok dengan kavling mana pun`,
+                      missing.length > 0 && `${missing.length} kavling berpenghuni belum terdaftar`,
+                      notOnPlan.length > 0 && `${notOnPlan.length} rumah terdaftar tidak cocok dengan kavling mana pun`,
                     ]
                       .filter(Boolean)
-                      .join(" | ")}
+                      .join(" · ")}
                     .{" "}
-                    <Link
-                      to="/admin/rumah?tampilan=denah"
-                      className="font-semibold text-primary underline"
-                    >
+                    <Link to="/admin/rumah?tampilan=denah" className="font-semibold text-primary underline">
                       Atur di Rumah &amp; QR
                     </Link>
                   </p>
@@ -70,34 +58,18 @@ export function AturDenah() {
 
               <div className="mt-6 flex items-center justify-between gap-3">
                 <SectionTitle>Pratinjau</SectionTitle>
-                <SegmentedControl
-                  aria-label="Tampilan"
-                  size="sm"
-                  value={view}
-                  onValueChange={setView}
-                  options={VIEWS}
-                />
+                <SegmentedControl aria-label="Tampilan" size="sm" value={view} onValueChange={setView} options={VIEWS} />
               </div>
               {view === "2d" ? (
                 <PlanCalibration houses={houses} />
               ) : (
-                <Suspense
-                  fallback={
-                    <p className="py-20 text-center text-muted">
-                      Memuat tampilan 3D…
-                    </p>
-                  }
-                >
+                <Suspense fallback={<p className="py-20 text-center text-muted">Memuat tampilan 3D…</p>}>
                   <SiteMap3D plan={SITE_PLAN} houses={houses} markers={{}} />
                 </Suspense>
               )}
               <p className="mt-2 text-xs text-muted">
-                Kavling berarsir = kavling yang belum dibangun (dicoret di denah
-                asli). Bentuk denah diatur di kode{" "}
-                <code className="rounded bg-idle-soft px-1">
-                  src/site-plan/natura.ts
-                </code>
-                .
+                Kavling berarsir = kavling yang belum dibangun (dicoret di denah asli). Bentuk denah diatur di kode{" "}
+                <code className="rounded bg-idle-soft px-1">src/site-plan/natura.ts</code>.
               </p>
             </>
           );
@@ -107,20 +79,10 @@ export function AturDenah() {
   );
 }
 
-function Stat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number | string;
-  tone?: "warn";
-}) {
+function Stat({ label, value, tone }: { label: string; value: number | string; tone?: "warn" }) {
   return (
     <div>
-      <p className={cx("text-2xl font-bold", tone === "warn" && "text-warn")}>
-        {value}
-      </p>
+      <p className={cx("text-2xl font-bold", tone === "warn" && "text-warn")}>{value}</p>
       <p className="text-xs text-muted">{label}</p>
     </div>
   );
