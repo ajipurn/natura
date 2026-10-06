@@ -37,7 +37,8 @@ export const router = createBrowserRouter([
       { path: "riwayat/:tanggal", element: <PatrolDetail basePath="/admin/riwayat" canCorrect /> },
       { path: "audit", element: <AuditPage /> },
       { path: "rekap", element: <RekapPage /> },
-      { path: "jadwal", element: <JadwalPage /> },
+      // Tujuh malam berdampingan di layar lebar (lihat AdminLayout).
+      { path: "jadwal", element: <JadwalPage />, handle: { wide: true } },
       { path: "rumah", element: <RumahPage /> },
       { path: "rumah/cetak", element: <CetakPage /> },
       { path: "denah", element: <DenahPage /> },

@@ -4,6 +4,14 @@ export type GuardColor = (typeof GUARD_COLORS)[number];
 
 export const GUARD_COLOR_LABEL: Record<GuardColor, string> = { green: "Hijau", yellow: "Kuning", orange: "Oranye" };
 
+/** Arti warna di tabel jadwal Natura: seberapa mungkin orangnya ikut ronda. */
+export const GUARD_COLOR_MEANING: Record<GuardColor | "white", string> = {
+  green: "Aktif",
+  yellow: "Kadang ikut",
+  orange: "Jarang ikut",
+  white: "Tidak ikut",
+};
+
 /** Warna khas spreadsheet (Excel, Google Sheets) untuk tiap warna jadwal. */
 const REFERENCES: [GuardColor | null, string][] = [
   ["green", "#74aa4e"],

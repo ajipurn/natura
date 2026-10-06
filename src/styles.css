@@ -57,6 +57,11 @@
   color-scheme: dark;
 }
 
+/* Layar sangat lebar (mis. jadwal seminggu berdampingan). Dalam rem supaya urutannya setelah `2xl`. */
+@theme {
+  --breakpoint-3xl: 112.5rem;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-card: var(--card);

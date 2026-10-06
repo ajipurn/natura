@@ -29,7 +29,8 @@ const when = (at: string) => `${formatDateShort(new Date(at).toLocaleDateString(
 
 /**
  * Permintaan ubah jadwal dari petugas. Saat ada perubahan jadwal yang belum disimpan, keputusan
- * ditahan dulu supaya tidak tertimpa saat jadwal disimpan.
+ * ditahan dulu supaya tidak tertimpa saat jadwal disimpan. Tanpa permintaan yang menunggu, cukup
+ * satu baris untuk membuka riwayatnya.
  */
 export function RequestsPanel({ locked }: { locked: boolean }) {
   const query = useQuery(requestsQuery);
@@ -37,6 +38,22 @@ export function RequestsPanel({ locked }: { locked: boolean }) {
   const pending = requests.filter((r) => r.status === "pending");
   const decided = requests.filter((r) => r.status !== "pending");
   if (requests.length === 0) return null;
+
+  if (pending.length === 0) {
+    return (
+      <Collapsible
+        title={
+          <span className="inline-flex items-center gap-1.5">
+            <CalendarClock className="size-4" /> Riwayat permintaan ubah jadwal ({decided.length})
+          </span>
+        }
+        className="mb-3 text-sm"
+        triggerClassName="w-auto font-medium text-muted hover:text-fg"
+      >
+        <DecidedList requests={decided} />
+      </Collapsible>
+    );
+  }
 
   return (
     <Card className={cx("mb-4", pending.length > 0 && "border-warn/50")}>
@@ -47,35 +64,37 @@ export function RequestsPanel({ locked }: { locked: boolean }) {
       {locked && pending.length > 0 && (
         <p className="mt-1 text-sm text-muted">Simpan atau batalkan perubahan jadwal dulu sebelum memutuskan permintaan.</p>
       )}
-      {pending.length === 0 ? (
-        <p className="mt-1 text-sm text-muted">Tidak ada permintaan yang menunggu.</p>
-      ) : (
-        <ul className="mt-2 divide-y divide-line">
-          {pending.map((r) => (
-            <PendingRequest key={r.id} request={r} locked={locked} />
-          ))}
-        </ul>
-      )}
+      <ul className="mt-2 divide-y divide-line">
+        {pending.map((r) => (
+          <PendingRequest key={r.id} request={r} locked={locked} />
+        ))}
+      </ul>
       {decided.length > 0 && (
         <Collapsible title={`Sudah diproses (${decided.length})`} className="mt-2 text-sm" triggerClassName="font-semibold text-muted">
-          <ul className="mt-2 space-y-1.5">
-            {decided.map((r) => (
-              <li key={r.id}>
-                <span className={cx("mr-1.5 rounded-full px-2 py-0.5 text-xs font-semibold", REQUEST_STATUS[r.status].tone)}>
-                  {REQUEST_STATUS[r.status].label}
-                </span>
-                <strong>{r.userName}</strong> {requestChange(r.fromDay, r.toDay)}
-                <span className="text-muted">
-                  {r.decidedAt && ` · ${when(r.decidedAt)}`}
-                  {r.decidedBy && ` oleh ${r.decidedBy}`}
-                  {r.response && ` · “${r.response}”`}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <DecidedList requests={decided} />
         </Collapsible>
       )}
     </Card>
+  );
+}
+
+function DecidedList({ requests }: { requests: Request[] }) {
+  return (
+    <ul className="mt-2 space-y-1.5">
+      {requests.map((r) => (
+        <li key={r.id}>
+          <span className={cx("mr-1.5 rounded-full px-2 py-0.5 text-xs font-semibold", REQUEST_STATUS[r.status].tone)}>
+            {REQUEST_STATUS[r.status].label}
+          </span>
+          <strong>{r.userName}</strong> {requestChange(r.fromDay, r.toDay)}
+          <span className="text-muted">
+            {r.decidedAt && ` · ${when(r.decidedAt)}`}
+            {r.decidedBy && ` oleh ${r.decidedBy}`}
+            {r.response && ` · “${r.response}”`}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

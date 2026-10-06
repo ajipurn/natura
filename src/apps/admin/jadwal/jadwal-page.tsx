@@ -9,6 +9,8 @@ import {
   GripVertical,
   Plus,
   Trash2,
+  UserRound,
+  UsersRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { useBlocker } from "react-router";
@@ -22,13 +24,14 @@ import { Alert, Button, Card, PageHeader, cx } from "@/components/ui";
 import { ScheduleImportForm } from "@/features/jadwal/import-form";
 import { scheduleQuery } from "@/features/jadwal/queries";
 import { rondaDate } from "@/lib/dates";
-import { GUARD_COLOR_LABEL, GUARD_COLORS, type GuardColor } from "@/lib/guard-color";
+import { GUARD_COLOR_LABEL, GUARD_COLOR_MEANING, GUARD_COLORS, type GuardColor } from "@/lib/guard-color";
 import { DAY_NAMES, dayLabel, scheduleDay, slotHouseLabel } from "@/lib/schedule";
 import { houseKey } from "@/lib/site-plan";
 import type { HouseDTO, ScheduleDTO } from "@/lib/types";
 import type { Petugas } from "../petugas/petugas-dialog";
 import { housesQuery, usersQuery } from "../queries";
 import { AddSlotDialog } from "./add-slot-dialog";
+import { HouseNameDialog } from "./house-name-dialog";
 import { RequestsPanel } from "./requests-panel";
 import { moveSlot, newKey, sameSchedule, shiftSlot, toDraft, toSlots, type DraftSlot } from "./draft";
 
@@ -37,6 +40,7 @@ const COLOR_CHOICES: [GuardColor | null, string][] = [
   ...GUARD_COLORS.map((c) => [c, GUARD_COLOR_LABEL[c]] as [GuardColor, string]),
   [null, "Putih"],
 ];
+const colorMeaning = (color: GuardColor | null) => GUARD_COLOR_MEANING[color ?? "white"];
 
 export function JadwalPage() {
   const schedule = useQuery(scheduleQuery);
@@ -106,6 +110,7 @@ function ScheduleEditor({
   const [base, setBase] = useState(initial);
   const [draft, setDraft] = useState(initial);
   const [adding, setAdding] = useState<number | null>(null);
+  const [naming, setNaming] = useState<HouseDTO | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [dropDay, setDropDay] = useState<number | null>(null);
   const dirty = !sameSchedule(draft, base);
@@ -142,9 +147,11 @@ function ScheduleEditor({
   }, [dirty]);
 
   const days = DAY_NAMES.map((_, i) => (tonight + i) % 7);
+  const houseById = useMemo(() => new Map(houses.map((h) => [h.id, h])), [houses]);
   const stats = {
     total: draft.length,
     linked: draft.filter((s) => s.userId).length,
+    unnamed: draft.filter((s) => !s.name && !s.ownerName).length,
     inactive: draft.filter((s) => s.userActive === false).length,
   };
 
@@ -192,13 +199,24 @@ function ScheduleEditor({
   return (
     <div>
       <RequestsPanel locked={dirty} />
-      <p className="mb-3 text-sm text-muted">
-        {stats.total} baris · {stats.linked} terhubung ke akun petugas.{" "}
-        <span className="hidden sm:inline">
-          Geser baris untuk mengurutkan atau memindah ke malam lain, atau pakai menu ⋯.
-        </span>
-        <span className="sm:hidden">Pakai menu ⋯ untuk mengurutkan atau memindah ke malam lain.</span>
-      </p>
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1.5 text-sm text-muted">
+        <p>
+          {stats.total} baris · {stats.linked} terhubung ke akun petugas
+          {stats.unnamed > 0 && ` · ${stats.unnamed} rumah belum ada nama`}.{" "}
+          <span className="hidden sm:inline">
+            Geser baris untuk mengurutkan atau memindah ke malam lain, atau pakai menu ⋯.
+          </span>
+          <span className="sm:hidden">Pakai menu ⋯ untuk mengurutkan atau memindah ke malam lain.</span>
+        </p>
+        <ul aria-label="Arti warna" className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+          {COLOR_CHOICES.map(([color]) => (
+            <li key={color ?? "white"} className="inline-flex items-center gap-1.5">
+              <span aria-hidden className={cx("size-2.5 rounded-full", guardColorClass(color))} />
+              {colorMeaning(color)}
+            </li>
+          ))}
+        </ul>
+      </div>
       {stats.inactive > 0 && (
         <p className="mb-3 flex gap-2 rounded-xl bg-warn-soft px-3 py-2 text-sm text-warn">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
@@ -225,7 +243,8 @@ function ScheduleEditor({
         ))}
       </nav>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {/* Layar lebar (rute ini `wide`, lihat AdminLayout): seminggu penuh dalam satu baris. */}
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 3xl:grid-cols-7">
         {days.map((day) => {
           const slots = draft.filter((s) => s.day === day);
           return (
@@ -248,16 +267,27 @@ function ScheduleEditor({
                 dropDay === day && "ring-2 ring-primary",
               )}
             >
-              <header className="flex items-baseline justify-between gap-2 px-4 pb-2 pt-3">
-                <h2 className="font-semibold">
-                  {DAY_NAMES[day]} <span className="text-sm font-normal text-muted">(malam {NIGHT[day]})</span>
-                  {day === tonight && (
-                    <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-fg">
-                      Malam ini
-                    </span>
-                  )}
-                </h2>
-                <span className="shrink-0 text-sm text-muted">{slots.length} orang</span>
+              <header className="px-4 pb-2 pt-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="flex min-w-0 items-center gap-2 font-semibold">
+                    <span className="truncate">{DAY_NAMES[day]}</span>
+                    {day === tonight && (
+                      <span className="shrink-0 whitespace-nowrap rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-fg">
+                        Malam ini
+                      </span>
+                    )}
+                  </h2>
+                  <span title={`${slots.length} orang`} className="inline-flex shrink-0 items-center gap-1 text-sm text-muted">
+                    <UsersRound aria-hidden className="size-3.5" />
+                    {slots.length}
+                    <span className="sr-only"> orang</span>
+                  </span>
+                </div>
+                {/* Satu baris di semua lebar, supaya baris pertama tiap malam sejajar. */}
+                <div className="mt-0.5 flex items-center justify-between gap-2 text-xs text-muted">
+                  <span className="truncate">malam {NIGHT[day]}</span>
+                  <ColorMix slots={slots} />
+                </div>
               </header>
               <ol className="flex-1 divide-y divide-line border-y border-line">
                 {slots.length === 0 && <li className="px-4 py-3 text-sm text-muted">Belum ada yang jaga.</li>}
@@ -279,6 +309,16 @@ function ScheduleEditor({
                     }}
                     onDrop={(e) => drop(e, day, slot.key)}
                     actions={[
+                      ...(slot.houseId && !slot.name && !slot.ownerName
+                        ? [
+                            {
+                              label: "Isi nama KK",
+                              icon: <UserRound className="size-4" />,
+                              disabled: !houseById.has(slot.houseId),
+                              onSelect: () => setNaming(houseById.get(slot.houseId!) ?? null),
+                            },
+                          ]
+                        : []),
                       {
                         label: "Naikkan",
                         icon: <ArrowUp className="size-4" />,
@@ -302,6 +342,7 @@ function ScheduleEditor({
                       { heading: "Warna" },
                       ...COLOR_CHOICES.map(([color, label]) => ({
                         label: slot.color === color ? `${label} ✓` : label,
+                        hint: colorMeaning(color),
                         icon: <span aria-hidden className={cx("size-4 rounded-full", guardColorClass(color))} />,
                         onSelect: () => setDraft((d) => d.map((s) => (s.key === slot.key ? { ...s, color } : s))),
                       })),
@@ -358,6 +399,17 @@ function ScheduleEditor({
         </div>
       )}
 
+      <HouseNameDialog
+        house={naming}
+        onClose={() => setNaming(null)}
+        onSaved={(houseId, ownerName) => {
+          // Tampil juga di jadwal yang sedang diedit; nama KK tidak ikut disimpan bersama jadwal.
+          const withName = (d: DraftSlot[]) => d.map((s) => (s.houseId === houseId && !s.userId ? { ...s, ownerName } : s));
+          setDraft(withName);
+          setBase(withName);
+          setNaming(null);
+        }}
+      />
       <AddSlotDialog
         day={adding}
         onClose={() => setAdding(null)}
@@ -396,8 +448,10 @@ function SlotRow({
 }) {
   const [over, setOver] = useState(false);
   const house = slotHouseLabel(slot);
-  // Baris tanpa nama petugas ditampilkan dengan kode rumahnya.
-  const title = slot.name ?? house;
+  // Nama petugas (atau nama bebas), atau nama KK untuk baris rumah tanpa akun.
+  const name = slot.name ?? slot.ownerName;
+  // Rumah yang belum ada namanya: cukup kode rumahnya, satu baris.
+  const title = name ?? house;
   return (
     <li
       draggable
@@ -426,14 +480,44 @@ function SlotRow({
       />
       <span className="w-5 shrink-0 text-right text-xs text-muted">{index + 1}</span>
       <span className="min-w-0 flex-1">
-        <span className={cx("block truncate font-medium", slot.userActive === false && "line-through")}>{title}</span>
-        <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
-          {slot.name ? house || "tanpa rumah" : <span>{slot.ownerName ? `KK: ${slot.ownerName}` : "belum ada nama KK"}</span>}
-          {!slot.userId && <span title="Belum punya akun petugas">· tanpa akun</span>}
-          {slot.userActive === false && <span className="text-warn">· nonaktif</span>}
+        <span className="flex min-w-0 items-baseline gap-1.5">
+          {/* Kode rumah pendek, jadi tidak dipotong; yang dipotong keterangannya kalau kolomnya sempit. */}
+          <span
+            title={title}
+            className={cx("font-medium", name ? "truncate" : "shrink-0", slot.userActive === false && "line-through")}
+          >
+            {title}
+          </span>
+          {!name && <span className="truncate text-xs text-muted">tanpa nama</span>}
         </span>
+        {name && (
+          <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
+            {house || "tanpa rumah"}
+            {!slot.userId && <span title="Belum punya akun petugas">· tanpa akun</span>}
+            {slot.userActive === false && <span className="text-warn">· nonaktif</span>}
+          </span>
+        )}
       </span>
       <Menu label={`Aksi untuk ${title}`} items={actions} />
     </li>
+  );
+}
+
+/** Banyaknya orang per warna di satu malam, dari yang paling aktif. */
+function ColorMix({ slots }: { slots: DraftSlot[] }) {
+  return (
+    <span className="flex shrink-0 gap-1.5">
+      {COLOR_CHOICES.map(([color]) => {
+        const count = slots.filter((s) => s.color === color).length;
+        if (!count) return null;
+        return (
+          <span key={color ?? "white"} className="inline-flex items-center gap-0.5" title={`${colorMeaning(color)}: ${count}`}>
+            <span aria-hidden className={cx("size-2.5 rounded-full", guardColorClass(color))} />
+            <span className="sr-only">{colorMeaning(color)}</span>
+            {count}
+          </span>
+        );
+      })}
+    </span>
   );
 }

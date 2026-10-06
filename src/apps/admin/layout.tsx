@@ -17,7 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router";
+import { NavLink, useLocation, useMatches, useNavigate } from "react-router";
 import { api, call } from "@/client/api";
 import { clearCache } from "@/client/query";
 import { ScrollArea } from "@/components/scroll-area";
@@ -58,6 +58,8 @@ const NAV: { group: string; items: { to: string; label: string; icon: LucideIcon
 export function AdminLayout({ user, children }: { user: SessionUser; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  // Halaman yang butuh layar lebar (mis. jadwal seminggu) menandai rutenya dengan `handle: { wide: true }`.
+  const wide = useMatches().some((match) => (match.handle as { wide?: boolean } | undefined)?.wide);
 
   // Tutup menu geser setelah pindah halaman.
   const [lastPath, setLastPath] = useState(location.pathname);
@@ -98,7 +100,12 @@ export function AdminLayout({ user, children }: { user: SessionUser; children: R
           </Button>
           <span className="font-semibold">Admin Jimpitan</span>
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-5 lg:px-8 lg:pt-8 print:max-w-none print:p-0">
+        <main
+          className={cx(
+            "mx-auto w-full flex-1 px-4 pb-16 pt-5 lg:px-8 lg:pt-8 print:max-w-none print:p-0",
+            wide ? "max-w-[120rem]" : "max-w-6xl",
+          )}
+        >
           {children}
         </main>
       </div>
