@@ -344,6 +344,8 @@ describe("warna jadwal & permintaan ubah jadwal", () => {
     const users = (await rudi.get("/api/auth/users")).data.users as { id: number; name: string }[];
     rudiId = users.find((u) => u.name === "Rudi")!.id;
     await rudi.post("/api/auth/login", { userId: rudiId, pin: "1470" });
+    // Malam jaga dari dialog petugas: hijau (aktif), bukan putih yang disembunyikan dari petugas.
+    expect((await schedule()).filter((s) => s.userId === rudiId).map((s) => s.color)).toEqual(["green"]);
     // Beri warna ke baris Rudi supaya terlihat ikut pindah.
     const rows = await schedule();
     await admin.put("/api/admin/jadwal/slot", {
@@ -385,9 +387,10 @@ describe("warna jadwal & permintaan ubah jadwal", () => {
     await rudi.post("/api/jadwal/permintaan", { fromDay: null, toDay: 1, note: "" });
     pending = ((await admin.get("/api/admin/permintaan")).data.requests as { id: number; status: string }[]).find((r) => r.status === "pending")!;
     await admin.post(`/api/admin/permintaan/${pending.id}/setujui`, { response: "" });
-    expect((await schedule()).filter((s) => s.userId === rudiId).map((s) => [s.day, s.block])).toEqual([
-      [1, "AB"],
-      [5, "AB"],
+    // Malam tambahan hijau; malam lama tetap dengan warnanya.
+    expect((await schedule()).filter((s) => s.userId === rudiId).map((s) => [s.day, s.block, s.color])).toEqual([
+      [1, "AB", "green"],
+      [5, "AB", "orange"],
     ]);
 
     await rudi.post("/api/jadwal/permintaan", { fromDay: 1, toDay: 3, note: "" });

@@ -2,6 +2,7 @@ import { Home, Search, UserPlus, UserRound } from "lucide-react";
 import { useState } from "react";
 import { Dialog } from "@/components/dialog";
 import { Button, Input } from "@/components/ui";
+import { NEW_SLOT_COLOR } from "@/lib/guard-color";
 import { compareHouses, houseLabel, searchHouses } from "@/lib/houses";
 import { DAY_NAMES, dayLabel } from "@/lib/schedule";
 import type { HouseDTO } from "@/lib/types";
@@ -63,7 +64,7 @@ function Picker({
       name: u.name,
       userId: u.id,
       userActive: u.active,
-      color: null,
+      color: NEW_SLOT_COLOR,
       block: house?.block ?? "",
       number: house?.number ?? "",
       houseId: house?.id ?? null,
@@ -128,7 +129,7 @@ function Picker({
                 <Button
                   variant="plain"
                   onClick={() =>
-                    onAdd({ name: null, userId: null, userActive: null, color: null, block: h.block, number: h.number, houseId: h.id, ownerName: h.ownerName })
+                    onAdd({ name: null, userId: null, userActive: null, color: NEW_SLOT_COLOR, block: h.block, number: h.number, houseId: h.id, ownerName: h.ownerName })
                   }
                   className="flex w-full items-center gap-3 px-1 py-2.5 text-left hover:bg-idle-soft"
                 >
@@ -146,7 +147,7 @@ function Picker({
         <Button
           variant="plain"
           onClick={() =>
-            onAdd({ name: query.trim().slice(0, 60), userId: null, userActive: null, color: null, block: "", number: "", houseId: null, ownerName: null })
+            onAdd({ name: query.trim().slice(0, 60), userId: null, userActive: null, color: NEW_SLOT_COLOR, block: "", number: "", houseId: null, ownerName: null })
           }
           className="flex w-full items-center gap-3 rounded-xl border border-dashed border-line px-3 py-2.5 text-left text-sm hover:bg-idle-soft"
         >

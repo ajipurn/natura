@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { useState } from "react";
 import { GuardChip } from "@/components/guard-chip";
 import { Button, cx } from "@/components/ui";
+import { shownToGuards } from "@/lib/guard-color";
 import { NIGHT_OF, scheduleDay, slotHouseLabel } from "@/lib/schedule";
 import type { ScheduleDTO } from "@/lib/types";
 
@@ -12,7 +13,8 @@ const wideScreen = () => typeof window !== "undefined" && window.matchMedia?.("(
 /**
  * Siapa yang dijadwalkan jaga di malam ronda ini, diringkas jadi satu baris
  * ("Kamu jaga · bersama Nino, Sahrul +5") yang bisa dibuka untuk melihat semuanya. Baris rumah yang
- * belum ada nama warganya tidak ditampilkan dan tidak dihitung; warna jadwal juga tidak dipakai.
+ * belum ada nama warganya dan baris putih (tidak ikut ronda, lihat `shownToGuards`) tidak ditampilkan
+ * dan tidak dihitung; warna lainnya tidak dipakai.
  */
 export function TonightGuards({ schedule, date, userId }: { schedule: ScheduleDTO[]; date: string; userId?: number }) {
   const [expanded, setExpanded] = useState(wideScreen);
@@ -20,7 +22,7 @@ export function TonightGuards({ schedule, date, userId }: { schedule: ScheduleDT
   const entries = schedule
     .flatMap((e) => {
       const name = e.name ?? e.ownerName;
-      return e.day === day && name ? [{ ...e, name }] : [];
+      return e.day === day && name && shownToGuards(e, userId) ? [{ ...e, name }] : [];
     })
     // Petugas yang sedang masuk ditaruh paling depan.
     .sort((a, b) => Number(b.userId === userId) - Number(a.userId === userId) || a.position - b.position);

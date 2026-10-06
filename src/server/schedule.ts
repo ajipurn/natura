@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, notInArray, sql } from "drizzle-orm";
-import type { GuardColor } from "@/lib/guard-color";
+import { NEW_SLOT_COLOR, type GuardColor } from "@/lib/guard-color";
 import { analyzeSchedule, matchGuardAccount, resolveEntry, type ScheduleEntry, type SlotSource } from "@/lib/schedule";
 import { houseKey } from "@/lib/site-plan";
 import type { ScheduleDTO } from "@/lib/types";
@@ -110,6 +110,7 @@ export function userDaysStatements(
         dayOfWeek: day,
         position: sql`(select coalesce(max(${rondaSchedule.position}), -1) + 1 from ${rondaSchedule} where ${rondaSchedule.dayOfWeek} = ${day})`,
         userId,
+        color: NEW_SLOT_COLOR,
       }),
     );
   }

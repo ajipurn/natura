@@ -1,8 +1,19 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { classifyCellColor } from "@/lib/guard-color";
+import { classifyCellColor, shownToGuards } from "@/lib/guard-color";
 import { parseSchedule } from "@/lib/schedule";
 import { tableFromHtml } from "@/lib/table-paste";
+
+describe("baris jadwal di app petugas", () => {
+  it("putih (tidak ikut ronda) disembunyikan, kecuali baris petugas itu sendiri", () => {
+    expect(shownToGuards({ color: "green", userId: 1 })).toBe(true);
+    expect(shownToGuards({ color: "orange", userId: null })).toBe(true);
+    expect(shownToGuards({ color: null, userId: null }, 7)).toBe(false);
+    expect(shownToGuards({ color: null, userId: 1 }, 7)).toBe(false);
+    expect(shownToGuards({ color: null, userId: 7 }, 7)).toBe(true);
+    expect(shownToGuards({ color: null, userId: 7 })).toBe(false);
+  });
+});
 
 describe("warna sel jadwal", () => {
   it("mengenali warna khas Excel/Google Sheets dan foto jadwal Natura", () => {

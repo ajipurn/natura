@@ -1,4 +1,5 @@
 import { and, desc, eq, sql } from "drizzle-orm";
+import { NEW_SLOT_COLOR } from "@/lib/guard-color";
 import { runBatch, type Db, type Executor } from "./db";
 import { guardDaysByUser } from "./schedule";
 import { houses, rondaSchedule, scheduleRequests, users } from "./schema";
@@ -136,7 +137,7 @@ export async function decideRequest(
     ]);
   } else {
     // Rumahnya ikut dari akun petugas.
-    await runBatch(db, (tx) => [mark(tx), tx.insert(rondaSchedule).values({ dayOfWeek: request.toDay, position: lastPosition, userId: request.userId })]);
+    await runBatch(db, (tx) => [mark(tx), tx.insert(rondaSchedule).values({ dayOfWeek: request.toDay, position: lastPosition, userId: request.userId, color: NEW_SLOT_COLOR })]);
   }
   return null;
 }

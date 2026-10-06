@@ -4,6 +4,7 @@ import { CalendarDays } from "lucide-react";
 import { QueryState } from "@/components/query-state";
 import { Card, PageHeader, cx } from "@/components/ui";
 import { rondaDate } from "@/lib/dates";
+import { shownToGuards } from "@/lib/guard-color";
 import { DAY_NAMES, dayLabel, scheduleDay, slotHouseLabel } from "@/lib/schedule";
 import type { ScheduleDTO } from "@/lib/types";
 import { scheduleQuery } from "./queries";
@@ -31,8 +32,9 @@ export function SchedulePage({
       {intro}
       <QueryState query={query}>
         {({ schedule: all }) => {
-          // Baris rumah yang belum ada nama warganya tidak ditampilkan dan tidak dihitung.
-          const schedule = all.filter((e) => e.name ?? e.ownerName);
+          // Baris rumah yang belum ada nama warganya dan baris putih (tidak ikut ronda) tidak
+          // ditampilkan dan tidak dihitung.
+          const schedule = all.filter((e) => (e.name ?? e.ownerName) && shownToGuards(e, currentUserId));
           return schedule.length === 0 ? (
               <Card className="text-center">
                 <CalendarDays className="mx-auto size-10 text-muted" />

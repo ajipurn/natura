@@ -12,6 +12,20 @@ export const GUARD_COLOR_MEANING: Record<GuardColor | "white", string> = {
   white: "Tidak ikut",
 };
 
+/**
+ * Warna baris jadwal baru (ditambah admin, malam jaga dari dialog petugas, permintaan tambah malam).
+ * Bukan putih: putih berarti tidak ikut ronda dan disembunyikan dari petugas.
+ */
+export const NEW_SLOT_COLOR: GuardColor = "green";
+
+/**
+ * Baris jadwal yang ditampilkan di app petugas: yang putih (tidak ikut ronda) disembunyikan, kecuali
+ * baris petugas yang sedang masuk sendiri, karena ia tetap terjadwal dan boleh mencatat.
+ */
+export function shownToGuards(slot: { color: GuardColor | null; userId: number | null }, currentUserId?: number): boolean {
+  return slot.color !== null || (currentUserId !== undefined && slot.userId === currentUserId);
+}
+
 /** Warna khas spreadsheet (Excel, Google Sheets) untuk tiap warna jadwal. */
 const REFERENCES: [GuardColor | null, string][] = [
   ["green", "#74aa4e"],
