@@ -14,7 +14,7 @@ export function CetakPage() {
 
   return (
     <QueryState query={query}>
-      {({ houses: allHouses, communityName, origin, fromEnv }) => {
+      {({ houses: allHouses, communityName, logoUrl, origin, fromEnv }) => {
         const blocks = [...new Set(allHouses.map((h) => h.block))];
         const blok = params.get("blok");
         const selected = blok && blocks.includes(blok) ? blok : null;
@@ -79,12 +79,18 @@ export function CetakPage() {
                   key={house.id}
                   className="flex break-inside-avoid flex-col items-center rounded-2xl border border-line bg-white p-4 text-center text-black print:h-[68mm] print:justify-center print:rounded-none print:border-dashed print:border-gray-400 print:p-[4mm]"
                 >
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-gray-600">
-                    Jimpitan {communityName}
-                  </p>
+                  <div className="flex items-center justify-center gap-1.5">
+                    {logoUrl && (
+                      <img src={logoUrl} alt="" className="h-7 w-auto max-w-16 object-contain print:h-[7mm] print:max-w-[18mm]" />
+                    )}
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-gray-600">
+                      Jimpitan {communityName}
+                    </p>
+                  </div>
+                  {/* Dengan logo, baris judulnya lebih tinggi: QR sedikit diperkecil supaya stiker tetap 68 mm. */}
                   <QrSvg
                     text={houseUrl(origin, house.token)}
-                    className="my-2 w-full max-w-44 print:w-[42mm] print:max-w-none"
+                    className={cx("my-2 w-full max-w-44 print:w-[42mm] print:max-w-none", logoUrl && "print:w-[38mm]")}
                   />
                   <p className="text-2xl font-black leading-tight">
                     Blok {house.block} | No. {house.number}

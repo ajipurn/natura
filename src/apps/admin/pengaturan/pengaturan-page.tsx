@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { QueryState } from "@/components/query-state";
 import { Card, PageHeader } from "@/components/ui";
 import { settingsQuery } from "../queries";
+import { LogoSettings } from "./logo-settings";
 import { SettingsForm } from "./settings-form";
 
 export function PengaturanPage() {
@@ -12,7 +13,10 @@ export function PengaturanPage() {
       <QueryState query={query}>
         {(settings) => (
           <Card className="max-w-xl">
-            <SettingsForm communityName={settings.communityName} defaultAmount={settings.defaultAmount} />
+            <LogoSettings logoUrl={settings.logoUrl} />
+            <div className="mt-5 border-t border-line pt-5">
+              <SettingsForm communityName={settings.communityName} defaultAmount={settings.defaultAmount} />
+            </div>
           </Card>
         )}
       </QueryState>

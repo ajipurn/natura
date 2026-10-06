@@ -4,6 +4,7 @@ import type { AppEnv } from "./env";
 import { adminRoutes } from "./routes/admin";
 import { authRoutes } from "./routes/auth";
 import { houseRoutes } from "./routes/house";
+import { logoRoutes } from "./routes/logo";
 import { rondaRoutes } from "./routes/ronda";
 import { wargaRoutes } from "./routes/warga";
 
@@ -19,6 +20,7 @@ export const app = new Hono<AppEnv>()
   })
   .route("/auth", authRoutes)
   .route("/rumah", houseRoutes)
+  .route("/logo", logoRoutes)
   .route("/warga", wargaRoutes)
   .route("/admin", adminRoutes)
   .route("/", rondaRoutes);

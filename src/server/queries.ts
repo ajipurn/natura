@@ -11,13 +11,21 @@ import { collectionLogs, collections, houses, patrols, settings, users } from ".
 
 export const DEFAULT_SETTINGS = { communityName: "Lingkungan Kita", defaultAmount: 500 };
 
+/** Kolom untuk `logoUrl`, tanpa memuat gambarnya. */
+export const logoColumns = { logoVersion: settings.logoVersion, hasLogo: sql<boolean>`${settings.logo} is not null` };
+
+/** Alamat gambar logo (berganti tiap logo diganti, lihat routes/logo.ts); null = belum ada logo. */
+export function logoUrl(row: { logoVersion: number; hasLogo: boolean } | undefined): string | null {
+  return row?.hasLogo ? `/api/logo?v=${row.logoVersion}` : null;
+}
+
 export async function getSettings(db: Db) {
   const [row] = await db
-    .select({ communityName: settings.communityName, defaultAmount: settings.defaultAmount })
+    .select({ communityName: settings.communityName, defaultAmount: settings.defaultAmount, ...logoColumns })
     .from(settings)
     .where(eq(settings.id, 1))
     .limit(1);
-  return row ?? DEFAULT_SETTINGS;
+  return row ? { communityName: row.communityName, defaultAmount: row.defaultAmount, logoUrl: logoUrl(row) } : { ...DEFAULT_SETTINGS, logoUrl: null };
 }
 
 /** Titik acuan kalibrasi denah ↔ GPS (kosong = belum dikalibrasi). */

@@ -7,7 +7,7 @@ import { scheduleDay } from "@/lib/schedule";
 import { endWargaAccess, hasWargaAccess, requireWarga, startWargaAccess } from "../auth";
 import type { AppEnv } from "../env";
 import { body, idParam } from "../http";
-import { getHouseHistory, getMonthRecap, getSettings } from "../queries";
+import { getHouseHistory, getMonthRecap, getSettings, logoColumns, logoUrl } from "../queries";
 import { listSchedule } from "../schedule";
 import { announcements, contacts, houses, settings } from "../schema";
 import { monthQuery } from "./ronda";
@@ -20,10 +20,10 @@ export const wargaRoutes = new Hono<AppEnv>()
   .get("/akses", async (c) => {
     const db = c.var.db;
     const [[row], access] = await Promise.all([
-      db.select({ communityName: settings.communityName, code: settings.wargaCode }).from(settings).where(eq(settings.id, 1)).limit(1),
+      db.select({ communityName: settings.communityName, code: settings.wargaCode, ...logoColumns }).from(settings).where(eq(settings.id, 1)).limit(1),
       hasWargaAccess(c),
     ]);
-    return c.json({ communityName: row?.communityName ?? null, enabled: Boolean(row?.code), access });
+    return c.json({ communityName: row?.communityName ?? null, logoUrl: logoUrl(row), enabled: Boolean(row?.code), access });
   })
 
   .post("/masuk", body(z.object({ code: z.string().trim().max(32) })), async (c) => {

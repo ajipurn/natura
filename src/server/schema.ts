@@ -48,6 +48,10 @@ export const settings = pgTable("settings", {
   wargaCodeVersion: integer("warga_code_version").notNull().default(1),
   /** Titik acuan kalibrasi denah ↔ GPS, untuk fitur "Lokasi saya" di denah. */
   planAnchors: jsonb("plan_anchors").$type<GeoAnchor[]>(),
+  /** Logo lingkungan sebagai data URL PNG/JPEG/WebP (sudah diperkecil di browser). Null = belum ada. */
+  logo: text("logo"),
+  /** Dinaikkan tiap logo diganti: bagian dari alamat gambarnya, supaya browser boleh menyimpannya lama. */
+  logoVersion: integer("logo_version").notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 

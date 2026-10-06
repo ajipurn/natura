@@ -24,7 +24,7 @@ import { ScrollArea } from "@/components/scroll-area";
 import { ThemeSwitch } from "@/components/theme-toggle";
 import { Button, cx } from "@/components/ui";
 import type { SessionUser } from "@/server/auth";
-import { requestsQuery } from "./queries";
+import { requestsQuery, settingsQuery } from "./queries";
 
 const NAV: { group: string; items: { to: string; label: string; icon: LucideIcon; end?: boolean }[] }[] = [
   {
@@ -110,6 +110,7 @@ function Sidebar({ user }: { user: SessionUser }) {
   const navigate = useNavigate();
   // Jumlah permintaan ubah jadwal yang menunggu, tampil di menu Jadwal ronda.
   const pendingRequests = useQuery(requestsQuery).data?.pending ?? 0;
+  const logoUrl = useQuery(settingsQuery).data?.logoUrl;
   const logout = useMutation({
     mutationFn: () => call(api.auth.logout.$post()),
     onSuccess: () => {
@@ -123,9 +124,12 @@ function Sidebar({ user }: { user: SessionUser }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="px-5 pb-3 pt-5">
-        <p className="text-xs font-semibold uppercase tracking-wide text-primary">Jimpitan</p>
-        <p className="text-lg font-bold">Admin</p>
+      <div className="flex items-center gap-3 px-5 pb-3 pt-5">
+        {logoUrl && <img src={logoUrl} alt="" className="size-10 shrink-0 rounded-lg object-contain" />}
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Jimpitan</p>
+          <p className="text-lg font-bold">Admin</p>
+        </div>
       </div>
       <ScrollArea element="nav" aria-label="Menu admin" className="min-h-0 flex-1 overflow-y-auto">
         <div className="px-3">

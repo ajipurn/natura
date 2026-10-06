@@ -30,6 +30,7 @@ export const houseRoutes = new Hono<AppEnv>()
     const canRecord = user ? (await dutyDays(db, user.id)).has(scheduleDay(tonight)) : false;
     return c.json({
       communityName: settings.communityName,
+      logoUrl: settings.logoUrl,
       defaultAmount: settings.defaultAmount,
       tonight,
       canRecord,

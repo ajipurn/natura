@@ -69,12 +69,17 @@ export function BerandaPage() {
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-16 pt-6">
       <PageTitle title="Info warga" />
       <header className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-primary">
-            Jimpitan
-            {access.data?.communityName ? ` ${access.data.communityName}` : ""}
-          </p>
-          <h1 className="text-3xl font-bold tracking-tight">Info warga</h1>
+        <div className="flex min-w-0 items-center gap-3">
+          {access.data?.logoUrl && (
+            <img src={access.data.logoUrl} alt="" className="size-14 shrink-0 rounded-xl object-contain" />
+          )}
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-primary">
+              Jimpitan
+              {access.data?.communityName ? ` ${access.data.communityName}` : ""}
+            </p>
+            <h1 className="text-3xl font-bold tracking-tight">Info warga</h1>
+          </div>
         </div>
         <div className="mt-1 flex shrink-0 gap-2">
           <ThemeButton />

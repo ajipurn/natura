@@ -16,7 +16,8 @@ import { runBatch, type Executor } from "../db";
 import type { AppEnv } from "../env";
 import { body, idParam, pinField, trimmed } from "../http";
 import { hashPin } from "../pin";
-import { DEFAULT_SETTINGS, getHouseIds, getPlanAnchors, getSettings, listHouses, listHousesWithUsage, listUsers } from "../queries";
+import { MAX_LOGO_DATA_URL, parseLogo } from "../logo";
+import { DEFAULT_SETTINGS, getHouseIds, getPlanAnchors, getSettings, listHouses, listHousesWithUsage, listUsers, logoColumns, logoUrl } from "../queries";
 import { countPendingRequests, decideRequest, listRequestsForAdmin } from "../requests";
 import { clearSchedule, houseSlots, replaceSlots, saveSchedule, userDaysStatements } from "../schedule";
 import { announcements, collections, contacts, houses, rondaSchedule, settings, users } from "../schema";
@@ -115,7 +116,7 @@ export const adminRoutes = new Hono<AppEnv>()
   .get("/rumah", async (c) => {
     const db = c.var.db;
     const [list, settingsRow] = await Promise.all([listHousesWithUsage(db), getSettings(db)]);
-    return c.json({ houses: list, communityName: settingsRow.communityName, ...appOrigin(c) });
+    return c.json({ houses: list, communityName: settingsRow.communityName, logoUrl: settingsRow.logoUrl, ...appOrigin(c) });
   })
 
   /** Tambah satu rumah atau banyak sekaligus ("1-20", "1, 3, 5"). */
@@ -304,11 +305,17 @@ export const adminRoutes = new Hono<AppEnv>()
 
   .get("/pengaturan", async (c) => {
     const [row] = await c.var.db
-      .select({ communityName: settings.communityName, defaultAmount: settings.defaultAmount, wargaCode: settings.wargaCode })
+      .select({ communityName: settings.communityName, defaultAmount: settings.defaultAmount, wargaCode: settings.wargaCode, ...logoColumns })
       .from(settings)
       .where(eq(settings.id, 1))
       .limit(1);
-    return c.json({ ...(row ?? { communityName: "", defaultAmount: 500, wargaCode: null }), ...appOrigin(c) });
+    return c.json({
+      communityName: row?.communityName ?? "",
+      defaultAmount: row?.defaultAmount ?? 500,
+      wargaCode: row?.wargaCode ?? null,
+      logoUrl: logoUrl(row),
+      ...appOrigin(c),
+    });
   })
 
   .put("/pengaturan", body(settingsSchema), async (c) => {
@@ -318,6 +325,20 @@ export const adminRoutes = new Hono<AppEnv>()
       .values({ id: 1, ...values })
       .onConflictDoUpdate({ target: settings.id, set: { ...values, updatedAt: new Date() } });
     return c.json({ success: "Pengaturan disimpan." });
+  })
+
+  /** Ganti logo (data URL PNG/JPEG/WebP yang sudah diperkecil di browser) atau hapus (`null`). */
+  .put("/pengaturan/logo", body(z.object({ logo: z.string().max(MAX_LOGO_DATA_URL, "Gambar logo terlalu besar.").nullable() })), async (c) => {
+    const { logo } = c.req.valid("json");
+    if (logo !== null && !parseLogo(logo)) {
+      return c.json({ error: "Gambar ini tidak bisa dipakai sebagai logo. Pilih file PNG atau JPG yang lebih kecil." }, 400);
+    }
+    const [row] = await c.var.db
+      .update(settings)
+      .set({ logo, logoVersion: sql`${settings.logoVersion} + 1`, updatedAt: new Date() })
+      .where(eq(settings.id, 1))
+      .returning({ logoVersion: settings.logoVersion });
+    return c.json({ logoUrl: row ? logoUrl({ logoVersion: row.logoVersion, hasLogo: logo !== null }) : null });
   })
 
   /** Buat kode warga baru (kode lama tidak berlaku lagi) atau tutup halaman warga. */

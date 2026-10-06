@@ -21,7 +21,7 @@ export function HousePage() {
   return (
     <main className="mx-auto w-full max-w-md px-4 py-8">
       <QueryState query={query}>
-        {({ communityName, defaultAmount, tonight, canRecord, house, history, user }) => {
+        {({ communityName, logoUrl, defaultAmount, tonight, canRecord, house, history, user }) => {
           const month = tonight.slice(0, 7);
           const thisMonth = history.filter((h) => h.date.startsWith(month));
           const monthFilled = thisMonth.filter((h) => h.status === "filled");
@@ -31,7 +31,10 @@ export function HousePage() {
           return (
             <>
               <PageTitle title={houseLabelLong(house)} />
-              <p className="text-sm font-medium text-primary">Jimpitan {communityName}</p>
+              <p className="flex items-center gap-2 text-sm font-medium text-primary">
+                {logoUrl && <img src={logoUrl} alt="" className="size-8 shrink-0 rounded-md object-contain" />}
+                Jimpitan {communityName}
+              </p>
               <h1 className="mt-1 text-3xl font-bold tracking-tight">{houseLabelLong(house)}</h1>
               {house.ownerName && <p className="text-muted">{house.ownerName}</p>}
               {house.status === "vacant" && (
