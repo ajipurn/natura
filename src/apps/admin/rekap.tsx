@@ -8,7 +8,7 @@ import {
   Pencil,
   Search,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { QueryState } from "@/components/query-state";
 import { ScrollArea } from "@/components/scroll-area";
@@ -199,12 +199,15 @@ function RecapBody({
   const [sort, setSort] = useState<Sort>("rumah");
   const [target, setTarget] = useState<CorrectionTarget | null>(null);
   const [targetOpen, setTargetOpen] = useState(false);
+  const headRef = useRef<HTMLDivElement>(null);
   const dates = editing
     ? daysInMonth(data.month).filter((d) => d <= tonight)
     : data.dates;
   const patrolDates = new Set(data.dates);
   const { rows, dateTotals, grandTotal } = summarizeMonth({ ...data, dates });
   const nights = data.dates.length;
+  // Kolom Rumah mengisi sisa lebar, tapi tidak lebih sempit dari ini (lihat `RecapCols`).
+  const minWidth = `calc(11rem + ${dates.length} * ${DATE_COL} + ${ADA_COL} + ${TOTAL_COL})`;
 
   const stats = rows.map((r) => ({
     ...r,
@@ -346,143 +349,189 @@ function RecapBody({
           Tidak ada rumah yang cocok.
         </Card>
       ) : (
-        <ScrollArea className="mt-3 overflow-x-auto rounded-2xl border border-line bg-card">
-          <table className="min-w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-line text-xs text-muted">
-                <th className="sticky left-0 z-10 w-full min-w-40 bg-card px-3 py-2 text-left font-semibold">
-                  Rumah
-                </th>
-                {dates.map((d) => (
-                  <th key={d} className="px-0.5 py-1.5 font-medium">
-                    <Link
-                      to={`/admin/riwayat/${d}`}
-                      title={`Buka riwayat ${formatDateShort(d)}`}
-                      className={cx(
-                        "flex min-w-7 flex-col items-center rounded-md py-0.5 leading-tight hover:bg-idle-soft hover:text-fg",
-                        // Malam tanpa catatan (hanya tampil saat mengisi).
-                        !patrolDates.has(d) && "opacity-50",
-                      )}
-                    >
-                      <span className="text-[10px]">
-                        {formatDateShort(d).split(",")[0]}
-                      </span>
-                      <span className="font-semibold">
-                        {Number(d.slice(8))}
-                      </span>
-                    </Link>
+        <div className="mt-3 rounded-2xl border border-line bg-card">
+          {/*
+           * Judul kolom menempel di atas saat halaman digulir (di bawah header HP, lihat layout.tsx).
+           * Tabel terpisah karena wadah geser-mendatar di bawah menghalangi `sticky` vertikal; strip
+           * ini ikut digeser mendatar lewat `onScrollCapture`. Lebar kolom sama lewat `RecapCols`.
+           */}
+          <div
+            ref={headRef}
+            className="sticky top-[57px] z-20 overflow-hidden rounded-t-[15px] border-b border-line bg-card lg:top-0"
+          >
+            <table
+              role="presentation"
+              className="w-full table-fixed border-collapse text-sm"
+              style={{ minWidth }}
+            >
+              <RecapCols dates={dates.length} />
+              <thead>
+                <tr className="text-xs text-muted">
+                  <th className="sticky left-0 z-10 bg-card px-3 py-2 text-left font-semibold">
+                    Rumah
                   </th>
-                ))}
-                <th className="whitespace-nowrap px-3 py-2 text-right font-semibold">
-                  Ada
-                </th>
-                <th className="whitespace-nowrap px-3 py-2 text-right font-semibold">
-                  Total
-                </th>
-              </tr>
-            </thead>
-            {groups.map(([block, list]) => (
-              <tbody key={block ?? "semua"}>
-                {block && (
-                  <tr className="border-b border-line bg-bg/60">
-                    <th
-                      colSpan={dates.length + 3}
-                      className="sticky left-0 px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-muted"
-                    >
-                      Blok {block} · {list.length} rumah ·{" "}
-                      {formatRupiah(list.reduce((s, r) => s + r.total, 0))}
+                  {dates.map((d) => (
+                    <th key={d} className="px-0.5 py-1.5 font-medium">
+                      <Link
+                        to={`/admin/riwayat/${d}`}
+                        title={`Buka riwayat ${formatDateShort(d)}`}
+                        aria-label={`Buka riwayat ${formatDateShort(d)}`}
+                        className={cx(
+                          "flex flex-col items-center rounded-md py-0.5 leading-tight hover:bg-idle-soft hover:text-fg",
+                          // Malam tanpa catatan (hanya tampil saat mengisi).
+                          !patrolDates.has(d) && "opacity-50",
+                        )}
+                      >
+                        <span className="text-[10px]">
+                          {formatDateShort(d).split(",")[0]}
+                        </span>
+                        <span className="font-semibold">
+                          {Number(d.slice(8))}
+                        </span>
+                      </Link>
                     </th>
+                  ))}
+                  <th className="whitespace-nowrap px-3 py-2 text-right font-semibold">
+                    Ada
+                  </th>
+                  <th className="whitespace-nowrap px-3 py-2 text-right font-semibold">
+                    Total
+                  </th>
+                </tr>
+              </thead>
+            </table>
+          </div>
+          <div
+            onScrollCapture={(e) => {
+              if (headRef.current && e.target instanceof HTMLElement) {
+                headRef.current.scrollLeft = e.target.scrollLeft;
+              }
+            }}
+          >
+            <ScrollArea className="overflow-x-auto rounded-b-[15px]">
+              <table
+                className="w-full table-fixed border-collapse text-sm"
+                style={{ minWidth }}
+              >
+                <RecapCols dates={dates.length} />
+                {/* Judul kolom untuk pembaca layar; yang terlihat ada di strip di atas. */}
+                <thead className="sr-only">
+                  <tr>
+                    <th>Rumah</th>
+                    {dates.map((d) => (
+                      <th key={d}>{formatDateShort(d)}</th>
+                    ))}
+                    <th>Ada</th>
+                    <th>Total</th>
                   </tr>
-                )}
-                {list.map((r) => (
-                  <tr
-                    key={r.house.id}
-                    className={cx(
-                      "border-b border-line last:border-0 hover:bg-idle-soft/50",
-                      r.house.status === "vacant" && "text-muted",
+                </thead>
+                {groups.map(([block, list]) => (
+                  <tbody key={block ?? "semua"}>
+                    {block && (
+                      <tr className="border-b border-line bg-bg/60">
+                        <th
+                          colSpan={dates.length + 3}
+                          className="px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-muted"
+                        >
+                          {/* Sel ini selebar tabel, jadi yang menempel di kiri saat digeser teksnya. */}
+                          <span className="sticky left-3 inline-block">
+                            Blok {block} · {list.length} rumah ·{" "}
+                            {formatRupiah(list.reduce((s, r) => s + r.total, 0))}
+                          </span>
+                        </th>
+                      </tr>
                     )}
-                  >
+                    {list.map((r) => (
+                      <tr
+                        key={r.house.id}
+                        className={cx(
+                          "border-b border-line last:border-0 hover:bg-idle-soft/50",
+                          r.house.status === "vacant" && "text-muted",
+                        )}
+                      >
+                        <th
+                          scope="row"
+                          className="sticky left-0 z-10 bg-card px-3 py-1.5 text-left font-normal"
+                        >
+                          <span className="flex items-baseline gap-2">
+                            <span className="font-semibold">
+                              {houseLabel(r.house)}
+                            </span>
+                            <span className="min-w-0 truncate text-xs text-muted">
+                              {r.house.ownerName ?? ""}
+                            </span>
+                            {r.house.status === "vacant" && (
+                              <span className="shrink-0 rounded-full bg-warn-soft px-1.5 text-[10px] font-semibold text-warn">
+                                mudik
+                              </span>
+                            )}
+                          </span>
+                        </th>
+                        {r.cells.map((cell, i) => {
+                          const vacant = r.house.status === "vacant";
+                          const content = (
+                            <Cell cell={cell} vacant={vacant} date={dates[i]} />
+                          );
+                          return (
+                            <td key={dates[i]} className="px-0.5 py-1 text-center">
+                              {editing ? (
+                                // Tombol biasa (bukan Base UI Button): jumlahnya bisa ribuan dalam satu tabel.
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setTarget({ house: r.house, date: dates[i], current: cell });
+                                    setTargetOpen(true);
+                                  }}
+                                  aria-label={`${houseLabel(r.house)}, ${formatDateShort(dates[i])}: ${cellText(cell, vacant)}`}
+                                  className="inline-flex cursor-pointer rounded-md align-middle transition hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                >
+                                  {content}
+                                </button>
+                              ) : (
+                                content
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
+                          {r.filledCount}
+                          <span className="text-muted">
+                            /{r.filledCount + r.empty}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-1.5 text-right font-semibold tabular-nums">
+                          {formatRupiah(r.total)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                ))}
+                <tfoot>
+                  <tr className="border-t-2 border-line font-semibold">
                     <th
                       scope="row"
-                      className="sticky left-0 z-10 bg-card px-3 py-1.5 text-left font-normal"
+                      className="sticky left-0 z-10 bg-card px-3 py-2 text-left"
                     >
-                      <span className="flex items-baseline gap-2">
-                        <span className="font-semibold">
-                          {houseLabel(r.house)}
-                        </span>
-                        <span className="min-w-0 truncate text-xs text-muted">
-                          {r.house.ownerName ?? ""}
-                        </span>
-                        {r.house.status === "vacant" && (
-                          <span className="shrink-0 rounded-full bg-warn-soft px-1.5 text-[10px] font-semibold text-warn">
-                            mudik
-                          </span>
-                        )}
-                      </span>
+                      Total
                     </th>
-                    {r.cells.map((cell, i) => {
-                      const vacant = r.house.status === "vacant";
-                      const content = (
-                        <Cell cell={cell} vacant={vacant} date={dates[i]} />
-                      );
-                      return (
-                        <td key={dates[i]} className="px-0.5 py-1 text-center">
-                          {editing ? (
-                            // Tombol biasa (bukan Base UI Button): jumlahnya bisa ribuan dalam satu tabel.
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setTarget({ house: r.house, date: dates[i], current: cell });
-                                setTargetOpen(true);
-                              }}
-                              aria-label={`${houseLabel(r.house)}, ${formatDateShort(dates[i])}: ${cellText(cell, vacant)}`}
-                              className="inline-flex cursor-pointer rounded-md align-middle transition hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                            >
-                              {content}
-                            </button>
-                          ) : (
-                            content
-                          )}
-                        </td>
-                      );
-                    })}
-                    <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
-                      {r.filledCount}
-                      <span className="text-muted">
-                        /{r.filledCount + r.empty}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-1.5 text-right font-semibold tabular-nums">
-                      {formatRupiah(r.total)}
+                    {dateTotals.map((t, i) => (
+                      <td
+                        key={dates[i]}
+                        className="px-0.5 py-2 text-center text-[10px] text-muted"
+                      >
+                        {t > 0 ? formatAmountShort(t) : "–"}
+                      </td>
+                    ))}
+                    <td />
+                    <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                      {formatRupiah(grandTotal)}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            ))}
-            <tfoot>
-              <tr className="border-t-2 border-line font-semibold">
-                <th
-                  scope="row"
-                  className="sticky left-0 z-10 bg-card px-3 py-2 text-left"
-                >
-                  Total
-                </th>
-                {dateTotals.map((t, i) => (
-                  <td
-                    key={dates[i]}
-                    className="px-0.5 py-2 text-center text-[10px] text-muted"
-                  >
-                    {t > 0 ? formatAmountShort(t) : "–"}
-                  </td>
-                ))}
-                <td />
-                <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                  {formatRupiah(grandTotal)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </ScrollArea>
+                </tfoot>
+              </table>
+            </ScrollArea>
+          </div>
+        </div>
       )}
 
       <CorrectionDialog
@@ -492,6 +541,27 @@ function RecapBody({
         defaultAmount={data.defaultAmount}
       />
     </>
+  );
+}
+
+const DATE_COL = "2rem";
+const ADA_COL = "4.5rem";
+const TOTAL_COL = "8rem";
+
+/**
+ * Lebar kolom tetap (`table-fixed`), sama untuk strip judul dan isi tabel supaya kolomnya sejajar.
+ * Kolom Rumah tanpa lebar: mengisi sisanya.
+ */
+function RecapCols({ dates }: { dates: number }) {
+  return (
+    <colgroup>
+      <col />
+      {Array.from({ length: dates }, (_, i) => (
+        <col key={i} style={{ width: DATE_COL }} />
+      ))}
+      <col style={{ width: ADA_COL }} />
+      <col style={{ width: TOTAL_COL }} />
+    </colgroup>
   );
 }
 
