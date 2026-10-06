@@ -277,8 +277,13 @@ function ResetPin({ petugas, locked }: { petugas: Petugas; locked: string | null
           inputMode="numeric"
           pattern="\d{4,6}"
           aria-label="PIN baru"
+          autoComplete="off"
           className="font-mono tracking-[0.3em]"
         />
+        <Button onClick={() => setPin(randomPin())} variant="secondary" title="PIN acak lain" className="shrink-0">
+          <Dices className="size-5" />
+          <span className="sr-only">PIN acak lain</span>
+        </Button>
         <Button type="submit" disabled={reset.isPending} variant="secondary" className="shrink-0">
           {reset.isPending ? "Menyimpan…" : "Atur ulang"}
         </Button>
