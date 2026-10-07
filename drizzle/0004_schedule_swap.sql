@@ -1,0 +1,4 @@
+ALTER TABLE "schedule_requests" ADD COLUMN "target_user_id" integer;--> statement-breakpoint
+ALTER TABLE "schedule_requests" ADD CONSTRAINT "schedule_requests_target_user_id_users_id_fk" FOREIGN KEY ("target_user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "schedule_requests_target_idx" ON "schedule_requests" USING btree ("target_user_id");--> statement-breakpoint
+ALTER TABLE "schedule_requests" ADD CONSTRAINT "schedule_requests_swap" CHECK (target_user_id is null or (from_day is not null and target_user_id <> user_id and from_day <> to_day));

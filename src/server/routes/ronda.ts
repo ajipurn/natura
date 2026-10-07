@@ -52,6 +52,7 @@ export const rondaRoutes = new Hono<AppEnv>()
       z.object({
         fromDay: z.number().int().min(0).max(6).nullable(),
         toDay: z.number("Pilih malam yang diinginkan.").int().min(0).max(6),
+        targetUserId: z.number().int().positive().nullable().optional(),
         note: z
           .string()
           .trim()

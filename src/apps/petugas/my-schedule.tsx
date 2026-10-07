@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { CalendarClock, CalendarDays, LayoutDashboard } from "lucide-react";
+import { ArrowRightLeft, CalendarClock, CalendarDays, LayoutDashboard } from "lucide-react";
 import { useState } from "react";
 import { api, call } from "@/client/api";
 import { useAuth } from "@/client/auth";
@@ -10,13 +10,15 @@ import { Alert, Button, Card, Field, Textarea, buttonClass, cx } from "@/compone
 import { myRequestsQuery, scheduleQuery } from "@/features/jadwal/queries";
 import { REQUEST_STATUS, requestChange } from "@/lib/request-text";
 import { DAY_NAMES, dayLabel, slotHouseLabel } from "@/lib/schedule";
+import { SwapRequestForm } from "./swap-request-form";
 
 /** Malam jaga petugas yang sedang masuk, plus permintaan ubah jadwal ke admin. */
 export function MySchedule() {
   const user = useAuth().data?.user;
-  const schedule = useQuery(scheduleQuery);
+  const schedule = useQuery({ ...scheduleQuery, refetchInterval: 30_000 });
   const requests = useQuery(myRequestsQuery);
   const [open, setOpen] = useState(false);
+  const [swapOpen, setSwapOpen] = useState(false);
   const cancel = useMutation({
     mutationFn: (id: number) => call(api.jadwal.permintaan[":id"].batal.$post({ param: { id: String(id) } })),
     onSuccess: () => invalidate(["jadwal"]),
@@ -28,6 +30,10 @@ export function MySchedule() {
   const pending = list.find((r) => r.status === "pending");
   // Keputusan admin yang terakhir, supaya petugas tahu hasil permintaannya.
   const recent = list.filter((r) => r.status !== "pending" && r.status !== "cancelled" && r.decidedAt).slice(0, 2);
+  const change = (r: (typeof list)[number]) =>
+    r.targetUserId === user.id
+      ? requestChange(r.toDay, r.fromDay!, r.userName)
+      : requestChange(r.fromDay, r.toDay, r.targetUserId ? r.targetUserName ?? "petugas lain" : null);
 
   return (
     <Card className="space-y-3">
@@ -38,7 +44,7 @@ export function MySchedule() {
         ) : mySlots.length ? (
           <ul className="flex-1 space-y-1">
             {mySlots.map((s) => (
-              <li key={s.id} className="flex items-center gap-2">
+              <li key={s.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                 <strong>{dayLabel(s.day)}</strong>
                 {s.block && <span className="text-muted">· {slotHouseLabel(s)}</span>}
               </li>
@@ -51,24 +57,33 @@ export function MySchedule() {
 
       {pending ? (
         <div className="rounded-xl bg-warn-soft p-3 text-sm text-warn">
-          <p className="font-semibold">Menunggu persetujuan admin: {requestChange(pending.fromDay, pending.toDay)}</p>
+          <p className="font-semibold">Menunggu persetujuan admin: {change(pending)}</p>
+          {pending.userId !== user.id && <p className="mt-1">Diajukan oleh {pending.userName}.</p>}
           {pending.note && <p className="mt-0.5">“{pending.note}”</p>}
-          <Button
-            variant="plain"
-            disabled={cancel.isPending}
-            onClick={() => cancel.mutate(pending.id)}
-            className="mt-1 font-semibold underline"
-          >
-            Batalkan permintaan
-          </Button>
+          {pending.userId === user.id && (
+            <Button
+              variant="plain"
+              disabled={cancel.isPending}
+              onClick={() => cancel.mutate(pending.id)}
+              className="mt-1 min-h-11 font-semibold underline"
+            >
+              Batalkan permintaan
+            </Button>
+          )}
         </div>
       ) : user.role === "admin" ? (
-        <a href="/admin/jadwal" className={cx(buttonClass("secondary", "sm"), "w-full")}>
-          <LayoutDashboard className="size-4" /> Ubah jadwal di dashboard admin
+        <a href="/admin/jadwal" className={cx(buttonClass("secondary", "sm"), "min-h-11 h-auto w-full py-2")}>
+          <LayoutDashboard className="size-4 shrink-0" aria-hidden /> Ubah jadwal jaga
         </a>
       ) : (
-        <Button onClick={() => setOpen(true)} variant="secondary" size="sm" className="w-full">
-          <CalendarClock className="size-4" /> Minta ubah jadwal
+        <Button onClick={() => setOpen(true)} variant="secondary" size="sm" className="min-h-11 h-auto w-full py-2">
+          <CalendarClock className="size-4 shrink-0" aria-hidden /> Minta ubah jadwal
+        </Button>
+      )}
+
+      {!pending && mySlots.length > 0 && (
+        <Button onClick={() => setSwapOpen(true)} variant="secondary" size="sm" className="min-h-11 h-auto w-full py-2">
+          <ArrowRightLeft className="size-4 shrink-0" aria-hidden /> Tukar jadwal
         </Button>
       )}
 
@@ -77,7 +92,7 @@ export function MySchedule() {
           <span className={cx("mr-1.5 rounded-full px-2 py-0.5 text-xs font-semibold", REQUEST_STATUS[r.status].tone)}>
             {REQUEST_STATUS[r.status].label}
           </span>
-          {requestChange(r.fromDay, r.toDay)}
+          {change(r)}
           {r.response && <span className="text-muted"> · “{r.response}”</span>}
         </p>
       ))}
@@ -90,6 +105,14 @@ export function MySchedule() {
         description="Permintaan dikirim ke admin. Jadwalmu berubah setelah disetujui."
       >
         <RequestForm myDays={mySlots.map((s) => s.day)} onDone={() => setOpen(false)} />
+      </Dialog>
+      <Dialog
+        open={swapOpen}
+        onClose={() => setSwapOpen(false)}
+        title="Tukar jadwal"
+        description="Setelah admin menyetujui, kalian bertukar malam jaga untuk seterusnya."
+      >
+        <SwapRequestForm schedule={schedule.data?.schedule ?? []} userId={user.id} onDone={() => setSwapOpen(false)} />
       </Dialog>
     </Card>
   );

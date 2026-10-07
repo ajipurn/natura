@@ -7,4 +7,5 @@ export const scheduleQuery = queryOptions({ queryKey: ["jadwal"], queryFn: () =>
 export const myRequestsQuery = queryOptions({
   queryKey: ["jadwal", "permintaan"],
   queryFn: () => call(api.jadwal.permintaan.$get()),
+  refetchInterval: 30_000,
 });

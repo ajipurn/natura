@@ -178,7 +178,14 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   }
 
   const viewSwitch = (
-    <SegmentedControl aria-label="Tampilan" compact value={view} onValueChange={changeView} options={VIEWS} className="shrink-0" />
+    <SegmentedControl
+      aria-label="Tampilan"
+      fill
+      value={view}
+      onValueChange={changeView}
+      options={VIEWS}
+      className="[&>button]:h-11"
+    />
   );
   const allDone = summary.unchecked.length === 0 && summary.checked > 0;
   const recap = (
@@ -193,15 +200,14 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   );
 
   return (
-    <div className="lg:grid lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start lg:gap-6">
-      {/* Di HP isi kolom kiri ikut alur halaman (`contents`), supaya ringkasan bisa menempel di atas. */}
-      <aside className="contents lg:sticky lg:top-5 lg:block lg:space-y-3">
-        <div className="sticky top-0 z-20 -mx-4 -mt-5 bg-bg px-4 pb-2 pt-3 lg:static lg:m-0 lg:bg-transparent lg:p-0">
-          <div className="rounded-2xl border border-line bg-card p-3 shadow-sm lg:shadow-none">
+    <main>
+      {/* Ringkasan tetap menempel di atas pada semua ukuran layar. */}
+      <>
+        <div className="sticky top-0 z-20 -mx-4 -mt-5 bg-bg px-4 pb-2 pt-3">
+          <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h1 className="text-base font-bold leading-tight">Ronda malam ini</h1>
-                <p className="truncate text-xs text-muted">{formatDateLong(store.date)}</p>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 <SyncChip status={store.status} pendingCount={store.pendingCount} onRetry={() => store.sync()} />
@@ -209,6 +215,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                 <ThemeButton />
               </div>
             </div>
+            <p className="mt-1 text-xs text-muted">{formatDateLong(store.date)}</p>
             {houses.length > 0 && (
               <>
                 <div className="mt-2 flex items-baseline justify-between">
@@ -242,7 +249,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
           </div>
         </div>
 
-        <div className="mt-1 space-y-3 lg:mt-0">
+        <div className="mt-1 space-y-3">
           <StatusNotice status={store.status} />
           {/* Data lama di HP (sebelum ada jadwal) belum punya `schedule`. */}
           <TonightGuards schedule={snapshot.schedule ?? []} date={store.date} userId={snapshot.user.id} />
@@ -252,16 +259,20 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
               <div>
                 <p className="font-semibold">Bukan jadwal jagamu malam ini</p>
                 <p className="mt-0.5">
-                  Scan dan catat jimpitan hanya untuk petugas yang jaga {dayLabel(scheduleDay(store.date))}.
+                  Pencatatan dibuka untuk petugas yang jaga {dayLabel(scheduleDay(store.date))}.
+                </p>
+                <p className="mt-2">
                   {mySchedule.length > 0
-                    ? ` Jadwalmu: ${[...new Set(mySchedule.map((e) => e.day))]
+                    ? `Jadwalmu: ${[...new Set(mySchedule.map((e) => e.day))]
                         .sort()
                         .map((d) => DAY_NAMES[d])
                         .join(", ")}.`
-                    : " Kamu belum dijadwalkan."}
-                  {isAdmin && " Sebagai admin, catatan malam ini tetap bisa dikoreksi lewat Riwayat di dashboard."}
+                    : "Kamu belum dijadwalkan."}
                 </p>
-                <Link to="/petugas/jadwal" className="mt-1 inline-block font-semibold underline">
+                {isAdmin && (
+                  <p className="mt-1 text-xs">Koreksi catatan tersedia di Riwayat pada dashboard admin.</p>
+                )}
+                <Link to="/petugas/jadwal" className="mt-2 inline-block font-semibold underline">
                   Lihat jadwal atau minta ubah jadwal
                 </Link>
               </div>
@@ -288,15 +299,10 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
               onEdit={canRecord ? () => setActive({ house: lastEntry.house, method: "manual" }) : undefined}
             />
           )}
-          {canRecord && houses.length > 0 && (
-            <div className="hidden gap-2 lg:flex">
-              <ActionButtons onSearch={() => setSearchOpen(true)} onScan={() => setScannerOpen(true)} />
-            </div>
-          )}
         </div>
-      </aside>
+      </>
 
-      <section aria-label="Rumah" className="mt-5 lg:mt-0">
+      <section aria-label="Rumah" className="mt-5">
         {houses.length === 0 ? (
           <Card className="text-center">
             <p className="font-semibold">Belum ada data rumah</p>
@@ -309,15 +315,14 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
           </Card>
         ) : (
           <>
-            <div className="mb-3 flex items-center justify-between gap-2">
-              {view === "list" ? (
+            <div className="mb-4 space-y-3">
+              {viewSwitch}
+              {view === "list" && (
                 <SegmentedControl
                   aria-label="Saring rumah"
                   fill
-                  size="sm"
                   value={filter}
                   onValueChange={setFilter}
-                  // Angkanya kecil dan jaraknya rapat supaya tiga pilihan muat di samping tombol tampilan di HP.
                   options={(
                     [
                       ["belum", "Belum", summary.unchecked.length],
@@ -331,14 +336,11 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                         {label} <span className="text-xs font-normal">{count}</span>
                       </>
                     ),
-                    className: "px-1",
+                    className: "px-2",
                   }))}
-                  className="min-w-0 flex-1"
+                  className="[&>button]:h-11"
                 />
-              ) : (
-                <p className="text-sm font-semibold">{view === "map" ? "Denah" : "Denah 3D"}</p>
               )}
-              {viewSwitch}
             </div>
 
             {view !== "list" ? (
@@ -410,10 +412,10 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
       {canRecord && houses.length > 0 && (
         <>
           {/* Ruang supaya bagian bawah daftar tidak tertutup bar aksi. */}
-          <div className="h-16 lg:hidden" aria-hidden />
+          <div className="h-16" aria-hidden />
           {/* Bar aksi menempel tepat di atas navigasi bawah (tingginya h-14, lihat PetugasLayout). */}
-          <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] z-20 border-t border-line bg-card/95 px-4 py-2 backdrop-blur lg:hidden">
-            <div className="mx-auto flex max-w-3xl gap-2">
+          <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] z-20 border-t border-line bg-card/95 py-2 backdrop-blur">
+            <div className="mx-auto flex max-w-3xl gap-2 px-4">
               <ActionButtons onSearch={() => setSearchOpen(true)} onScan={() => setScannerOpen(true)} />
             </div>
           </div>
@@ -464,7 +466,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
           {toast.text}
         </div>
       )}
-    </div>
+    </main>
   );
 }
 

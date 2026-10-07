@@ -1,7 +1,7 @@
 import { move } from "@dnd-kit/helpers";
 import { DragDropProvider, useDroppable } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowDown,
@@ -10,6 +10,7 @@ import {
   CalendarDays,
   FileSpreadsheet,
   GripVertical,
+  ImageDown,
   Plus,
   Trash2,
   UserRound,
@@ -29,14 +30,16 @@ import { scheduleQuery } from "@/features/jadwal/queries";
 import { rondaDate } from "@/lib/dates";
 import { GUARD_COLOR_LABEL, GUARD_COLOR_MEANING, GUARD_COLORS, type GuardColor } from "@/lib/guard-color";
 import { DAY_NAMES, dayLabel, scheduleDay, slotHouseLabel } from "@/lib/schedule";
+import { createScheduleImage } from "@/lib/schedule-image";
 import { houseKey } from "@/lib/site-plan";
 import type { HouseDTO, ScheduleDTO } from "@/lib/types";
 import type { Petugas } from "../petugas/petugas-dialog";
-import { housesQuery, usersQuery } from "../queries";
+import { housesQuery, settingsQuery, usersQuery } from "../queries";
 import { AddSlotDialog } from "./add-slot-dialog";
 import { HouseNameDialog } from "./house-name-dialog";
 import { RequestsPanel } from "./requests-panel";
-import { applyKeysByDay, keysByDay, moveSlot, newKey, sameSchedule, shiftSlot, toDraft, toSlots, type DraftSlot } from "./draft";
+import { SwapSlotDialog } from "./swap-slot-dialog";
+import { applyKeysByDay, keysByDay, moveSlot, newKey, sameSchedule, shiftSlot, swapSlots, toDraft, toSlots, type DraftSlot } from "./draft";
 
 const NIGHT = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
 const COLOR_CHOICES: [GuardColor | null, string][] = [
@@ -46,25 +49,59 @@ const COLOR_CHOICES: [GuardColor | null, string][] = [
 const colorMeaning = (color: GuardColor | null) => GUARD_COLOR_MEANING[color ?? "white"];
 
 export function JadwalPage() {
+  const queryClient = useQueryClient();
   const schedule = useQuery(scheduleQuery);
   const users = useQuery(usersQuery);
   const houses = useQuery(housesQuery);
   const [importOpen, setImportOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   // Dinaikkan setelah impor supaya editor mulai lagi dari jadwal baru.
   const [version, setVersion] = useState(0);
   const tonight = scheduleDay(rondaDate(new Date()));
+  const exporting = useMutation({
+    mutationFn: async () => {
+      const settings = await queryClient.ensureQueryData(settingsQuery);
+      const blob = await createScheduleImage(schedule.data?.schedule ?? [], settings.communityName);
+      const url = URL.createObjectURL(blob);
+      const link = Object.assign(document.createElement("a"), { href: url, download: `jadwal-ronda-${rondaDate(new Date())}.png` });
+      document.body.append(link);
+      link.click();
+      link.remove();
+      // Beri browser waktu mengambil blob sebelum URL dilepas.
+      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    },
+  });
 
   return (
     <>
       <PageHeader
         title="Jadwal ronda"
         subtitle={`Malam ini: ${dayLabel(tonight)}`}
+        className="flex-wrap sm:flex-nowrap"
         action={
-          <Button onClick={() => setImportOpen(true)} variant="secondary" size="sm">
-            <FileSpreadsheet className="size-4" /> Impor
-          </Button>
+          <div className="flex w-full shrink-0 gap-2 sm:w-auto">
+            <Button
+              onClick={() => exporting.mutate()}
+              disabled={editing || exporting.isPending || !schedule.data?.schedule.length}
+              aria-busy={exporting.isPending}
+              title={editing ? "Simpan atau batalkan perubahan sebelum mengekspor" : "Unduh tabel jadwal sebagai PNG"}
+              variant="secondary"
+              size="sm"
+              className="h-11 sm:h-9"
+            >
+              <ImageDown className="size-4" /> {exporting.isPending ? "Menyiapkan…" : "Ekspor gambar"}
+            </Button>
+            <Button onClick={() => setImportOpen(true)} variant="secondary" size="sm" className="h-11 sm:h-9">
+              <FileSpreadsheet className="size-4" /> Impor
+            </Button>
+          </div>
         }
       />
+      {exporting.isError && (
+        <div className="mb-4">
+          <Alert>{exporting.error.message}</Alert>
+        </div>
+      )}
       <QueryState query={schedule}>
         {(data) => (
           <ScheduleEditor
@@ -74,6 +111,7 @@ export function JadwalPage() {
             houses={houses.data?.houses ?? []}
             tonight={tonight}
             onImport={() => setImportOpen(true)}
+            onEditingChange={setEditing}
           />
         )}
       </QueryState>
@@ -100,12 +138,14 @@ function ScheduleEditor({
   houses,
   tonight,
   onImport,
+  onEditingChange,
 }: {
   schedule: ScheduleDTO[];
   users: Petugas[];
   houses: HouseDTO[];
   tonight: number;
   onImport: () => void;
+  onEditingChange: (editing: boolean) => void;
 }) {
   const initial = useMemo(() => toDraft(schedule), [schedule]);
   // Jadwal terakhir dari server, jadwal yang dianggap tersimpan, dan jadwal yang sedang diedit.
@@ -114,6 +154,7 @@ function ScheduleEditor({
   const [draft, setDraft] = useState(initial);
   const [adding, setAdding] = useState<number | null>(null);
   const [naming, setNaming] = useState<HouseDTO | null>(null);
+  const [swapping, setSwapping] = useState<string | null>(null);
   const beforeDrag = useRef(draft);
   const dirty = !sameSchedule(draft, base);
 
@@ -133,6 +174,7 @@ function ScheduleEditor({
       await invalidate(["jadwal"], ["admin"], ["ronda"]);
     },
   });
+  useEffect(() => onEditingChange(dirty || save.isPending), [dirty, save.isPending, onEditingChange]);
 
   // Jangan sampai perubahan hilang karena pindah halaman atau menutup tab.
   const blocker = useBlocker(dirty);
@@ -150,12 +192,7 @@ function ScheduleEditor({
 
   const days = DAY_NAMES.map((_, i) => (tonight + i) % 7);
   const houseById = useMemo(() => new Map(houses.map((h) => [h.id, h])), [houses]);
-  const stats = {
-    total: draft.length,
-    linked: draft.filter((s) => s.userId).length,
-    unnamed: draft.filter((s) => !s.name && !s.ownerName).length,
-    inactive: draft.filter((s) => s.userActive === false).length,
-  };
+  const inactiveCount = draft.filter((s) => s.userActive === false).length;
 
   if (draft.length === 0 && !dirty) {
     return (
@@ -192,28 +229,10 @@ function ScheduleEditor({
   return (
     <div>
       <RequestsPanel locked={dirty} />
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1.5 text-sm text-muted">
-        <p>
-          {stats.total} baris · {stats.linked} terhubung ke akun petugas
-          {stats.unnamed > 0 && ` · ${stats.unnamed} rumah belum ada nama`}.{" "}
-          <span className="hidden sm:inline">
-            Geser baris untuk mengurutkan atau memindah ke malam lain, atau pakai menu ⋯.
-          </span>
-          <span className="sm:hidden">Tekan lama lalu geser baris, atau pakai menu ⋯, untuk mengurutkan atau memindah ke malam lain.</span>
-        </p>
-        <ul aria-label="Arti warna" className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-          {COLOR_CHOICES.map(([color]) => (
-            <li key={color ?? "white"} className="inline-flex items-center gap-1.5">
-              <span aria-hidden className={cx("size-2.5 rounded-full", guardColorClass(color))} />
-              {colorMeaning(color)}
-            </li>
-          ))}
-        </ul>
-      </div>
-      {stats.inactive > 0 && (
+      {inactiveCount > 0 && (
         <p className="mb-3 flex gap-2 rounded-xl bg-warn-soft px-3 py-2 text-sm text-warn">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-          <span>{stats.inactive} petugas di jadwal sudah nonaktif.</span>
+          <span>{inactiveCount} petugas di jadwal sudah nonaktif.</span>
         </p>
       )}
 
@@ -292,6 +311,12 @@ function ScheduleEditor({
                         disabled: i === slots.length - 1,
                         onSelect: () => setDraft((d) => shiftSlot(d, slot.key, 1)),
                       },
+                      {
+                        label: "Tukar jadwal",
+                        icon: <ArrowRightLeft className="size-4" />,
+                        disabled: save.isPending,
+                        onSelect: () => setSwapping(slot.key),
+                      },
                       { heading: "Pindah ke" },
                       ...days
                         .filter((d) => d !== day)
@@ -353,6 +378,15 @@ function ScheduleEditor({
         </div>
       )}
 
+      <SwapSlotDialog
+        sourceKey={swapping}
+        draft={draft}
+        onClose={() => setSwapping(null)}
+        onSwap={(targetKey) => {
+          setDraft((d) => swapSlots(d, swapping!, targetKey));
+          setSwapping(null);
+        }}
+      />
       <HouseNameDialog
         house={naming}
         onClose={() => setNaming(null)}

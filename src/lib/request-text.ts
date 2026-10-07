@@ -1,7 +1,8 @@
 import { DAY_NAMES } from "./schedule";
 
 /** "Ahad → Rabu", atau "Tambah Rabu" untuk petugas yang belum punya jadwal. */
-export function requestChange(fromDay: number | null, toDay: number): string {
+export function requestChange(fromDay: number | null, toDay: number, swapWith?: string | null): string {
+  if (swapWith && fromDay !== null) return `Tukar ${DAY_NAMES[fromDay]} ↔ ${DAY_NAMES[toDay]} dengan ${swapWith}`;
   return fromDay === null ? `Tambah ${DAY_NAMES[toDay]}` : `${DAY_NAMES[fromDay]} → ${DAY_NAMES[toDay]}`;
 }
 

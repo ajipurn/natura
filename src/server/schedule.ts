@@ -124,7 +124,7 @@ export function houseSlots(db: Db, houseId: number | null) {
 }
 
 /** Malam jaga tiap petugas (userId → hari-hari, urut). */
-export async function guardDaysByUser(db: Db): Promise<Map<number, number[]>> {
+export async function guardDaysByUser(db: Executor): Promise<Map<number, number[]>> {
   const rows = await db
     .select({ userId: rondaSchedule.userId, day: rondaSchedule.dayOfWeek })
     .from(rondaSchedule)

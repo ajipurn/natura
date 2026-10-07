@@ -17,6 +17,9 @@ type Request = {
   days: number[];
   fromDay: number | null;
   toDay: number;
+  targetUserId: number | null;
+  targetUserName: string | null;
+  targetHouse: string | null;
   note: string | null;
   status: string;
   response: string | null;
@@ -86,7 +89,7 @@ function DecidedList({ requests }: { requests: Request[] }) {
           <span className={cx("mr-1.5 rounded-full px-2 py-0.5 text-xs font-semibold", REQUEST_STATUS[r.status].tone)}>
             {REQUEST_STATUS[r.status].label}
           </span>
-          <strong>{r.userName}</strong> {requestChange(r.fromDay, r.toDay)}
+          <strong>{r.userName}</strong> {requestChange(r.fromDay, r.toDay, r.targetUserName)}
           <span className="text-muted">
             {r.decidedAt && ` · ${when(r.decidedAt)}`}
             {r.decidedBy && ` oleh ${r.decidedBy}`}
@@ -115,7 +118,12 @@ function PendingRequest({ request: r, locked }: { request: Request; locked: bool
             <strong>{r.userName}</strong>
             {r.house && <span className="text-muted"> · {r.house}</span>}
           </p>
-          <p className="font-semibold text-primary">{requestChange(r.fromDay, r.toDay)}</p>
+          <p className="font-semibold text-primary">{requestChange(r.fromDay, r.toDay, r.targetUserName)}</p>
+          {r.targetUserId !== null && r.fromDay !== null && (
+            <p className="mt-1 text-sm">
+              {r.userName} → {DAY_NAMES[r.toDay]} · {r.targetUserName}{r.targetHouse && ` (${r.targetHouse})`} → {DAY_NAMES[r.fromDay]}
+            </p>
+          )}
           <p className="text-xs text-muted">
             Dikirim {when(r.createdAt)}
             {r.days.length > 0 && ` · sekarang jaga ${r.days.map((d) => DAY_NAMES[d]).join(", ")}`}

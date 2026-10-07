@@ -1,6 +1,6 @@
 import { CalendarDays, History, ScanLine, UserRound, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { NavLink, useMatch } from "react-router";
+import { NavLink } from "react-router";
 import { cx } from "@/components/ui";
 
 const ITEMS: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
@@ -10,13 +10,11 @@ const ITEMS: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = 
   { to: "/petugas/akun", label: "Akun", icon: UserRound },
 ];
 
-/** Kerangka app petugas: isi halaman + navigasi bawah (khusus HP). */
+/** Kerangka app petugas: tampilan satu kolom dan navigasi bawah pada semua ukuran layar. */
 export function PetugasLayout({ children }: { children: ReactNode }) {
-  // Layar Ronda dua kolom di layar lebar (ringkasan di kiri, rumah/denah di kanan).
-  const wide = useMatch({ path: "/petugas", end: true });
   return (
     <>
-      <div className={cx("mx-auto w-full flex-1 px-4 pb-28 pt-5", wide ? "max-w-3xl lg:max-w-6xl" : "max-w-3xl")}>{children}</div>
+      <div className="mx-auto w-full max-w-3xl flex-1 px-4 pb-28 pt-5">{children}</div>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
         <ul className="mx-auto grid max-w-3xl grid-cols-4">
           {ITEMS.map(({ to, label, icon: Icon, end }) => (

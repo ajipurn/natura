@@ -7,9 +7,6 @@ import { shownToGuards } from "@/lib/guard-color";
 import { NIGHT_OF, scheduleDay, slotHouseLabel } from "@/lib/schedule";
 import type { ScheduleDTO } from "@/lib/types";
 
-/** Di layar lebar ada ruang, jadi daftar jaga langsung terbuka. */
-const wideScreen = () => typeof window !== "undefined" && window.matchMedia?.("(min-width: 1024px)").matches;
-
 /**
  * Siapa yang dijadwalkan jaga di malam ronda ini, diringkas jadi satu baris
  * ("Kamu jaga · bersama Nino, Sahrul +5") yang bisa dibuka untuk melihat semuanya. Baris rumah yang
@@ -17,7 +14,7 @@ const wideScreen = () => typeof window !== "undefined" && window.matchMedia?.("(
  * dan tidak dihitung; warna lainnya tidak dipakai.
  */
 export function TonightGuards({ schedule, date, userId }: { schedule: ScheduleDTO[]; date: string; userId?: number }) {
-  const [expanded, setExpanded] = useState(wideScreen);
+  const [expanded, setExpanded] = useState(false);
   const day = scheduleDay(date);
   const entries = schedule
     .flatMap((e) => {

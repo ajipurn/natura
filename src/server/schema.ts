@@ -175,7 +175,7 @@ export const rondaSchedule = pgTable(
   ],
 ).enableRLS();
 
-/** Permintaan petugas untuk mengubah malam jaganya; admin menyetujui atau menolak. */
+/** Permintaan pindah atau tukar jadwal mingguan; admin menyetujui atau menolak. */
 export const scheduleRequests = pgTable(
   "schedule_requests",
   {
@@ -187,6 +187,8 @@ export const scheduleRequests = pgTable(
     fromDay: integer("from_day"),
     /** Malam yang diinginkan. */
     toDay: integer("to_day").notNull(),
+    /** Petugas yang diajak tukar; null = pindah/tambah jadwal satu orang. */
+    targetUserId: integer("target_user_id").references(() => users.id, { onDelete: "cascade" }),
     /** Alasan dari petugas. */
     note: text("note"),
     status: requestStatusEnum("status").notNull().default("pending"),
@@ -196,7 +198,11 @@ export const scheduleRequests = pgTable(
     createdAt: createdAt(),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
   },
-  (t) => [index("schedule_requests_status_idx").on(t.status, t.createdAt)],
+  (t) => [
+    index("schedule_requests_status_idx").on(t.status, t.createdAt),
+    index("schedule_requests_target_idx").on(t.targetUserId),
+    check("schedule_requests_swap", sql`target_user_id is null or (from_day is not null and target_user_id <> user_id and from_day <> to_day)`),
+  ],
 ).enableRLS();
 
 /** Pengumuman untuk warga. */

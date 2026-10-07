@@ -77,3 +77,27 @@ export function shiftSlot(draft: DraftSlot[], key: string, delta: -1 | 1): Draft
   [next[a], next[b]] = [next[b], next[a]];
   return next;
 }
+
+function sameGuard(a: DraftSlot, b: DraftSlot) {
+  if (a.userId !== null || b.userId !== null) return a.userId !== null && a.userId === b.userId;
+  if (a.houseId !== null || b.houseId !== null) return a.houseId !== null && a.houseId === b.houseId;
+  return a.name !== null && a.name === b.name;
+}
+
+/** Pasangan harus beda malam dan pertukarannya tidak membuat petugas/rumah tercatat dua kali. */
+export function canSwapSlots(draft: DraftSlot[], key: string, targetKey: string): boolean {
+  const a = draft.find((s) => s.key === key);
+  const b = draft.find((s) => s.key === targetKey);
+  if (!a || !b || a.day === b.day || sameGuard(a, b)) return false;
+  return !draft.some((s) => s.key !== key && s.key !== targetKey && (
+    (s.day === b.day && sameGuard(s, a)) || (s.day === a.day && sameGuard(s, b))
+  ));
+}
+
+/** Tukar malam dan posisi dua baris; rujukan akun/rumah dan warna tetap ikut masing-masing. */
+export function swapSlots(draft: DraftSlot[], key: string, targetKey: string): DraftSlot[] {
+  if (!canSwapSlots(draft, key, targetKey)) return draft;
+  const a = draft.find((s) => s.key === key)!;
+  const b = draft.find((s) => s.key === targetKey)!;
+  return draft.map((s) => s.key === key ? { ...b, day: a.day } : s.key === targetKey ? { ...a, day: b.day } : s);
+}

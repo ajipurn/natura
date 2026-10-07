@@ -67,13 +67,15 @@ export function PageHeader({
   title,
   subtitle,
   action,
+  className,
 }: {
   title: string;
   subtitle?: ReactNode;
   action?: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="mb-4 flex items-start justify-between gap-3">
+    <div className={cx("mb-4 flex items-start justify-between gap-3", className)}>
       <PageTitle title={title} />
       <div className="min-w-0">
         <h1 className="text-2xl font-bold tracking-tight">{title}</h1>

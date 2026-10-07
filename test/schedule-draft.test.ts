@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyKeysByDay, keysByDay, moveSlot, sameSchedule, shiftSlot, toDraft, toSlots, type DraftSlot } from "@/apps/admin/jadwal/draft";
+import { applyKeysByDay, canSwapSlots, keysByDay, moveSlot, sameSchedule, shiftSlot, swapSlots, toDraft, toSlots, type DraftSlot } from "@/apps/admin/jadwal/draft";
 import type { ScheduleDTO } from "@/lib/types";
 
 const slot = (id: number, day: number, position: number, name: string, userId: number | null = null): ScheduleDTO => ({
@@ -59,5 +59,54 @@ describe("draf jadwal", () => {
     expect(slots.at(-1)).toEqual({ day: 3, userId: null, houseId: null, name: "Satpam", color: null });
     expect(sameSchedule(draft, toDraft(withName))).toBe(true);
     expect(sameSchedule(draft, shiftSlot(draft, "slot-2", -1))).toBe(false);
+  });
+
+  it("tukar malam mempertahankan posisi, warna, dan rujukan masing-masing tanpa mengubah baris lain", () => {
+    const draft = toDraft(schedule);
+    const swapped = swapSlots(draft, "slot-1", "slot-3");
+    expect(names(swapped, 0)).toEqual(["Nino", "Widi"]);
+    expect(names(swapped, 1)).toEqual(["Yusuf"]);
+    expect(swapped.find((s) => s.key === "slot-1")).toEqual({ ...draft[0], day: 1 });
+    expect(swapped.find((s) => s.key === "slot-3")).toEqual({ ...draft[2], day: 0 });
+    expect(swapped[1]).toBe(draft[1]);
+    expect(swapped[3]).toBe(draft[3]);
+    expect(toSlots(swapped)).toEqual([
+      { day: 0, userId: null, houseId: 3, name: null, color: null },
+      { day: 0, userId: null, houseId: 2, name: null, color: null },
+      { day: 1, userId: 10, houseId: null, name: null, color: "green" },
+      { day: 2, userId: null, houseId: 4, name: null, color: null },
+    ]);
+    expect(draft).toEqual(toDraft(schedule));
+    expect(swapSlots(swapped, "slot-1", "slot-3")).toEqual(draft);
+  });
+
+  it("tukar jadwal memakai draf terbaru, termasuk baris baru dan perubahan yang belum disimpan", () => {
+    const edited = moveSlot(toDraft(schedule), "slot-2", 3).map((s) => s.key === "slot-1" ? { ...s, color: "orange" as const } : s);
+    const fresh: DraftSlot = { ...edited[0], key: "baru-1", day: 5, userId: null, houseId: null, name: "Satpam", color: "yellow" };
+    const swapped = swapSlots([...edited, fresh], "slot-1", fresh.key);
+    expect(names(swapped, 0)).toEqual(["Satpam"]);
+    expect(names(swapped, 3)).toEqual(["Widi"]);
+    expect(swapped.find((s) => s.key === "slot-1")).toMatchObject({ day: 5, color: "orange", userId: 10 });
+    expect(swapped.find((s) => s.key === fresh.key)).toMatchObject({ day: 0, color: "yellow", name: "Satpam" });
+  });
+
+  it("menahan pasangan pada malam yang sama, baris hilang, dan jadwal ganda di kedua arah", () => {
+    const draft = toDraft(schedule);
+    for (const target of ["slot-1", "slot-2", "hilang"]) {
+      expect(canSwapSlots(draft, "slot-1", target)).toBe(false);
+      expect(swapSlots(draft, "slot-1", target)).toBe(draft);
+    }
+    expect(swapSlots(draft, "hilang", "slot-3")).toBe(draft);
+    const duplicates: DraftSlot[] = [
+      { ...draft[0], key: "akun-sama", day: 1 },
+      { ...draft[2], key: "rumah-sama", day: 0 },
+    ];
+    for (const duplicate of duplicates) {
+      const withDuplicate = [...draft, duplicate];
+      expect(canSwapSlots(withDuplicate, "slot-1", "slot-3")).toBe(false);
+      expect(swapSlots(withDuplicate, "slot-1", "slot-3")).toBe(withDuplicate);
+    }
+    const named = [{ ...draft[0], userId: null, houseId: null, name: "Satpam" }, { ...draft[2], userId: null, houseId: null, name: "Satpam" }];
+    expect(canSwapSlots(named, "slot-1", "slot-3")).toBe(false);
   });
 });

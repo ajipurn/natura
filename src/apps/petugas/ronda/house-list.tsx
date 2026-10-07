@@ -3,7 +3,7 @@ import { useState } from "react";
 import { ScrollArea } from "@/components/scroll-area";
 import { Button, cx } from "@/components/ui";
 import { formatAmountShort, formatRupiah } from "@/lib/format";
-import { groupByBlock, houseLabelLong } from "@/lib/houses";
+import { groupByBlock, houseLabel } from "@/lib/houses";
 import type { HouseDTO } from "@/lib/types";
 import type { MergedCollection } from "./use-ronda-store";
 
@@ -62,8 +62,8 @@ export function HouseList({
         const isExpanded = expanded.has(block);
         const tiles = finished ? (isExpanded ? list : []) : visible;
         return (
-          // Ruang di atas saat dituju dari BlockJump: di HP ringkasan ronda menempel di atas.
-          <section key={block} id={blockId(block)} aria-label={`Blok ${block}`} className="scroll-mt-44 lg:scroll-mt-6">
+          // Ruang di atas saat dituju dari BlockJump: ringkasan ronda menempel di atas.
+          <section key={block} id={blockId(block)} aria-label={`Blok ${block}`} className="scroll-mt-52">
             {finished ? (
               <Button
                 variant="plain"
@@ -81,7 +81,7 @@ export function HouseList({
               <BlockHeader block={block} done={done} total={total} open={open} />
             )}
             {tiles.length > 0 && (
-              <div className={cx("grid grid-cols-5 gap-2 sm:grid-cols-6 xl:grid-cols-8", finished ? "mt-2" : "mt-2.5")}>
+              <div className={cx("grid grid-cols-5 gap-2 sm:grid-cols-6", finished ? "mt-2" : "mt-2.5")}>
                 {tiles.map((h) => (
                   <HouseTile key={h.id} house={h} collection={collections.get(h.id)} onClick={() => onOpen(h)} />
                 ))}
@@ -106,8 +106,8 @@ function BlockJump({ sections, filter }: { sections: { block: string; visible: H
     document.getElementById(blockId(block))?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
   }
   return (
-    <ScrollArea element="nav" aria-label="Lompat ke blok" className="-mx-4 overflow-x-auto lg:mx-0">
-      <ul className="flex w-max gap-1.5 px-4 pb-1 lg:w-auto lg:flex-wrap lg:px-0">
+    <ScrollArea element="nav" aria-label="Lompat ke blok" className="-mx-4 overflow-x-auto">
+      <ul className="flex w-max gap-1.5 px-4 pb-1">
         {sections.map(({ block, visible }) => (
           <li key={block}>
             <Button
@@ -164,16 +164,16 @@ function HouseTile({
     <Button
       variant="plain"
       onClick={onClick}
-      aria-label={`${houseLabelLong(house)}, ${stateText}${collection?.pending ? ", belum terkirim" : ""}`}
+      aria-label={`${houseLabel(house)}, ${stateText}${collection?.pending ? ", belum terkirim" : ""}`}
       className={cx(
-        "relative flex aspect-square flex-col items-center justify-center rounded-xl border-2 text-lg font-bold leading-none active:scale-95",
+        "relative flex min-h-16 flex-col items-center justify-center rounded-xl border px-1 py-2 text-sm font-semibold leading-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-[0.96] motion-reduce:transform-none",
         state === "filled" && "border-filled bg-filled-soft text-filled",
         state === "empty" && "border-empty bg-empty-soft text-empty",
-        state === "unchecked" && "border-line bg-card text-fg",
+        state === "unchecked" && "border-line bg-card text-fg hover:border-primary/50",
         state === "vacant" && "border-dashed border-muted/60 bg-transparent text-muted",
       )}
     >
-      {house.number}
+      {houseLabel(house)}
       {state === "filled" && collection && (
         <span className="mt-1 text-[10px] font-semibold">{formatAmountShort(collection.amount)}</span>
       )}
