@@ -31,27 +31,27 @@ export function PaymentPanel({ month }: { month: string }) {
   return (
     <Card className="mb-5 space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h2 className="flex items-center gap-2 font-semibold"><ReceiptText className="size-4 text-primary" /> Pembayaran mingguan & bulanan</h2><p className="mt-1 text-xs text-muted">Pembayaran sesuai periode. Kolom Bulanan di rekap terpisah dari uang hasil ronda.</p></div>
+        <div><h2 className="flex items-center gap-2 font-semibold"><ReceiptText className="size-4 text-primary" /> Pembayaran mingguan & bulanan</h2><p className="mt-1 text-xs text-muted">Pembayaran sesuai periode. Kolom Mingguan dan Bulanan di rekap terpisah dari uang hasil ronda.</p></div>
         <Button size="sm" onClick={() => record()}><Plus className="size-4" /> Catat pembayaran</Button>
       </div>
       <QueryState query={query}>
         {(data) => {
-          const previousOverdue = data.overdueBills ?? [];
-          const bills = [...previousOverdue, ...data.bills].filter((b) => b.cadence !== "daily" && byId.get(b.houseId)?.status === "active");
-          const overdue = bills.filter((b) => b.status === "overdue");
+          const previousUnpaid = data.previousUnpaidBills ?? [];
+          const bills = [...previousUnpaid, ...data.bills].filter((b) => b.cadence !== "daily" && byId.get(b.houseId)?.status === "active");
+          const unpaid = bills.filter((b) => b.status === "unpaid");
           const paid = bills.filter((b) => b.status === "paid");
           return (
             <>
-              <p className="text-sm text-muted">{bills.length} periode · {paid.length} sudah dibayar{overdue.length > 0 && <span className="text-warn"> · {overdue.length} terlambat</span>} · {data.payments.length} pembayaran tercatat</p>
+              <p className="text-sm text-muted">{bills.length} periode · {paid.length} sudah bayar · {unpaid.length} belum bayar · {data.payments.length} pembayaran tercatat</p>
               <Button variant="ghost" size="sm" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? "Tutup rincian pembayaran" : "Lihat status & riwayat pembayaran"}</Button>
               {expanded && (
                 <div className="space-y-4">
-                  {previousOverdue.length > 0 && <p className="text-xs text-warn">Daftar ini juga menampilkan tunggakan sebelum bulan yang dipilih.</p>}
-                  {bills.length === 0 ? <p className="text-sm text-muted">Atur kesepakatan mingguan/bulanan di <Link to="/admin/rumah" className="font-semibold text-primary underline">Rumah & QR</Link> untuk menampilkan nominal dan jatuh tempo.</p> : (
+                  {previousUnpaid.length > 0 && <p className="text-xs text-muted">Daftar ini juga menampilkan periode sebelumnya yang belum dibayar.</p>}
+                  {bills.length === 0 ? <p className="text-sm text-muted">Atur pembayaran mingguan/bulanan di <Link to="/admin/rumah" className="font-semibold text-primary underline">Rumah & QR</Link> untuk menampilkan status tiap periode.</p> : (
                     <ul className="divide-y divide-line">
                       {bills.map((b) => <li key={b.planId + ":" + b.start} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
-                        <div className="min-w-0"><p className="font-semibold">{label(b.houseId)} <span className="text-xs font-normal text-muted">{CADENCE_LABEL[b.cadence]}</span></p><p className="text-xs text-muted">{formatDateShort(b.start)} – {formatDateShort(b.end)} · jatuh tempo {formatDateShort(b.dueDate)}</p></div>
-                        <div className="text-right"><p className={cx("text-xs font-semibold", b.status === "overdue" ? "text-warn" : b.status === "paid" ? "text-primary" : "text-muted")}>{BILLING_LABEL[b.status]}</p><p className="text-sm tabular-nums">{formatRupiah(b.paid)} / {formatRupiah(b.expected)}</p></div>
+                        <div className="min-w-0"><p className="font-semibold">{label(b.houseId)} <span className="text-xs font-normal text-muted">{CADENCE_LABEL[b.cadence]}</span></p><p className="text-xs text-muted">{formatDateShort(b.start)} – {formatDateShort(b.end)}</p></div>
+                        <div className="text-right"><p className={cx("text-xs font-semibold", b.status === "paid" ? "text-filled" : "text-empty")}>{BILLING_LABEL[b.status]}</p><p className="text-sm tabular-nums">{formatRupiah(b.paid)} / {formatRupiah(b.expected)}</p></div>
                       </li>)}
                     </ul>
                   )}

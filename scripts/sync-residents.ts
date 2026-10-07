@@ -16,7 +16,7 @@ const sourceSchema = z.object({
   })).min(1),
   plans: z.array(z.object({
     house: z.string().min(1), effectiveFrom: z.string().refine(isIsoDate), cadence: z.enum(["daily", "weekly", "monthly"]),
-    ratePerNight: z.number().int().positive().max(1_000_000), dueTiming: z.enum(["start", "end"]),
+    ratePerNight: z.number().int().positive().max(1_000_000), dueTiming: z.enum(["start", "end"]).default("end"),
     graceDays: z.number().int().min(0).max(31).default(0), weekStart: z.number().int().min(0).max(6).default(1),
   })).default([]),
 });

@@ -53,11 +53,11 @@ export function RingkasanPage() {
             )}
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <StatCard label="Malam ini terkumpul" value={formatRupiah(t.total)} hint={`${t.filled} rumah ada isinya`} />
+              <StatCard label="Malam ini terkumpul" value={formatRupiah(t.total)} hint={`${t.filled} rumah berstatus hijau`} />
               <StatCard
-                label="Rumah dicek"
+                label="Rumah selesai"
                 value={`${t.checked}/${t.expected}`}
-                hint={t.unchecked ? `${t.unchecked} belum dicek` : "Semua sudah dicek"}
+                hint={t.unchecked ? `${t.unchecked} harian belum dicek` : "Semua selesai"}
               />
               <StatCard
                 label={`Total ${formatMonth(d.month)}`}
@@ -74,8 +74,7 @@ export function RingkasanPage() {
 
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl bg-primary/5 px-4 py-3 text-sm">
               <Link to="/admin/rekap" className="font-semibold text-primary">Pembayaran periode hari ini: {formatRupiah(d.paymentOverview.receivedToday)}</Link>
-              <span className="text-muted">{d.paymentOverview.dueHouses} rumah jatuh tempo hari ini</span>
-              {d.paymentOverview.overdueHouses > 0 && <Link to="/admin/rekap" className="font-semibold text-warn">{d.paymentOverview.overdueHouses} rumah terlambat · {formatRupiah(d.paymentOverview.overdueAmount)}</Link>}
+              <Link to="/admin/rekap" className="font-semibold text-muted">{d.paymentOverview.unpaidHouses} rumah belum bayar periode berjalan · {formatRupiah(d.paymentOverview.unpaidAmount)}</Link>
             </div>
 
             <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_20rem]">
@@ -105,6 +104,7 @@ export function RingkasanPage() {
                 <p className="mt-3 text-sm text-muted">
                   {t.collectors.length ? `Petugas yang mencatat: ${t.collectors.join(", ")}` : "Belum ada catatan malam ini."}
                 </p>
+                <p className="mt-1 text-xs text-muted">Status mingguan/bulanan otomatis dari pembayaran periode.</p>
               </Card>
 
               <Card>
@@ -190,14 +190,13 @@ function todoItems(
     noSchedule: boolean;
     noWargaCode: boolean;
     onlyOneUser: boolean;
-    overduePayments: number;
-    duePayments: number;
+    unpaidPayments: number;
   },
   date: string,
 ): { to: string; text: string; icon: LucideIcon }[] {
   const items: { to: string; text: string; icon: LucideIcon }[] = [];
-  if (todo.overduePayments || todo.duePayments) {
-    items.push({ to: "/admin/rekap", icon: CalendarClock, text: `${todo.overduePayments} rumah terlambat membayar, ${todo.duePayments} jatuh tempo hari ini` });
+  if (todo.unpaidPayments) {
+    items.push({ to: "/admin/rekap", icon: CalendarClock, text: `${todo.unpaidPayments} rumah belum bayar periode berjalan` });
   }
   if (todo.offDuty > 0) {
     items.push({

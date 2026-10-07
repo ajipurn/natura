@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/client/api";
 import { rondaDate } from "@/lib/dates";
 import { houseLabel } from "@/lib/houses";
+import { planAt, rondaPaymentPeriods } from "@/lib/payments";
 import type {
   CollectionDTO,
   CollectionMethod,
@@ -261,6 +262,9 @@ export function useRondaStore() {
   const record = useCallback(
     (house: HouseDTO, entryStatus: CollectionStatus | "none", amount: number, method: CollectionMethod) => {
       const at = serverNow();
+      const saved = snapshotRef.current;
+      if (saved && (planAt(saved.paymentPlans ?? [], house.id, rondaDate(at))?.cadence ?? "daily") !== "daily") return;
+      if (saved && rondaPaymentPeriods(saved, rondaDate(at)).some((p) => p.houseId === house.id)) return;
       const entry: PendingEntry = {
         clientId: newClientId(),
         houseId: house.id,

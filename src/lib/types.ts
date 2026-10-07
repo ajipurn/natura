@@ -1,6 +1,6 @@
 import type { GeoAnchor } from "./geo";
 import type { GuardColor } from "./guard-color";
-import type { BillingPeriod, PaymentCell, PeriodPayment } from "./payments";
+import type { BillingPeriod, PaymentCadence, PaymentCell, PaymentPlanDTO, PeriodPayment } from "./payments";
 
 export type Role = "admin" | "petugas";
 export type HouseStatus = "active" | "vacant";
@@ -58,6 +58,7 @@ export type RondaSnapshot = {
   planAnchors?: GeoAnchor[];
   paymentCells?: Record<string, PaymentCell>;
   paymentPeriods?: BillingPeriod[];
+  paymentPlans?: PaymentPlanDTO[];
 };
 
 /** Satu catatan dari HP petugas. `none` = hapus catatan rumah itu untuk malam tersebut. */
@@ -89,4 +90,6 @@ export type MonthRecap = {
   paymentCells?: Record<string, PaymentCell>;
   paymentPeriods?: BillingPeriod[];
   periodPayments?: PeriodPayment[];
+  /** Cara bayar yang berlaku selama bulan rekap; bisa lebih dari satu jika berubah di tengah bulan. */
+  paymentCadences?: Record<number, PaymentCadence[]>;
 };

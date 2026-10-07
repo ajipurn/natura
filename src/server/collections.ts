@@ -3,11 +3,12 @@ import { z } from "zod";
 import { formatTime, rondaDate } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { dayLabel, scheduleDay } from "@/lib/schedule";
+import { CADENCE_LABEL, planAt } from "@/lib/payments";
 import type { EntryInput, EntryResult } from "@/lib/types";
 import type { SessionUser } from "./auth";
 import { runBatch, type Db, type Executor, type Statement } from "./db";
 import { getHouseIds } from "./queries";
-import { collectionLogs, collections, patrols, rondaSchedule, users } from "./schema";
+import { collectionLogs, collections, paymentPlans, patrols, rondaSchedule, users } from "./schema";
 
 const MAX_CLOCK_SKEW_MS = 10 * 60 * 1000;
 /** Petugas hanya bisa menyinkronkan catatan sampai 3 hari ke belakang; selebihnya lewat admin. */
@@ -207,7 +208,7 @@ export async function applyEntries(
   entries: EntryInput[],
   now = new Date(),
 ): Promise<EntryResult[]> {
-  const [known, duty] = await Promise.all([getHouseIds(db), dutyDays(db, user.id)]);
+  const [known, duty, plans] = await Promise.all([getHouseIds(db), dutyDays(db, user.id), db.select().from(paymentPlans)]);
   const results: EntryResult[] = [];
   const logs: LogWrite[] = [];
   // Per malam + rumah cukup simpan catatan terbaru; yang lebih lama toh akan kalah.
@@ -216,6 +217,7 @@ export async function applyEntries(
 
   for (const entry of entries) {
     const at = new Date(entry.recordedAt);
+    const cadence = Number.isNaN(at.getTime()) ? "daily" : planAt(plans, entry.houseId, rondaDate(at))?.cadence ?? "daily";
     const fail = (error: string) => results.push({ clientId: entry.clientId, ok: false, error });
 
     if (Number.isNaN(at.getTime())) {
@@ -226,6 +228,8 @@ export async function applyEntries(
       fail("Catatan sudah lebih dari 3 hari. Minta admin untuk mengoreksi.");
     } else if (!known.has(entry.houseId)) {
       fail("Rumah tidak ditemukan (mungkin sudah dihapus).");
+    } else if (cadence !== "daily") {
+      fail(`${CADENCE_LABEL[cadence]} dikelola otomatis dari pembayaran periode. Tidak bisa mencatat Ada/Kosong lewat ronda.`);
     } else if (!duty.has(scheduleDay(rondaDate(at)))) {
       // Hanya yang dijadwalkan jaga malam itu yang boleh scan/catat, admin juga. Admin tetap bisa
       // mengoreksi lewat Riwayat di dashboard (`writeCollections`).

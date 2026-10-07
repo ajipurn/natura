@@ -29,22 +29,19 @@ export async function getPaymentMonth(db: Db, month: string, today = localDate(n
   const days = daysInMonth(month);
   const bills = billingPeriods(data.plans, data.cells, data.dailyCells, today, days[0], days[days.length - 1]);
   const first = data.plans.reduce((date, p) => p.effectiveFrom < date ? p.effectiveFrom : date, today);
-  const overdueBills = billingPeriods(data.plans, data.cells, data.dailyCells, today, first, addDays(days[0], -1))
-    .filter((b) => b.end < days[0] && b.status === "overdue");
-  return { ...data, bills, overdueBills };
+  const previousUnpaidBills = billingPeriods(data.plans, data.cells, data.dailyCells, today, first, addDays(days[0], -1))
+    .filter((b) => b.end < days[0] && b.status === "unpaid");
+  return { ...data, bills, previousUnpaidBills };
 }
 
 export async function getPaymentOverview(db: Db, today: string, month = today.slice(0, 7)) {
   const data = await getPaymentData(db);
-  const first = data.plans.reduce((date, p) => p.effectiveFrom < date ? p.effectiveFrom : date, today);
-  const bills = billingPeriods(data.plans, data.cells, data.dailyCells, today, first, today);
+  const bills = billingPeriods(data.plans, data.cells, data.dailyCells, today, today, today);
   const active = new Set((await db.select({ id: houses.id }).from(houses).where(eq(houses.status, "active"))).map((h) => h.id));
-  const overdue = bills.filter((b) => b.status === "overdue" && active.has(b.houseId));
-  const due = bills.filter((b) => b.status === "due" && active.has(b.houseId));
+  const unpaid = bills.filter((b) => b.status === "unpaid" && active.has(b.houseId));
   return {
-    overdueHouses: new Set(overdue.map((b) => b.houseId)).size,
-    overdueAmount: overdue.reduce((sum, b) => sum + b.remaining, 0),
-    dueHouses: new Set(due.map((b) => b.houseId)).size,
+    unpaidHouses: new Set(unpaid.map((b) => b.houseId)).size,
+    unpaidAmount: unpaid.reduce((sum, b) => sum + b.remaining, 0),
     receivedToday: data.receipts.filter((p) => p.receivedDate === today).reduce((sum, p) => sum + p.amount, 0),
     receivedMonth: data.receipts.filter((p) => p.receivedDate.startsWith(month)).reduce((sum, p) => sum + p.amount, 0),
   };

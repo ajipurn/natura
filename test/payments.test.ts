@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { addDays, daysInMonth, localDate, shiftMonth } from "@/lib/dates";
-import { allocatePayment, billingPeriods, paymentCells, paymentPeriod, type PaymentPlanDTO } from "@/lib/payments";
+import { allocatePayment, billingPeriods, paymentCells, paymentPeriod, rondaPaymentPeriods, type PaymentPlanDTO } from "@/lib/payments";
+import { summarize } from "@/lib/recap";
 import { summarizeMonth } from "@/lib/month-summary";
 import { getMonthRecap } from "@/server/queries";
 import { getDashboard } from "@/server/dashboard";
@@ -21,21 +22,22 @@ describe("periode pembayaran", () => {
     const payment = { id: 1, houseId: 1, receivedDate: "2026-10-01", periodStart: "2026-10-01", periodEnd: "2026-10-31", cadence: "monthly" as const, amount: 5001 };
     expect(allocatePayment(payment).reduce((sum, [, n]) => sum + n, 0)).toBe(5001);
     const cells = paymentCells([payment], [plan], 500);
-    expect(billingPeriods([plan], cells, {}, "2026-10-07", "2026-10-01", "2026-10-31")[0]).toMatchObject({ status: "partial", expected: 15500, paid: 5001, remaining: 10499 });
-    expect(billingPeriods([plan], cells, {}, "2026-11-01", "2026-10-01", "2026-10-31")[0].status).toBe("overdue");
+    expect(billingPeriods([plan], cells, {}, "2026-10-07", "2026-10-01", "2026-10-31")[0]).toMatchObject({ status: "unpaid", expected: 15500, paid: 5001, remaining: 10499 });
+    expect(billingPeriods([plan], cells, {}, "2026-11-01", "2026-10-01", "2026-10-31")[0].status).toBe("unpaid");
   });
-  it("akhir bulan sekarang, awal bulan berikutnya; tidak menagih sebelum mulai berlaku", () => {
+  it("hanya punya status sudah/belum bayar, tanpa jatuh tempo dan sebelum kesepakatan mulai berlaku", () => {
     const future = { ...plan, id: 2, effectiveFrom: "2026-11-01", dueTiming: "start" as const };
     const periods = billingPeriods([plan, future], {}, {}, "2026-10-07", "2026-09-01", "2026-11-30");
     expect(periods).toHaveLength(2);
-    expect(periods[0]).toMatchObject({ start: "2026-10-01", end: "2026-10-31", dueDate: "2026-10-31", expected: 15500, status: "not-due" });
-    expect(periods[1]).toMatchObject({ start: "2026-11-01", end: "2026-11-30", dueDate: "2026-11-01", expected: 15000, status: "not-due" });
-    expect(billingPeriods([future], {}, {}, "2026-11-01", "2026-11-01", "2026-11-30")[0].status).toBe("due");
+    expect(periods[0]).toMatchObject({ start: "2026-10-01", end: "2026-10-31", expected: 15500, status: "unpaid" });
+    expect(periods[1]).toMatchObject({ start: "2026-11-01", end: "2026-11-30", expected: 15000, status: "unpaid" });
+    expect(periods.every((p) => !("dueDate" in p))).toBe(true);
+    expect(billingPeriods([future], {}, {}, "2026-11-01", "2026-11-01", "2026-11-30")[0].status).toBe("unpaid");
   });
-  it("mulai di tengah bulan hanya menagih sejak tanggal berlaku dan memberi tambahan waktu", () => {
+  it("mulai di tengah bulan hanya menghitung sejak tanggal berlaku, mengabaikan tenggat lama", () => {
     const p = { ...plan, effectiveFrom: "2026-10-07", graceDays: 3 };
     const bill = billingPeriods([p], {}, {}, "2026-11-02", "2026-10-01", "2026-10-31")[0];
-    expect(bill).toMatchObject({ start: "2026-10-07", expected: 12500, dueDate: "2026-11-03", status: "not-due" });
+    expect(bill).toMatchObject({ start: "2026-10-07", expected: 12500, status: "unpaid" });
   });
   it("mingguan lintas bulan tetap memisahkan nominal bulan dan kas diterima", () => {
     const payment = { id: 1, houseId: 1, receivedDate: "2026-10-29", periodStart: "2026-10-29", periodEnd: "2026-11-04", cadence: "weekly" as const, amount: 3500 };
@@ -54,7 +56,26 @@ describe("periode pembayaran", () => {
   it("kembali ke harian membatasi tagihan bulanan dan tidak membuat tunggakan wadah harian", () => {
     const daily = { ...plan, id: 2, effectiveFrom: "2026-10-07", cadence: "daily" as const };
     const bills = billingPeriods([plan, daily], {}, {}, "2026-11-01", "2026-10-01", "2026-10-31");
-    expect(bills).toEqual([expect.objectContaining({ cadence: "monthly", start: "2026-10-01", end: "2026-10-06", expected: 3000, status: "overdue" })]);
+    expect(bills).toEqual([expect.objectContaining({ cadence: "monthly", start: "2026-10-01", end: "2026-10-06", expected: 3000, status: "unpaid" })]);
+  });
+
+  it("status otomatis menyelesaikan rumah periode tanpa menggandakan uang harian", () => {
+    const paid = billingPeriods([plan], paymentCells([{ id: 1, houseId: 1, receivedDate: "2026-10-07", periodStart: "2026-10-01", periodEnd: "2026-10-31", cadence: "monthly", amount: 15500 }], [plan], 500), {}, "2026-10-07", "2026-10-07", "2026-10-07");
+    const unpaid = { ...paid[0], houseId: 2, paid: 0, remaining: 15500, status: "unpaid" as const };
+    const result = summarize([1, 2, 3, 4].map((id) => ({ id, block: "Z", number: String(id), status: "active" as const })), [{ houseId: 3, status: "filled", amount: 500, collectorName: "Petugas" }], [...paid, unpaid]);
+    expect(result).toMatchObject({ expected: 4, checked: 3, total: 500 });
+    expect(result.filled.map((h) => h.id)).toEqual([1, 3]);
+    expect(result.empty.map((h) => h.id)).toEqual([2]);
+    expect(result.unchecked.map((h) => h.id)).toEqual([4]);
+  });
+
+  it("salinan di HP mengganti periode saat bulan berganti dan mengenali pembayaran bulan berikutnya", () => {
+    const receipts = [{ id: 1, houseId: 1, receivedDate: "2026-10-07", periodStart: "2026-11-01", periodEnd: "2026-11-30", cadence: "monthly" as const, amount: 15000 }];
+    const cells = paymentCells(receipts, [plan], 500);
+    const data = { paymentPlans: [plan], paymentCells: cells, paymentPeriods: billingPeriods([plan], cells, {}, "2026-10-07", "2026-10-01", "2026-10-31") };
+    expect(rondaPaymentPeriods(data, "2026-10-31")[0]).toMatchObject({ start: "2026-10-01", status: "unpaid" });
+    expect(rondaPaymentPeriods(data, "2026-11-01")[0]).toMatchObject({ start: "2026-11-01", status: "paid" });
+    expect(rondaPaymentPeriods(data, "2026-12-01")[0]).toMatchObject({ start: "2026-12-01", status: "unpaid" });
   });
 });
 
@@ -160,7 +181,7 @@ describe("API pembayaran dan kas", () => {
   });
   it("tunggakan bulan sebelumnya tetap bisa dilihat saat membuka bulan berikutnya", async () => {
     const data = await getPaymentMonth(db, nextMonth, nextDays[0]);
-    expect(data.overdueBills).toEqual(expect.arrayContaining([expect.objectContaining({ houseId: houseIds[0], start: days[0], remaining: monthlyAmount, status: "overdue" })]));
+    expect(data.previousUnpaidBills).toEqual(expect.arrayContaining([expect.objectContaining({ houseId: houseIds[0], start: days[0], remaining: monthlyAmount, status: "unpaid" })]));
   });
   it("ringkasan lewat tengah malam tetap menjumlahkan penerimaan pada bulan ronda yang tampil", async () => {
     const overview = await getDashboard(db, new Date(nextMonth + "-01T02:00:00+07:00"));

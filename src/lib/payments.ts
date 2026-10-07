@@ -22,14 +22,13 @@ export type PeriodPayment = {
   amount: number;
 };
 export type PaymentCell = { amount: number; monthlyAmount: number; weeklyAmount: number; paid: boolean };
-export type BillingStatus = "paid" | "partial" | "not-due" | "due" | "overdue";
+export type BillingStatus = "paid" | "unpaid";
 export type BillingPeriod = {
   houseId: number;
   planId: number;
   cadence: PaymentCadence;
   start: string;
   end: string;
-  dueDate: string;
   expected: number;
   paid: number;
   remaining: number;
@@ -38,7 +37,7 @@ export type BillingPeriod = {
 
 export const CADENCE_LABEL: Record<PaymentCadence, string> = { daily: "Harian", weekly: "Mingguan", monthly: "Bulanan" };
 export const BILLING_LABEL: Record<BillingStatus, string> = {
-  paid: "Sudah dibayar", partial: "Kurang bayar", "not-due": "Belum jatuh tempo", due: "Jatuh tempo hari ini", overdue: "Terlambat",
+  paid: "Sudah bayar", unpaid: "Belum bayar",
 };
 
 /** Periode kalender; mingguan dapat dimulai pada hari yang disepakati. */
@@ -84,7 +83,7 @@ export function billingPeriods(
   plans: PaymentPlanDTO[],
   cells: Record<string, PaymentCell>,
   collections: Record<string, { status: string; amount: number }>,
-  today: string,
+  _today: string,
   start: string,
   end: string,
 ): BillingPeriod[] {
@@ -109,13 +108,20 @@ export function billingPeriods(
       }
       const expected = count * plan.ratePerNight;
       const remaining = Math.max(0, expected - paid);
-      const dueDate = addDays(plan.dueTiming === "start" ? from : to, plan.graceDays);
-      const status: BillingStatus = !remaining ? "paid" : today > dueDate ? "overdue" : today === dueDate ? "due" : paid > 0 ? "partial" : "not-due";
-      result.push({ houseId: plan.houseId, planId: plan.id, cadence: plan.cadence, start: from, end: to, dueDate, expected, paid, remaining, status });
+      const status: BillingStatus = remaining === 0 ? "paid" : "unpaid";
+      result.push({ houseId: plan.houseId, planId: plan.id, cadence: plan.cadence, start: from, end: to, expected, paid, remaining, status });
       cursor = addDays(calendar.end, 1);
     }
   });
   return result;
+}
+
+/** Status periode dari salinan di HP; pergantian minggu/bulan tetap memakai kesepakatan yang berlaku. */
+export function rondaPaymentPeriods(data: { paymentPlans?: PaymentPlanDTO[]; paymentPeriods?: BillingPeriod[]; paymentCells?: Record<string, PaymentCell> }, date: string) {
+  const cached = (data.paymentPeriods ?? []).filter((p) => p.start <= date && p.end >= date)
+    .map((p): BillingPeriod => ({ ...p, status: p.remaining === 0 ? "paid" : "unpaid" }));
+  const calculated = billingPeriods(data.paymentPlans ?? [], data.paymentCells ?? {}, {}, date, date, date);
+  return [...cached, ...calculated.filter((p) => !cached.some((c) => c.houseId === p.houseId))];
 }
 
 /** Lege kalender bulan berikutnya tetap dihitung dengan jumlah hari sesungguhnya. */

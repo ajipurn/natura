@@ -62,7 +62,7 @@ export function HouseSheet({
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-muted">
-              {method === "scan" ? "Hasil scan" : "Catat manual"}
+              {paymentPeriod ? "Status pembayaran" : method === "scan" ? "Hasil scan" : "Catat manual"}
             </p>
             <h2
               id="house-sheet-title"
@@ -83,14 +83,14 @@ export function HouseSheet({
         </div>
 
         {house.status === "active" && <div className="mt-3"><PaymentNotice period={paymentPeriod} cell={paymentCell} /></div>}
-        {(paymentPeriod || paymentCell) && <p className="mt-2 text-xs text-muted">Pembayaran periode terpisah dari hasil ronda. Catat Ada hanya untuk uang yang benar-benar diambil malam ini.</p>}
+        {paymentPeriod && <p className="mt-2 text-xs text-muted">Status otomatis dari pembayaran periode. Rumah ini tidak perlu discan dan tidak bisa dicatat Ada/Kosong.</p>}
 
         {house.status === "vacant" && (
           <p className="mt-3 rounded-xl bg-warn-soft px-3 py-2 text-sm text-warn">
             Ditandai rumah kosong/mudik — tidak dihitung.
           </p>
         )}
-        {existing && byOther && (
+        {existing && byOther && !paymentPeriod && (
           <div className="mt-3 flex gap-2.5 rounded-xl border border-warn/40 bg-warn-soft px-3 py-2.5 text-sm text-warn">
             <UserCheck className="mt-0.5 size-5 shrink-0" />
             <div>
@@ -109,7 +109,7 @@ export function HouseSheet({
             </div>
           </div>
         )}
-        {existing && !byOther && (
+        {existing && !byOther && !paymentPeriod && (
           <p
             className={cx(
               "mt-3 rounded-xl px-3 py-2 text-sm",
@@ -131,7 +131,9 @@ export function HouseSheet({
           </p>
         )}
 
-        {byOther && !replacing ? (
+        {paymentPeriod ? (
+          <Button onClick={onClose} className="mt-5 h-12 w-full">Tutup</Button>
+        ) : byOther && !replacing ? (
           <div className="mt-5 grid gap-3">
             <Button
               variant="plain"

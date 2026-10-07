@@ -18,19 +18,20 @@ const toCsv = (lines: (string | number)[][]) => lines.map((row) => row.map(csvCe
 export function buildRecapCsv(recap: MonthRecap): string {
   const { rows, dateTotals, grandTotal } = summarizeMonth(recap);
   return toCsv([
-    ["Blok", "No", "Nama KK", ...recap.dates, "Jumlah Ada", "Bulanan (Rp)", "Mingguan (Rp)", "Total (Rp)"],
-    ...rows.map(({ house, cells, filledCount, total, monthlyTotal, weeklyTotal }) => [
+    ["Blok", "No", "Nama KK", ...recap.dates, "Jumlah Ada", "Harian (Rp)", "Mingguan (Rp)", "Bulanan (Rp)", "Total (Rp)"],
+    ...rows.map(({ house, cells, filledCount, total, collectedTotal, monthlyTotal, weeklyTotal }) => [
       house.block,
       house.number,
       house.ownerName ?? "",
       // Angka = nominal, K = kosong, kosong = belum dicek.
       ...cells.map((c) => (c?.status === "filled" ? c.amount : c?.status === "empty" ? "K" : "")),
       filledCount,
-      monthlyTotal,
+      collectedTotal,
       weeklyTotal,
+      monthlyTotal,
       total,
     ]),
-    ["", "", "Total", ...dateTotals, "", rows.reduce((sum, r) => sum + r.monthlyTotal, 0), rows.reduce((sum, r) => sum + r.weeklyTotal, 0), grandTotal],
+    ["", "", "Total", ...dateTotals, "", rows.reduce((sum, r) => sum + r.collectedTotal, 0), rows.reduce((sum, r) => sum + r.weeklyTotal, 0), rows.reduce((sum, r) => sum + r.monthlyTotal, 0), grandTotal],
   ]);
 }
 
@@ -46,7 +47,7 @@ export function buildSheetsCsv(recap: MonthRecap, month: string, communityName: 
   let filledTotal = 0;
   let emptyTotal = 0;
   let uncheckedTotal = 0;
-  const houseLines = rows.map(({ house, cells, filledCount, total, monthlyTotal, weeklyTotal }) => {
+  const houseLines = rows.map(({ house, cells, filledCount, total, collectedTotal, monthlyTotal, weeklyTotal }) => {
     const empty = cells.filter((c) => c?.status === "empty").length;
     // Rumah mudik tidak dihitung "tidak dicek".
     const unchecked = house.status === "active" ? cells.filter((c) => !c).length : 0;
@@ -64,12 +65,13 @@ export function buildSheetsCsv(recap: MonthRecap, month: string, communityName: 
       ...cells.map((c) => (c?.status === "filled" ? c.amount : c?.status === "empty" ? "kosong" : "")),
       monthlyTotal,
       weeklyTotal,
+      collectedTotal,
     ];
   });
   return toCsv([
     [`Rekap jimpitan ${communityName} · ${formatMonth(month)}`],
-    ["Blok", "No", "Status", "Total (Rp)", "Ada", "Kosong", "Tidak dicek", ...recap.dates.map((d) => Number(d.slice(8))), "Bulanan (Rp)", "Mingguan (Rp)"],
-    ["Total", "", "", grandTotal, filledTotal, emptyTotal, uncheckedTotal, ...dateTotals, rows.reduce((sum, r) => sum + r.monthlyTotal, 0), rows.reduce((sum, r) => sum + r.weeklyTotal, 0)],
+    ["Blok", "No", "Status", "Total (Rp)", "Ada", "Kosong", "Tidak dicek", ...recap.dates.map((d) => Number(d.slice(8))), "Bulanan (Rp)", "Mingguan (Rp)", "Harian (Rp)"],
+    ["Total", "", "", grandTotal, filledTotal, emptyTotal, uncheckedTotal, ...dateTotals, rows.reduce((sum, r) => sum + r.monthlyTotal, 0), rows.reduce((sum, r) => sum + r.weeklyTotal, 0), rows.reduce((sum, r) => sum + r.collectedTotal, 0)],
     ...houseLines,
   ]);
 }

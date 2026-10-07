@@ -30,8 +30,9 @@ const paymentSchema = z.object({
 
 const planSchema = z.object({
   effectiveFrom: date, cadence,
-  ratePerNight: z.number().int().positive("Isi nominal per malam.").max(1_000_000),
-  dueTiming: z.enum(["start", "end"]),
+  ratePerNight: z.number().int().positive("Isi nominal per hari.").max(1_000_000),
+  // Kompatibilitas data lama; status periode tidak memakai jatuh tempo lagi.
+  dueTiming: z.enum(["start", "end"]).default("end"),
   graceDays: z.number().int().min(0).max(31).default(0),
   weekStart: z.number().int().min(0).max(6).default(1),
 });
@@ -51,7 +52,7 @@ export const paymentRoutes = new Hono<AppEnv>().use(requireAdmin)
       .where(or(and(gte(payments.receivedDate, days[0]), lte(payments.receivedDate, days[days.length - 1])), and(lte(payments.periodStart, days[days.length - 1]), gte(payments.periodEnd, days[0]))))
       .orderBy(desc(payments.receivedDate), desc(payments.id));
     return c.json({
-      month, today, plans: data.plans, bills: data.bills, overdueBills: data.overdueBills, dailyCells: data.dailyCells,
+      month, today, plans: data.plans, bills: data.bills, previousUnpaidBills: data.previousUnpaidBills, dailyCells: data.dailyCells,
       history: history.map((p) => ({ ...p, cancelledAt: p.cancelledAt?.toISOString() ?? null })),
       payments: data.receipts.filter((p) => p.receivedDate.startsWith(month) || (p.periodStart <= days[days.length - 1] && p.periodEnd >= days[0]))
         .map((p) => ({ ...p, updatedAt: p.updatedAt.toISOString() })),

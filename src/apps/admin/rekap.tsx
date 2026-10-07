@@ -36,6 +36,7 @@ import {
 import { formatAmountShort, formatRupiah } from "@/lib/format";
 import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
 import { summarizeMonth } from "@/lib/month-summary";
+import { BILLING_LABEL, CADENCE_LABEL, type BillingPeriod, type PaymentCadence } from "@/lib/payments";
 import { buildRecapCsv } from "@/lib/recap-csv";
 import { buildRecapSheets } from "@/lib/recap-xlsx";
 import type { MonthCell, MonthRecap } from "@/lib/types";
@@ -46,6 +47,14 @@ import { PaymentPanel } from "./payments/payment-panel";
 type Filter = "semua" | "kosong" | "tidak-dicek";
 type RecapData = MonthRecap & { month: string; defaultAmount: number };
 type Sort = "rumah" | "total" | "kosong";
+type CadenceFilter = "all" | PaymentCadence;
+
+const CADENCE_FILTERS = [
+  { value: "all", label: "Semua" },
+  { value: "daily", label: CADENCE_LABEL.daily },
+  { value: "weekly", label: CADENCE_LABEL.weekly },
+  { value: "monthly", label: CADENCE_LABEL.monthly },
+] as const;
 
 const SORTS: { value: Sort; label: string }[] = [
   { value: "rumah", label: "Blok & nomor" },
@@ -231,6 +240,7 @@ function RecapBody({
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("semua");
+  const [cadence, setCadence] = useState<CadenceFilter>("all");
   const [sort, setSort] = useState<Sort>("rumah");
   // Kotak yang dipilih untuk diisi sekaligus ("idRumah:tanggal"), hanya saat `editing`.
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -268,26 +278,36 @@ function RecapBody({
   const hoverStyleRef = useRef<HTMLStyleElement>(null);
   const dates = daysInMonth(data.month);
   const patrolDates = new Set(data.dates);
+  const periodAt = (houseId: number, date: string) => data.paymentPeriods?.find((p) => p.houseId === houseId && p.start <= date && p.end >= date);
   const { rows, dateTotals, grandTotal } = summarizeMonth({ ...data, dates });
   const monthlyTotal = rows.reduce((sum, r) => sum + r.monthlyTotal, 0);
   const weeklyTotal = rows.reduce((sum, r) => sum + r.weeklyTotal, 0);
-  const showWeekly = weeklyTotal > 0;
   const nights = data.dates.length;
   const maxNight = Math.max(...dateTotals, 1);
   // Malam yang belum tiba (selalu di akhir bulan) diberi kolom sempit.
   const future = dates.filter((d) => d > tonight).length;
   // Kolom tanggal berbagi sisa lebar, tapi tidak lebih sempit dari ini (lihat `RecapCols`).
-  const minWidth = `calc(var(--rumah-col) + ${dates.length - future} * ${DATE_COL} + ${future} * ${FUTURE_COL} + ${ADA_COL} + ${PERIOD_COL} + ${showWeekly ? PERIOD_COL : "0rem"} + ${TOTAL_COL})`;
+  const minWidth = `calc(var(--rumah-col) + ${dates.length - future} * ${DATE_COL} + ${future} * ${FUTURE_COL} + ${ADA_COL} + 3 * ${PERIOD_COL} + ${TOTAL_COL})`;
 
-  const stats = rows.map((r) => ({
-    ...r,
-    empty: r.cells.filter((c) => c?.status === "empty").length,
-    // Rumah kosong/mudik tidak dihitung "tidak dicek", begitu juga malam tanpa catatan sama sekali.
-    unchecked:
-      r.house.status === "active"
-        ? r.cells.filter((c, i) => !c && patrolDates.has(dates[i])).length
-        : 0,
-  }));
+  const stats = rows.map((r) => {
+    const cadences: PaymentCadence[] = data.paymentCadences?.[r.house.id] ?? ["daily"];
+    const statusAt = (i: number) => {
+      if (dates[i] > tonight) return undefined;
+      const period = r.house.status === "active" ? periodAt(r.house.id, dates[i]) : undefined;
+      return period ? period.status === "paid" ? "filled" : "empty" : r.cells[i]?.status;
+    };
+    return {
+      ...r,
+      cadences,
+      filledCount: r.cells.filter((_, i) => statusAt(i) === "filled").length,
+      empty: r.cells.filter((_, i) => statusAt(i) === "empty").length,
+      // Rumah kosong/mudik tidak dihitung "tidak dicek", begitu juga malam tanpa catatan sama sekali.
+      unchecked:
+        r.house.status === "active"
+          ? r.cells.filter((c, i) => !c && patrolDates.has(dates[i]) && !periodAt(r.house.id, dates[i])).length
+          : 0,
+    };
+  });
   const filledCells = stats.reduce((s, r) => s + r.filledCount, 0);
   const emptyCells = stats.reduce((s, r) => s + r.empty, 0);
   const uncheckedCells = stats.reduce((s, r) => s + r.unchecked, 0);
@@ -297,7 +317,7 @@ function RecapBody({
   const due = dates.filter((d) => d < tonight || (d === tonight && patrolDates.has(d)));
   const missingNights = due.length - nights;
   const activeRows = rows.filter((r) => r.house.status === "active");
-  const checkedPerDate = dates.map((_, i) => activeRows.filter((r) => r.cells[i]).length);
+  const checkedPerDate = dates.map((date, i) => activeRows.filter((r) => r.cells[i] || periodAt(r.house.id, date)).length);
   // Malam yang dicek kurang dari separuh rumah (mis. baru mulai diisi) tidak ikut rata-rata.
   const halfChecked = (i: number) => checkedPerDate[i] * 2 >= activeRows.length;
   const countedNights = dates.flatMap((d, i) => (patrolDates.has(d) && halfChecked(i) ? [i] : []));
@@ -341,6 +361,7 @@ function RecapBody({
   ];
   const visible = stats
     .filter((r) => !matched || matched.has(r.house.id))
+    .filter((r) => cadence === "all" || r.cadences.includes(cadence))
     .filter(filters.find((f) => f.value === filter)!.match)
     .sort((a, b) =>
       sort === "total"
@@ -349,6 +370,16 @@ function RecapBody({
           ? b.empty - a.empty || a.filledCount - b.filledCount
           : 0,
     );
+  const shownTotals = {
+    daily: visible.reduce((sum, r) => sum + r.collectedTotal, 0),
+    weekly: visible.reduce((sum, r) => sum + r.weeklyTotal, 0),
+    monthly: visible.reduce((sum, r) => sum + r.monthlyTotal, 0),
+    total: visible.reduce((sum, r) => sum + r.total, 0),
+  };
+  const shownDateTotals = dates.map((_, i) => visible.reduce((sum, r) => {
+    const cell = r.cells[i];
+    return sum + (cell?.status === "filled" ? cell.amount : 0);
+  }, 0));
   // Diurutkan per rumah: dikelompokkan per blok. Urutan lain: satu daftar.
   const groups: [string | null, typeof visible][] =
     sort === "rumah"
@@ -391,6 +422,7 @@ function RecapBody({
     for (let row = Math.min(start.row, end.row); row <= Math.max(start.row, end.row); row++) {
       for (let col = Math.min(start.col, end.col); col <= Math.max(start.col, end.col); col++) {
         const k = cellKey(rowOrder[row], editableDates[col]);
+        if (periodAt(rowOrder[row], editableDates[col])) continue;
         if (start.on) next.add(k);
         else next.delete(k);
       }
@@ -424,15 +456,15 @@ function RecapBody({
       setCells([key], !selected.has(key));
     },
   };
-  const rowKeys = (houseId: number) => editableDates.map((d) => cellKey(houseId, d));
+  const rowKeys = (houseId: number) => editableDates.filter((d) => !periodAt(houseId, d)).map((d) => cellKey(houseId, d));
   // Satu malam: rumah yang tampil dan dihuni (rumah mudik tidak dicek).
-  const columnKeys = (date: string) => visible.filter((r) => r.house.status === "active").map((r) => cellKey(r.house.id, date));
+  const columnKeys = (date: string) => visible.filter((r) => r.house.status === "active" && !periodAt(r.house.id, date)).map((r) => cellKey(r.house.id, date));
 
   return (
     <>
       <Card className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
         <div className="shrink-0 sm:w-56 sm:self-start">
-          <p className="text-xs text-muted">Jimpitan untuk {formatMonth(data.month)}</p>
+          <p className="text-xs text-muted">Jimpitan seluruh rumah · {formatMonth(data.month)}</p>
           <p className="text-3xl font-bold leading-tight tracking-tight tabular-nums">
             {formatRupiah(grandTotal)}
           </p>
@@ -460,7 +492,7 @@ function RecapBody({
               d > tonight
                 ? `${formatDateShort(d)}: belum tiba`
                 : patrolDates.has(d)
-                  ? `${formatDateShort(d)}: ${formatRupiah(dateTotals[i])} · ${checkedPerDate[i]} dari ${activeRows.length} rumah dicek`
+                  ? `${formatDateShort(d)}: ${formatRupiah(dateTotals[i])} · ${checkedPerDate[i]} dari ${activeRows.length} rumah selesai`
                   : `${formatDateShort(d)}: belum ada catatan`,
           }))}
         />
@@ -497,13 +529,13 @@ function RecapBody({
         />
         <Stat
           className="col-span-2 sm:col-span-1"
-          label="Wadah ada isinya"
+          label="Rumah berstatus hijau"
           value={
             checkedCells
               ? `${Math.round((filledCells / checkedCells) * 100)}%`
               : "–"
           }
-          hint={`${emptyCells} kosong · ${uncheckedCells} tidak dicek`}
+          hint={`${emptyCells} kosong/belum bayar · ${uncheckedCells} tidak dicek`}
         />
       </div>
 
@@ -550,6 +582,23 @@ function RecapBody({
         </div>
       </div>
 
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-sm text-muted">Cara bayar</span>
+        <ChipGroup
+          aria-label="Cara bayar"
+          value={cadence}
+          onValueChange={(next) => {
+            setCadence(next);
+            setSelected(new Set());
+          }}
+          options={CADENCE_FILTERS.map((f) => ({ ...f, count: stats.filter((r) => f.value === "all" || r.cadences.includes(f.value)).length }))}
+          className="flex-wrap"
+        />
+      </div>
+      <p className="mt-2 text-xs text-muted">
+        Harian menunjukkan uang hasil ronda. Mingguan dan Bulanan menunjukkan pembayaran periode; kotak tanggalnya otomatis hijau jika sudah bayar, merah jika belum.
+        {visible.length !== stats.length && ` Menampilkan ${visible.length} rumah; total tabel mengikuti hasil saringan.`}
+      </p>
       <Legend editing={editing} defaultAmount={data.defaultAmount} />
 
       {visible.length === 0 ? (
@@ -587,7 +636,7 @@ function RecapBody({
               className="w-full table-fixed border-collapse text-sm"
               style={{ minWidth }}
             >
-              <RecapCols dates={dates.length} future={future} weekly={showWeekly} />
+              <RecapCols dates={dates.length} future={future} />
               <thead>
                 <tr className="text-xs text-muted">
                   <th className="sticky left-0 z-10 bg-card px-2 py-2 text-left font-semibold sm:px-3">
@@ -649,8 +698,9 @@ function RecapBody({
                   <th className="whitespace-nowrap px-2 py-2 text-right font-semibold">
                     Ada
                   </th>
+                  <th className="whitespace-nowrap px-2 py-2 text-right font-semibold" title="Uang yang diambil saat ronda">Harian</th>
+                  <th className="whitespace-nowrap px-2 py-2 text-right font-semibold" title="Pembayaran mingguan sesuai periode yang dibayar">Mingguan</th>
                   <th className="whitespace-nowrap px-2 py-2 text-right font-semibold text-primary" title="Pembayaran bulanan sesuai periode yang dibayar">Bulanan</th>
-                  {showWeekly && <th className="whitespace-nowrap px-2 py-2 text-right font-semibold" title="Pembayaran mingguan sesuai periode yang dibayar">Mingguan</th>}
                   <th className="whitespace-nowrap px-3 py-2 text-right font-semibold">
                     Total
                   </th>
@@ -672,7 +722,7 @@ function RecapBody({
                 style={{ minWidth }}
                 {...(editing ? selectHandlers : {})}
               >
-                <RecapCols dates={dates.length} future={future} weekly={showWeekly} />
+                <RecapCols dates={dates.length} future={future} />
                 {/* Judul kolom untuk pembaca layar; yang terlihat ada di strip di atas. */}
                 <thead className="sr-only">
                   <tr>
@@ -681,8 +731,9 @@ function RecapBody({
                       <th key={d}>{formatDateShort(d)}</th>
                     ))}
                     <th>Ada</th>
+                    <th>Harian</th>
+                    <th>Mingguan</th>
                     <th>Bulanan</th>
-                    {showWeekly && <th>Mingguan</th>}
                     <th>Total</th>
                   </tr>
                 </thead>
@@ -691,7 +742,7 @@ function RecapBody({
                     {block && (
                       <tr className="border-b border-line bg-bg/60">
                         <th
-                          colSpan={dates.length + 4 + Number(showWeekly)}
+                          colSpan={dates.length + 6}
                           className="px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-muted"
                         >
                           {/* Sel ini selebar tabel, jadi yang menempel di kiri saat digeser teksnya. */}
@@ -717,13 +768,13 @@ function RecapBody({
                         >
                           {/* HP: label di atas, nama kecil di bawah. Layar lebar: satu baris. */}
                           <RowLabel
-                            editing={editing}
-                            selected={editableDates.length > 0 && rowKeys(r.house.id).every((k) => selected.has(k))}
+                            editing={editing && rowKeys(r.house.id).length > 0}
+                            selected={rowKeys(r.house.id).length > 0 && rowKeys(r.house.id).every((k) => selected.has(k))}
                             onSelect={() => toggleCells(rowKeys(r.house.id))}
                             label={houseLabel(r.house)}
                           >
                           <span className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2">
-                            <span className="font-semibold leading-4 sm:leading-normal">
+                            <span className="shrink-0 whitespace-nowrap font-semibold leading-4 sm:leading-normal">
                               {houseLabel(r.house)}
                             </span>
                             <span className="flex h-3 min-w-0 items-center gap-1 sm:contents">
@@ -737,6 +788,9 @@ function RecapBody({
                               </span>
                             </span>
                           </span>
+                          <span className="mt-0.5 flex flex-wrap gap-1" title={`Cara bayar yang berlaku pada ${formatMonth(data.month)}${r.cadences.length > 1 ? "; berubah dalam bulan ini" : ""}`}>
+                            {r.cadences.map((c) => <span key={c} className="rounded-full bg-idle-soft px-1.5 py-0.5 text-[10px] font-medium leading-3 text-muted">{CADENCE_LABEL[c]}</span>)}
+                          </span>
                           </RowLabel>
                         </th>
                         {r.cells.map((cell, i) => {
@@ -744,7 +798,8 @@ function RecapBody({
                           const vacant = r.house.status === "vacant";
                           const recorded = patrolDates.has(date);
                           const future = date > tonight;
-                          const content = future ? null : (
+                          const period = vacant ? undefined : periodAt(r.house.id, date);
+                          const content = future ? null : period ? <PeriodCell period={period} date={date} /> : (
                             <Cell
                               cell={cell}
                               vacant={vacant}
@@ -765,7 +820,7 @@ function RecapBody({
                                   : !recorded && !future && "bg-idle-soft/25",
                               )}
                             >
-                              {editing && !future ? (
+                              {editing && !future && !period ? (
                                 // Tombol biasa (bukan Base UI Button): jumlahnya bisa ribuan dalam satu tabel. Diketuk
                                 // atau diseret dipilih lewat `selectHandlers` di tabel.
                                 <button
@@ -794,8 +849,9 @@ function RecapBody({
                             /{r.filledCount + r.empty}
                           </span>
                         </td>
+                        <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{r.collectedTotal > 0 ? formatRupiah(r.collectedTotal) : "–"}</td>
+                        <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{r.weeklyTotal > 0 ? formatRupiah(r.weeklyTotal) : "–"}</td>
                         <td className="whitespace-nowrap bg-primary/5 px-2 py-1.5 text-right font-semibold tabular-nums text-primary" title="Pembayaran bulanan untuk bulan ini, terpisah dari pengambilan saat ronda">{r.monthlyTotal > 0 ? formatRupiah(r.monthlyTotal) : "–"}</td>
-                        {showWeekly && <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{r.weeklyTotal > 0 ? formatRupiah(r.weeklyTotal) : "–"}</td>}
                         <td className="whitespace-nowrap px-3 py-1.5 text-right font-semibold tabular-nums">
                           {formatRupiah(r.total)}
                         </td>
@@ -807,13 +863,14 @@ function RecapBody({
                 <tfoot className="sr-only">
                   <tr>
                     <th scope="row">Total</th>
-                    {dateTotals.map((t, i) => (
+                    {shownDateTotals.map((t, i) => (
                       <td key={dates[i]}>{t > 0 ? formatRupiah(t) : "–"}</td>
                     ))}
                     <td />
-                    <td>{formatRupiah(monthlyTotal)}</td>
-                    {showWeekly && <td>{formatRupiah(weeklyTotal)}</td>}
-                    <td>{formatRupiah(grandTotal)}</td>
+                    <td>{formatRupiah(shownTotals.daily)}</td>
+                    <td>{formatRupiah(shownTotals.weekly)}</td>
+                    <td>{formatRupiah(shownTotals.monthly)}</td>
+                    <td>{formatRupiah(shownTotals.total)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -830,13 +887,13 @@ function RecapBody({
               className="w-full table-fixed border-collapse text-sm"
               style={{ minWidth }}
             >
-              <RecapCols dates={dates.length} future={future} weekly={showWeekly} />
+              <RecapCols dates={dates.length} future={future} />
               <tbody>
                 <tr className="font-semibold">
                   <th className="sticky left-0 z-10 bg-card px-2 py-2 text-left sm:px-3">
                     Total
                   </th>
-                  {dateTotals.map((t, i) => (
+                  {shownDateTotals.map((t, i) => (
                     // Kolomnya sempit untuk angka: tinggi batang = terkumpul malam itu, angkanya di judul.
                     <td
                       key={dates[i]}
@@ -853,10 +910,11 @@ function RecapBody({
                     </td>
                   ))}
                   <td />
-                  <td className="whitespace-nowrap bg-primary/5 px-2 py-2 text-right tabular-nums text-primary">{formatRupiah(monthlyTotal)}</td>
-                  {showWeekly && <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{formatRupiah(weeklyTotal)}</td>}
+                  <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{formatRupiah(shownTotals.daily)}</td>
+                  <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{formatRupiah(shownTotals.weekly)}</td>
+                  <td className="whitespace-nowrap bg-primary/5 px-2 py-2 text-right tabular-nums text-primary">{formatRupiah(shownTotals.monthly)}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                    {formatRupiah(grandTotal)}
+                    {formatRupiah(shownTotals.total)}
                   </td>
                 </tr>
               </tbody>
@@ -888,7 +946,7 @@ const TOTAL_COL = "7rem";
  * `DATE_COL`), jadi kotaknya tidak terpisah jauh dari nama rumah. `future` kolom terakhir (malam
  * yang belum tiba) dibuat sempit.
  */
-function RecapCols({ dates, future, weekly }: { dates: number; future: number; weekly: boolean }) {
+function RecapCols({ dates, future }: { dates: number; future: number }) {
   return (
     <colgroup>
       <col style={{ width: "var(--rumah-col)" }} />
@@ -897,7 +955,8 @@ function RecapCols({ dates, future, weekly }: { dates: number; future: number; w
       ))}
       <col style={{ width: ADA_COL }} />
       <col style={{ width: PERIOD_COL }} />
-      {weekly && <col style={{ width: PERIOD_COL }} />}
+      <col style={{ width: PERIOD_COL }} />
+      <col style={{ width: PERIOD_COL }} />
       <col style={{ width: TOTAL_COL }} />
     </colgroup>
   );
@@ -911,6 +970,11 @@ function cellText(cell: MonthCell | undefined, vacant: boolean) {
 
 /** Kotak persegi selebar kolom, paling besar 24px (kolom tanggal bisa lebih lebar atau lebih sempit). */
 const cellBox = "mx-auto flex aspect-square w-full max-w-6 items-center justify-center rounded-[5px]";
+
+function PeriodCell({ period, date }: { period: BillingPeriod; date: string }) {
+  const paid = period.status === "paid";
+  return <span title={`${formatDateShort(date)}: ${CADENCE_LABEL[period.cadence]} · ${BILLING_LABEL[period.status]} (otomatis)`} className={cx(cellBox, "text-xs font-bold ring-1 ring-inset", paid ? "bg-filled-soft text-filled ring-filled/15" : "bg-empty-soft text-empty ring-empty/15")}>{paid ? <Check className="size-3" aria-hidden /> : "×"}</span>;
+}
 
 /**
  * Satu kotak rumah × malam. "Ada" dengan nominal awal cukup hijau polos; angkanya hanya ditulis kalau

@@ -2,7 +2,7 @@ import { and, asc, desc, eq, gte, isNotNull, lte, max, ne, or, sql } from "drizz
 import { daysInMonth, localDate, rondaDate } from "@/lib/dates";
 import type { GeoAnchor } from "@/lib/geo";
 import { compareHouses } from "@/lib/houses";
-import type { PaymentCadence } from "@/lib/payments";
+import { planAt, type PaymentCadence } from "@/lib/payments";
 import type { CollectionDTO, HouseDTO, MonthCell, MonthRecap, RondaSnapshot } from "@/lib/types";
 import type { SessionUser } from "./auth";
 import type { Db } from "./db";
@@ -171,8 +171,11 @@ export async function getRondaSnapshot(db: Db, user: SessionUser, now = new Date
     collections: collectionRows,
     schedule,
     planAnchors,
-    paymentCells: Object.fromEntries(Object.entries(paymentData.cells).filter(([key]) => key.endsWith(":" + date))),
-    paymentPeriods: paymentData.bills.filter((b) => b.start <= date && b.end >= date),
+    // Alokasi bulan ini dan pembayaran mendatang untuk pergantian periode saat HP offline.
+    paymentCells: Object.fromEntries(Object.entries(paymentData.cells).filter(([key]) => key.split(":")[1] >= date.slice(0, 7) + "-01")),
+    paymentPeriods: paymentData.bills,
+    paymentPlans: paymentData.plans.map(({ id, houseId, effectiveFrom, cadence, ratePerNight, dueTiming, graceDays, weekStart }) =>
+      ({ id, houseId, effectiveFrom, cadence, ratePerNight, dueTiming, graceDays, weekStart })),
   };
 }
 
@@ -257,6 +260,9 @@ export async function getMonthRecap(db: Db, month: string): Promise<MonthRecap> 
   }
   return {
     month, houses: houseRows, dates, cells,
+    paymentCadences: Object.fromEntries(houseRows.map((h) => [h.id,
+      [...new Set(days.map((date) => planAt(paymentData.plans, h.id, date)?.cadence ?? "daily"))],
+    ])),
     paymentCells: Object.fromEntries(Object.entries(paymentData.cells).filter(([key]) => key.split(":")[1].startsWith(month))),
     paymentPeriods: paymentData.bills,
     periodPayments: paymentData.receipts.filter((p) => p.periodStart <= days[days.length - 1] && p.periodEnd >= days[0])

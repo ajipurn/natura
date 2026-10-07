@@ -42,11 +42,11 @@ export function buildRecapSheets(recap: MonthRecap, communityName: string): Xlsx
   const title = `Rekap jimpitan ${communityName}${month ? ` · ${formatMonth(month)}` : ""}`;
   const dateCount = recap.dates.length;
   const lead = 4; // Blok, No, Nama KK, Status
-  const tail = 6; // Ada, Kosong, Tidak dicek, Bulanan, Mingguan, Total
+  const tail = 7; // Ada, Kosong, Tidak dicek, Harian, Mingguan, Bulanan, Total
 
   let emptyTotal = 0;
   let uncheckedTotal = 0;
-  const houseRows = rows.map(({ house, cells, filledCount, total, monthlyTotal, weeklyTotal }) => {
+  const houseRows = rows.map(({ house, cells, filledCount, total, collectedTotal, monthlyTotal, weeklyTotal }) => {
     const empty = cells.filter((c) => c?.status === "empty").length;
     const unchecked = house.status === "active" ? cells.filter((c) => !c).length : 0;
     emptyTotal += empty;
@@ -66,8 +66,9 @@ export function buildRecapSheets(recap: MonthRecap, communityName: string): Xlsx
       num(filledCount),
       num(empty),
       num(unchecked),
-      num(monthlyTotal, { format: RUPIAH, textColor: "#1d4ed8", backgroundColor: "#dbeafe" }),
+      num(collectedTotal, { format: RUPIAH }),
       num(weeklyTotal, { format: RUPIAH }),
+      num(monthlyTotal, { format: RUPIAH, textColor: "#1d4ed8", backgroundColor: "#dbeafe" }),
       num(total, { format: RUPIAH, fontWeight: "bold" }),
     ];
   });
@@ -76,11 +77,11 @@ export function buildRecapSheets(recap: MonthRecap, communityName: string): Xlsx
     sheet: "Per rumah",
     data: [
       [text(title, { fontWeight: "bold", fontSize: 14, columnSpan: lead + dateCount + tail })],
-      [text("Tanggal = hasil ronda. Bulanan dan Mingguan = pembayaran sesuai periode, terpisah dari uang hasil ronda. Total termasuk semuanya.", { columnSpan: lead + dateCount + tail })],
+      [text("Tanggal dan Harian = hasil ronda. Mingguan dan Bulanan = pembayaran sesuai periode. Total = Harian + Mingguan + Bulanan.", { columnSpan: lead + dateCount + tail })],
       [
         ...["Blok", "No", "Nama KK", "Status"].map((h) => text(h, HEADER)),
         ...recap.dates.map((d) => text(String(Number(d.slice(8))), { ...HEADER, align: "center" })),
-        ...["Ada", "Kosong", "Tidak dicek", "Bulanan (Rp)", "Mingguan (Rp)", "Total (Rp)"].map((h) => text(h, { ...HEADER, align: "right" })),
+        ...["Ada", "Kosong", "Tidak dicek", "Harian (Rp)", "Mingguan (Rp)", "Bulanan (Rp)", "Total (Rp)"].map((h) => text(h, { ...HEADER, align: "right" })),
       ],
       ...houseRows,
       [
@@ -92,12 +93,13 @@ export function buildRecapSheets(recap: MonthRecap, communityName: string): Xlsx
         num(rows.reduce((sum, r) => sum + r.filledCount, 0), { fontWeight: "bold" }),
         num(emptyTotal, { fontWeight: "bold" }),
         num(uncheckedTotal, { fontWeight: "bold" }),
-        num(rows.reduce((sum, r) => sum + r.monthlyTotal, 0), { format: RUPIAH, fontWeight: "bold" }),
+        num(rows.reduce((sum, r) => sum + r.collectedTotal, 0), { format: RUPIAH, fontWeight: "bold" }),
         num(rows.reduce((sum, r) => sum + r.weeklyTotal, 0), { format: RUPIAH, fontWeight: "bold" }),
+        num(rows.reduce((sum, r) => sum + r.monthlyTotal, 0), { format: RUPIAH, fontWeight: "bold" }),
         num(grandTotal, { format: RUPIAH, fontWeight: "bold" }),
       ],
     ],
-    columns: [{ width: 6 }, { width: 6 }, { width: 24 }, { width: 9 }, ...recap.dates.map(() => ({ width: 7 })), { width: 6 }, { width: 8 }, { width: 11 }, { width: 13 }, { width: 13 }, { width: 13 }],
+    columns: [{ width: 6 }, { width: 6 }, { width: 24 }, { width: 9 }, ...recap.dates.map(() => ({ width: 7 })), { width: 6 }, { width: 8 }, { width: 11 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 13 }],
     stickyRowsCount: 3,
     stickyColumnsCount: 3,
   };

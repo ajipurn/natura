@@ -4,7 +4,7 @@ import { getAudit } from "@/server/audit";
 import { applyEntries, writeCollections } from "@/server/collections";
 import type { Db } from "@/server/db";
 import { getCollectionsForDate, getMonthRecap, listPatrols } from "@/server/queries";
-import { collectionLogs, houses, rondaSchedule, users } from "@/server/schema";
+import { collectionLogs, houses, paymentPlans, rondaSchedule, users } from "@/server/schema";
 import type { SessionUser } from "@/server/auth";
 import type { EntryInput } from "@/lib/types";
 import { createTestEnv } from "./helpers/db";
@@ -49,6 +49,25 @@ beforeAll(async () => {
 });
 
 describe("applyEntries", () => {
+  it("menolak Ada/Kosong/hapus untuk rumah mingguan/bulanan, tetapi tetap menerima rumah harian", async () => {
+    const added = await db.insert(houses).values([
+      { block: "P", number: "1", token: "PERIOD-WEEKLY" },
+      { block: "P", number: "2", token: "PERIOD-MONTHLY" },
+      { block: "P", number: "3", token: "PERIOD-DAILY" },
+    ]).returning({ id: houses.id });
+    await db.insert(paymentPlans).values([
+      { houseId: added[0].id, cadence: "weekly", effectiveFrom: "2026-10-01", ratePerNight: 500, dueTiming: "end" },
+      { houseId: added[1].id, cadence: "monthly", effectiveFrom: "2026-10-01", ratePerNight: 500, dueTiming: "end" },
+    ]);
+    const periodEntries = added.slice(0, 2).flatMap((h) => (["filled", "empty", "none"] as const).map((status) => entry({ houseId: h.id, status, method: "manual" })));
+    const result = await applyEntries(db, petugas, [...periodEntries, entry({ houseId: added[2].id })], NOW);
+    expect(result.map((r) => r.ok)).toEqual([false, false, false, false, false, false, true]);
+    expect(result.slice(0, 6).every((r) => !r.ok && r.error.includes("otomatis"))).toBe(true);
+    const records = await getCollectionsForDate(db, "2026-10-04");
+    expect(records.filter((r) => added.slice(0, 2).some((h) => h.id === r.houseId))).toEqual([]);
+    // Bersihkan catatan contoh agar tes riwayat di bawah tetap punya catatannya sendiri.
+    await applyEntries(db, petugas, [entry({ houseId: added[2].id, status: "none", recordedAt: new Date(NOW.getTime() + 60_000).toISOString() })], NOW);
+  });
   it("menyimpan catatan dan menolak data yang tidak masuk akal", async () => {
     const results = await applyEntries(
       db,

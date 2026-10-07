@@ -16,6 +16,7 @@ import {
 } from "../queries";
 import { cancelRequest, createRequest, listOwnRequests } from "../requests";
 import { listSchedule } from "../schedule";
+import { getPaymentMonth } from "../payments";
 
 /** ?bulan=YYYY-MM; kosong/salah = bulan malam ronda sekarang. */
 const monthQuery = validator("query", (value: Record<string, string | string[]>) => {
@@ -103,12 +104,13 @@ export const rondaRoutes = new Hono<AppEnv>()
     async (c) => {
       const { date } = c.req.valid("param");
       const db = c.var.db;
-      const [houses, collections, settings] = await Promise.all([
+      const [houses, collections, settings, paymentData] = await Promise.all([
         listHouses(db),
         getCollectionsForDate(db, date),
         getSettings(db),
+        getPaymentMonth(db, date.slice(0, 7)),
       ]);
-      return c.json({ date, houses, collections, settings });
+      return c.json({ date, houses, collections, settings, paymentPeriods: paymentData.bills.filter((p) => p.start <= date && p.end >= date) });
     },
   )
 

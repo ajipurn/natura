@@ -11,7 +11,7 @@ import { CADENCE_LABEL, type BillingPeriod, type PaymentCell } from "@/lib/payme
 export type ListFilter = "belum" | "sudah" | "semua";
 
 /** Rumah yang masih perlu dicek malam ini (rumah kosong/mudik tidak dihitung). */
-const isOpen = (h: HouseDTO, collections: Map<number, MergedCollection>) => h.status === "active" && !collections.has(h.id);
+const isOpen = (h: HouseDTO, collections: Map<number, MergedCollection>, periods: BillingPeriod[]) => h.status === "active" && !collections.has(h.id) && !periods.some((p) => p.houseId === h.id);
 
 /**
  * Daftar rumah per blok. "Belum" (bawaan) hanya menampilkan rumah yang belum dicek; blok yang sudah
@@ -46,8 +46,8 @@ export function HouseList({
   const groups = groupByBlock(houses);
   const sections = groups.flatMap(([block, list]) => {
     const active = list.filter((h) => h.status === "active");
-    const open = list.filter((h) => isOpen(h, collections));
-    const checked = list.filter((h) => collections.has(h.id));
+    const open = list.filter((h) => isOpen(h, collections, paymentPeriods));
+    const checked = list.filter((h) => collections.has(h.id) || (h.status === "active" && paymentPeriods.some((p) => p.houseId === h.id)));
     const visible = filter === "belum" ? open : filter === "sudah" ? checked : list;
     if (filter === "sudah" && visible.length === 0) return [];
     return [{ block, list, done: active.length - open.length, total: active.length, open: open.length, visible }];
@@ -163,8 +163,8 @@ function HouseTile({
   paymentCell?: PaymentCell;
 }) {
   const vacant = house.status === "vacant";
-  const state = collection?.status ?? (vacant ? "vacant" : "unchecked");
-  const stateText = {
+  const state = vacant ? "vacant" : paymentPeriod ? paymentPeriod.status === "paid" ? "filled" : "empty" : collection?.status ?? "unchecked";
+  const stateText = paymentPeriod && !vacant ? paymentPeriod.status === "paid" ? "sudah bayar" : "belum bayar" : {
     filled: `ada ${collection ? formatRupiah(collection.amount) : ""}`,
     empty: "kosong",
     vacant: "rumah kosong/mudik",
@@ -187,10 +187,11 @@ function HouseTile({
       )}
     >
       {houseLabel(house)}
-      {state === "filled" && collection && (
+      {state === "filled" && collection && !paymentPeriod && (
         <span className="mt-1 text-[10px] font-semibold">{formatAmountShort(collection.amount)}</span>
       )}
-      {state === "empty" && <span className="mt-1 text-[10px] font-semibold">kosong</span>}
+      {paymentPeriod && !vacant && <span className="mt-1 text-[10px] font-semibold">{paid ? "sudah bayar" : "belum bayar"}</span>}
+      {state === "empty" && !paymentPeriod && <span className="mt-1 text-[10px] font-semibold">kosong</span>}
       {state === "vacant" && <span className="mt-1 text-[10px] font-medium">mudik</span>}
       {paymentLabel && !vacant && <span className="mt-1 rounded bg-primary/10 px-1 text-[9px] font-semibold text-primary">{paymentLabel}{paid ? " ✓" : ""}</span>}
       {collection?.pending && <span className="absolute right-1 top-1 size-2 rounded-full bg-warn" aria-hidden />}

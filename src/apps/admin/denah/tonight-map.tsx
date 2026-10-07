@@ -14,7 +14,7 @@ import { summarize } from "@/lib/recap";
 import { SITE_PLAN } from "@/site-plan";
 import { HouseChips, HousePanel, MapWithPanel } from "./house-panel";
 
-/** Peta ronda malam ini: warna tiap rumah mengikuti catatan petugas, diperbarui tiap 30 detik. */
+/** Peta ronda malam ini: catatan harian dan status otomatis pembayaran periode. */
 export function TonightMap() {
   const date = rondaDate(new Date());
   const query = useQuery({ ...patrolQuery(date), refetchInterval: 30_000 });
@@ -22,11 +22,14 @@ export function TonightMap() {
 
   return (
     <QueryState query={query}>
-      {({ houses, collections, settings }) => {
-        const summary = summarize(houses, collections);
+      {({ houses, collections, settings, paymentPeriods }) => {
+        const summary = summarize(houses, collections, paymentPeriods);
         const byHouse = new Map(collections.map((c) => [c.houseId, c]));
         const markers: Record<number, MarkerState> = Object.fromEntries(
-          houses.map((h) => [h.id, byHouse.get(h.id)?.status ?? (h.status === "vacant" ? "vacant" : "unchecked")]),
+          houses.map((h) => {
+            const period = paymentPeriods?.find((p) => p.houseId === h.id);
+            return [h.id, h.status === "vacant" ? "vacant" : period ? period.status === "paid" ? "filled" : "empty" : byHouse.get(h.id)?.status ?? "unchecked"];
+          }),
         );
         const emptyCount = summary.empty.length;
         // Rumah aktif yang ada isinya (rumah mudik yang kebetulan diisi tidak ikut dihitung di bilah).
@@ -50,13 +53,13 @@ export function TonightMap() {
                 <div
                   className="flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-idle-soft"
                   role="img"
-                  aria-label={`${summary.checked} dari ${summary.expected} rumah sudah dicek`}
+                  aria-label={`${summary.checked} dari ${summary.expected} rumah selesai`}
                 >
                   {filledCount > 0 && <span className="bg-filled" style={{ width: `${(filledCount / summary.expected) * 100}%` }} />}
                   {emptyCount > 0 && <span className="bg-empty" style={{ width: `${(emptyCount / summary.expected) * 100}%` }} />}
                 </div>
                 <p className="mt-1.5 text-sm text-muted">
-                  <strong className="text-fg">{summary.checked}</strong> dari {summary.expected} rumah sudah dicek
+                  <strong className="text-fg">{summary.checked}</strong> dari {summary.expected} rumah selesai
                   {summary.expected > 0 && ` (${Math.round((summary.checked / summary.expected) * 100)}%)`}
                 </p>
               </div>
@@ -68,6 +71,7 @@ export function TonightMap() {
                 <Stat value={formatRupiah(summary.total)} label="Terkumpul" />
               </div>
               {summary.collectors.length > 0 && <p className="text-sm text-muted">Petugas: {summary.collectors.join(", ")}</p>}
+              {!!paymentPeriods?.length && <p className="text-xs text-muted">Mingguan/bulanan otomatis; tidak perlu discan.</p>}
             </Card>
 
             <MapWithPanel
@@ -96,7 +100,7 @@ export function TonightMap() {
                     key={house.id}
                     house={house}
                     month={date.slice(0, 7)}
-                    tonight={{ date, collection: byHouse.get(house.id) ?? null, defaultAmount: settings.defaultAmount }}
+                    tonight={{ date, collection: byHouse.get(house.id) ?? null, defaultAmount: settings.defaultAmount, period: paymentPeriods?.find((p) => p.houseId === house.id) }}
                     onClose={() => setSelected(null)}
                   />
                 ) : (
@@ -105,7 +109,7 @@ export function TonightMap() {
                     <HouseChips
                       title="Belum dicek"
                       houses={summary.unchecked}
-                      empty={summary.expected ? "Semua rumah sudah dicek." : "Belum ada rumah."}
+                      empty={summary.expected ? "Semua rumah selesai." : "Belum ada rumah."}
                       onSelect={setSelected}
                     />
                   </Card>

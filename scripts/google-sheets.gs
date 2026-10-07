@@ -24,7 +24,7 @@
 /** @OnlyCurrentDoc */
 
 const FIRST_NIGHT = 8; // kolom H
-const COLUMNS = FIRST_NIGHT - 1 + 31 + 2; // Bulanan dan Mingguan di belakang tanggal
+const COLUMNS = FIRST_NIGHT - 1 + 31 + 3; // Bulanan, Mingguan, dan Harian di belakang tanggal
 const TIME_ZONE = "Asia/Jakarta";
 const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 /** Rumus di A1: link Natura, dengan `?bulan=YYYY-MM` untuk tab arsip. */
@@ -52,7 +52,7 @@ function rapikanRekap() {
   [48, 48, 64, 84, 48, 60, 84].forEach((width, i) => sheet.setColumnWidth(i + 1, width));
   sheet.setColumnWidths(FIRST_NIGHT, nights, 52);
 
-  const night = sheet.getRange(4, FIRST_NIGHT, rows - 3, nights + 2);
+  const night = sheet.getRange(4, FIRST_NIGHT, rows - 3, nights + 3);
   const house = sheet.getRange(4, 1, rows - 3, FIRST_NIGHT - 1);
   // Mengganti semua aturan format bersyarat di lembar ini. Warnanya sama dengan file Excel dari Natura.
   sheet.setConditionalFormatRules([

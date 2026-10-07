@@ -25,6 +25,7 @@ import { formatRupiah } from "@/lib/format";
 import type { MarkerState } from "@/lib/house-state";
 import { houseLabel } from "@/lib/houses";
 import { parseQrToken } from "@/lib/qr";
+import { CADENCE_LABEL, rondaPaymentPeriods } from "@/lib/payments";
 import { buildRecapText, summarize } from "@/lib/recap";
 import { DAY_NAMES, dayLabel, scheduleDay } from "@/lib/schedule";
 import { matchPlan } from "@/lib/site-plan";
@@ -72,7 +73,8 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   const houses = useMemo(() => snapshot?.houses ?? [], [snapshot]);
   const byToken = useMemo(() => new Map(houses.map((h) => [h.token, h])), [houses]);
   const collectionList = useMemo(() => [...store.collections.values()], [store.collections]);
-  const summary = useMemo(() => summarize(houses, collectionList), [houses, collectionList]);
+  const paymentPeriods = useMemo(() => snapshot ? rondaPaymentPeriods(snapshot, store.date) : [], [snapshot, store.date]);
+  const summary = useMemo(() => summarize(houses, collectionList, paymentPeriods), [houses, collectionList, paymentPeriods]);
   // Catatan terbaru malam ini (dari siapa pun), untuk baris "Terakhir".
   const lastEntry = useMemo(() => {
     const entry = collectionList.reduce<MergedCollection | null>(
@@ -87,10 +89,11 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   const markers = useMemo(() => {
     const result: Record<number, MarkerState> = {};
     for (const h of houses) {
-      result[h.id] = store.collections.get(h.id)?.status ?? (h.status === "vacant" ? "vacant" : "unchecked");
+      const period = paymentPeriods.find((p) => p.houseId === h.id);
+      result[h.id] = h.status === "vacant" ? "vacant" : period ? period.status === "paid" ? "filled" : "empty" : store.collections.get(h.id)?.status ?? "unchecked";
     }
     return result;
-  }, [houses, store.collections]);
+  }, [houses, store.collections, paymentPeriods]);
   const pendingIds = useMemo(
     () => new Set(collectionList.filter((c) => c.pending).map((c) => c.houseId)),
     [collectionList],
@@ -125,7 +128,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   const canRecord = onDuty;
 
   function openHouse(house: HouseDTO) {
-    if (canRecord) setActive({ house, method: "manual" });
+    if (canRecord || paymentPeriods.some((p) => p.houseId === house.id)) setActive({ house, method: "manual" });
     else showToast("Bukan jadwal jagamu malam ini.", "error");
   }
 
@@ -140,11 +143,14 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
       if (token) store.sync();
       return;
     }
+    const period = paymentPeriods.find((p) => p.houseId === house.id);
+    if (period) showToast(`${houseLabel(house)} · ${CADENCE_LABEL[period.cadence]} ${period.status === "paid" ? "sudah bayar" : "belum bayar"}`, period.status === "paid" ? "ok" : "error");
     setActive({ house, method: "scan" });
   }
 
   function handleRecord(status: CollectionStatus | "none", amount: number) {
     if (!active) return;
+    if (paymentPeriods.some((p) => p.houseId === active.house.id)) return;
     store.record(active.house, status, amount, active.method);
     const label = houseLabel(active.house);
     showToast(
@@ -195,6 +201,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
         date: store.date,
         houses,
         collections: collectionList,
+        paymentPeriods,
       })}
     />
   );
@@ -220,7 +227,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
               <>
                 <div className="mt-2 flex items-baseline justify-between">
                   <p className="text-sm text-muted">
-                    <strong className="text-2xl text-fg">{summary.checked}</strong> / {summary.expected} dicek
+                    <strong className="text-2xl text-fg">{summary.checked}</strong> / {summary.expected} selesai
                   </p>
                   <p className="text-xl font-bold">{formatRupiah(summary.total)}</p>
                 </div>
@@ -244,6 +251,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                     <LegendItem swatch="border border-dashed border-muted/60">Mudik {summary.vacant.length}</LegendItem>
                   )}
                 </p>
+                {paymentPeriods.length > 0 && <p className="mt-1 text-xs text-muted">Mingguan/bulanan otomatis; tidak perlu discan.</p>}
               </>
             )}
           </div>
@@ -390,12 +398,12 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
             ) : filter === "belum" && summary.unchecked.length === 0 ? (
               <Card className="text-center">
                 <CheckCircle2 className="mx-auto size-10 text-filled" />
-                <p className="mt-2 font-semibold">{allDone ? "Semua rumah sudah dicek" : "Tidak ada rumah yang perlu dicek"}</p>
+                <p className="mt-2 font-semibold">{allDone ? "Semua rumah selesai" : "Tidak ada rumah yang perlu dicek"}</p>
                 {allDone && <p className="mt-1 text-sm text-muted">Kirim rekapnya ke grup warga.</p>}
                 {allDone && <div className="mt-4">{recap}</div>}
               </Card>
             ) : (
-              <HouseList houses={houses} collections={store.collections} filter={filter} onOpen={openHouse} paymentPeriods={snapshot.date === store.date ? snapshot.paymentPeriods : []} paymentCells={snapshot.date === store.date ? snapshot.paymentCells : {}} date={store.date} />
+              <HouseList houses={houses} collections={store.collections} filter={filter} onOpen={openHouse} paymentPeriods={paymentPeriods} paymentCells={snapshot.paymentCells} date={store.date} />
             )}
 
             {/* Rekap bisa dibagikan kapan saja; saat semua selesai tombolnya ada di kartu di atas. */}
@@ -437,21 +445,21 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
           collections={store.collections}
           onPick={(house) => {
             setSearchOpen(false);
-            setActive({ house, method: "manual" });
+            openHouse(house);
           }}
           onClose={() => setSearchOpen(false)}
         />
       )}
 
-      {active && canRecord && (
+      {active && (canRecord || paymentPeriods.some((p) => p.houseId === active.house.id)) && (
         <HouseSheet
           key={`${active.house.id}-${active.method}`}
           house={active.house}
           existing={store.collections.get(active.house.id)}
           defaultAmount={snapshot.settings.defaultAmount}
           method={active.method}
-          paymentPeriod={snapshot.date === store.date ? snapshot.paymentPeriods?.find((p) => p.houseId === active.house.id) : undefined}
-          paymentCell={snapshot.date === store.date ? snapshot.paymentCells?.[active.house.id + ":" + store.date] : undefined}
+          paymentPeriod={paymentPeriods.find((p) => p.houseId === active.house.id)}
+          paymentCell={snapshot.paymentCells?.[active.house.id + ":" + store.date]}
           onRecord={handleRecord}
           onClose={() => setActive(null)}
         />

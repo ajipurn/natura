@@ -2,12 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Hand, PenLine, Pencil, ScanLine, Table2, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
+import { PaymentNotice } from "@/components/payment-notice";
 import { ScrollArea } from "@/components/scroll-area";
 import { Button, Card, buttonClass, cx } from "@/components/ui";
 import { CorrectionDialog } from "@/features/riwayat/correction-form";
 import { formatDateShort, formatMonth, formatTime } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { houseLabel, type HouseRef } from "@/lib/houses";
+import type { BillingPeriod } from "@/lib/payments";
 import type { CollectionDTO, HouseDTO } from "@/lib/types";
 import { recapQuery } from "../queries";
 
@@ -105,6 +107,7 @@ export function HousePanel({
     date: string;
     collection: CollectionDTO | null;
     defaultAmount: number;
+    period?: BillingPeriod;
   };
   onClose: () => void;
 }) {
@@ -166,16 +169,26 @@ export function HousePanel({
       {tonight && (
         <section>
           <PanelHeading>Malam ini</PanelHeading>
-          <TonightStatus house={house} collection={tonight.collection} />
-          <Button
-            variant="secondary"
-            size="sm"
-            className="mt-2.5"
-            onClick={() => setCorrecting(true)}
-          >
-            <PenLine className="size-4" />
-            {tonight.collection ? "Ubah catatan" : "Isi catatan"}
-          </Button>
+          {tonight.period ? (
+            <>
+              <PaymentNotice period={tonight.period} />
+              <p className="mt-2 text-sm text-muted">Status otomatis dari pembayaran periode; tidak perlu dicatat saat ronda.</p>
+              <Link to="/admin/rekap" className={cx(buttonClass("secondary", "sm"), "mt-2.5")}>Lihat pembayaran</Link>
+            </>
+          ) : (
+            <>
+              <TonightStatus house={house} collection={tonight.collection} />
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-2.5"
+                onClick={() => setCorrecting(true)}
+              >
+                <PenLine className="size-4" />
+                {tonight.collection ? "Ubah catatan" : "Isi catatan"}
+              </Button>
+            </>
+          )}
           <CorrectionDialog
             target={{
               house,

@@ -2,6 +2,7 @@ import { formatDateLong } from "./dates";
 import { formatRupiah } from "./format";
 import { compareHouses, houseLabel, type HouseRef } from "./houses";
 import type { CollectionStatus, HouseStatus } from "./types";
+import type { BillingPeriod } from "./payments";
 
 type RecapHouse = HouseRef & { id: number; status: HouseStatus };
 type RecapCollection = {
@@ -28,6 +29,7 @@ export type RecapSummary = {
 export function summarize(
   houses: RecapHouse[],
   collections: RecapCollection[],
+  periods: BillingPeriod[] = [],
 ): RecapSummary {
   const byHouse = new Map(collections.map((c) => [c.houseId, c]));
   const summary: RecapSummary = {
@@ -54,12 +56,14 @@ export function summarize(
     }
 
     summary.expected++;
-    if (!c) {
+    const period = periods.find((p) => p.houseId === house.id);
+    const status = period ? period.status === "paid" ? "filled" : "empty" : c?.status;
+    if (!status) {
       summary.unchecked.push(house);
       continue;
     }
     summary.checked++;
-    if (c.status === "filled") summary.filled.push(house);
+    if (status === "filled") summary.filled.push(house);
     else summary.empty.push(house);
   }
 
@@ -79,8 +83,9 @@ export function buildRecapText(input: {
   date: string;
   houses: RecapHouse[];
   collections: RecapCollection[];
+  paymentPeriods?: BillingPeriod[];
 }): string {
-  const s = summarize(input.houses, input.collections);
+  const s = summarize(input.houses, input.collections, input.paymentPeriods);
   const lines = [
     `*Jimpitan ${input.communityName}*`,
     formatDateLong(input.date),
@@ -96,6 +101,8 @@ export function buildRecapText(input: {
   if (s.vacant.length > 0) {
     lines.push(`🏠 Rumah kosong/mudik: ${s.vacant.length} rumah`);
   }
+  const automatic = input.houses.filter((h) => h.status === "active" && input.paymentPeriods?.some((p) => p.houseId === h.id)).length;
+  if (automatic) lines.push(`🔄 Mingguan/bulanan: ${automatic} rumah berstatus otomatis`);
   lines.push(`💰 Total: ${formatRupiah(s.total)}`);
   if (s.collectors.length > 0) {
     lines.push(`👮 Petugas: ${s.collectors.join(", ")}`);

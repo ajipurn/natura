@@ -23,12 +23,12 @@ describe("rekap bulanan sebagai xlsx", () => {
     const [perHouse, perNight] = buildRecapSheets(recap, "Natura");
     expect(perHouse.sheet).toBe("Per rumah");
     const values = (row: (typeof perHouse.data)[number]) => row.map((c) => c?.value ?? null);
-    expect(values(perHouse.data[2])).toEqual(["Blok", "No", "Nama KK", "Status", "5", "6", "Ada", "Kosong", "Tidak dicek", "Bulanan (Rp)", "Mingguan (Rp)", "Total (Rp)"]);
-    expect(values(perHouse.data[3])).toEqual(["AD", "3", "Yusuf", "Dihuni", 500, 1000, 2, 0, 0, 0, 0, 1500]);
-    expect(values(perHouse.data[4])).toEqual(["AD", "5", "=Wawan", "Dihuni", "kosong", null, 0, 1, 1, 0, 0, 0]);
+    expect(values(perHouse.data[2])).toEqual(["Blok", "No", "Nama KK", "Status", "5", "6", "Ada", "Kosong", "Tidak dicek", "Harian (Rp)", "Mingguan (Rp)", "Bulanan (Rp)", "Total (Rp)"]);
+    expect(values(perHouse.data[3])).toEqual(["AD", "3", "Yusuf", "Dihuni", 500, 1000, 2, 0, 0, 1500, 0, 0, 1500]);
+    expect(values(perHouse.data[4])).toEqual(["AD", "5", "=Wawan", "Dihuni", "kosong", null, 0, 1, 1, 0, 0, 0, 0]);
     // Rumah mudik tidak dihitung "tidak dicek".
-    expect(values(perHouse.data[5])).toEqual(["AF", "7", "", "Mudik", null, null, 0, 0, 0, 0, 0, 0]);
-    expect(values(perHouse.data.at(-1)!)).toEqual(["Total", null, null, null, 500, 1000, 2, 1, 1, 0, 0, 1500]);
+    expect(values(perHouse.data[5])).toEqual(["AF", "7", "", "Mudik", null, null, 0, 0, 0, 0, 0, 0, 0]);
+    expect(values(perHouse.data.at(-1)!)).toEqual(["Total", null, null, null, 500, 1000, 2, 1, 1, 1500, 0, 0, 1500]);
     expect(perNight.data.slice(3).map(values)).toEqual([
       ["Senin, 5 Oktober 2026", 1, 1, 0, 500],
       ["Selasa, 6 Oktober 2026", 1, 0, 1, 1000],
@@ -51,9 +51,16 @@ describe("rekap bulanan sebagai xlsx", () => {
     const data: MonthRecap = { month: "2026-11", houses: [recap.houses[0]], dates: [], cells: {}, paymentCells: { "1:2026-11-01": { amount: 500, monthlyAmount: 500, weeklyAmount: 0, paid: true } }, periodPayments: [{ id: 1, houseId: 1, receivedDate: "2026-10-07", periodStart: "2026-11-01", periodEnd: "2026-11-30", cadence: "monthly", amount: 15000 }] };
     const sheets = buildRecapSheets(data, "Natura");
     expect(sheets[0].data[0][0]?.value).toContain("November 2026");
-    expect(sheets[0].data[3].slice(-3).map((c) => c?.value)).toEqual([500, 0, 500]);
+    expect(sheets[0].data[3].slice(-4).map((c) => c?.value)).toEqual([0, 0, 500, 500]);
     expect(sheets[2].data[3].map((c) => c?.value)).toEqual(["AD-3", "Yusuf", "Bulanan", "2026-10-07", "2026-11-01", "2026-11-30", 15000]);
     const files = unzipSync(new Uint8Array(await writeXlsxFile(sheets).toBuffer()));
     expect(files["xl/worksheets/sheet3.xml"]).toBeDefined();
+  });
+
+  it("tiga sumber uang tetap terpisah saat rumah berganti cara bayar", () => {
+    const mixed = { ...recap, paymentCells: { "1:2026-10-05": { amount: 4000, monthlyAmount: 3000, weeklyAmount: 1000, paid: true } } };
+    const [sheet] = buildRecapSheets(mixed, "Natura");
+    expect(sheet.data[3].slice(-4).map((c) => c?.value)).toEqual([1500, 1000, 3000, 5500]);
+    expect(sheet.data[0][0]?.columnSpan).toBe(sheet.columns.length);
   });
 });

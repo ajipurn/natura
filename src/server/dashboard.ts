@@ -39,7 +39,7 @@ export async function getDashboard(db: Db, now: Date) {
       getPaymentOverview(db, localDate(now), month),
     ]);
 
-  const tonight = summarize(houseRows, tonightRows);
+  const tonight = summarize(houseRows, tonightRows, (recap.paymentPeriods ?? []).filter((p) => p.start <= date && p.end >= date));
   const stats = monthStats(recap);
   const day = scheduleDay(date);
   const plan = matchPlan(SITE_PLAN, houseRows);
@@ -88,8 +88,7 @@ export async function getDashboard(db: Db, now: Date) {
       offDuty,
       /** Malam sebelum malam ini yang belum dicatat setorannya. */
       undeposited: cash.undeposited,
-      overduePayments: paymentOverview.overdueHouses,
-      duePayments: paymentOverview.dueHouses,
+      unpaidPayments: paymentOverview.unpaidHouses,
     },
   };
 }

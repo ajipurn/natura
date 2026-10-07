@@ -514,7 +514,7 @@ function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string 
                           className={cx(
                             "relative w-full rounded-lg border px-1 py-1.5 text-center transition active:scale-95",
                             h.paymentPeriod && h.status === "active"
-                              ? h.paymentPeriod.status === "paid" ? "border-primary/40 bg-primary/10 text-primary" : h.paymentPeriod.status === "overdue" ? "border-warn/40 bg-warn-soft text-warn" : "border-line bg-card text-muted"
+                              ? h.paymentPeriod.status === "paid" ? "border-filled/40 bg-filled-soft text-filled" : "border-empty/40 bg-empty-soft text-empty"
                               : h.status === "vacant" || ratio === null
                               ? "border-dashed border-line text-muted hover:border-muted"
                               : ratio >= 0.8
@@ -527,7 +527,7 @@ function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string 
                         >
                           <span className="block text-sm font-bold">{h.number}</span>
                           <span className="block text-[11px]">
-                            {h.status === "vacant" ? "mudik" : h.paymentPeriod ? h.paymentPeriod.status === "paid" ? "sudah bayar" : h.paymentPeriod.status === "overdue" ? "terlambat" : CADENCE_LABEL[h.paymentPeriod.cadence] : checked ? `${h.filled}/${checked}` : "–"}
+                            {h.status === "vacant" ? "mudik" : h.paymentPeriod ? h.paymentPeriod.status === "paid" ? "sudah bayar" : "belum bayar" : checked ? `${h.filled}/${checked}` : "–"}
                           </span>
                         </Button>
                       </li>
