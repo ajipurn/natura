@@ -135,7 +135,7 @@ function Sidebar({ user }: { user: SessionUser }) {
           {NAV.map(({ group, items }) => (
             <div key={group} className="mb-4">
               <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted">{group}</p>
-              <ul>
+              <ul className="space-y-1">
                 {items.map((item) => (
                   <li key={item.to}>
                     <SidebarLink item={item}>
@@ -155,7 +155,7 @@ function Sidebar({ user }: { user: SessionUser }) {
           ))}
         </div>
       </ScrollArea>
-      <div className="border-t border-line p-3">
+      <div className="space-y-1 border-t border-line p-3">
         <SidebarLink item={SETTINGS} />
         <ThemeSwitch />
         <a href="/petugas/" className="flex items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium hover:bg-idle-soft">
