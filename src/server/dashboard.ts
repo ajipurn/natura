@@ -39,17 +39,26 @@ export async function getDashboard(db: Db, now: Date) {
       getPaymentOverview(db, localDate(now), month),
     ]);
 
-  const tonight = summarize(houseRows, tonightRows, (recap.paymentPeriods ?? []).filter((p) => p.start <= date && p.end >= date));
+  const periods = (recap.paymentPeriods ?? []).filter((p) => p.start <= date && p.end >= date);
+  const tonight = summarize(houseRows, tonightRows, periods);
+  const automaticIds = new Set(periods.map((p) => p.houseId));
+  const activeHouses = houseRows.filter((h) => h.status === "active");
+  const dailyHouses = activeHouses.filter((h) => !automaticIds.has(h.id));
+  const daily = summarize(dailyHouses, tonightRows);
   const stats = monthStats(recap);
   const day = scheduleDay(date);
   const plan = matchPlan(SITE_PLAN, houseRows);
 
-  // Rumah aktif yang paling sering kosong bulan ini.
-  const oftenEmpty = stats.perHouse
-    .filter((h) => h.status === "active" && h.empty > 0)
-    .sort((a, b) => b.empty - a.empty || a.filled - b.filled)
-    .slice(0, 6)
-    .map((h) => ({ id: h.id, label: houseLabel(h), empty: h.empty, nights: stats.nights }));
+  // Wadah harian yang benar-benar diperiksa kosong, terpisah dari periode belum bayar.
+  const oftenEmpty = activeHouses
+    .map((h) => {
+      const checked = recap.dates.filter((day) => day <= date && !recap.paymentPeriods?.some((p) => p.houseId === h.id && p.start <= day && p.end >= day))
+        .flatMap((day) => recap.cells[`${h.id}:${day}`] ? [recap.cells[`${h.id}:${day}`]] : []);
+      return { id: h.id, label: houseLabel(h), empty: checked.filter((c) => c.status === "empty").length, nights: checked.length };
+    })
+    .filter((h) => h.empty > 0)
+    .sort((a, b) => b.empty - a.empty || a.nights - b.nights)
+    .slice(0, 6);
 
   return {
     communityName: settingsRow.communityName,
@@ -58,11 +67,14 @@ export async function getDashboard(db: Db, now: Date) {
     tonight: {
       expected: tonight.expected,
       checked: tonight.checked,
-      filled: tonight.filled.length,
+      filled: tonight.filled.filter((h) => h.status === "active").length,
       empty: tonight.empty.length,
       unchecked: tonight.unchecked.length,
       vacant: tonight.vacant.length,
       total: tonight.total,
+      collectedHouses: tonightRows.filter((c) => c.status === "filled").length,
+      automatic: activeHouses.filter((h) => automaticIds.has(h.id)).length,
+      daily: { expected: daily.expected, checked: daily.checked, unchecked: daily.unchecked.length },
       collectors: tonight.collectors,
       guards: schedule
         .filter((s) => s.day === day)

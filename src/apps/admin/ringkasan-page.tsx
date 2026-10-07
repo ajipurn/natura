@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   CalendarClock,
   CalendarDays,
+  ChevronRight,
   KeyRound,
   Map as MapIcon,
   ShieldAlert,
@@ -16,11 +17,12 @@ import { Link } from "react-router";
 import { BarChart } from "@/components/bar-chart";
 import { GuardChip } from "@/components/guard-chip";
 import { QueryState } from "@/components/query-state";
-import { Card, PageHeader, cx } from "@/components/ui";
+import { Card, PageHeader } from "@/components/ui";
 import { formatDateLong, formatDateShort, formatMonth } from "@/lib/dates";
 import { formatAmountShort, formatRupiah } from "@/lib/format";
 import { dayLabel, scheduleDay } from "@/lib/schedule";
 import { dashboardQuery } from "./queries";
+import { TonightCard } from "./tonight-card";
 
 export function RingkasanPage() {
   const query = useQuery(dashboardQuery);
@@ -29,7 +31,6 @@ export function RingkasanPage() {
     <QueryState query={query}>
       {(d) => {
         const t = d.tonight;
-        const progress = t.expected ? Math.round((t.checked / t.expected) * 100) : 0;
         const todo = todoItems(d.todo, d.date);
         return (
           <>
@@ -53,11 +54,11 @@ export function RingkasanPage() {
             )}
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <StatCard label="Malam ini terkumpul" value={formatRupiah(t.total)} hint={`${t.filled} rumah berstatus hijau`} />
+              <StatCard label="Uang hasil ronda" value={formatRupiah(t.total)} hint={t.collectedHouses ? `Diambil dari ${t.collectedHouses} rumah malam ini` : "Belum ada uang yang diambil malam ini"} />
               <StatCard
-                label="Rumah selesai"
-                value={`${t.checked}/${t.expected}`}
-                hint={t.unchecked ? `${t.unchecked} harian belum dicek` : "Semua selesai"}
+                label="Progres ronda harian"
+                value={t.daily.expected ? `${t.daily.checked}/${t.daily.expected}` : "—"}
+                hint={!t.daily.expected ? "Tidak ada rumah harian" : t.daily.unchecked ? `${t.daily.unchecked} rumah belum dicek` : "Semua rumah harian sudah dicek"}
               />
               <StatCard
                 label={`Total ${formatMonth(d.month)}`}
@@ -72,40 +73,21 @@ export function RingkasanPage() {
               />
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl bg-primary/5 px-4 py-3 text-sm">
-              <Link to="/admin/rekap" className="font-semibold text-primary">Pembayaran periode hari ini: {formatRupiah(d.paymentOverview.receivedToday)}</Link>
-              <Link to="/admin/rekap" className="font-semibold text-muted">{d.paymentOverview.unpaidHouses} rumah belum bayar periode berjalan · {formatRupiah(d.paymentOverview.unpaidAmount)}</Link>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Link to="/admin/rekap" className="flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-3 transition-colors hover:border-primary/40">
+                <Wallet className="size-5 shrink-0 text-primary" aria-hidden />
+                <div className="min-w-0 flex-1"><p className="text-xs text-muted">Pembayaran periode diterima hari ini</p><p className="mt-0.5 text-sm font-semibold tabular-nums">{formatRupiah(d.paymentOverview.receivedToday)}</p></div>
+                <ChevronRight className="size-4 text-muted" aria-hidden />
+              </Link>
+              <Link to="/admin/rekap" className="flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-3 transition-colors hover:border-primary/40">
+                <CalendarClock className="size-5 shrink-0 text-primary" aria-hidden />
+                <div className="min-w-0 flex-1"><p className="text-xs text-muted">Belum bayar periode berjalan</p><p className="mt-0.5 text-sm font-semibold tabular-nums">{d.paymentOverview.unpaidHouses} rumah · {formatRupiah(d.paymentOverview.unpaidAmount)}</p></div>
+                <ChevronRight className="size-4 text-muted" aria-hidden />
+              </Link>
             </div>
 
             <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_20rem]">
-              <Card>
-                <div className="flex items-baseline justify-between gap-2">
-                  <h2 className="font-semibold">Ronda malam ini</h2>
-                  <Link to={`/admin/riwayat/${d.date}`} className="text-sm font-semibold text-primary">
-                    Detail
-                  </Link>
-                </div>
-                <div
-                  className="mt-3 h-3 overflow-hidden rounded-full bg-idle-soft"
-                  role="progressbar"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={progress}
-                  aria-label="Progres ronda malam ini"
-                >
-                  <div className="h-full rounded-full bg-filled transition-all" style={{ width: `${progress}%` }} />
-                </div>
-                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
-                  <Dot className="bg-filled" label={`Ada ${t.filled}`} />
-                  <Dot className="bg-empty" label={`Kosong ${t.empty}`} />
-                  <Dot className="border border-line bg-card" label={`Belum ${t.unchecked}`} />
-                  {t.vacant > 0 && <Dot className="border border-dashed border-muted" label={`Mudik ${t.vacant}`} />}
-                </div>
-                <p className="mt-3 text-sm text-muted">
-                  {t.collectors.length ? `Petugas yang mencatat: ${t.collectors.join(", ")}` : "Belum ada catatan malam ini."}
-                </p>
-                <p className="mt-1 text-xs text-muted">Status mingguan/bulanan otomatis dari pembayaran periode.</p>
-              </Card>
+              <TonightCard tonight={t} date={d.date} />
 
               <Card>
                 <h2 className="flex items-center gap-2 font-semibold">
@@ -153,16 +135,17 @@ export function RingkasanPage() {
               </Card>
 
               <Card>
-                <h2 className="font-semibold">Sering kosong bulan ini</h2>
+                <h2 className="font-semibold">Wadah harian sering kosong</h2>
+                <p className="mt-1 text-xs text-muted">Hasil pemeriksaan {formatMonth(d.month)}</p>
                 {d.oftenEmpty.length === 0 ? (
-                  <p className="mt-2 text-sm text-muted">Tidak ada rumah yang kosong. 👍</p>
+                  <p className="mt-3 text-sm text-muted">Belum ada wadah harian tercatat kosong.</p>
                 ) : (
                   <ul className="mt-2 divide-y divide-line">
                     {d.oftenEmpty.map((h) => (
                       <li key={h.id} className="flex items-center justify-between py-1.5 text-sm">
                         <span className="font-semibold">{h.label}</span>
                         <span className="text-empty">
-                          {h.empty}× dari {h.nights} malam
+                          {h.empty}× kosong · {h.nights}× dicek
                         </span>
                       </li>
                     ))}
@@ -195,9 +178,6 @@ function todoItems(
   date: string,
 ): { to: string; text: string; icon: LucideIcon }[] {
   const items: { to: string; text: string; icon: LucideIcon }[] = [];
-  if (todo.unpaidPayments) {
-    items.push({ to: "/admin/rekap", icon: CalendarClock, text: `${todo.unpaidPayments} rumah belum bayar periode berjalan` });
-  }
   if (todo.offDuty > 0) {
     items.push({
       to: `/admin/riwayat/${date}?tab=log`,
@@ -224,8 +204,8 @@ function StatCard({ label, value, hint, to }: { label: string; value: string; hi
   const body = (
     <>
       <p className="text-sm text-muted">{label}</p>
-      <p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
-      {hint && <p className="text-xs text-muted">{hint}</p>}
+      <p className="mt-1 text-2xl font-bold tracking-tight tabular-nums">{value}</p>
+      {hint && <p className="mt-1 text-xs text-muted">{hint}</p>}
     </>
   );
   return to ? (
@@ -234,14 +214,5 @@ function StatCard({ label, value, hint, to }: { label: string; value: string; hi
     </Link>
   ) : (
     <Card>{body}</Card>
-  );
-}
-
-function Dot({ className, label }: { className: string; label: string }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <span className={cx("inline-block size-3 rounded", className)} />
-      {label}
-    </span>
   );
 }
