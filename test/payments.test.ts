@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { addDays, daysInMonth, localDate, shiftMonth } from "@/lib/dates";
 import { allocatePayment, billingPeriods, paymentCells, paymentPeriod, rondaPaymentPeriods, type PaymentPlanDTO } from "@/lib/payments";
 import { summarize } from "@/lib/recap";
@@ -8,6 +8,13 @@ import { getDashboard } from "@/server/dashboard";
 import { getPaymentMonth } from "@/server/payments";
 import type { Db } from "@/server/db";
 import { apiClient, createTestEnv } from "./helpers/db";
+
+// Tanggal kalender dan malam ronda harus sama dalam fixture kas; sebelum 06.00 berbeda.
+vi.hoisted(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-07T12:00:00Z"));
+});
+afterAll(() => vi.useRealTimers());
 
 const plan: PaymentPlanDTO = { id: 1, houseId: 1, effectiveFrom: "2026-10-01", cadence: "monthly", ratePerNight: 500, dueTiming: "end", graceDays: 0, weekStart: 1 };
 

@@ -15,7 +15,7 @@ import { recapQuery } from "../queries";
 import { HouseChips, HousePanel, MapWithPanel } from "./house-panel";
 
 /**
- * Seberapa sering wadah kosong, dari malam yang dicek. Satu warna (merah "kosong"), makin pekat
+ * Seberapa sering status kosong, dari malam yang tercatat. Satu warna (merah "kosong"), makin pekat
  * makin sering; rumah yang tidak pernah kosong dibiarkan polos.
  */
 const HEAT_STEPS: (LotPaint & { upTo: number; label: string; swatch: string })[] = [
@@ -25,11 +25,11 @@ const HEAT_STEPS: (LotPaint & { upTo: number; label: string; swatch: string })[]
   { upTo: 0.5, label: "≤50%", shape: "fill-empty/60 stroke-empty", text: "fill-fg", swatch: "border-empty bg-empty/60" },
   { upTo: 1, label: ">50%", shape: "fill-empty/90 stroke-empty", text: "fill-card", swatch: "border-empty bg-empty/90" },
 ];
-const NO_DATA: LotPaint = { shape: "fill-idle-soft stroke-fg/25", text: "fill-muted", note: "belum pernah dicek" };
+const NO_DATA: LotPaint = { shape: "fill-idle-soft stroke-fg/25", text: "fill-muted", note: "belum ada status" };
 /** Batas "sering kosong" untuk ringkasan di atas denah. */
 const OFTEN = 0.25;
 
-/** Bagian malam yang wadahnya kosong dari malam yang dicek; null kalau belum pernah dicek. */
+/** Bagian malam berstatus kosong; null kalau belum ada status. */
 function emptyRate(h: HouseMonthStats): number | null {
   const checked = h.filled + h.empty;
   return checked ? h.empty / checked : null;
@@ -94,7 +94,7 @@ export function MonthMap() {
                 </Card>
                 <Card className="p-3 text-center">
                   <p className="text-xl font-bold">{checked ? `${Math.round((filled / checked) * 100)}%` : "–"}</p>
-                  <p className="text-xs text-muted">Wadah terisi</p>
+                  <p className="text-xs text-muted">Status terisi</p>
                 </Card>
                 <Card className="p-3 text-center">
                   <p className={cx("text-xl font-bold", often.some((h) => (emptyRate(h) ?? 0) > OFTEN) && "text-empty")}>
@@ -119,7 +119,7 @@ export function MonthMap() {
                       onHouseClick={(h) => setSelected(h.id)}
                     />
                     <Legend>
-                      <span className="font-medium text-fg">Wadah kosong</span>
+                      <span className="font-medium text-fg">Status kosong</span>
                       {HEAT_STEPS.map((s) => (
                         <LegendItem key={s.label} swatch={s.swatch}>
                           {s.label}
@@ -128,6 +128,7 @@ export function MonthMap() {
                       <LegendItem swatch="border-fg/25 bg-idle-soft">Belum dicek</LegendItem>
                       <LegendItem swatch="border-dashed border-muted bg-card">Mudik</LegendItem>
                     </Legend>
+                    <p className="text-xs text-muted">Harian mengikuti catatan ronda. Mingguan/bulanan otomatis dari pembayaran periode.</p>
                   </>
                 }
                 panel={
@@ -138,7 +139,7 @@ export function MonthMap() {
                       <HouseChips
                         title="Paling sering kosong"
                         houses={often.slice(0, 12).flatMap((h) => byId.get(h.id) ?? [])}
-                        empty={stats.nights ? "Tidak ada wadah kosong bulan ini." : "Belum ada catatan."}
+                        empty={stats.nights ? "Tidak ada status kosong bulan ini." : "Belum ada catatan."}
                         onSelect={setSelected}
                         render={(h) => {
                           const s = stats.perHouse.find((p) => p.id === h.id)!;

@@ -32,7 +32,8 @@ import {
   rondaDate,
 } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
-import type { MarkerState } from "@/lib/house-state";
+import { rondaHouseState } from "@/lib/house-state";
+import { CADENCE_LABEL, type BillingPeriod } from "@/lib/payments";
 import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
 import { buildRecapText, summarize } from "@/lib/recap";
 import type { CollectionDTO, HouseDTO } from "@/lib/types";
@@ -153,12 +154,13 @@ export function PatrolDetail({
         <ErrorCard message="Tanggal tidak valid." />
       ) : (
         <QueryState query={query}>
-          {({ houses, collections, settings }) => (
+          {({ houses, collections, settings, paymentPeriods }) => (
             <NightDetail
               date={date}
               isTonight={date === tonight}
               houses={houses}
               collections={collections}
+              paymentPeriods={paymentPeriods}
               communityName={settings.communityName}
               defaultAmount={settings.defaultAmount}
               // Malam yang belum tiba belum bisa diisi.
@@ -179,6 +181,7 @@ function NightDetail({
   isTonight,
   houses,
   collections,
+  paymentPeriods = [],
   communityName,
   defaultAmount,
   canCorrect,
@@ -190,6 +193,7 @@ function NightDetail({
   isTonight: boolean;
   houses: HouseDTO[];
   collections: CollectionDTO[];
+  paymentPeriods?: BillingPeriod[];
   communityName: string;
   defaultAmount: number;
   canCorrect: boolean;
@@ -207,17 +211,16 @@ function NightDetail({
   const [mapTarget, setMapTarget] = useState<CorrectionTarget | null>(null);
   const [mapTargetOpen, setMapTargetOpen] = useState(false);
 
-  const summary = summarize(houses, collections);
+  const summary = summarize(houses, collections, paymentPeriods);
   const byHouse = new Map(collections.map((c) => [c.houseId, c]));
-  const markers: Record<number, MarkerState> = Object.fromEntries(
-    houses.map((h) => [
-      h.id,
-      byHouse.get(h.id)?.status ??
-        (h.status === "vacant" ? "vacant" : "unchecked"),
-    ]),
+  const periodOf = (h: HouseDTO) => h.status === "active" ? paymentPeriods.find((p) => p.houseId === h.id) : undefined;
+  const markers: Record<number, ReturnType<typeof rondaHouseState>> = Object.fromEntries(
+    houses.map((h) => [h.id, rondaHouseState(h, byHouse.get(h.id), periodOf(h))]),
   );
-  const stateOf = (h: HouseDTO) =>
-    byHouse.get(h.id)?.status ?? (h.status === "vacant" ? "vacant" : "none");
+  const stateOf = (h: HouseDTO) => {
+    const state = markers[h.id];
+    return state === "unchecked" ? "none" : state;
+  };
   const matched = search.trim()
     ? new Set(searchHouses(houses, search, houses.length).map((h) => h.id))
     : null;
@@ -309,7 +312,7 @@ function NightDetail({
         {summary.checked > 0 ? (
           <ShareRecap
             className="mt-4"
-            text={buildRecapText({ communityName, date, houses, collections })}
+            text={buildRecapText({ communityName, date, houses, collections, paymentPeriods })}
           />
         ) : (
           <p className="mt-4 rounded-xl bg-idle-soft px-3 py-2.5 text-sm text-muted">
@@ -318,6 +321,7 @@ function NightDetail({
               " Isi semua rumah sekaligus, lalu ubah yang berbeda lewat tombol koreksi di daftar."}
           </p>
         )}
+        {paymentPeriods.length > 0 && <p className="mt-3 text-xs text-muted">Mingguan/bulanan otomatis dari pembayaran periode; tidak perlu discan. Nominal terkumpul hanya uang yang diambil saat ronda.</p>}
         {canCorrect &&
           summary.unchecked.length > 0 &&
           (bulkFilling ? (
@@ -512,6 +516,7 @@ function NightDetail({
                           <StatusBadge
                             status={stateOf(h)}
                             amount={c?.amount ?? 0}
+                            period={periodOf(h)}
                           />
                           {canCorrect && (
                             <Button
@@ -577,9 +582,11 @@ function Stat({
 function StatusBadge({
   status,
   amount,
+  period,
 }: {
   status: "filled" | "empty" | "vacant" | "none";
   amount: number;
+  period?: BillingPeriod;
 }) {
   const styles = {
     filled: "bg-filled-soft text-filled",
@@ -587,7 +594,9 @@ function StatusBadge({
     vacant: "border border-dashed border-line text-muted",
     none: "bg-idle-soft text-muted",
   }[status];
-  const label = {
+  const label = period && (period.status === "paid" || status !== "filled")
+    ? `${CADENCE_LABEL[period.cadence]} · ${period.status === "paid" ? "Sudah bayar" : "Belum bayar"}`
+    : {
     filled: formatRupiah(amount),
     empty: "Kosong",
     vacant: "Mudik",

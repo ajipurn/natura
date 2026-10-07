@@ -1,4 +1,17 @@
-import type { MonthRecap } from "./types";
+import { rondaHouseState } from "./house-state";
+import type { HouseDTO, MonthRecap } from "./types";
+
+/** Status tampilan per malam; catatan dan nominal asli tetap disimpan terpisah. */
+export function monthHouseNights(recap: Pick<MonthRecap, "dates" | "cells" | "paymentPeriods">, house: Pick<HouseDTO, "id" | "status">) {
+  return recap.dates.map((date) => {
+    const cell = recap.cells[`${house.id}:${date}`];
+    const period = house.status === "active"
+      ? recap.paymentPeriods?.find((p) => p.houseId === house.id && p.start <= date && p.end >= date)
+      : undefined;
+    const status = house.status === "active" ? rondaHouseState(house, cell, period) : cell?.status ?? "unchecked";
+    return { date, cell, period, status };
+  });
+}
 
 /** Baris tabel rekap bulanan: sel per malam, jumlah "ada", dan total per rumah. */
 export function summarizeMonth(recap: MonthRecap) {

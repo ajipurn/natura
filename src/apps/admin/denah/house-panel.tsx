@@ -9,7 +9,9 @@ import { CorrectionDialog } from "@/features/riwayat/correction-form";
 import { formatDateShort, formatMonth, formatTime } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { houseLabel, type HouseRef } from "@/lib/houses";
-import type { BillingPeriod } from "@/lib/payments";
+import { CADENCE_LABEL, type BillingPeriod } from "@/lib/payments";
+import { monthHouseNights } from "@/lib/month-summary";
+import { monthStats } from "@/lib/month-stats";
 import type { CollectionDTO, HouseDTO } from "@/lib/types";
 import { recapQuery } from "../queries";
 
@@ -117,20 +119,10 @@ export function HousePanel({
     ...recapQuery(month),
     refetchInterval: tonight ? 30_000 : false,
   });
-  const nights = recap.data
-    ? recap.data.dates.map((date) => ({
-        date,
-        cell: recap.data.cells[`${house.id}:${date}`] ?? null,
-      }))
-    : null;
-  const filled = nights?.filter((n) => n.cell?.status === "filled").length ?? 0;
-  const empty = nights?.filter((n) => n.cell?.status === "empty").length ?? 0;
-  const unchecked = (nights?.length ?? 0) - filled - empty;
-  const total =
-    nights?.reduce(
-      (sum, n) => sum + (n.cell?.status === "filled" ? n.cell.amount : 0),
-      0,
-    ) ?? 0;
+  const nights = recap.data ? monthHouseNights(recap.data, house) : null;
+  const stats = recap.data ? monthStats(recap.data).perHouse.find((h) => h.id === house.id) : undefined;
+  const { filled = 0, empty = 0, unchecked = 0, total = 0 } = stats ?? {};
+  const automatic = nights?.some((n) => n.period) ?? false;
 
   return (
     <Card className="space-y-4">
@@ -223,12 +215,14 @@ export function HousePanel({
               className="mt-3 flex flex-wrap gap-1"
               aria-label="Catatan per malam"
             >
-              {nights.map(({ date, cell }) => {
-                const text = cell
-                  ? cell.status === "filled"
-                    ? `ada ${formatRupiah(cell.amount)}`
-                    : "kosong"
-                  : "tidak dicek";
+              {nights.map(({ date, cell, period, status }) => {
+                const text = period?.status === "paid"
+                  ? `${CADENCE_LABEL[period.cadence]} · Sudah bayar`
+                  : cell?.status === "filled"
+                    ? `ada ${formatRupiah(cell.amount)}${period ? ` · ${CADENCE_LABEL[period.cadence]} · Belum bayar penuh` : ""}`
+                    : period
+                      ? `${CADENCE_LABEL[period.cadence]} · Belum bayar`
+                      : cell ? "kosong" : "tidak dicek";
                 return (
                   <li key={date}>
                     <Link
@@ -237,9 +231,9 @@ export function HousePanel({
                       aria-label={`${formatDateShort(date)}: ${text}`}
                       className={cx(
                         "block size-4 rounded-[3px] hover:ring-2 hover:ring-primary/50",
-                        cell?.status === "filled" && "bg-filled",
-                        cell?.status === "empty" && "bg-empty",
-                        !cell && "border border-line bg-idle-soft",
+                        status === "filled" && "bg-filled",
+                        status === "empty" && "bg-empty",
+                        status === "unchecked" && "border border-line bg-idle-soft",
                       )}
                     />
                   </li>
@@ -247,7 +241,9 @@ export function HousePanel({
               })}
             </ul>
             <p className="mt-2 text-xs text-muted">
-              {filled + empty > 0
+              {automatic
+                ? `Status mingguan/bulanan otomatis dari pembayaran. Total jimpitan ${formatRupiah(total)}.`
+                : filled + empty > 0
                 ? `Kosong ${Math.round((empty / (filled + empty)) * 100)}% dari ${filled + empty} malam yang dicek · ${formatRupiah(total)}`
                 : "Belum pernah dicek bulan ini."}
             </p>
