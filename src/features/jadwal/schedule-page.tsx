@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Check, Clock3, Minus, X } from "lucide-react";
 import { QueryState } from "@/components/query-state";
+import { guardColorClass } from "@/components/guard-color-class";
 import { GuardColorLegend } from "@/components/guard-color-legend";
 import { Card, PageHeader, cx } from "@/components/ui";
 import { rondaDate } from "@/lib/dates";
-import { shownToGuards } from "@/lib/guard-color";
+import { GUARD_COLOR_LABEL, GUARD_COLOR_MEANING, shownToGuards } from "@/lib/guard-color";
 import { DAY_NAMES, dayLabel, scheduleDay, slotHouseLabel } from "@/lib/schedule";
 import type { ScheduleDTO } from "@/lib/types";
 import { scheduleQuery } from "./queries";
@@ -95,8 +96,13 @@ function DayCard({
         <ol className="mt-2 divide-y divide-line">
           {entries.map((e) => {
             const me = currentUserId !== undefined && e.userId === currentUserId;
+            const status = `${e.color ? GUARD_COLOR_LABEL[e.color] : "Putih"}: ${GUARD_COLOR_MEANING[e.color ?? "white"]}`;
+            const StatusIcon = e.color === "green" ? Check : e.color === "yellow" || e.color === "orange" ? Clock3 : e.color === "blue" ? X : Minus;
             return (
               <li key={e.id} className={cx("flex items-center gap-3 py-1.5", me && "-mx-2 rounded-lg bg-primary/10 px-2")}>
+                <span role="img" aria-label={status} title={status} className={cx("flex size-5 shrink-0 items-center justify-center rounded-md", guardColorClass(e.color))}>
+                  <StatusIcon aria-hidden className="size-3.5" strokeWidth={1.5} />
+                </span>
                 <span className="w-14 shrink-0 font-bold">{slotHouseLabel(e) || "—"}</span>
                 <span className="min-w-0 flex-1 truncate">{e.name ?? e.ownerName ?? <span className="text-muted">—</span>}</span>
                 {me && <span className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-fg">Kamu</span>}
