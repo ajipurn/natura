@@ -12,6 +12,7 @@ import { getHouseHistory, getMonthRecap, getSettings, logoColumns, logoUrl } fro
 import { listSchedule } from "../schedule";
 import { announcements, contacts, houses, settings } from "../schema";
 import { monthQuery } from "./ronda";
+import { getHousePaymentInfo } from "../payments";
 
 /** Banyaknya malam ronda terakhir di riwayat per rumah (± 3 bulan). */
 const HISTORY_NIGHTS = 100;
@@ -92,13 +93,15 @@ export const wargaRoutes = new Hono<AppEnv>()
       .limit(1);
     if (!house) return c.json({ error: "Rumah tidak ditemukan." }, 404);
     const history = await getHouseHistory(db, house, HISTORY_NIGHTS);
+    const paymentInfo = await getHousePaymentInfo(db, house.id, rondaDate(new Date()));
     const { createdAt: _createdAt, ...rest } = house;
-    return c.json({ house: rest, today: rondaDate(new Date()), history });
+    return c.json({ house: rest, today: rondaDate(new Date()), history, paymentInfo });
   })
 
   /** Rekap bulanan tanpa nama: total per malam dan per rumah. */
   .get("/rekap", requireWarga, monthQuery, async (c) => {
     const month = c.req.valid("query").bulan;
-    const stats = monthStats(await getMonthRecap(c.var.db, month));
-    return c.json({ month, today: rondaDate(new Date()), ...stats });
+    const recap = await getMonthRecap(c.var.db, month);
+    const stats = monthStats(recap);
+    return c.json({ month, today: rondaDate(new Date()), ...stats, paymentPeriods: recap.paymentPeriods ?? [] });
   });

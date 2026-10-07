@@ -1,5 +1,5 @@
 import { eq, sql } from "drizzle-orm";
-import { rondaDate } from "@/lib/dates";
+import { localDate, rondaDate } from "@/lib/dates";
 import { houseLabel } from "@/lib/houses";
 import { monthStats } from "@/lib/month-stats";
 import { summarize } from "@/lib/recap";
@@ -10,6 +10,7 @@ import type { Db } from "./db";
 import { getCollectionsForDate, getMonthRecap, getSettings, listHouses, listPatrols } from "./queries";
 import { countOffDuty } from "./audit";
 import { getCashOverview } from "./kas";
+import { getPaymentOverview } from "./payments";
 import { countPendingRequests } from "./requests";
 import { listSchedule } from "./schedule";
 import { settings, users } from "./schema";
@@ -18,7 +19,7 @@ import { settings, users } from "./schema";
 export async function getDashboard(db: Db, now: Date) {
   const date = rondaDate(now);
   const month = date.slice(0, 7);
-  const [settingsRow, houseRows, tonightRows, recap, recent, schedule, [userCounts], [codeRow], pendingRequests, offDuty, cash] =
+  const [settingsRow, houseRows, tonightRows, recap, recent, schedule, [userCounts], [codeRow], pendingRequests, offDuty, cash, paymentOverview] =
     await Promise.all([
       getSettings(db),
       listHouses(db),
@@ -35,6 +36,7 @@ export async function getDashboard(db: Db, now: Date) {
       countPendingRequests(db),
       countOffDuty(db, date),
       getCashOverview(db, date),
+      getPaymentOverview(db, localDate(now), month),
     ]);
 
   const tonight = summarize(houseRows, tonightRows);
@@ -66,7 +68,8 @@ export async function getDashboard(db: Db, now: Date) {
         .filter((s) => s.day === day)
         .map((s) => ({ id: s.id, label: slotHouseLabel(s), name: s.name ?? s.ownerName, color: s.color })),
     },
-    monthSummary: { nights: stats.nights, total: stats.total, average: stats.average },
+    monthSummary: { nights: stats.nights, total: stats.perNight.reduce((sum, n) => sum + n.total, 0) + paymentOverview.receivedMonth, average: stats.average },
+    paymentOverview,
     /** 30 malam terakhir, urut dari yang terlama. */
     trend: [...recent].reverse().map((p) => ({ date: p.date, filled: p.filled, empty: p.empty, total: p.total })),
     oftenEmpty,
@@ -85,6 +88,8 @@ export async function getDashboard(db: Db, now: Date) {
       offDuty,
       /** Malam sebelum malam ini yang belum dicatat setorannya. */
       undeposited: cash.undeposited,
+      overduePayments: paymentOverview.overdueHouses,
+      duePayments: paymentOverview.dueHouses,
     },
   };
 }

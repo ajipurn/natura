@@ -1,8 +1,8 @@
-import { and, asc, desc, eq, gte, lt, lte, min, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lt, lte, min, sql } from "drizzle-orm";
 import { daysInMonth } from "@/lib/dates";
 import type { Db } from "./db";
 import { listPatrols } from "./queries";
-import { cashDeposits, cashEntries, collections, patrols, settings, users } from "./schema";
+import { cashDeposits, cashEntries, collections, payments, patrols, settings, users } from "./schema";
 
 /** Batas satu catatan kas (Rp). */
 export const MAX_CASH = 100_000_000;
@@ -14,7 +14,7 @@ export const MAX_CASH = 100_000_000;
 async function cashTotals(db: Db, month: string) {
   const days = daysInMonth(month);
   const [start, end] = [days[0], days[days.length - 1]];
-  const [[dep], [ent]] = await Promise.all([
+  const [[dep], [ent], [direct]] = await Promise.all([
     db
       .select({
         before: sql<number>`coalesce(sum(${cashDeposits.amount}) filter (where ${cashDeposits.date} < ${start}), 0)`.mapWith(Number),
@@ -32,15 +32,21 @@ async function cashTotals(db: Db, month: string) {
         allOut: sql<number>`coalesce(sum(${cashEntries.amount}) filter (where ${cashEntries.direction} = 'out'), 0)`.mapWith(Number),
       })
       .from(cashEntries),
+    db.select({
+      before: sql<number>`coalesce(sum(${payments.amount}) filter (where ${payments.receivedDate} < ${start}), 0)`.mapWith(Number),
+      during: sql<number>`coalesce(sum(${payments.amount}) filter (where ${payments.receivedDate} between ${start} and ${end}), 0)`.mapWith(Number),
+      all: sql<number>`coalesce(sum(${payments.amount}), 0)`.mapWith(Number),
+    }).from(payments).where(and(eq(payments.receivedBy, "treasurer"), isNull(payments.cancelledAt))),
   ]);
-  const opening = dep.before + ent.beforeIn - ent.beforeOut;
+  const opening = dep.before + ent.beforeIn - ent.beforeOut + direct.before;
   return {
     opening,
     deposits: dep.during,
     income: ent.income,
+    directPayments: direct.during,
     expenses: ent.expenses,
-    closing: opening + dep.during + ent.income - ent.expenses,
-    balance: dep.all + ent.allIn - ent.allOut,
+    closing: opening + dep.during + ent.income + direct.during - ent.expenses,
+    balance: dep.all + ent.allIn + direct.all - ent.allOut,
   };
 }
 
@@ -78,7 +84,10 @@ export async function undepositedNights(db: Db, tonight: string): Promise<string
     .groupBy(patrols.date)
     .having(sql`sum(${collections.amount}) > 0`)
     .orderBy(asc(patrols.date));
-  return rows.map((r) => r.date);
+  const periodRows = await db.select({ date: payments.receivedDate }).from(payments)
+    .leftJoin(cashDeposits, eq(cashDeposits.date, payments.receivedDate))
+    .where(and(eq(payments.receivedBy, "collector"), isNull(payments.cancelledAt), gte(payments.receivedDate, first.date), lt(payments.receivedDate, tonight), isNull(cashDeposits.id)));
+  return [...new Set([...rows, ...periodRows].map((r) => r.date))].sort();
 }
 
 /**
@@ -87,7 +96,7 @@ export async function undepositedNights(db: Db, tonight: string): Promise<string
  */
 export async function getCashMonth(db: Db, month: string, tonight: string) {
   const days = daysInMonth(month);
-  const [totals, patrolRows, depositRows, entries, undeposited] = await Promise.all([
+  const [totals, patrolRows, depositRows, entries, undeposited, periodRows] = await Promise.all([
     cashTotals(db, month),
     listPatrols(db, days.length, month),
     db
@@ -103,23 +112,33 @@ export async function getCashMonth(db: Db, month: string, tonight: string) {
       .where(and(gte(cashDeposits.date, days[0]), lte(cashDeposits.date, days[days.length - 1]))),
     monthEntries(db, month),
     undepositedNights(db, tonight),
+    db.select({
+      id: payments.id, date: payments.receivedDate, amount: payments.amount, receivedBy: payments.receivedBy,
+      periodStart: payments.periodStart, periodEnd: payments.periodEnd, houseId: payments.houseId,
+    }).from(payments).where(and(isNull(payments.cancelledAt), gte(payments.receivedDate, days[0]), lte(payments.receivedDate, days[days.length - 1]))),
   ]);
 
   const recorded = new Map(patrolRows.map((p) => [p.date, { total: p.total, filled: p.filled }]));
+  const heldByCollectors = new Map<string, number>();
+  for (const p of periodRows.filter((p) => p.receivedBy === "collector")) {
+    heldByCollectors.set(p.date, (heldByCollectors.get(p.date) ?? 0) + p.amount);
+  }
   const deposits = new Map(depositRows.map((d) => [d.date, { ...d, updatedAt: d.updatedAt.toISOString() }]));
   // Malam yang ada uangnya atau sudah ada setorannya, terbaru dulu.
-  const dates = [...new Set([...patrolRows.filter((p) => p.total > 0).map((p) => p.date), ...deposits.keys()])].sort().reverse();
+  const dates = [...new Set([...patrolRows.filter((p) => p.total > 0).map((p) => p.date), ...deposits.keys(), ...heldByCollectors.keys()])].sort().reverse();
   return {
     month,
     tonight,
     ...totals,
     nights: dates.map((date) => ({
       date,
-      recorded: recorded.get(date)?.total ?? 0,
+      recorded: (recorded.get(date)?.total ?? 0) + (heldByCollectors.get(date) ?? 0),
+      periodPayments: heldByCollectors.get(date) ?? 0,
       filled: recorded.get(date)?.filled ?? 0,
       deposit: deposits.get(date) ?? null,
     })),
     entries,
+    directReceipts: periodRows.filter((p) => p.receivedBy === "treasurer"),
     /** Semua malam (bulan mana pun) yang belum dicatat setorannya. */
     undeposited,
   };
@@ -137,12 +156,13 @@ export async function getCashOverview(db: Db, tonight: string) {
  */
 export async function getCashPublic(db: Db, tonight: string) {
   const month = tonight.slice(0, 7);
-  const [[row], [anyDeposit], [anyEntry]] = await Promise.all([
+  const [[row], [anyDeposit], [anyEntry], [anyPayment]] = await Promise.all([
     db.select({ cashPublic: settings.cashPublic }).from(settings).where(eq(settings.id, 1)).limit(1),
     db.select({ id: cashDeposits.id }).from(cashDeposits).limit(1),
     db.select({ id: cashEntries.id }).from(cashEntries).limit(1),
+    db.select({ id: payments.id }).from(payments).where(and(isNull(payments.cancelledAt), eq(payments.receivedBy, "treasurer"))).limit(1),
   ]);
-  if (row?.cashPublic === false || (!anyDeposit && !anyEntry)) return null;
+  if (row?.cashPublic === false || (!anyDeposit && !anyEntry && !anyPayment)) return null;
   const [totals, entries] = await Promise.all([cashTotals(db, month), monthEntries(db, month)]);
   return {
     month,

@@ -8,6 +8,7 @@ import { applyEntries, dutyDays, MAX_AMOUNT } from "../collections";
 import type { AppEnv } from "../env";
 import { body } from "../http";
 import { getHouseByToken, getHouseHistory, getSettings } from "../queries";
+import { getHousePaymentInfo } from "../payments";
 
 const tokenParam = validator("param", (value: Record<string, string>, c) =>
   /^[A-Za-z0-9]{6,32}$/.test(value.token) ? { token: value.token } : c.json({ error: "Rumah tidak ditemukan." }, 404),
@@ -26,6 +27,7 @@ export const houseRoutes = new Hono<AppEnv>()
     if (!house) return c.json({ error: "Rumah tidak ditemukan." }, 404);
     const [user, settings, history] = await Promise.all([getSessionUser(c), getSettings(db), getHouseHistory(db, house, 30)]);
     const tonight = rondaDate(new Date());
+    const paymentInfo = await getHousePaymentInfo(db, house.id, tonight);
     // Hanya yang dijadwalkan jaga malam ini yang bisa mencatat (admin juga; koreksi lewat dashboard).
     const canRecord = user ? (await dutyDays(db, user.id)).has(scheduleDay(tonight)) : false;
     return c.json({
@@ -43,6 +45,7 @@ export const houseRoutes = new Hono<AppEnv>()
         ownerName: user ? house.ownerName : null,
       },
       history,
+      paymentInfo,
       user,
     });
   })

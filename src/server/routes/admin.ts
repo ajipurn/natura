@@ -20,7 +20,7 @@ import { MAX_LOGO_DATA_URL, parseLogo } from "../logo";
 import { DEFAULT_SETTINGS, getHouseIds, getPlanAnchors, getSettings, listHouses, listHousesWithUsage, listUsers, logoColumns, logoUrl } from "../queries";
 import { countPendingRequests, decideRequest, listRequestsForAdmin } from "../requests";
 import { clearSchedule, houseSlots, replaceSlots, saveSchedule, userDaysStatements } from "../schedule";
-import { announcements, cashDeposits, cashEntries, collections, contacts, houses, rondaSchedule, settings, users } from "../schema";
+import { announcements, cashDeposits, cashEntries, collections, contacts, houses, payments, rondaSchedule, settings, users } from "../schema";
 import { getAudit } from "../audit";
 import { getDashboard } from "../dashboard";
 import { getCashMonth, MAX_CASH } from "../kas";
@@ -213,8 +213,9 @@ export const adminRoutes = new Hono<AppEnv>()
       .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(collections)
       .where(eq(collections.houseId, id));
-    if (count > 0) {
-      return c.json({ error: "Rumah ini sudah punya catatan jimpitan. Tandai sebagai kosong/mudik saja." }, 409);
+    const [payment] = await db.select({ id: payments.id }).from(payments).where(eq(payments.houseId, id)).limit(1);
+    if (count > 0 || payment) {
+      return c.json({ error: "Rumah ini sudah punya catatan jimpitan atau pembayaran. Tandai sebagai kosong/mudik saja." }, 409);
     }
     await db.delete(houses).where(eq(houses.id, id));
     return c.json({ success: "Rumah dihapus." });

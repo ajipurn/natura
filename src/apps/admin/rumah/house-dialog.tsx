@@ -12,8 +12,9 @@ import { houseLabelLong, normalizeHouseField, parseNumberList } from "@/lib/hous
 import { houseUrl } from "@/lib/qr";
 import type { HouseDTO, HouseStatus } from "@/lib/types";
 import { HOUSE_REFRESH } from "../queries";
+import { PaymentPlanSection } from "../payments/plan-section";
 
-export type AdminHouse = HouseDTO & { collectionCount: number };
+export type AdminHouse = HouseDTO & { collectionCount: number; paymentCount: number };
 
 
 const STATUSES: { value: HouseStatus; label: string; hint: string }[] = [
@@ -253,6 +254,7 @@ function EditForm({ house, accounts, origin, onDone }: { house: AdminHouse; acco
         </div>
       </form>
 
+      <PaymentPlanSection houseId={house.id} />
       <QrSection house={house} origin={origin} />
       <DeleteSection house={house} onDeleted={onDone} />
     </div>
@@ -308,10 +310,10 @@ function DeleteSection({ house, onDeleted }: { house: AdminHouse; onDeleted: () 
     },
   });
 
-  if (house.collectionCount > 0) {
+  if (house.collectionCount > 0 || house.paymentCount > 0) {
     return (
       <p className="border-t border-line pt-4 text-xs text-muted">
-        Rumah ini sudah punya {house.collectionCount} catatan jimpitan, jadi tidak bisa dihapus. Tandai kosong/mudik kalau tidak dihuni
+        Rumah ini sudah punya catatan jimpitan atau pembayaran, jadi tidak bisa dihapus. Tandai kosong/mudik kalau tidak dihuni
         lagi.
       </p>
     );

@@ -7,6 +7,8 @@ import { formatRupiah } from "@/lib/format";
 import { houseLabelLong } from "@/lib/houses";
 import type { CollectionMethod, CollectionStatus, HouseDTO } from "@/lib/types";
 import type { MergedCollection } from "./use-ronda-store";
+import { PaymentNotice } from "@/components/payment-notice";
+import type { BillingPeriod, PaymentCell } from "@/lib/payments";
 
 const STEP = 500;
 
@@ -17,6 +19,8 @@ export function HouseSheet({
   method,
   onRecord,
   onClose,
+  paymentPeriod,
+  paymentCell,
 }: {
   house: HouseDTO;
   existing: MergedCollection | undefined;
@@ -24,6 +28,8 @@ export function HouseSheet({
   method: CollectionMethod;
   onRecord: (status: CollectionStatus | "none", amount: number) => void;
   onClose: () => void;
+  paymentPeriod?: BillingPeriod;
+  paymentCell?: PaymentCell;
 }) {
   const [amount, setAmount] = useState(
     existing?.status === "filled" && existing.amount > 0
@@ -75,6 +81,9 @@ export function HouseSheet({
             <X className="size-5" />
           </Button>
         </div>
+
+        {house.status === "active" && <div className="mt-3"><PaymentNotice period={paymentPeriod} cell={paymentCell} /></div>}
+        {(paymentPeriod || paymentCell) && <p className="mt-2 text-xs text-muted">Pembayaran periode terpisah dari hasil ronda. Catat Ada hanya untuk uang yang benar-benar diambil malam ini.</p>}
 
         {house.status === "vacant" && (
           <p className="mt-3 rounded-xl bg-warn-soft px-3 py-2 text-sm text-warn">

@@ -1,5 +1,6 @@
 import type { GeoAnchor } from "./geo";
 import type { GuardColor } from "./guard-color";
+import type { BillingPeriod, PaymentCell, PeriodPayment } from "./payments";
 
 export type Role = "admin" | "petugas";
 export type HouseStatus = "active" | "vacant";
@@ -55,6 +56,8 @@ export type RondaSnapshot = {
   schedule: ScheduleDTO[];
   /** Kalibrasi denah ↔ GPS untuk "Lokasi saya" (salinan lama di HP belum punya). */
   planAnchors?: GeoAnchor[];
+  paymentCells?: Record<string, PaymentCell>;
+  paymentPeriods?: BillingPeriod[];
 };
 
 /** Satu catatan dari HP petugas. `none` = hapus catatan rumah itu untuk malam tersebut. */
@@ -75,9 +78,15 @@ export type EntryResult =
 export type MonthCell = { status: CollectionStatus; amount: number };
 
 export type MonthRecap = {
+  /** Bulan rekap, termasuk saat belum ada malam ronda. Opsional untuk cache lama. */
+  month?: string;
   houses: HouseDTO[];
   /** Malam-malam ronda di bulan itu (YYYY-MM-DD, urut). */
   dates: string[];
   /** Kunci `${houseId}:${date}`. */
   cells: Record<string, MonthCell>;
+  /** Alokasi pembayaran sesuai periode, bukan uang yang diambil pada malam itu. */
+  paymentCells?: Record<string, PaymentCell>;
+  paymentPeriods?: BillingPeriod[];
+  periodPayments?: PeriodPayment[];
 };

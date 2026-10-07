@@ -59,6 +59,7 @@ export function KasPage() {
             <Summary data={data} />
             {data.undeposited.length > 0 && <Undeposited dates={data.undeposited} month={month} />}
             <Deposits nights={data.nights} tonight={tonight} />
+            {data.directReceipts.length > 0 && <section aria-label="Pembayaran langsung bendahara"><h2 className="font-semibold">Pembayaran langsung bendahara</h2><p className="mt-1 text-sm text-muted">Sudah masuk kas pada tanggal diterima. Koreksi di Rekap bulanan.</p><ul className="mt-3 divide-y divide-line rounded-2xl border border-line bg-card">{data.directReceipts.map((p) => <li key={p.id} className="flex flex-wrap justify-between gap-2 px-4 py-3"><div><p className="text-sm font-semibold">Diterima {formatDateShort(p.date)}</p><p className="text-xs text-muted">Periode {formatDateShort(p.periodStart)} – {formatDateShort(p.periodEnd)} <Link to="/admin/rekap" className="font-semibold text-primary underline">Lihat pembayaran</Link></p></div><span className="text-sm font-semibold text-filled">{formatRupiah(p.amount)}</span></li>)}</ul></section>}
             <Entries entries={data.entries} onOpen={openEntry} onAdd={() => openEntry()} />
             {cashPublic !== undefined && (
               <p className="text-xs text-muted">
@@ -120,6 +121,7 @@ function Summary({ data }: { data: CashMonth }) {
   const rows: [string, number, string?][] = [
     ["Saldo awal bulan", data.opening],
     ["+ Setoran jimpitan", data.deposits, "text-filled"],
+    ["+ Pembayaran langsung", data.directPayments, "text-filled"],
     ["+ Pemasukan lain", data.income, "text-filled"],
     ["− Pengeluaran", data.expenses, "text-empty"],
   ];
@@ -235,6 +237,7 @@ function NightRow({
             Tercatat <span className="font-semibold text-fg tabular-nums">{formatRupiah(recorded)}</span>
             {filled > 0 && ` · ${filled} rumah`}
           </p>
+          {night.periodPayments > 0 && <p className="mt-1 text-xs text-muted">Termasuk pembayaran periode ke petugas {formatRupiah(night.periodPayments)}.</p>}
           {deposit && (deposit.note || deposit.recordedByName) && (
             <p className="mt-1 break-words text-xs text-muted">
               {[deposit.note, deposit.recordedByName && `dicatat ${deposit.recordedByName}`].filter(Boolean).join(" · ")}

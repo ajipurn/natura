@@ -15,8 +15,12 @@ export function summarizeMonth(recap: MonthRecap) {
       }
       return cell;
     });
-    return { house, cells, filledCount, total };
+    const allocations = Object.entries(recap.paymentCells ?? {}).filter(([key]) => key.startsWith(house.id + ":")).map(([, c]) => c);
+    const monthlyTotal = allocations.reduce((sum, c) => sum + c.monthlyAmount, 0);
+    const weeklyTotal = allocations.reduce((sum, c) => sum + c.weeklyAmount, 0);
+    const periodTotal = allocations.reduce((sum, c) => sum + c.amount, 0);
+    return { house, cells, filledCount, total: total + periodTotal, collectedTotal: total, monthlyTotal, weeklyTotal, periodTotal };
   });
-  const grandTotal = dateTotals.reduce((a, b) => a + b, 0);
+  const grandTotal = rows.reduce((sum, row) => sum + row.total, 0);
   return { rows, dateTotals, grandTotal };
 }

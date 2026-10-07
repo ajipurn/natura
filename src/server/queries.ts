@@ -7,7 +7,8 @@ import type { SessionUser } from "./auth";
 import type { Db } from "./db";
 import { houseName } from "./house-name";
 import { guardDaysByUser, listSchedule } from "./schedule";
-import { collectionLogs, collections, houses, patrols, settings, users } from "./schema";
+import { collectionLogs, collections, houses, payments, patrols, settings, users } from "./schema";
+import { getPaymentMonth } from "./payments";
 
 export const DEFAULT_SETTINGS = { communityName: "Lingkungan Kita", defaultAmount: 500 };
 
@@ -111,6 +112,7 @@ export async function listHousesWithUsage(db: Db) {
     .select({
       ...houseColumns,
       collectionCount: sql<number>`count(${collections.id})`.mapWith(Number),
+      paymentCount: sql<number>`(select count(*) from ${payments} where ${payments.houseId} = ${houses.id})`.mapWith(Number),
     })
     .from(houses)
     .leftJoin(collections, eq(collections.houseId, houses.id))
@@ -146,12 +148,13 @@ export async function getCollectionsForDate(db: Db, date: string): Promise<Colle
 
 export async function getRondaSnapshot(db: Db, user: SessionUser, now = new Date()): Promise<RondaSnapshot> {
   const date = rondaDate(now);
-  const [settingsRow, houseRows, collectionRows, schedule, planAnchors] = await Promise.all([
+  const [settingsRow, houseRows, collectionRows, schedule, planAnchors, paymentData] = await Promise.all([
     getSettings(db),
     listHouses(db),
     getCollectionsForDate(db, date),
     listSchedule(db),
     getPlanAnchors(db),
+    getPaymentMonth(db, date.slice(0, 7)),
   ]);
   return {
     date,
@@ -162,6 +165,8 @@ export async function getRondaSnapshot(db: Db, user: SessionUser, now = new Date
     collections: collectionRows,
     schedule,
     planAnchors,
+    paymentCells: Object.fromEntries(Object.entries(paymentData.cells).filter(([key]) => key.endsWith(":" + date))),
+    paymentPeriods: paymentData.bills.filter((b) => b.start <= date && b.end >= date),
   };
 }
 
@@ -221,7 +226,7 @@ export async function getHouseHistory(db: Db, house: { id: number; createdAt: Da
 /** Data rekap bulanan: matriks rumah × tanggal ronda. */
 export async function getMonthRecap(db: Db, month: string): Promise<MonthRecap> {
   const days = daysInMonth(month);
-  const [houseRows, rows] = await Promise.all([
+  const [houseRows, rows, paymentData] = await Promise.all([
     listHouses(db),
     db
       .select({
@@ -234,6 +239,7 @@ export async function getMonthRecap(db: Db, month: string): Promise<MonthRecap> 
       .leftJoin(collections, eq(collections.patrolId, patrols.id))
       .where(and(gte(patrols.date, days[0]), lte(patrols.date, days[days.length - 1])))
       .orderBy(asc(patrols.date)),
+    getPaymentMonth(db, month),
   ]);
 
   const dates = [...new Set(rows.map((r) => r.date))];
@@ -243,7 +249,13 @@ export async function getMonthRecap(db: Db, month: string): Promise<MonthRecap> 
       cells[`${r.houseId}:${r.date}`] = { status: r.status, amount: r.amount };
     }
   }
-  return { houses: houseRows, dates, cells };
+  return {
+    month, houses: houseRows, dates, cells,
+    paymentCells: Object.fromEntries(Object.entries(paymentData.cells).filter(([key]) => key.split(":")[1].startsWith(month))),
+    paymentPeriods: paymentData.bills,
+    periodPayments: paymentData.receipts.filter((p) => p.periodStart <= days[days.length - 1] && p.periodEnd >= days[0])
+      .map(({ id, houseId, receivedDate, periodStart, periodEnd, cadence, amount }) => ({ id, houseId, receivedDate, periodStart, periodEnd, cadence, amount })),
+  };
 }
 
 /** Id semua rumah yang terdaftar (jumlahnya kecil, jadi lebih murah daripada query per id). */

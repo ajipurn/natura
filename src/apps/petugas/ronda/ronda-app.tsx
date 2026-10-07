@@ -395,7 +395,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                 {allDone && <div className="mt-4">{recap}</div>}
               </Card>
             ) : (
-              <HouseList houses={houses} collections={store.collections} filter={filter} onOpen={openHouse} />
+              <HouseList houses={houses} collections={store.collections} filter={filter} onOpen={openHouse} paymentPeriods={snapshot.date === store.date ? snapshot.paymentPeriods : []} paymentCells={snapshot.date === store.date ? snapshot.paymentCells : {}} date={store.date} />
             )}
 
             {/* Rekap bisa dibagikan kapan saja; saat semua selesai tombolnya ada di kartu di atas. */}
@@ -450,6 +450,8 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
           existing={store.collections.get(active.house.id)}
           defaultAmount={snapshot.settings.defaultAmount}
           method={active.method}
+          paymentPeriod={snapshot.date === store.date ? snapshot.paymentPeriods?.find((p) => p.houseId === active.house.id) : undefined}
+          paymentCell={snapshot.date === store.date ? snapshot.paymentCells?.[active.house.id + ":" + store.date] : undefined}
           onRecord={handleRecord}
           onClose={() => setActive(null)}
         />

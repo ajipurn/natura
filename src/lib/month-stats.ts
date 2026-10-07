@@ -14,6 +14,7 @@ export type HouseMonthStats = {
   /** Malam ronda yang rumah ini tidak tercatat. */
   unchecked: number;
   total: number;
+  periodTotal: number;
 };
 
 export type MonthStats = {
@@ -26,7 +27,7 @@ export type MonthStats = {
 };
 
 /** Ringkasan rekap bulanan per malam dan per rumah. */
-export function monthStats({ houses, dates, cells }: MonthRecap): MonthStats {
+export function monthStats({ houses, dates, cells, paymentCells = {} }: MonthRecap): MonthStats {
   const perNight = dates.map((date) => ({ date, filled: 0, empty: 0, total: 0 }));
   const perHouse = houses.map((h) => {
     const stats: HouseMonthStats = {
@@ -38,6 +39,7 @@ export function monthStats({ houses, dates, cells }: MonthRecap): MonthStats {
       empty: 0,
       unchecked: 0,
       total: 0,
+      periodTotal: 0,
     };
     dates.forEach((date, i) => {
       const cell = cells[`${h.id}:${date}`];
@@ -54,8 +56,11 @@ export function monthStats({ houses, dates, cells }: MonthRecap): MonthStats {
         if (h.status === "active") perNight[i].empty++;
       }
     });
+    stats.periodTotal = Object.entries(paymentCells).filter(([key]) => key.startsWith(h.id + ":")).reduce((sum, [, cell]) => sum + cell.amount, 0);
+    stats.total += stats.periodTotal;
     return stats;
   });
-  const total = perNight.reduce((sum, n) => sum + n.total, 0);
-  return { nights: dates.length, total, average: dates.length ? Math.round(total / dates.length) : 0, perNight, perHouse };
+  const collectedTotal = perNight.reduce((sum, n) => sum + n.total, 0);
+  const total = perHouse.reduce((sum, h) => sum + h.total, 0);
+  return { nights: dates.length, total, average: dates.length ? Math.round(collectedTotal / dates.length) : 0, perNight, perHouse };
 }

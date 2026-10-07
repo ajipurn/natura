@@ -8,6 +8,7 @@ import { houseRoutes } from "./routes/house";
 import { logoRoutes } from "./routes/logo";
 import { rondaRoutes } from "./routes/ronda";
 import { wargaRoutes } from "./routes/warga";
+import { paymentRoutes } from "./routes/payments";
 
 /** API di /api/*. Tipe `AppType` dipakai klien (hono/client) supaya pemanggilan API ikut dicek TypeScript. */
 export const app = new Hono<AppEnv>()
@@ -24,6 +25,7 @@ export const app = new Hono<AppEnv>()
   .route("/logo", logoRoutes)
   .route("/warga", wargaRoutes)
   .route("/admin", adminRoutes)
+  .route("/admin/pembayaran", paymentRoutes)
   .route("/ekspor", eksporRoutes)
   .route("/", rondaRoutes);
 

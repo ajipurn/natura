@@ -36,6 +36,13 @@
       "when": 1791337445243,
       "tag": "0004_schedule_swap",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791380566317,
+      "tag": "0005_period_payments",
+      "breakpoints": true
     }
   ]
 }

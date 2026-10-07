@@ -6,6 +6,7 @@ import { formatAmountShort, formatRupiah } from "@/lib/format";
 import { groupByBlock, houseLabel } from "@/lib/houses";
 import type { HouseDTO } from "@/lib/types";
 import type { MergedCollection } from "./use-ronda-store";
+import { CADENCE_LABEL, type BillingPeriod, type PaymentCell } from "@/lib/payments";
 
 export type ListFilter = "belum" | "sudah" | "semua";
 
@@ -21,11 +22,17 @@ export function HouseList({
   collections,
   filter,
   onOpen,
+  paymentPeriods = [],
+  paymentCells = {},
+  date,
 }: {
   houses: HouseDTO[];
   collections: Map<number, MergedCollection>;
   filter: ListFilter;
   onOpen: (house: HouseDTO) => void;
+  paymentPeriods?: BillingPeriod[];
+  paymentCells?: Record<string, PaymentCell>;
+  date?: string;
 }) {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const toggle = (block: string) =>
@@ -83,7 +90,7 @@ export function HouseList({
             {tiles.length > 0 && (
               <div className={cx("grid grid-cols-5 gap-2 sm:grid-cols-6", finished ? "mt-2" : "mt-2.5")}>
                 {tiles.map((h) => (
-                  <HouseTile key={h.id} house={h} collection={collections.get(h.id)} onClick={() => onOpen(h)} />
+                  <HouseTile key={h.id} house={h} collection={collections.get(h.id)} paymentPeriod={paymentPeriods.find((p) => p.houseId === h.id)} paymentCell={paymentCells[h.id + ":" + date]} onClick={() => onOpen(h)} />
                 ))}
               </div>
             )}
@@ -146,10 +153,14 @@ function HouseTile({
   house,
   collection,
   onClick,
+  paymentPeriod,
+  paymentCell,
 }: {
   house: HouseDTO;
   collection: MergedCollection | undefined;
   onClick: () => void;
+  paymentPeriod?: BillingPeriod;
+  paymentCell?: PaymentCell;
 }) {
   const vacant = house.status === "vacant";
   const state = collection?.status ?? (vacant ? "vacant" : "unchecked");
@@ -159,12 +170,14 @@ function HouseTile({
     vacant: "rumah kosong/mudik",
     unchecked: "belum dicek",
   }[state];
+  const paymentLabel = paymentPeriod ? CADENCE_LABEL[paymentPeriod.cadence] : paymentCell ? paymentCell.monthlyAmount > 0 ? CADENCE_LABEL.monthly : CADENCE_LABEL.weekly : undefined;
+  const paid = paymentPeriod ? paymentPeriod.status === "paid" : paymentCell?.paid;
 
   return (
     <Button
       variant="plain"
       onClick={onClick}
-      aria-label={`${houseLabel(house)}, ${stateText}${collection?.pending ? ", belum terkirim" : ""}`}
+      aria-label={`${houseLabel(house)}, ${stateText}${paymentLabel && !vacant ? ", " + paymentLabel + (paid ? ", sudah dibayar" : "") : ""}${collection?.pending ? ", belum terkirim" : ""}`}
       className={cx(
         "relative flex min-h-16 flex-col items-center justify-center rounded-xl border px-1 py-2 text-sm font-semibold leading-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-[0.96] motion-reduce:transform-none",
         state === "filled" && "border-filled bg-filled-soft text-filled",
@@ -179,6 +192,7 @@ function HouseTile({
       )}
       {state === "empty" && <span className="mt-1 text-[10px] font-semibold">kosong</span>}
       {state === "vacant" && <span className="mt-1 text-[10px] font-medium">mudik</span>}
+      {paymentLabel && !vacant && <span className="mt-1 rounded bg-primary/10 px-1 text-[9px] font-semibold text-primary">{paymentLabel}{paid ? " ✓" : ""}</span>}
       {collection?.pending && <span className="absolute right-1 top-1 size-2 rounded-full bg-warn" aria-hidden />}
     </Button>
   );

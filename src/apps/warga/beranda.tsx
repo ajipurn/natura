@@ -34,6 +34,7 @@ import { DAY_NAMES, NIGHT_OF, slotHouseLabel } from "@/lib/schedule";
 import type { CashPublic } from "@/server/kas";
 import { HouseHistoryDialog } from "./house-history";
 import { houseMonthText, useMyHouse } from "./my-house";
+import { BILLING_LABEL, CADENCE_LABEL, type BillingPeriod } from "@/lib/payments";
 
 const accessQuery = { queryKey: ["warga", "akses"], queryFn: () => call(api.warga.akses.$get()) };
 
@@ -353,7 +354,7 @@ function MonthRecap({ today, children }: { today: string; children?: ReactNode }
         </div>
         <QueryState query={recap} loading={<p className="py-8 text-center text-muted">Memuat…</p>}>
           {(data) =>
-            data.nights === 0 ? (
+            data.nights === 0 && data.total === 0 ? (
               <div className="pb-1 pt-4 text-center text-sm text-muted">
                 {month === thisMonth ? (
                   <>
@@ -369,7 +370,7 @@ function MonthRecap({ today, children }: { today: string; children?: ReactNode }
             ) : (
               <>
                 <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                  <Stat label="Terkumpul" value={formatRupiah(data.total)} />
+                  <Stat label="Untuk periode ini" value={formatRupiah(data.total)} />
                   <Stat label="Malam ronda" value={String(data.nights)} />
                   <Stat label="Rata-rata/malam" value={formatRupiah(data.average)} />
                 </div>
@@ -391,14 +392,14 @@ function MonthRecap({ today, children }: { today: string; children?: ReactNode }
                       };
                     })}
                 />
-                <p className="mt-1 text-center text-xs text-muted">Jimpitan per malam (tanggal)</p>
+                <p className="mt-1 text-center text-xs text-muted">Grafik menunjukkan uang hasil ronda. Total periode termasuk pembayaran mingguan dan bulanan.</p>
               </>
             )
           }
         </QueryState>
       </Card>
       {children}
-      {recap.data && recap.data.nights > 0 && <HouseStatus perHouse={recap.data.perHouse} month={recap.data.month} />}
+      {recap.data && (recap.data.nights > 0 || recap.data.total > 0 || recap.data.paymentPeriods.length > 0) && <HouseStatus perHouse={recap.data.perHouse.map((h) => ({ ...h, paymentPeriod: recap.data.paymentPeriods.find((p) => p.houseId === h.id && p.cadence !== "daily") }))} month={recap.data.month} />}
     </>
   );
 }
@@ -416,8 +417,9 @@ function CashCard({ cash }: { cash: CashPublic }) {
       <Card>
         <p className="text-xs text-muted">Saldo kas sekarang</p>
         <p className="text-3xl font-bold tabular-nums">{formatRupiah(cash.balance)}</p>
-        <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+        <div className="mt-4 grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
           <Stat label={`Setoran ${monthName}`} value={formatRupiah(cash.deposits)} />
+          <Stat label="Pembayaran langsung" value={formatRupiah(cash.directPayments)} />
           <Stat label="Pemasukan lain" value={formatRupiah(cash.income)} />
           <Stat label="Pengeluaran" value={formatRupiah(cash.expenses)} />
         </div>
@@ -442,7 +444,7 @@ function CashCard({ cash }: { cash: CashPublic }) {
   );
 }
 
-type HouseRow = { id: number; block: string; number: string; status: "active" | "vacant"; filled: number; empty: number };
+type HouseRow = { id: number; block: string; number: string; status: "active" | "vacant"; filled: number; empty: number; periodTotal?: number; paymentPeriod?: BillingPeriod };
 
 /** Status tiap rumah bulan ini, tanpa nama warga. Ketuk rumah untuk melihat riwayatnya. */
 function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string }) {
@@ -464,6 +466,7 @@ function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string 
           Berapa malam wadah jimpitan ada isinya di {formatMonth(month)}, dari malam-malam rumah itu dicek petugas. Ketuk
           rumah untuk melihat riwayatnya.
         </p>
+        <p className="text-xs text-muted">Rumah dengan pembayaran mingguan/bulanan menampilkan status pembayaran. Wadah kosong tidak berarti belum bayar.</p>
         {mine && (
           <Button
             variant="plain"
@@ -474,6 +477,7 @@ function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string 
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold">Rumah saya · {houseLabel(mine)}</span>
               <span className="block text-sm text-muted">{houseMonthText(mine)}</span>
+              {mine.paymentPeriod && <span className="block text-xs text-primary">{CADENCE_LABEL[mine.paymentPeriod.cadence]} · {BILLING_LABEL[mine.paymentPeriod.status]}</span>}
             </span>
             <span className="shrink-0 text-sm font-semibold text-primary">Riwayat</span>
           </Button>
@@ -509,7 +513,9 @@ function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string 
                           aria-label={`${houseLabel(h)}: ${houseMonthText(h)}. Lihat riwayat`}
                           className={cx(
                             "relative w-full rounded-lg border px-1 py-1.5 text-center transition active:scale-95",
-                            h.status === "vacant" || ratio === null
+                            h.paymentPeriod && h.status === "active"
+                              ? h.paymentPeriod.status === "paid" ? "border-primary/40 bg-primary/10 text-primary" : h.paymentPeriod.status === "overdue" ? "border-warn/40 bg-warn-soft text-warn" : "border-line bg-card text-muted"
+                              : h.status === "vacant" || ratio === null
                               ? "border-dashed border-line text-muted hover:border-muted"
                               : ratio >= 0.8
                                 ? "border-filled/40 bg-filled-soft text-filled hover:border-filled"
@@ -521,7 +527,7 @@ function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string 
                         >
                           <span className="block text-sm font-bold">{h.number}</span>
                           <span className="block text-[11px]">
-                            {h.status === "vacant" ? "mudik" : checked ? `${h.filled}/${checked}` : "–"}
+                            {h.status === "vacant" ? "mudik" : h.paymentPeriod ? h.paymentPeriod.status === "paid" ? "sudah bayar" : h.paymentPeriod.status === "overdue" ? "terlambat" : CADENCE_LABEL[h.paymentPeriod.cadence] : checked ? `${h.filled}/${checked}` : "–"}
                           </span>
                         </Button>
                       </li>

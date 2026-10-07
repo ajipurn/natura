@@ -260,6 +260,57 @@ export const cashEntries = pgTable(
   (t) => [index("cash_entries_date_idx").on(t.date), check("cash_entries_amount", sql`${t.amount} > 0`)],
 ).enableRLS();
 
+/** Kesepakatan berlaku sejak tanggal tertentu; perubahan berikutnya tidak menagih periode sebelumnya. */
+export const paymentPlans = pgTable("payment_plans", {
+  id: serial("id").primaryKey(),
+  houseId: integer("house_id").notNull().references(() => houses.id, { onDelete: "cascade" }),
+  effectiveFrom: date("effective_from", { mode: "string" }).notNull(),
+  cadence: text("cadence").$type<"daily" | "weekly" | "monthly">().notNull(),
+  ratePerNight: integer("rate_per_night").notNull(),
+  dueTiming: text("due_timing").$type<"start" | "end">().notNull(),
+  graceDays: integer("grace_days").notNull().default(0),
+  weekStart: integer("week_start").notNull().default(1),
+  recordedBy: integer("recorded_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("payment_plans_house_date_idx").on(t.houseId, t.effectiveFrom),
+  check("payment_plans_values", sql`${t.ratePerNight} > 0 and ${t.graceDays} between 0 and 31 and ${t.weekStart} between 0 and 6 and ${t.cadence} in ('daily', 'weekly', 'monthly') and ${t.dueTiming} in ('start', 'end')`),
+]).enableRLS();
+
+/** Satu penerimaan uang untuk rentang tanggal, terpisah dari pemeriksaan wadah saat ronda. */
+export const payments = pgTable("jimpitan_payments", {
+  id: serial("id").primaryKey(),
+  clientId: text("client_id").notNull(),
+  houseId: integer("house_id").notNull().references(() => houses.id, { onDelete: "restrict" }),
+  receivedDate: date("received_date", { mode: "string" }).notNull(),
+  periodStart: date("period_start", { mode: "string" }).notNull(),
+  periodEnd: date("period_end", { mode: "string" }).notNull(),
+  cadence: text("cadence").$type<"daily" | "weekly" | "monthly">().notNull(),
+  amount: integer("amount").notNull(),
+  receivedBy: text("received_by").$type<"treasurer" | "collector">().notNull(),
+  collectorId: integer("collector_id").references(() => users.id, { onDelete: "set null" }),
+  note: text("note"),
+  recordedBy: integer("recorded_by").references(() => users.id, { onDelete: "set null" }),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("jimpitan_payments_client_idx").on(t.clientId),
+  index("jimpitan_payments_house_period_idx").on(t.houseId, t.periodStart, t.periodEnd),
+  index("jimpitan_payments_received_idx").on(t.receivedDate),
+  check("jimpitan_payments_values", sql`${t.amount} > 0 and ${t.periodEnd} >= ${t.periodStart} and ${t.cadence} in ('daily', 'weekly', 'monthly') and ${t.receivedBy} in ('treasurer', 'collector')`),
+]).enableRLS();
+
+/** Koreksi dan pembatalan tetap meninggalkan catatan sebelumnya, pelaku, dan waktu perubahan. */
+export const paymentLogs = pgTable("payment_logs", {
+  id: serial("id").primaryKey(),
+  paymentId: integer("payment_id").notNull().references(() => payments.id, { onDelete: "restrict" }),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  action: text("action").$type<"create" | "update" | "cancel">().notNull(),
+  payload: jsonb("payload").notNull(),
+  createdAt: createdAt(),
+}, (t) => [index("payment_logs_payment_idx").on(t.paymentId)]).enableRLS();
+
 export type User = typeof users.$inferSelect;
 export type House = typeof houses.$inferSelect;
 export type Collection = typeof collections.$inferSelect;

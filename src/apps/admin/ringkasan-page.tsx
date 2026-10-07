@@ -62,7 +62,7 @@ export function RingkasanPage() {
               <StatCard
                 label={`Total ${formatMonth(d.month)}`}
                 value={formatRupiah(d.monthSummary.total)}
-                hint={`${d.monthSummary.nights} malam ronda`}
+                hint={`${d.monthSummary.nights} malam ronda + pembayaran periode diterima bulan ini`}
               />
               <StatCard
                 label="Saldo kas"
@@ -70,6 +70,12 @@ export function RingkasanPage() {
                 hint={d.cash.undeposited ? `${d.cash.undeposited} malam belum disetor` : "Semua malam sudah disetor"}
                 to="/admin/kas"
               />
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl bg-primary/5 px-4 py-3 text-sm">
+              <Link to="/admin/rekap" className="font-semibold text-primary">Pembayaran periode hari ini: {formatRupiah(d.paymentOverview.receivedToday)}</Link>
+              <span className="text-muted">{d.paymentOverview.dueHouses} rumah jatuh tempo hari ini</span>
+              {d.paymentOverview.overdueHouses > 0 && <Link to="/admin/rekap" className="font-semibold text-warn">{d.paymentOverview.overdueHouses} rumah terlambat · {formatRupiah(d.paymentOverview.overdueAmount)}</Link>}
             </div>
 
             <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_20rem]">
@@ -184,10 +190,15 @@ function todoItems(
     noSchedule: boolean;
     noWargaCode: boolean;
     onlyOneUser: boolean;
+    overduePayments: number;
+    duePayments: number;
   },
   date: string,
 ): { to: string; text: string; icon: LucideIcon }[] {
   const items: { to: string; text: string; icon: LucideIcon }[] = [];
+  if (todo.overduePayments || todo.duePayments) {
+    items.push({ to: "/admin/rekap", icon: CalendarClock, text: `${todo.overduePayments} rumah terlambat membayar, ${todo.duePayments} jatuh tempo hari ini` });
+  }
   if (todo.offDuty > 0) {
     items.push({
       to: `/admin/riwayat/${date}?tab=log`,

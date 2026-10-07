@@ -9,6 +9,8 @@ import { formatRupiah } from "@/lib/format";
 import { houseLabelLong } from "@/lib/houses";
 import { dayLabel, scheduleDay } from "@/lib/schedule";
 import { QuickRecord } from "./quick-record";
+import { PaymentNotice } from "@/components/payment-notice";
+import { CADENCE_LABEL } from "@/lib/payments";
 
 /** Halaman yang terbuka saat QR rumah di-scan pakai kamera HP biasa. */
 export function HousePage() {
@@ -21,7 +23,7 @@ export function HousePage() {
   return (
     <main className="mx-auto w-full max-w-md px-4 py-8">
       <QueryState query={query}>
-        {({ communityName, logoUrl, defaultAmount, tonight, canRecord, house, history, user }) => {
+        {({ communityName, logoUrl, defaultAmount, tonight, canRecord, house, history, user, paymentInfo }) => {
           const month = tonight.slice(0, 7);
           const thisMonth = history.filter((h) => h.date.startsWith(month));
           const monthFilled = thisMonth.filter((h) => h.status === "filled");
@@ -37,6 +39,7 @@ export function HousePage() {
               </p>
               <h1 className="mt-1 text-3xl font-bold tracking-tight">{houseLabelLong(house)}</h1>
               {house.ownerName && <p className="text-muted">{house.ownerName}</p>}
+              {house.status === "active" && <div className="mt-4"><PaymentNotice period={paymentInfo.periods.find((p) => p.start <= tonight && p.end >= tonight)} cell={paymentInfo.tonight} /></div>}
               {house.status === "vacant" && (
                 <p className="mt-2 inline-block rounded-full bg-warn-soft px-3 py-1 text-sm text-warn">
                   Ditandai rumah kosong/mudik
@@ -49,7 +52,7 @@ export function HousePage() {
                     <ScanLine className="size-5 text-primary" /> Catat malam ini
                   </p>
                   {canRecord ? (
-                    <QuickRecord token={house.token} defaultAmount={defaultAmount} current={current} />
+                    <><p className="mt-2 text-xs text-muted">Catat uang yang benar-benar diambil malam ini. Pembayaran periode sudah tercatat terpisah.</p><QuickRecord token={house.token} defaultAmount={defaultAmount} current={current} /></>
                   ) : (
                     <p className="mt-3 rounded-xl bg-warn-soft px-3 py-2.5 text-sm text-warn">
                       Bukan jadwal jagamu malam ini ({dayLabel(scheduleDay(tonight))}). Catatan hanya bisa diisi petugas
@@ -72,6 +75,8 @@ export function HousePage() {
                   <p className="text-xl font-bold">{formatRupiah(monthTotal)}</p>
                 </div>
               </Card>
+
+              {paymentInfo.receipts.length > 0 && <Card className="mt-5"><h2 className="font-semibold">Pembayaran periode</h2><ul className="mt-3 space-y-3">{paymentInfo.receipts.map((p, i) => <li key={i} className="text-sm"><p className="flex flex-wrap justify-between gap-2"><span>{CADENCE_LABEL[p.cadence]}</span><strong>{formatRupiah(p.amount)}</strong></p><p className="text-xs text-muted">Untuk {formatDateShort(p.periodStart)} – {formatDateShort(p.periodEnd)} {p.periodEnd.slice(0, 4)} · diterima {formatDateShort(p.receivedDate)}.</p></li>)}</ul></Card>}
 
               <h2 className="mb-2 mt-6 text-sm font-semibold uppercase tracking-wide text-muted">30 malam terakhir</h2>
               {history.length === 0 ? (

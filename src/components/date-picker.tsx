@@ -11,11 +11,14 @@ export function DatePicker({
   value,
   onValueChange,
   today,
+  max = today,
 }: {
   label: string;
   value: string;
   onValueChange: (date: string) => void;
   today: string;
+  /** Periode pembayaran dan kesepakatan boleh mencakup tanggal yang akan datang. */
+  max?: string;
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -61,7 +64,7 @@ export function DatePicker({
                 selected={value}
                 today={today}
                 todayLabel="hari ini"
-                max={today}
+                max={max}
                 onSelect={pick}
               />
               <div className="mt-2 flex items-center justify-between gap-3 border-t border-line pt-2.5">

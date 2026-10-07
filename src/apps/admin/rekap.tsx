@@ -41,6 +41,7 @@ import { buildRecapSheets } from "@/lib/recap-xlsx";
 import type { MonthCell, MonthRecap } from "@/lib/types";
 import { recapQuery } from "./queries";
 import { SheetsLinkDialog } from "./sheets-link";
+import { PaymentPanel } from "./payments/payment-panel";
 
 type Filter = "semua" | "kosong" | "tidak-dicek";
 type RecapData = MonthRecap & { month: string; defaultAmount: number };
@@ -90,7 +91,7 @@ export function RekapPage() {
   const tonight = rondaDate(new Date());
   const thisMonth = tonight.slice(0, 7);
   const bulan = params.get("bulan") ?? "";
-  const month = isMonth(bulan) && bulan <= thisMonth ? bulan : thisMonth;
+  const month = isMonth(bulan) && bulan <= shiftMonth(thisMonth, 12) ? bulan : thisMonth;
   const query = useQuery({
     ...recapQuery(month),
     placeholderData: (previous) => previous,
@@ -114,7 +115,7 @@ export function RekapPage() {
     <>
       <PageHeader
         title="Rekap bulanan"
-        subtitle="Jimpitan per rumah per malam ronda"
+        subtitle="Hasil ronda dan pembayaran periode per rumah"
         action={
           <Menu
             label="Unduh rekap"
@@ -129,7 +130,7 @@ export function RekapPage() {
             items={[
               {
                 label: "Excel (.xlsx)",
-                hint: "Berwarna, lembar per rumah dan per malam",
+                hint: "Per rumah, per malam, dan pembayaran periode",
                 icon: <FileSpreadsheet className="mt-0.5 size-4 shrink-0 text-filled" />,
                 onSelect: exportXlsx,
                 disabled: !ready || exporting,
@@ -173,7 +174,7 @@ export function RekapPage() {
         <span className="min-w-36 px-2 text-center font-semibold">
           {formatMonth(month)}
         </span>
-        {month < thisMonth ? (
+        {month < shiftMonth(thisMonth, 12) ? (
           <Link
             to={`/admin/rekap?bulan=${shiftMonth(month, 1)}`}
             className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-idle-soft"
@@ -200,6 +201,8 @@ export function RekapPage() {
         {editing ? "Selesai" : "Isi/ubah catatan"}
       </Button>
       </div>
+
+      <PaymentPanel key={month} month={month} />
 
       <QueryState query={query}>
         {(data) => (
@@ -266,12 +269,15 @@ function RecapBody({
   const dates = daysInMonth(data.month);
   const patrolDates = new Set(data.dates);
   const { rows, dateTotals, grandTotal } = summarizeMonth({ ...data, dates });
+  const monthlyTotal = rows.reduce((sum, r) => sum + r.monthlyTotal, 0);
+  const weeklyTotal = rows.reduce((sum, r) => sum + r.weeklyTotal, 0);
+  const showWeekly = weeklyTotal > 0;
   const nights = data.dates.length;
   const maxNight = Math.max(...dateTotals, 1);
   // Malam yang belum tiba (selalu di akhir bulan) diberi kolom sempit.
   const future = dates.filter((d) => d > tonight).length;
   // Kolom tanggal berbagi sisa lebar, tapi tidak lebih sempit dari ini (lihat `RecapCols`).
-  const minWidth = `calc(var(--rumah-col) + ${dates.length - future} * ${DATE_COL} + ${future} * ${FUTURE_COL} + ${ADA_COL} + ${TOTAL_COL})`;
+  const minWidth = `calc(var(--rumah-col) + ${dates.length - future} * ${DATE_COL} + ${future} * ${FUTURE_COL} + ${ADA_COL} + ${PERIOD_COL} + ${showWeekly ? PERIOD_COL : "0rem"} + ${TOTAL_COL})`;
 
   const stats = rows.map((r) => ({
     ...r,
@@ -299,7 +305,7 @@ function RecapBody({
   const average = countedNights.length
     ? countedNights.reduce((sum, i) => sum + dateTotals[i], 0) / countedNights.length
     : nights
-      ? grandTotal / nights
+      ? dateTotals.reduce((sum, n) => sum + n, 0) / nights
       : null;
   const best = dates.reduce<number | null>((top, _, i) => (dateTotals[i] > (top === null ? 0 : dateTotals[top]) ? i : top), null);
 
@@ -307,16 +313,6 @@ function RecapBody({
     return (
       <Card className="py-10 text-center text-muted">
         Belum ada data rumah.
-      </Card>
-    );
-  }
-  if (nights === 0 && !editing) {
-    return (
-      <Card className="py-10 text-center text-muted">
-        Belum ada catatan ronda di bulan ini.
-        <span className="mt-1 block text-sm">
-          Tekan “Isi/ubah catatan” untuk mengisinya manual.
-        </span>
       </Card>
     );
   }
@@ -436,10 +432,11 @@ function RecapBody({
     <>
       <Card className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
         <div className="shrink-0 sm:w-56 sm:self-start">
-          <p className="text-xs text-muted">Terkumpul {formatMonth(data.month)}</p>
+          <p className="text-xs text-muted">Jimpitan untuk {formatMonth(data.month)}</p>
           <p className="text-3xl font-bold leading-tight tracking-tight tabular-nums">
             {formatRupiah(grandTotal)}
           </p>
+          {(monthlyTotal > 0 || weeklyTotal > 0) && <p className="mt-1 text-xs text-muted">Termasuk bulanan {formatRupiah(monthlyTotal)}{weeklyTotal > 0 && " dan mingguan " + formatRupiah(weeklyTotal)}. Grafik menunjukkan uang hasil ronda per malam.</p>}
           {best !== null && (
             <p className="mt-1 text-xs text-muted">
               Tertinggi {formatRupiah(dateTotals[best])} pada{" "}
@@ -590,7 +587,7 @@ function RecapBody({
               className="w-full table-fixed border-collapse text-sm"
               style={{ minWidth }}
             >
-              <RecapCols dates={dates.length} future={future} />
+              <RecapCols dates={dates.length} future={future} weekly={showWeekly} />
               <thead>
                 <tr className="text-xs text-muted">
                   <th className="sticky left-0 z-10 bg-card px-2 py-2 text-left font-semibold sm:px-3">
@@ -652,6 +649,8 @@ function RecapBody({
                   <th className="whitespace-nowrap px-2 py-2 text-right font-semibold">
                     Ada
                   </th>
+                  <th className="whitespace-nowrap px-2 py-2 text-right font-semibold text-primary" title="Pembayaran bulanan sesuai periode yang dibayar">Bulanan</th>
+                  {showWeekly && <th className="whitespace-nowrap px-2 py-2 text-right font-semibold" title="Pembayaran mingguan sesuai periode yang dibayar">Mingguan</th>}
                   <th className="whitespace-nowrap px-3 py-2 text-right font-semibold">
                     Total
                   </th>
@@ -673,7 +672,7 @@ function RecapBody({
                 style={{ minWidth }}
                 {...(editing ? selectHandlers : {})}
               >
-                <RecapCols dates={dates.length} future={future} />
+                <RecapCols dates={dates.length} future={future} weekly={showWeekly} />
                 {/* Judul kolom untuk pembaca layar; yang terlihat ada di strip di atas. */}
                 <thead className="sr-only">
                   <tr>
@@ -682,6 +681,8 @@ function RecapBody({
                       <th key={d}>{formatDateShort(d)}</th>
                     ))}
                     <th>Ada</th>
+                    <th>Bulanan</th>
+                    {showWeekly && <th>Mingguan</th>}
                     <th>Total</th>
                   </tr>
                 </thead>
@@ -690,7 +691,7 @@ function RecapBody({
                     {block && (
                       <tr className="border-b border-line bg-bg/60">
                         <th
-                          colSpan={dates.length + 3}
+                          colSpan={dates.length + 4 + Number(showWeekly)}
                           className="px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-muted"
                         >
                           {/* Sel ini selebar tabel, jadi yang menempel di kiri saat digeser teksnya. */}
@@ -793,6 +794,8 @@ function RecapBody({
                             /{r.filledCount + r.empty}
                           </span>
                         </td>
+                        <td className="whitespace-nowrap bg-primary/5 px-2 py-1.5 text-right font-semibold tabular-nums text-primary" title="Pembayaran bulanan untuk bulan ini, terpisah dari pengambilan saat ronda">{r.monthlyTotal > 0 ? formatRupiah(r.monthlyTotal) : "–"}</td>
+                        {showWeekly && <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{r.weeklyTotal > 0 ? formatRupiah(r.weeklyTotal) : "–"}</td>}
                         <td className="whitespace-nowrap px-3 py-1.5 text-right font-semibold tabular-nums">
                           {formatRupiah(r.total)}
                         </td>
@@ -808,6 +811,8 @@ function RecapBody({
                       <td key={dates[i]}>{t > 0 ? formatRupiah(t) : "–"}</td>
                     ))}
                     <td />
+                    <td>{formatRupiah(monthlyTotal)}</td>
+                    {showWeekly && <td>{formatRupiah(weeklyTotal)}</td>}
                     <td>{formatRupiah(grandTotal)}</td>
                   </tr>
                 </tfoot>
@@ -825,7 +830,7 @@ function RecapBody({
               className="w-full table-fixed border-collapse text-sm"
               style={{ minWidth }}
             >
-              <RecapCols dates={dates.length} future={future} />
+              <RecapCols dates={dates.length} future={future} weekly={showWeekly} />
               <tbody>
                 <tr className="font-semibold">
                   <th className="sticky left-0 z-10 bg-card px-2 py-2 text-left sm:px-3">
@@ -848,6 +853,8 @@ function RecapBody({
                     </td>
                   ))}
                   <td />
+                  <td className="whitespace-nowrap bg-primary/5 px-2 py-2 text-right tabular-nums text-primary">{formatRupiah(monthlyTotal)}</td>
+                  {showWeekly && <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{formatRupiah(weeklyTotal)}</td>}
                   <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
                     {formatRupiah(grandTotal)}
                   </td>
@@ -872,6 +879,7 @@ function RecapBody({
 const DATE_COL = "1.375rem";
 const FUTURE_COL = "1rem";
 const ADA_COL = "3.5rem";
+const PERIOD_COL = "7rem";
 const TOTAL_COL = "7rem";
 
 /**
@@ -880,7 +888,7 @@ const TOTAL_COL = "7rem";
  * `DATE_COL`), jadi kotaknya tidak terpisah jauh dari nama rumah. `future` kolom terakhir (malam
  * yang belum tiba) dibuat sempit.
  */
-function RecapCols({ dates, future }: { dates: number; future: number }) {
+function RecapCols({ dates, future, weekly }: { dates: number; future: number; weekly: boolean }) {
   return (
     <colgroup>
       <col style={{ width: "var(--rumah-col)" }} />
@@ -888,6 +896,8 @@ function RecapCols({ dates, future }: { dates: number; future: number }) {
         <col key={i} style={i >= dates - future ? { width: FUTURE_COL } : undefined} />
       ))}
       <col style={{ width: ADA_COL }} />
+      <col style={{ width: PERIOD_COL }} />
+      {weekly && <col style={{ width: PERIOD_COL }} />}
       <col style={{ width: TOTAL_COL }} />
     </colgroup>
   );

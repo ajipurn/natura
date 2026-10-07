@@ -9,6 +9,13 @@ export const housesQuery = queryOptions({
 /** Data rumah dipakai di banyak layar (ronda, jadwal, ringkasan, petugas): segarkan semuanya setelah diubah. */
 export const HOUSE_REFRESH = [["admin"], ["ronda"], ["jadwal"], ["auth", "users"]];
 
+export const paymentsQuery = (month: string) => queryOptions({
+  queryKey: ["admin", "pembayaran", month],
+  queryFn: () => call(api.admin.pembayaran.$get({ query: { bulan: month } })),
+});
+
+export const PAYMENT_REFRESH = [["admin"], ["rekap"], ["ronda"], ["rumah"], ["warga"]];
+
 export const usersQuery = queryOptions({
   queryKey: ["admin", "petugas"],
   queryFn: () => call(api.admin.petugas.$get()),

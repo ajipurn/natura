@@ -4,6 +4,8 @@ import { api, call } from "@/client/api";
 import { Dialog } from "@/components/dialog";
 import { QueryState } from "@/components/query-state";
 import { Button, cx } from "@/components/ui";
+import { PaymentNotice } from "@/components/payment-notice";
+import { CADENCE_LABEL } from "@/lib/payments";
 import { daysInMonth, formatDateShort, formatMonth } from "@/lib/dates";
 import { formatAmountShort, formatRupiah } from "@/lib/format";
 import { scheduleDay } from "@/lib/schedule";
@@ -58,12 +60,15 @@ function HistoryBody({ houseId }: { houseId: number }) {
   });
   return (
     <QueryState query={query} loading={<p className="py-10 text-center text-muted">Memuat riwayat…</p>}>
-      {({ house, history, today }) => {
+      {({ house, history, today, paymentInfo }) => {
         const byDate = new Map((history as Night[]).map((n) => [n.date, n]));
         // Bulan-bulan yang punya malam ronda, terbaru dulu.
         const months = [...new Set(history.map((n) => n.date.slice(0, 7)))].sort().reverse().slice(0, 3);
         return (
           <div className="space-y-5">
+            {house.status === "active" && <PaymentNotice period={paymentInfo.periods.find((b) => b.start <= today && b.end >= today)} cell={paymentInfo.tonight} />}
+            {paymentInfo.periods.some((p) => p.status === "overdue") && house.status === "active" && <p className="text-sm text-warn">Periode sebelumnya belum lunas: {paymentInfo.periods.filter((p) => p.status === "overdue").map((p) => formatDateShort(p.start) + " – " + formatDateShort(p.end) + " (sisa " + formatRupiah(p.remaining) + ")").join("; ")}.</p>}
+            {paymentInfo.receipts.length > 0 && <section><h3 className="font-semibold">Pembayaran periode</h3><ul className="mt-2 space-y-2">{paymentInfo.receipts.map((p, i) => <li key={i} className="rounded-xl bg-primary/5 px-3 py-2 text-sm"><div className="flex flex-wrap justify-between gap-2"><span>{CADENCE_LABEL[p.cadence]}</span><strong>{formatRupiah(p.amount)}</strong></div><p className="text-xs text-muted">Untuk {formatDateShort(p.periodStart)} – {formatDateShort(p.periodEnd)} {p.periodEnd.slice(0, 4)} · diterima {formatDateShort(p.receivedDate)}.</p></li>)}</ul><p className="mt-2 text-xs text-muted">Terpisah dari hasil pemeriksaan wadah di kalender ronda.</p></section>}
             {house.status === "vacant" && (
               <p className="rounded-xl bg-warn-soft px-3 py-2 text-sm text-warn">
                 Ditandai rumah kosong/mudik: tidak dihitung bolong walau wadahnya kosong.

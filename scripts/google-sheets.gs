@@ -24,7 +24,7 @@
 /** @OnlyCurrentDoc */
 
 const FIRST_NIGHT = 8; // kolom H
-const COLUMNS = FIRST_NIGHT - 1 + 31;
+const COLUMNS = FIRST_NIGHT - 1 + 31 + 2; // Bulanan dan Mingguan di belakang tanggal
 const TIME_ZONE = "Asia/Jakarta";
 const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 /** Rumus di A1: link Natura, dengan `?bulan=YYYY-MM` untuk tab arsip. */
@@ -34,7 +34,7 @@ const LAST_ARCHIVED = "arsipTerakhir";
 
 function rapikanRekap() {
   const sheet = SpreadsheetApp.getActiveSheet();
-  const nights = COLUMNS - FIRST_NIGHT + 1;
+  const nights = 31;
   // Tempat untuk 31 malam, supaya bulan yang panjang tidak terpotong.
   if (sheet.getMaxColumns() < COLUMNS) sheet.insertColumnsAfter(sheet.getMaxColumns(), COLUMNS - sheet.getMaxColumns());
   const rows = sheet.getMaxRows();
@@ -52,12 +52,13 @@ function rapikanRekap() {
   [48, 48, 64, 84, 48, 60, 84].forEach((width, i) => sheet.setColumnWidth(i + 1, width));
   sheet.setColumnWidths(FIRST_NIGHT, nights, 52);
 
-  const night = sheet.getRange(4, FIRST_NIGHT, rows - 3, nights);
+  const night = sheet.getRange(4, FIRST_NIGHT, rows - 3, nights + 2);
   const house = sheet.getRange(4, 1, rows - 3, FIRST_NIGHT - 1);
   // Mengganti semua aturan format bersyarat di lembar ini. Warnanya sama dengan file Excel dari Natura.
   sheet.setConditionalFormatRules([
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("kosong").setFontColor("#be123c").setBackground("#ffe4e6").setRanges([night]).build(),
-    SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThan(0).setFontColor("#15803d").setBackground("#dcfce7").setRanges([night]).build(),
+    SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=AND(ISNUMBER(H$2),H4>0)').setFontColor("#15803d").setBackground("#dcfce7").setRanges([night]).build(),
+    SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=OR(H$2="Bulanan (Rp)",H$2="Mingguan (Rp)")').setFontColor("#1d4ed8").setBackground("#dbeafe").setRanges([night]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=$C4="Mudik"').setFontColor("#94a3b8").setRanges([house]).build(),
   ]);
 }
