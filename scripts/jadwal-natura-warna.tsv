@@ -1,4 +1,4 @@
-# Warna sel tabel jadwal (H = hijau, K = kuning, O = oranye, - = putih), baris dan kolom sama dengan jadwal-natura.tsv
+# Warna sel tabel jadwal (H = hijau, K = kuning, O = oranye, B = biru, - = putih), baris dan kolom sama dengan jadwal-natura.tsv
 	AHAD	SENIN	SELASA	RABU	KAMIS	JUMAT	SABTU
 1	H	H	H	H	H	H	H
 2	H	H	H	H	H	H	H

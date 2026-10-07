@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { CalendarDays } from "lucide-react";
 import { QueryState } from "@/components/query-state";
+import { GuardColorLegend } from "@/components/guard-color-legend";
 import { Card, PageHeader, cx } from "@/components/ui";
 import { rondaDate } from "@/lib/dates";
 import { shownToGuards } from "@/lib/guard-color";
@@ -30,9 +31,10 @@ export function SchedulePage({
     <>
       <PageHeader title="Jadwal ronda" subtitle={`Malam ini: ${dayLabel(tonight)}`} />
       {intro}
+      <GuardColorLegend />
       <QueryState query={query}>
         {({ schedule: all }) => {
-          // Baris rumah yang belum ada nama warganya dan baris putih (tidak ikut ronda) tidak
+          // Baris rumah yang belum ada nama warganya dan baris putih (kosong/tidak dihuni) tidak
           // ditampilkan dan tidak dihitung.
           const schedule = all.filter((e) => (e.name ?? e.ownerName) && shownToGuards(e, currentUserId));
           return schedule.length === 0 ? (

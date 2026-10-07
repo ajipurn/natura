@@ -5,9 +5,10 @@ import { parseSchedule } from "@/lib/schedule";
 import { tableFromHtml } from "@/lib/table-paste";
 
 describe("baris jadwal di app petugas", () => {
-  it("putih (tidak ikut ronda) disembunyikan, kecuali baris petugas itu sendiri", () => {
+  it("putih (kosong/tidak dihuni) disembunyikan, kecuali baris petugas itu sendiri", () => {
     expect(shownToGuards({ color: "green", userId: 1 })).toBe(true);
     expect(shownToGuards({ color: "orange", userId: null })).toBe(true);
+    expect(shownToGuards({ color: "blue", userId: null })).toBe(true);
     expect(shownToGuards({ color: null, userId: null }, 7)).toBe(false);
     expect(shownToGuards({ color: null, userId: 1 }, 7)).toBe(false);
     expect(shownToGuards({ color: null, userId: 7 }, 7)).toBe(true);
@@ -23,6 +24,12 @@ describe("warna sel jadwal", () => {
     expect(classifyCellColor("#ffff00")).toBe("yellow");
     expect(classifyCellColor("#F4B407")).toBe("orange");
     expect(classifyCellColor("#ffc000")).toBe("orange");
+    expect(classifyCellColor("#c6e0b4")).toBe("green");
+    expect(classifyCellColor("#ffe699")).toBe("orange");
+    expect(classifyCellColor("#bdd7ee")).toBe("blue");
+    expect(classifyCellColor("rgb(157, 195, 230)")).toBe("blue");
+    expect(classifyCellColor("blue")).toBe("blue");
+    expect(classifyCellColor("#d9d9d9")).toBeNull();
     expect(classifyCellColor("#ffffff")).toBeNull();
     expect(classifyCellColor("transparent")).toBeNull();
     expect(classifyCellColor("rgba(0, 0, 0, 0)")).toBeNull();
@@ -45,9 +52,11 @@ describe("warna sel jadwal", () => {
     ]);
 
     const excel = `<style>.xl65 {mso-number-format:General; background:#92D050; mso-pattern:black none;} .xl66 {background:#FFC000;}</style>
-      <table><tr><td></td><td>AHAD</td><td>SENIN</td></tr><tr><td>1</td><td class=xl65>WIDI (AA-12)</td><td class=xl66>EKO (A-1)</td></tr></table>`;
+      <table><tr><td></td><td>AHAD</td><td>SENIN</td></tr><tr><td>1</td><td class=xl65>WIDI (AA-12)</td><td class=xl66>EKO (A-1)</td></tr>
+      <tr><td>2</td><td style="background-color:#bdd7ee">WIDODO (A-5)</td><td style="background-color:#d9d9d9">(AA-1)</td></tr></table>`;
     const fromExcel = tableFromHtml(excel)!;
     expect(fromExcel.colors[1]).toEqual([null, "green", "orange"]);
+    expect(fromExcel.colors[2]).toEqual([null, "blue", null]);
     expect(tableFromHtml("<p>bukan tabel</p>")).toBeNull();
   });
 });

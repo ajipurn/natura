@@ -10,7 +10,7 @@ import type { ScheduleDTO } from "@/lib/types";
 /**
  * Siapa yang dijadwalkan jaga di malam ronda ini, diringkas jadi satu baris
  * ("Kamu jaga · bersama Nino, Sahrul +5") yang bisa dibuka untuk melihat semuanya. Baris rumah yang
- * belum ada nama warganya dan baris putih (tidak ikut ronda, lihat `shownToGuards`) tidak ditampilkan
+ * belum ada nama warganya dan baris putih (kosong/tidak dihuni, lihat `shownToGuards`) tidak ditampilkan
  * dan tidak dihitung; warna lainnya tidak dipakai.
  */
 export function TonightGuards({ schedule, date, userId }: { schedule: ScheduleDTO[]; date: string; userId?: number }) {

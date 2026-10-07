@@ -1,0 +1,1 @@
+ALTER TYPE "public"."guard_color" ADD VALUE 'blue';

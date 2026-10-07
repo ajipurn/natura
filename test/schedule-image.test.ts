@@ -40,13 +40,14 @@ describe("gambar jadwal ronda", () => {
       slot({ id: 3, day: 2, name: null, ownerName: null, userId: null, houseId: 3, block: "AB", number: "1", color: null }),
       slot({ id: 4, day: 3, name: "Satpam", block: "", number: "", houseId: null, userId: null }),
       slot({ id: 5, day: 4, name: "Apri (C-1)", block: "", number: "", houseId: null, userId: null }),
-      slot({ id: 6, day: 5, name: "Petugas nonaktif", userActive: false }),
+      slot({ id: 6, day: 5, name: "Petugas nonaktif", userActive: false, color: "blue" }),
     ]);
     expect(rows[0].map((cell) => cell?.text ?? "")).toEqual([
       "NAMA AKUN BARU (AD-3)", "BU ROS (AD-3)", "(AB-1)", "SATPAM", "APRI (C-1)", "PETUGAS NONAKTIF (AD-3)", "",
     ]);
     expect(rows[0][1]?.color).toBe("orange");
     expect(rows[0][2]?.color).toBeNull();
+    expect(rows[0][5]?.color).toBe("blue");
     expect(scheduleImageRows([])).toEqual([]);
   });
 

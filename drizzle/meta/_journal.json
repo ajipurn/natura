@@ -43,6 +43,13 @@
       "when": 1791380566317,
       "tag": "0005_period_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791385448626,
+      "tag": "0006_schedule_blue",
+      "breakpoints": true
     }
   ]
 }

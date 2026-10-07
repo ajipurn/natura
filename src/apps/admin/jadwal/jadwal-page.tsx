@@ -22,6 +22,7 @@ import { api, call } from "@/client/api";
 import { invalidate } from "@/client/query";
 import { Dialog } from "@/components/dialog";
 import { guardColorClass } from "@/components/guard-color-class";
+import { GuardColorLegend } from "@/components/guard-color-legend";
 import { Menu, type MenuItem } from "@/components/menu";
 import { QueryState } from "@/components/query-state";
 import { Alert, Button, Card, PageHeader, cx } from "@/components/ui";
@@ -229,6 +230,7 @@ function ScheduleEditor({
   return (
     <div>
       <RequestsPanel locked={dirty} />
+      <GuardColorLegend />
       {inactiveCount > 0 && (
         <p className="mb-3 flex gap-2 rounded-xl bg-warn-soft px-3 py-2 text-sm text-warn">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />

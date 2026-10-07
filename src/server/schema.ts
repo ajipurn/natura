@@ -34,7 +34,7 @@ export const logStatusEnum = pgEnum("log_status", ["filled", "empty", "none"]);
 /** `koreksi` = diubah admin dari halaman riwayat. */
 export const logMethodEnum = pgEnum("log_method", ["scan", "manual", "koreksi"]);
 /** Warna sel di tabel jadwal asli; null = putih. */
-export const guardColorEnum = pgEnum("guard_color", ["green", "yellow", "orange"]);
+export const guardColorEnum = pgEnum("guard_color", ["green", "yellow", "orange", "blue"]);
 export const requestStatusEnum = pgEnum("request_status", ["pending", "approved", "rejected", "cancelled"]);
 /** `in` = pemasukan lain (mis. saldo awal, sumbangan), `out` = pengeluaran. */
 export const cashDirectionEnum = pgEnum("cash_direction", ["in", "out"]);

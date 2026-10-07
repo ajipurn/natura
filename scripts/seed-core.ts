@@ -28,7 +28,7 @@ import { houses, rondaSchedule, users } from "../src/server/schema";
 import { SITE_PLAN } from "../src/site-plan";
 
 const MAX_NAME = 40;
-const COLOR_CODES: Record<string, GuardColor> = { H: "green", K: "yellow", O: "orange" };
+const COLOR_CODES: Record<string, GuardColor> = { H: "green", K: "yellow", O: "orange", B: "blue" };
 
 export type SeedOptions = {
   /** Folder proyek (tempat scripts/ dan file PIN). */

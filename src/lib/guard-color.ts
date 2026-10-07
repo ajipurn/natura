@@ -1,25 +1,26 @@
 /** Warna baris jadwal, mengikuti warna sel di tabel jadwal asli. Tanpa warna = putih. */
-export const GUARD_COLORS = ["green", "yellow", "orange"] as const;
+export const GUARD_COLORS = ["green", "yellow", "orange", "blue"] as const;
 export type GuardColor = (typeof GUARD_COLORS)[number];
 
-export const GUARD_COLOR_LABEL: Record<GuardColor, string> = { green: "Hijau", yellow: "Kuning", orange: "Oranye" };
+export const GUARD_COLOR_LABEL: Record<GuardColor, string> = { green: "Hijau", yellow: "Kuning", orange: "Oranye", blue: "Biru" };
 
 /** Arti warna di tabel jadwal Natura: seberapa mungkin orangnya ikut ronda. */
 export const GUARD_COLOR_MEANING: Record<GuardColor | "white", string> = {
-  green: "Aktif",
-  yellow: "Kadang ikut",
-  orange: "Jarang ikut",
-  white: "Tidak ikut",
+  green: "Bisa standby",
+  yellow: "Kadang-kadang",
+  orange: "Kadang-kadang",
+  blue: "Tidak bisa",
+  white: "Kosong/mudik/dijual/dilelang/over",
 };
 
 /**
  * Warna baris jadwal baru (ditambah admin, malam jaga dari dialog petugas, permintaan tambah malam).
- * Bukan putih: putih berarti tidak ikut ronda dan disembunyikan dari petugas.
+ * Bukan putih: putih menandai rumah kosong/tidak dihuni dan disembunyikan dari petugas.
  */
 export const NEW_SLOT_COLOR: GuardColor = "green";
 
 /**
- * Baris jadwal yang ditampilkan di app petugas: yang putih (tidak ikut ronda) disembunyikan, kecuali
+ * Baris jadwal yang ditampilkan di app petugas: yang putih (kosong/tidak dihuni) disembunyikan, kecuali
  * baris petugas yang sedang masuk sendiri, karena ia tetap terjadwal dan boleh mencatat.
  */
 export function shownToGuards(slot: { color: GuardColor | null; userId: number | null }, currentUserId?: number): boolean {
@@ -28,6 +29,7 @@ export function shownToGuards(slot: { color: GuardColor | null; userId: number |
 
 /** Warna khas spreadsheet (Excel, Google Sheets) untuk tiap warna jadwal. */
 const REFERENCES: [GuardColor | null, string][] = [
+  ["green", "#c6e0b4"],
   ["green", "#74aa4e"],
   ["green", "#92d050"],
   ["green", "#93c47d"],
@@ -45,8 +47,18 @@ const REFERENCES: [GuardColor | null, string][] = [
   ["orange", "#f9cb9c"],
   ["orange", "#e69138"],
   ["orange", "#ed7d31"],
+  ["orange", "#ffe699"],
+  ["blue", "#bdd7ee"],
+  ["blue", "#b8cce4"],
+  ["blue", "#9dc3e6"],
+  ["blue", "#cfe2f3"],
+  ["blue", "#9fc5e8"],
+  ["blue", "#5b9bd5"],
+  ["blue", "#4472c4"],
   [null, "#ffffff"],
   [null, "#f3f3f3"],
+  [null, "#d9d9d9"],
+  [null, "#cccccc"],
 ];
 
 function toRgb(css: string): [number, number, number] | null {
@@ -62,7 +74,7 @@ function toRgb(css: string): [number, number, number] | null {
     if (rgb[4] !== undefined && parseFloat(rgb[4]) === 0) return null;
     return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
   }
-  const named: Record<string, string> = { white: "#ffffff", yellow: "#ffff00", orange: "#ffa500", green: "#00b050", lime: "#00ff00" };
+  const named: Record<string, string> = { white: "#ffffff", yellow: "#ffff00", orange: "#ffa500", green: "#00b050", lime: "#00ff00", blue: "#0000ff" };
   return named[value] ? toRgb(named[value]) : null;
 }
 

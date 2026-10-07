@@ -320,20 +320,22 @@ describe("warna jadwal & permintaan ubah jadwal", () => {
 
   it("warna ikut tersimpan dari editor dan dari impor tabel", async () => {
     const res = await admin.put("/api/admin/jadwal", {
-      text: "Senin: Nino (AB-3), Sahrul (AF-19), (AB-5)",
+      text: "Senin: Nino (AB-3), Sahrul (AF-19), (AB-5), Slamet (AC-7)",
       fillNames: false,
       overwriteNames: false,
-      colors: ["green", null, "orange"],
+      colors: ["green", null, "orange", "blue"],
     });
     expect(res.status).toBe(200);
-    expect((await schedule()).map((s) => s.color)).toEqual(["green", null, "orange"]);
+    expect((await schedule()).map((s) => s.color)).toEqual(["green", null, "orange", "blue"]);
     // Jumlah warna tidak cocok dengan jadwal yang terbaca: warnanya diabaikan.
     await admin.put("/api/admin/jadwal", { text: "Senin: Nino (AB-3)", fillNames: false, overwriteNames: false, colors: ["green", "yellow"] });
     expect((await schedule()).map((s) => s.color)).toEqual([null]);
 
-    const slots = (await schedule()).map((s) => ({ ...toInput(s), color: "yellow" }));
-    await admin.put("/api/admin/jadwal/slot", { slots });
-    expect((await schedule())[0].color).toBe("yellow");
+    for (const color of ["yellow", "blue"]) {
+      const slots = (await schedule()).map((s) => ({ ...toInput(s), color }));
+      expect((await admin.put("/api/admin/jadwal/slot", { slots })).status).toBe(200);
+      expect((await schedule())[0].color).toBe(color);
+    }
   });
 
   it("petugas meminta pindah malam; admin menyetujui dan jadwal ikut berubah", async () => {

@@ -4,9 +4,10 @@ import type { ScheduleDTO } from "./types";
 
 type ImageCell = { text: string; color: GuardColor | null };
 const FILL: Record<GuardColor | "white", string> = {
-  green: "#e2f0d9",
+  green: "#c6e0b4",
   yellow: "#fff2cc",
-  orange: "#fce4d6",
+  orange: "#ffe699",
+  blue: "#bdd7ee",
   white: "#ffffff",
 };
 
@@ -79,7 +80,9 @@ export async function createScheduleImage(schedule: readonly ScheduleDTO[], comm
   const titleHeight = titleLines.length * 32 + 24;
   const headerHeight = 64;
   const tableHeight = titleHeight + headerHeight + rowHeights.reduce((sum, height) => sum + height, 0);
-  const height = margin * 2 + tableHeight;
+  const legend = "HIJAU: BISA STANDBY    KUNING/ORANYE: KADANG-KADANG    BIRU: TIDAK BISA    PUTIH: KOSONG/MUDIK/DIJUAL/DILELANG/OVER";
+  const legendHeight = 40;
+  const height = margin * 2 + tableHeight + legendHeight;
 
   // Mengubah ukuran canvas mereset konteks; semua gaya ditetapkan sesudahnya.
   canvas.width = width * 2;
@@ -140,6 +143,9 @@ export async function createScheduleImage(schedule: readonly ScheduleDTO[], comm
     ctx.lineTo(x, margin + tableHeight);
   }
   ctx.stroke();
+
+  ctx.font = "16px Arial, sans-serif";
+  ctx.fillText(legend, width / 2, margin + tableHeight + legendHeight / 2);
 
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {

@@ -1,5 +1,5 @@
 import { Star } from "lucide-react";
-import type { GuardColor } from "@/lib/guard-color";
+import { GUARD_COLOR_MEANING, type GuardColor } from "@/lib/guard-color";
 import { guardColorClass } from "./guard-color-class";
 import { cx } from "./ui";
 
@@ -22,6 +22,7 @@ export function GuardChip({
 }) {
   return (
     <li
+      title={GUARD_COLOR_MEANING[color ?? "white"]}
       className={cx(
         "inline-flex items-baseline gap-1 rounded-full px-2.5 py-1 text-sm leading-tight",
         guardColorClass(color),
@@ -33,6 +34,7 @@ export function GuardChip({
       {/* Spasi supaya pembaca layar membaca "Nino AB-3", bukan "NinoAB-3". */}
       {name && house && " "}
       {house && <span className={cx(name ? "opacity-85" : "font-semibold")}>{house}</span>}
+      <span className="sr-only">, {GUARD_COLOR_MEANING[color ?? "white"]}</span>
     </li>
   );
 }
