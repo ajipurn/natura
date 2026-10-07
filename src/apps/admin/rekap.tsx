@@ -7,22 +7,25 @@ import {
   Download,
   FileSpreadsheet,
   FileText,
+  ListFilter,
   Pencil,
+  ReceiptText,
   Search,
   Sheet,
+  Table2,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";
 import { BarChart } from "@/components/bar-chart";
 import { Menu } from "@/components/menu";
 import { QueryState } from "@/components/query-state";
 import { ScrollArea } from "@/components/scroll-area";
 import { Select } from "@/components/select";
-import { ChipGroup } from "@/components/toggle-group";
+import { SegmentedControl } from "@/components/toggle-group";
 import { api, call, errorMessage } from "@/client/api";
 import { invalidate } from "@/client/query";
-import { Alert, Button, Card, Input, PageHeader, cx } from "@/components/ui";
+import { Alert, Button, Card, Input, PageHeader, buttonClass, cx } from "@/components/ui";
 import { AmountChoice } from "@/features/riwayat/correction-form";
 import { CORRECTION_REFRESH } from "@/features/riwayat/queries";
 import {
@@ -48,6 +51,9 @@ type Filter = "semua" | "kosong" | "tidak-dicek";
 type RecapData = MonthRecap & { month: string; defaultAmount: number };
 type Sort = "rumah" | "total" | "kosong";
 type CadenceFilter = "all" | PaymentCadence;
+type RecapView = "houses" | "payments";
+type DateView = "recorded" | "month";
+type AmountColumn = { key: "daily" | "weekly" | "monthly"; field: "collectedTotal" | "weeklyTotal" | "monthlyTotal"; label: string; hint: string };
 
 const CADENCE_FILTERS = [
   { value: "all", label: "Semua" },
@@ -124,7 +130,7 @@ export function RekapPage() {
     <>
       <PageHeader
         title="Rekap bulanan"
-        subtitle="Hasil ronda dan pembayaran periode per rumah"
+        subtitle="Ringkasan jimpitan dan catatan setiap rumah."
         action={
           <Menu
             label="Unduh rekap"
@@ -168,14 +174,13 @@ export function RekapPage() {
         thisMonth={thisMonth}
       />
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
       <nav
         aria-label="Pilih bulan"
-        className="inline-flex items-center rounded-xl border border-line bg-card p-0.5"
+        className="mb-4 inline-flex items-center rounded-xl border border-line bg-card p-0.5"
       >
         <Link
           to={`/admin/rekap?bulan=${shiftMonth(month, -1)}`}
-          className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-idle-soft"
+          className={buttonClass("ghost", "icon-sm")}
           aria-label={`Bulan sebelumnya (${formatMonth(shiftMonth(month, -1))})`}
         >
           <ChevronLeft className="size-5" />
@@ -186,7 +191,7 @@ export function RekapPage() {
         {month < shiftMonth(thisMonth, 12) ? (
           <Link
             to={`/admin/rekap?bulan=${shiftMonth(month, 1)}`}
-            className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-idle-soft"
+            className={buttonClass("ghost", "icon-sm")}
             aria-label={`Bulan berikutnya (${formatMonth(shiftMonth(month, 1))})`}
           >
             <ChevronRight className="size-5" />
@@ -194,29 +199,17 @@ export function RekapPage() {
         ) : (
           <span
             aria-hidden
-            className="flex size-9 items-center justify-center text-muted/40"
+            className="flex size-8 items-center justify-center text-muted/40"
           >
             <ChevronRight className="size-5" />
           </span>
         )}
       </nav>
-      <Button
-        variant={editing ? "primary" : "secondary"}
-        size="sm"
-        aria-pressed={editing}
-        onClick={() => setEditing(!editing)}
-      >
-        {editing ? <Check className="size-4" /> : <Pencil className="size-4" />}
-        {editing ? "Selesai" : "Isi/ubah catatan"}
-      </Button>
-      </div>
-
-      <PaymentPanel key={month} month={month} />
 
       <QueryState query={query}>
         {(data) => (
           <div className={cx(query.isPlaceholderData && "opacity-60")}>
-            <RecapBody data={data} editing={editing} tonight={tonight} />
+            <RecapBody data={data} editing={editing} onEditingChange={setEditing} tonight={tonight} />
           </div>
         )}
       </QueryState>
@@ -225,23 +218,32 @@ export function RekapPage() {
 }
 
 /**
- * Tabel rekap: semua tanggal bulan itu seperti kalender. Malam tanpa catatan tampil pudar, malam
- * yang belum tiba kosong. Saat `editing`, tiap kotak sampai malam ini bisa diketuk untuk mengisi
- * atau mengubah catatan rumah itu.
+ * Tabel menampilkan malam yang tercatat. Seluruh kalender tersedia lewat filter tanggal dan
+ * otomatis ditampilkan saat koreksi, agar malam yang belum dicatat tetap bisa diisi.
  */
 function RecapBody({
   data,
   editing,
+  onEditingChange,
   tonight,
 }: {
   data: RecapData;
   editing: boolean;
+  onEditingChange: (editing: boolean) => void;
   tonight: string;
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("semua");
   const [cadence, setCadence] = useState<CadenceFilter>("all");
   const [sort, setSort] = useState<Sort>("rumah");
+  const [view, setView] = useState<RecapView>("houses");
+  const [dateView, setDateView] = useState<DateView>("recorded");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [trendOpen, setTrendOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const filtersId = useId();
+  const trendId = useId();
+  const guideId = useId();
   // Kotak yang dipilih untuk diisi sekaligus ("idRumah:tanggal"), hanya saat `editing`.
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   // Pilihan tidak terbawa keluar dari mode isi atau ke bulan lain.
@@ -284,16 +286,28 @@ function RecapBody({
   const weeklyTotal = rows.reduce((sum, r) => sum + r.weeklyTotal, 0);
   const nights = data.dates.length;
   const maxNight = Math.max(...dateTotals, 1);
+  const tableDates = editing || dateView === "month"
+    ? dates
+    : dates.filter((d) => patrolDates.has(d));
+  const tableIndices = tableDates.map((d) => dates.indexOf(d));
+  const paymentColumns: AmountColumn[] = [
+    { key: "daily", field: "collectedTotal", label: "Harian", hint: "Uang yang diambil saat ronda" },
+    ...(weeklyTotal > 0 || Object.values(data.paymentCadences ?? {}).some((c) => c.includes("weekly"))
+      ? [{ key: "weekly", field: "weeklyTotal", label: "Mingguan", hint: "Pembayaran untuk periode mingguan" } as const] : []),
+    ...(monthlyTotal > 0 || Object.values(data.paymentCadences ?? {}).some((c) => c.includes("monthly"))
+      ? [{ key: "monthly", field: "monthlyTotal", label: "Bulanan", hint: "Pembayaran untuk periode bulanan" } as const] : []),
+  ];
   // Malam yang belum tiba (selalu di akhir bulan) diberi kolom sempit.
-  const future = dates.filter((d) => d > tonight).length;
+  const future = tableDates.filter((d) => d > tonight).length;
   // Kolom tanggal berbagi sisa lebar, tapi tidak lebih sempit dari ini (lihat `RecapCols`).
-  const minWidth = `calc(var(--rumah-col) + ${dates.length - future} * ${DATE_COL} + ${future} * ${FUTURE_COL} + ${ADA_COL} + 3 * ${PERIOD_COL} + ${TOTAL_COL})`;
+  const minWidth = `calc(var(--rumah-col) + ${tableDates.length - future} * ${DATE_COL} + ${future} * ${FUTURE_COL} + ${ADA_COL} + ${paymentColumns.length} * ${PERIOD_COL} + ${TOTAL_COL})`;
 
   const stats = rows.map((r) => {
     const cadences: PaymentCadence[] = data.paymentCadences?.[r.house.id] ?? ["daily"];
     const statusAt = (i: number) => {
       if (dates[i] > tonight) return undefined;
       const period = r.house.status === "active" ? periodAt(r.house.id, dates[i]) : undefined;
+      if (r.cells[i]?.status === "filled") return "filled";
       return period ? period.status === "paid" ? "filled" : "empty" : r.cells[i]?.status;
     };
     return {
@@ -308,10 +322,6 @@ function RecapBody({
           : 0,
     };
   });
-  const filledCells = stats.reduce((s, r) => s + r.filledCount, 0);
-  const emptyCells = stats.reduce((s, r) => s + r.empty, 0);
-  const uncheckedCells = stats.reduce((s, r) => s + r.unchecked, 0);
-  const checkedCells = filledCells + emptyCells;
 
   // Ringkasan per malam. Malam ini yang belum dicatat belum dihitung terlewat.
   const due = dates.filter((d) => d < tonight || (d === tonight && patrolDates.has(d)));
@@ -328,14 +338,6 @@ function RecapBody({
       ? dateTotals.reduce((sum, n) => sum + n, 0) / nights
       : null;
   const best = dates.reduce<number | null>((top, _, i) => (dateTotals[i] > (top === null ? 0 : dateTotals[top]) ? i : top), null);
-
-  if (rows.length === 0) {
-    return (
-      <Card className="py-10 text-center text-muted">
-        Belum ada data rumah.
-      </Card>
-    );
-  }
 
   const matched = search.trim()
     ? new Set(
@@ -462,153 +464,110 @@ function RecapBody({
 
   return (
     <>
-      <Card className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
-        <div className="shrink-0 sm:w-56 sm:self-start">
-          <p className="text-xs text-muted">Jimpitan seluruh rumah · {formatMonth(data.month)}</p>
-          <p className="text-3xl font-bold leading-tight tracking-tight tabular-nums">
-            {formatRupiah(grandTotal)}
-          </p>
-          {(monthlyTotal > 0 || weeklyTotal > 0) && <p className="mt-1 text-xs text-muted">Termasuk bulanan {formatRupiah(monthlyTotal)}{weeklyTotal > 0 && " dan mingguan " + formatRupiah(weeklyTotal)}. Grafik menunjukkan uang hasil ronda per malam.</p>}
-          {best !== null && (
-            <p className="mt-1 text-xs text-muted">
-              Tertinggi {formatRupiah(dateTotals[best])} pada{" "}
-              {formatDateShort(dates[best])}
-            </p>
-          )}
-        </div>
-        <BarChart
-          size="sm"
-          labelEvery={7}
-          className="min-w-0 flex-1"
-          caption={`Jimpitan terkumpul per malam, ${formatMonth(data.month)}`}
-          bars={dates.map((d, i) => ({
-            key: d,
-            label: String(Number(d.slice(8))),
-            value: dateTotals[i],
-            highlight: d === tonight && patrolDates.has(d),
-            faint: patrolDates.has(d) && !halfChecked(i),
-            blank: d > tonight,
-            title:
-              d > tonight
-                ? `${formatDateShort(d)}: belum tiba`
-                : patrolDates.has(d)
-                  ? `${formatDateShort(d)}: ${formatRupiah(dateTotals[i])} · ${checkedPerDate[i]} dari ${activeRows.length} rumah selesai`
-                  : `${formatDateShort(d)}: belum ada catatan`,
-          }))}
-        />
+      <Card className="mb-5">
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+          <div className="col-span-2 md:col-span-1">
+            <dt className="text-sm text-muted">Total jimpitan</dt>
+            <dd className="mt-1 text-3xl font-bold tracking-tight tabular-nums">{formatRupiah(grandTotal)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted">Hasil ronda harian</dt>
+            <dd className="mt-1 text-lg font-semibold tabular-nums">{formatRupiah(grandTotal - monthlyTotal - weeklyTotal)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted">Pembayaran periode</dt>
+            <dd className="mt-1 text-lg font-semibold tabular-nums">{formatRupiah(monthlyTotal + weeklyTotal)}</dd>
+          </div>
+          <div className="col-span-2 flex items-center justify-between gap-3 md:col-span-1 md:block">
+            <div>
+              <dt className="text-xs text-muted">Malam tercatat</dt>
+              <dd className="mt-1 text-lg font-semibold tabular-nums">{nights} <span className="text-sm font-normal text-muted">malam</span></dd>
+            </div>
+            <Button variant="ghost" size="sm" className="md:-ml-3 md:mt-1" aria-expanded={trendOpen} aria-controls={trendOpen ? trendId : undefined} onClick={() => setTrendOpen(!trendOpen)}>
+              Grafik ronda <ChevronDown className={cx("size-4", trendOpen && "rotate-180")} />
+            </Button>
+          </div>
+        </dl>
+        {trendOpen && <div id={trendId} className="mt-5 space-y-4 border-t border-line pt-4">
+          <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
+            <div><p className="text-xs text-muted">Rata-rata per malam</p><p className="mt-1 font-semibold tabular-nums">{average === null ? "–" : formatRupiah(Math.round(average))}</p>{partialNights > 0 && <p className="mt-1 text-xs text-muted">Tanpa {partialNights} malam yang belum separuh dicek.</p>}</div>
+            {best !== null && <div><p className="text-xs text-muted">Ronda tertinggi</p><p className="mt-1 font-semibold tabular-nums">{formatRupiah(dateTotals[best])} <span className="font-normal text-muted">· {formatDateShort(dates[best])}</span></p></div>}
+            {missingNights > 0 && <p className="text-xs text-warn">{missingNights} malam belum ada catatan.</p>}
+          </div>
+          <BarChart
+            size="lg"
+            formatValue={formatAmountShort}
+            className="min-w-0"
+            caption={`Hasil ronda harian, ${formatMonth(data.month)}`}
+            bars={dates.flatMap((d, i) => d > tonight ? [] : [{
+              key: d, label: String(Number(d.slice(8))), value: dateTotals[i],
+              highlight: d === tonight && patrolDates.has(d), faint: patrolDates.has(d) && !halfChecked(i),
+              title: patrolDates.has(d)
+                ? `${formatDateShort(d)}: ${formatRupiah(dateTotals[i])} · ${checkedPerDate[i]} dari ${activeRows.length} rumah selesai`
+                : `${formatDateShort(d)}: belum ada catatan`,
+            }])}
+          />
+          <p className="text-xs text-muted">Grafik hanya menunjukkan uang yang diambil saat ronda. Pembayaran mingguan dan bulanan dihitung terpisah.</p>
+        </div>}
       </Card>
-      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-        <Stat
-          label="Malam tercatat"
-          value={
-            <>
-              {nights}
-              <span className="text-sm font-medium text-muted"> dari {due.length}</span>
-            </>
-          }
-          hint={
-            missingNights > 0 ? (
-              <span className="text-warn">{missingNights} malam belum ada catatan</span>
-            ) : due.length > 0 ? (
-              "Semua malam tercatat"
-            ) : undefined
-          }
-        />
-        <Stat
-          label="Rata-rata per malam"
-          value={average === null ? "–" : formatRupiah(Math.round(average))}
-          hint={
-            countedNights.length === 0 && nights > 0
-              ? "Semua malam baru sebagian dicek"
-              : partialNights > 0
-                ? `Tanpa ${partialNights} malam yang belum separuh dicek`
-                : nights > 0
-                  ? `Dari ${nights} malam`
-                  : undefined
-          }
-        />
-        <Stat
-          className="col-span-2 sm:col-span-1"
-          label="Rumah berstatus hijau"
-          value={
-            checkedCells
-              ? `${Math.round((filledCells / checkedCells) * 100)}%`
-              : "–"
-          }
-          hint={`${emptyCells} kosong/belum bayar · ${uncheckedCells} tidak dicek`}
-        />
-      </div>
 
-      <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center">
-        <label className="relative block lg:w-64">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted" />
-          <Input
-            type="search"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setSelected(new Set());
-            }}
-            placeholder="Cari rumah atau nama…"
-            aria-label="Cari rumah"
-            className="h-10 pl-10"
-          />
-        </label>
-        <ScrollArea className="-mx-4 overflow-x-auto lg:mx-0">
-          <ChipGroup
-            aria-label="Saring rumah"
-            value={filter}
-            onValueChange={(next) => {
-              setFilter(next);
-              setSelected(new Set());
-            }}
-            options={filters.map((f) => ({
-              value: f.value,
-              label: f.label,
-              count: stats.filter(f.match).length,
-            }))}
-            className="w-max min-w-full px-4 lg:px-0"
-          />
-        </ScrollArea>
-        <div className="flex items-center gap-2 text-sm lg:ml-auto">
-          <span className="text-muted">Urutkan</span>
-          <Select
-            aria-label="Urutkan"
-            value={sort}
-            onValueChange={setSort}
-            options={SORTS}
-            className="h-10 w-56"
-          />
+      <SegmentedControl
+        aria-label="Tampilan rekap"
+        value={view}
+        onValueChange={(next) => { setView(next); onEditingChange(false); setSelected(new Set()); }}
+        options={[{ value: "houses", label: "Per rumah", icon: Table2 }, { value: "payments", label: "Pembayaran", icon: ReceiptText }]}
+        size="sm"
+        className="mb-5 w-fit max-w-full"
+      />
+
+      {view === "payments" ? <PaymentPanel key={data.month} month={data.month} /> : <section aria-label="Rekap per rumah">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">Catatan rumah</h2>
+            <p className="mt-0.5 text-xs text-muted">{visible.length === stats.length ? stats.length : `${visible.length} dari ${stats.length}`} rumah · {editing || dateView === "month" ? "Seluruh tanggal bulan ini" : "Malam yang tercatat"}</p>
+          </div>
+          <Button variant={editing ? "primary" : "secondary"} size="sm" className="shrink-0 whitespace-nowrap" aria-pressed={editing} onClick={() => onEditingChange(!editing)}>
+            {editing ? <Check className="size-4" /> : <Pencil className="size-4" />}
+            {editing ? "Selesai" : "Ubah catatan"}
+          </Button>
         </div>
-      </div>
+        {nights === 0 && <p className="mb-3 text-sm text-muted">Belum ada ronda tercatat untuk bulan ini.{data.month <= tonight.slice(0, 7) && " Gunakan Ubah catatan untuk mulai mengisi."}</p>}
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="text-sm text-muted">Cara bayar</span>
-        <ChipGroup
-          aria-label="Cara bayar"
-          value={cadence}
-          onValueChange={(next) => {
-            setCadence(next);
-            setSelected(new Set());
-          }}
-          options={CADENCE_FILTERS.map((f) => ({ ...f, count: stats.filter((r) => f.value === "all" || r.cadences.includes(f.value)).length }))}
-          className="flex-wrap"
-        />
-      </div>
-      <p className="mt-2 text-xs text-muted">
-        Harian menunjukkan uang hasil ronda. Mingguan dan Bulanan menunjukkan pembayaran periode; kotak tanggalnya otomatis hijau jika sudah bayar, merah jika belum.
-        {visible.length !== stats.length && ` Menampilkan ${visible.length} rumah; total tabel mengikuti hasil saringan.`}
-      </p>
-      <Legend editing={editing} defaultAmount={data.defaultAmount} />
+        <div className="flex items-center gap-2">
+          <label className="relative block min-w-0 flex-1 sm:max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+            <Input type="search" value={search} onChange={(e) => { setSearch(e.target.value); setSelected(new Set()); }} placeholder="Cari rumah atau nama…" aria-label="Cari rumah" className="h-9 pl-9 sm:text-sm" />
+          </label>
+          <Button variant="secondary" size="sm" aria-expanded={filtersOpen} aria-controls={filtersOpen ? filtersId : undefined} onClick={() => setFiltersOpen(!filtersOpen)}>
+            <ListFilter className="size-4" /> Filter{(filter !== "semua" || cadence !== "all") && <span className="text-primary">{Number(filter !== "semua") + Number(cadence !== "all")}</span>}
+          </Button>
+        </div>
+        {filtersOpen && <div id={filtersId} className="mt-3 grid gap-3 rounded-xl border border-line bg-card p-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Select label="Status catatan" value={filter} onValueChange={(next) => { setFilter(next); setSelected(new Set()); }} options={filters.map((f) => ({ value: f.value, label: f.label, hint: String(stats.filter(f.match).length) }))} className="h-9 sm:text-sm" />
+          <Select label="Cara bayar" value={cadence} onValueChange={(next) => { setCadence(next); setSelected(new Set()); }} options={CADENCE_FILTERS.map((f) => ({ ...f, hint: String(stats.filter((r) => f.value === "all" || r.cadences.includes(f.value)).length) }))} className="h-9 sm:text-sm" />
+          <Select label="Urutkan" value={sort} onValueChange={setSort} options={SORTS} className="h-9 sm:text-sm" />
+          <Select label="Tanggal ditampilkan" value={dateView} onValueChange={setDateView} disabled={editing} options={[{ value: "recorded", label: "Malam tercatat" }, { value: "month", label: "Seluruh bulan" }]} className="h-9 sm:text-sm" />
+        </div>}
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <div className="flex flex-wrap items-center gap-x-3 text-xs text-muted">
+            {(filter !== "semua" || cadence !== "all" || search.trim()) && <><span>{[filter !== "semua" && filters.find((f) => f.value === filter)?.label, cadence !== "all" && CADENCE_LABEL[cadence]].filter(Boolean).join(" · ") || "Hasil pencarian"}. Total tabel mengikuti hasil filter.</span><Button variant="ghost" size="sm" onClick={() => { setSearch(""); setFilter("semua"); setCadence("all"); setSelected(new Set()); }}>Reset filter</Button></>}
+            {editing && <span className="text-primary">Pilih kotak untuk mengisi atau mengubah catatan.</span>}
+          </div>
+          <Button variant="ghost" size="sm" className="ml-auto" aria-expanded={guideOpen} aria-controls={guideOpen ? guideId : undefined} onClick={() => setGuideOpen(!guideOpen)}>Arti warna <ChevronDown className={cx("size-4", guideOpen && "rotate-180")} /></Button>
+        </div>
+        {guideOpen && <div id={guideId} className="mb-3 rounded-xl bg-idle-soft/50 px-3 pb-3 pt-px">
+          <Legend editing={editing} defaultAmount={data.defaultAmount} />
+          <p className="mt-2 text-xs text-muted">Harian menunjukkan uang hasil ronda. Rumah mingguan/bulanan mengikuti status pembayaran periode, kecuali sudah tercatat ada isinya saat ronda. Lihat rinciannya di tampilan Pembayaran.</p>
+        </div>}
 
       {visible.length === 0 ? (
-        <Card className="mt-3 text-center text-muted">
-          Tidak ada rumah yang cocok.
+        <Card className="mt-3 py-10 text-center text-muted">
+          {rows.length ? "Tidak ada rumah yang cocok. Coba ubah pencarian atau filter." : "Belum ada data rumah."}
         </Card>
       ) : (
         <div
           data-recap
-          className="mt-3 rounded-2xl border border-line bg-card [--rumah-col:5.75rem] sm:[--rumah-col:12rem]"
+          className="mt-1 rounded-2xl border border-line bg-card [--rumah-col:6.5rem] sm:[--rumah-col:12rem]"
           onMouseOver={(e) => {
             const col = (e.target as HTMLElement).closest<HTMLElement>("[data-col]")?.dataset.col;
             if (hoverStyleRef.current) {
@@ -636,13 +595,14 @@ function RecapBody({
               className="w-full table-fixed border-collapse text-sm"
               style={{ minWidth }}
             >
-              <RecapCols dates={dates.length} future={future} />
+              <RecapCols dates={tableDates.length} future={future} paymentColumns={paymentColumns.length} />
               <thead>
                 <tr className="text-xs text-muted">
                   <th className="sticky left-0 z-10 bg-card px-2 py-2 text-left font-semibold sm:px-3">
                     Rumah
                   </th>
-                  {dates.map((d, i) => {
+                  {tableDates.map((d) => {
+                    const i = dates.indexOf(d);
                     const label = (
                       <>
                         <span className="text-[10px]">
@@ -696,11 +656,9 @@ function RecapBody({
                     );
                   })}
                   <th className="whitespace-nowrap px-2 py-2 text-right font-semibold">
-                    Ada
+                    Terisi
                   </th>
-                  <th className="whitespace-nowrap px-2 py-2 text-right font-semibold" title="Uang yang diambil saat ronda">Harian</th>
-                  <th className="whitespace-nowrap px-2 py-2 text-right font-semibold" title="Pembayaran mingguan sesuai periode yang dibayar">Mingguan</th>
-                  <th className="whitespace-nowrap px-2 py-2 text-right font-semibold text-primary" title="Pembayaran bulanan sesuai periode yang dibayar">Bulanan</th>
+                  {paymentColumns.map((column) => <th key={column.key} className="whitespace-nowrap px-2 py-2 text-right font-semibold" title={column.hint}>{column.label}</th>)}
                   <th className="whitespace-nowrap px-3 py-2 text-right font-semibold">
                     Total
                   </th>
@@ -722,18 +680,16 @@ function RecapBody({
                 style={{ minWidth }}
                 {...(editing ? selectHandlers : {})}
               >
-                <RecapCols dates={dates.length} future={future} />
+                <RecapCols dates={tableDates.length} future={future} paymentColumns={paymentColumns.length} />
                 {/* Judul kolom untuk pembaca layar; yang terlihat ada di strip di atas. */}
                 <thead className="sr-only">
                   <tr>
                     <th>Rumah</th>
-                    {dates.map((d) => (
+                    {tableDates.map((d) => (
                       <th key={d}>{formatDateShort(d)}</th>
                     ))}
-                    <th>Ada</th>
-                    <th>Harian</th>
-                    <th>Mingguan</th>
-                    <th>Bulanan</th>
+                    <th>Terisi</th>
+                    {paymentColumns.map((column) => <th key={column.key}>{column.label}</th>)}
                     <th>Total</th>
                   </tr>
                 </thead>
@@ -742,8 +698,8 @@ function RecapBody({
                     {block && (
                       <tr className="border-b border-line bg-bg/60">
                         <th
-                          colSpan={dates.length + 6}
-                          className="px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-muted"
+                          colSpan={tableDates.length + paymentColumns.length + 3}
+                          className="px-3 py-2 text-left text-xs font-medium text-muted"
                         >
                           {/* Sel ini selebar tabel, jadi yang menempel di kiri saat digeser teksnya. */}
                           <span className="sticky left-3 inline-block">
@@ -764,7 +720,7 @@ function RecapBody({
                         <th
                           scope="row"
                           // Latar harus pekat (kolom ini menempel di kiri): warna sorotan barisnya dicampur.
-                          className="sticky left-0 z-10 bg-card px-2 py-1 text-left font-normal group-hover:bg-[color-mix(in_oklab,var(--idle-soft)_50%,var(--card))] sm:px-3"
+                          className="sticky left-0 z-10 bg-card px-2 py-2.5 text-left font-normal group-hover:bg-[color-mix(in_oklab,var(--idle-soft)_50%,var(--card))] sm:px-3"
                         >
                           {/* HP: label di atas, nama kecil di bawah. Layar lebar: satu baris. */}
                           <RowLabel
@@ -788,18 +744,19 @@ function RecapBody({
                               </span>
                             </span>
                           </span>
-                          <span className="mt-0.5 flex flex-wrap gap-1" title={`Cara bayar yang berlaku pada ${formatMonth(data.month)}${r.cadences.length > 1 ? "; berubah dalam bulan ini" : ""}`}>
-                            {r.cadences.map((c) => <span key={c} className="rounded-full bg-idle-soft px-1.5 py-0.5 text-[10px] font-medium leading-3 text-muted">{CADENCE_LABEL[c]}</span>)}
-                          </span>
+                          {r.cadences.some((c) => c !== "daily") && <span className="mt-0.5 flex flex-wrap gap-1" title={`Cara bayar yang berlaku pada ${formatMonth(data.month)}${r.cadences.length > 1 ? "; berubah dalam bulan ini" : ""}`}>
+                            {r.cadences.filter((c) => c !== "daily" || r.cadences.length > 1).map((c) => <span key={c} className="rounded-full bg-idle-soft px-1.5 py-0.5 text-[10px] font-medium leading-3 text-muted">{CADENCE_LABEL[c]}</span>)}
+                          </span>}
                           </RowLabel>
                         </th>
-                        {r.cells.map((cell, i) => {
+                        {tableIndices.map((i) => {
+                          const cell = r.cells[i];
                           const date = dates[i];
                           const vacant = r.house.status === "vacant";
                           const recorded = patrolDates.has(date);
                           const future = date > tonight;
                           const period = vacant ? undefined : periodAt(r.house.id, date);
-                          const content = future ? null : period ? <PeriodCell period={period} date={date} /> : (
+                          const content = future ? null : period && cell?.status !== "filled" ? <PeriodCell period={period} date={date} /> : (
                             <Cell
                               cell={cell}
                               vacant={vacant}
@@ -849,9 +806,7 @@ function RecapBody({
                             /{r.filledCount + r.empty}
                           </span>
                         </td>
-                        <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{r.collectedTotal > 0 ? formatRupiah(r.collectedTotal) : "–"}</td>
-                        <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{r.weeklyTotal > 0 ? formatRupiah(r.weeklyTotal) : "–"}</td>
-                        <td className="whitespace-nowrap bg-primary/5 px-2 py-1.5 text-right font-semibold tabular-nums text-primary" title="Pembayaran bulanan untuk bulan ini, terpisah dari pengambilan saat ronda">{r.monthlyTotal > 0 ? formatRupiah(r.monthlyTotal) : "–"}</td>
+                        {paymentColumns.map((column) => <td key={column.key} className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums" title={column.hint}>{r[column.field] > 0 ? formatRupiah(r[column.field]) : "–"}</td>)}
                         <td className="whitespace-nowrap px-3 py-1.5 text-right font-semibold tabular-nums">
                           {formatRupiah(r.total)}
                         </td>
@@ -863,13 +818,9 @@ function RecapBody({
                 <tfoot className="sr-only">
                   <tr>
                     <th scope="row">Total</th>
-                    {shownDateTotals.map((t, i) => (
-                      <td key={dates[i]}>{t > 0 ? formatRupiah(t) : "–"}</td>
-                    ))}
+                    {tableIndices.map((i) => <td key={dates[i]}>{shownDateTotals[i] > 0 ? formatRupiah(shownDateTotals[i]) : "–"}</td>)}
                     <td />
-                    <td>{formatRupiah(shownTotals.daily)}</td>
-                    <td>{formatRupiah(shownTotals.weekly)}</td>
-                    <td>{formatRupiah(shownTotals.monthly)}</td>
+                    {paymentColumns.map((column) => <td key={column.key}>{formatRupiah(shownTotals[column.key])}</td>)}
                     <td>{formatRupiah(shownTotals.total)}</td>
                   </tr>
                 </tfoot>
@@ -887,13 +838,15 @@ function RecapBody({
               className="w-full table-fixed border-collapse text-sm"
               style={{ minWidth }}
             >
-              <RecapCols dates={dates.length} future={future} />
+              <RecapCols dates={tableDates.length} future={future} paymentColumns={paymentColumns.length} />
               <tbody>
                 <tr className="font-semibold">
                   <th className="sticky left-0 z-10 bg-card px-2 py-2 text-left sm:px-3">
                     Total
                   </th>
-                  {shownDateTotals.map((t, i) => (
+                  {tableIndices.map((i) => {
+                    const t = shownDateTotals[i];
+                    return (
                     // Kolomnya sempit untuk angka: tinggi batang = terkumpul malam itu, angkanya di judul.
                     <td
                       key={dates[i]}
@@ -908,11 +861,9 @@ function RecapBody({
                         />
                       )}
                     </td>
-                  ))}
+                  ); })}
                   <td />
-                  <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{formatRupiah(shownTotals.daily)}</td>
-                  <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{formatRupiah(shownTotals.weekly)}</td>
-                  <td className="whitespace-nowrap bg-primary/5 px-2 py-2 text-right tabular-nums text-primary">{formatRupiah(shownTotals.monthly)}</td>
+                  {paymentColumns.map((column) => <td key={column.key} className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{formatRupiah(shownTotals[column.key])}</td>)}
                   <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
                     {formatRupiah(shownTotals.total)}
                   </td>
@@ -930,11 +881,12 @@ function RecapBody({
           onClear={() => setSelected(new Set())}
         />
       )}
+      </section>}
     </>
   );
 }
 
-const DATE_COL = "1.375rem";
+const DATE_COL = "2rem";
 const FUTURE_COL = "1rem";
 const ADA_COL = "3.5rem";
 const PERIOD_COL = "7rem";
@@ -946,7 +898,7 @@ const TOTAL_COL = "7rem";
  * `DATE_COL`), jadi kotaknya tidak terpisah jauh dari nama rumah. `future` kolom terakhir (malam
  * yang belum tiba) dibuat sempit.
  */
-function RecapCols({ dates, future }: { dates: number; future: number }) {
+function RecapCols({ dates, future, paymentColumns }: { dates: number; future: number; paymentColumns: number }) {
   return (
     <colgroup>
       <col style={{ width: "var(--rumah-col)" }} />
@@ -954,9 +906,7 @@ function RecapCols({ dates, future }: { dates: number; future: number }) {
         <col key={i} style={i >= dates - future ? { width: FUTURE_COL } : undefined} />
       ))}
       <col style={{ width: ADA_COL }} />
-      <col style={{ width: PERIOD_COL }} />
-      <col style={{ width: PERIOD_COL }} />
-      <col style={{ width: PERIOD_COL }} />
+      {Array.from({ length: paymentColumns }, (_, i) => <col key={`amount-${i}`} style={{ width: PERIOD_COL }} />)}
       <col style={{ width: TOTAL_COL }} />
     </colgroup>
   );
@@ -1170,27 +1120,5 @@ function Legend({ editing, defaultAmount }: { editing: boolean; defaultAmount: n
           : "Ketuk tanggal untuk membuka riwayat malam itu."}
       </span>
     </p>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  hint,
-  className,
-}: {
-  label: string;
-  value: ReactNode;
-  hint?: ReactNode;
-  className?: string;
-}) {
-  return (
-    <Card className={cx("p-3", className)}>
-      <p className="text-xs text-muted">{label}</p>
-      <p className="whitespace-nowrap text-xl font-bold leading-tight">
-        {value}
-      </p>
-      {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
-    </Card>
   );
 }

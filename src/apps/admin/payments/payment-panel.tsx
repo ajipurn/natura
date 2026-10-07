@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Pencil, Plus, ReceiptText } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, Pencil, Plus, ReceiptText } from "lucide-react";
+import { useId, useState } from "react";
 import { Link } from "react-router";
 import { api, call } from "@/client/api";
 import { invalidate } from "@/client/query";
@@ -21,6 +21,7 @@ export function PaymentPanel({ month }: { month: string }) {
   const [editing, setEditing] = useState<AdminPayment>();
   const [logId, setLogId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const historyId = useId();
   const byId = new Map((houses.data?.houses ?? []).map((h) => [h.id, h]));
   const label = (id: number) => { const house = byId.get(id); return house ? houseLabel(house) : "Rumah #" + id; };
   const cancel = useMutation({
@@ -29,9 +30,9 @@ export function PaymentPanel({ month }: { month: string }) {
   });
   function record(payment?: AdminPayment) { setEditing(payment); setOpened(true); }
   return (
-    <Card className="mb-5 space-y-3">
+    <Card className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h2 className="flex items-center gap-2 font-semibold"><ReceiptText className="size-4 text-primary" /> Pembayaran mingguan & bulanan</h2><p className="mt-1 text-xs text-muted">Pembayaran sesuai periode. Kolom Mingguan dan Bulanan di rekap terpisah dari uang hasil ronda.</p></div>
+        <div><h2 className="flex items-center gap-2 font-semibold"><ReceiptText className="size-4 text-primary" /> Pembayaran periode</h2><p className="mt-1 text-sm text-muted">Kelola pembayaran mingguan dan bulanan warga.</p></div>
         <Button size="sm" onClick={() => record()}><Plus className="size-4" /> Catat pembayaran</Button>
       </div>
       <QueryState query={query}>
@@ -42,28 +43,37 @@ export function PaymentPanel({ month }: { month: string }) {
           const paid = bills.filter((b) => b.status === "paid");
           return (
             <>
-              <p className="text-sm text-muted">{bills.length} periode · {paid.length} sudah bayar · {unpaid.length} belum bayar · {data.payments.length} pembayaran tercatat</p>
-              <Button variant="ghost" size="sm" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? "Tutup rincian pembayaran" : "Lihat status & riwayat pembayaran"}</Button>
-              {expanded && (
-                <div className="space-y-4">
-                  {previousUnpaid.length > 0 && <p className="text-xs text-muted">Daftar ini juga menampilkan periode sebelumnya yang belum dibayar.</p>}
-                  {bills.length === 0 ? <p className="text-sm text-muted">Atur pembayaran mingguan/bulanan di <Link to="/admin/rumah" className="font-semibold text-primary underline">Rumah & QR</Link> untuk menampilkan status tiap periode.</p> : (
-                    <ul className="divide-y divide-line">
-                      {bills.map((b) => <li key={b.planId + ":" + b.start} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
-                        <div className="min-w-0"><p className="font-semibold">{label(b.houseId)} <span className="text-xs font-normal text-muted">{CADENCE_LABEL[b.cadence]}</span></p><p className="text-xs text-muted">{formatDateShort(b.start)} – {formatDateShort(b.end)}</p></div>
-                        <div className="text-right"><p className={cx("text-xs font-semibold", b.status === "paid" ? "text-filled" : "text-empty")}>{BILLING_LABEL[b.status]}</p><p className="text-sm tabular-nums">{formatRupiah(b.paid)} / {formatRupiah(b.expected)}</p></div>
-                      </li>)}
-                    </ul>
-                  )}
-                  <div><h3 className="text-sm font-semibold">Riwayat pembayaran</h3><p className="text-xs text-muted">Menampilkan uang diterima bulan ini atau pembayaran yang mencakup periode bulan ini.</p></div>
-                  {data.history.length === 0 ? <p className="text-sm text-muted">Belum ada pembayaran periode. Pilih Catat pembayaran saat menerima uang dari warga.</p> : <ul className="divide-y divide-line">{data.history.map((p) => <li key={p.id} className="space-y-2 py-3">
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+                <div><dt className="text-xs text-muted">Belum lunas</dt><dd className="mt-1 text-xl font-semibold tabular-nums">{unpaid.length} <span className="text-sm font-normal text-muted">periode</span></dd></div>
+                <div><dt className="text-xs text-muted">Sudah lunas</dt><dd className="mt-1 text-xl font-semibold tabular-nums">{paid.length} <span className="text-sm font-normal text-muted">periode</span></dd></div>
+                <div className="col-span-2 sm:col-span-1"><dt className="text-xs text-muted">Sisa pembayaran</dt><dd className="mt-1 text-xl font-semibold tabular-nums">{formatRupiah(unpaid.reduce((sum, b) => sum + b.remaining, 0))}</dd></div>
+              </dl>
+              <div>
+                <h3 className="text-sm font-semibold">Status per rumah</h3>
+                {bills.some((b) => b.end < month + "-01") && <p className="mt-1 text-xs text-muted">Termasuk periode sebelumnya yang belum lunas.</p>}
+                {bills.length === 0 ? <p className="mt-3 text-sm text-muted">Belum ada kesepakatan mingguan atau bulanan. Atur cara bayar di <Link to="/admin/rumah" className="font-semibold text-primary underline">Rumah & QR</Link>.</p> : (
+                  <ul className="mt-2 divide-y divide-line">
+                    {bills.map((b) => <li key={b.planId + ":" + b.start} className="flex items-center justify-between gap-3 py-3">
+                      <div className="min-w-0"><p className="font-semibold">{label(b.houseId)} <span className="text-xs font-normal text-muted">{CADENCE_LABEL[b.cadence]}</span></p><p className="mt-0.5 text-xs text-muted">{formatDateShort(b.start)} – {formatDateShort(b.end)}</p></div>
+                      <div className="shrink-0 text-right"><p className={cx("text-xs font-semibold", b.status === "paid" ? "text-filled" : "text-empty")}>{BILLING_LABEL[b.status]}</p><p className="mt-0.5 text-sm tabular-nums">{formatRupiah(b.paid)} <span className="text-muted">/ {formatRupiah(b.expected)}</span></p></div>
+                    </li>)}
+                  </ul>
+                )}
+              </div>
+              <div className="border-t border-line pt-3">
+                <Button variant="ghost" size="sm" className="-ml-3" aria-expanded={expanded} aria-controls={expanded ? historyId : undefined} onClick={() => setExpanded(!expanded)}>
+                  Riwayat pembayaran <span className="text-muted">{data.history.length}</span> <ChevronDown className={cx("size-4", expanded && "rotate-180")} />
+                </Button>
+                {expanded && <div id={historyId} className="mt-3 space-y-3">
+                  <p className="text-xs text-muted">Uang diterima atau pembayaran yang mencakup bulan ini.</p>
+                  {data.history.length === 0 ? <p className="text-sm text-muted">Belum ada pembayaran tercatat. Gunakan Catat pembayaran saat menerima uang dari warga.</p> : <ul className="divide-y divide-line">{data.history.map((p) => <li key={p.id} className="space-y-2 py-3">
                     <div className="flex flex-wrap justify-between gap-2"><p className="font-semibold">{label(p.houseId)} <span className="text-xs font-normal text-muted">{CADENCE_LABEL[p.cadence]}{p.cancelledAt && " · Dibatalkan"}</span></p><p className={cx("font-semibold tabular-nums", !!p.cancelledAt && "text-muted line-through")}>{formatRupiah(p.amount)}</p></div>
                     <p className="text-xs text-muted">Periode {formatDateShort(p.periodStart)} – {formatDateShort(p.periodEnd)} {p.periodEnd.slice(0, 4)} · diterima {formatDateShort(p.receivedDate)} oleh {p.receivedBy === "treasurer" ? "bendahara" : p.collectorName ?? "petugas"}.</p>
                     {p.note && <p className="break-words text-xs text-muted">{p.note}</p>}
                     <div className="flex flex-wrap gap-2">{!p.cancelledAt && <Button variant="secondary" size="sm" onClick={() => record(p)}><Pencil className="size-3.5" /> Ubah</Button>}<Button variant="ghost" size="sm" onClick={() => setLogId(p.id)}>Log perubahan</Button>{!p.cancelledAt && <Button variant="ghost" size="sm" disabled={cancel.isPending} onClick={() => window.confirm("Batalkan pembayaran " + label(p.houseId) + " sebesar " + formatRupiah(p.amount) + "? Kas dan rekap akan diperbarui.") && cancel.mutate(p.id)}>Batalkan pembayaran</Button>}</div>
                   </li>)}</ul>}
-                </div>
-              )}
+                </div>}
+              </div>
             </>
           );
         }}
