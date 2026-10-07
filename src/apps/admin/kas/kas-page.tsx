@@ -1,15 +1,16 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, Pencil, Plus, TriangleAlert } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, Pencil, Plus, ReceiptText, TriangleAlert, Wallet } from "lucide-react";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { api, call } from "@/client/api";
 import { invalidate } from "@/client/query";
 import { RadioCards, type RadioCardOption } from "@/components/choice";
+import { DatePicker } from "@/components/date-picker";
 import { Dialog } from "@/components/dialog";
 import { QueryState } from "@/components/query-state";
 import { RupiahInput } from "@/components/rupiah-input";
 import { Alert, Button, Card, Field, Input, PageHeader, cx } from "@/components/ui";
-import { formatDateLong, formatDateShort, formatMonth, isMonth, localDate, rondaDate, shiftMonth } from "@/lib/dates";
+import { formatDateShort, formatMonth, isMonth, localDate, rondaDate, shiftMonth } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import type { CashMonth } from "@/server/kas";
 import { CASH_REFRESH, cashQuery, settingsQuery } from "../queries";
@@ -46,14 +47,14 @@ export function KasPage() {
     <>
       <PageHeader
         title="Kas"
-        subtitle="Setoran jimpitan ke bendahara, pemasukan lain, dan pengeluaran"
-        action={
-          <Button size="sm" className="shrink-0" onClick={() => openEntry()}>
-            <Plus className="size-4" /> Pengeluaran
-          </Button>
-        }
+        subtitle="Kelola setoran jimpitan, pemasukan lain, dan pengeluaran kas."
       />
-      <MonthNav month={month} thisMonth={thisMonth} />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <MonthNav month={month} thisMonth={thisMonth} />
+        <Button size="sm" onClick={() => openEntry()}>
+          <Plus className="size-4" aria-hidden /> Catat transaksi
+        </Button>
+      </div>
 
       <QueryState query={query}>
         {(data) => (
@@ -84,7 +85,7 @@ export function KasPage() {
 function MonthNav({ month, thisMonth }: { month: string; thisMonth: string }) {
   const link = (m: string) => (m === thisMonth ? "/admin/kas" : `/admin/kas?bulan=${m}`);
   return (
-    <nav aria-label="Pilih bulan" className="mb-4 inline-flex items-center rounded-xl border border-line bg-card p-0.5">
+    <nav aria-label="Pilih bulan" className="inline-flex items-center rounded-xl border border-line bg-card p-0.5">
       <Link
         to={link(shiftMonth(month, -1))}
         className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-idle-soft"
@@ -112,31 +113,38 @@ function MonthNav({ month, thisMonth }: { month: string; thisMonth: string }) {
 
 /** Saldo sekarang, dan alur kas bulan itu: saldo awal + setoran + pemasukan lain − pengeluaran. */
 function Summary({ data }: { data: CashMonth }) {
-  const monthName = formatMonth(data.month).split(" ")[0];
   const rows: [string, number, string?][] = [
-    [`Saldo awal ${monthName}`, data.opening],
+    ["Saldo awal bulan", data.opening],
     ["+ Setoran jimpitan", data.deposits, "text-filled"],
     ["+ Pemasukan lain", data.income, "text-filled"],
     ["− Pengeluaran", data.expenses, "text-empty"],
   ];
   return (
-    <Card className="flex flex-col gap-4 sm:flex-row sm:gap-8">
-      <div className="shrink-0 sm:w-56">
-        <p className="text-xs text-muted">Saldo kas sekarang</p>
-        <p className="text-3xl font-bold tabular-nums">{formatRupiah(data.balance)}</p>
+    <Card className="grid overflow-hidden p-0 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+      <div className="bg-primary/5 p-5 sm:p-6">
+        <p className="flex items-center gap-2 text-sm font-medium text-muted">
+          <Wallet className="size-4 text-primary" aria-hidden /> Saldo kas saat ini
+        </p>
+        <p className={cx("mt-2 break-words text-3xl font-bold tracking-tight tabular-nums", data.balance < 0 && "text-empty")}>
+          {formatRupiah(data.balance)}
+        </p>
+        <p className="mt-2 text-xs leading-relaxed text-muted">Dari seluruh setoran dan transaksi yang tercatat.</p>
       </div>
-      <dl className="min-w-0 flex-1 text-sm sm:max-w-sm">
-        {rows.map(([label, value, tone]) => (
-          <div key={label} className="flex justify-between gap-3 py-0.5">
-            <dt className="text-muted">{label}</dt>
-            <dd className={cx("font-semibold tabular-nums", value > 0 && tone)}>{formatRupiah(value)}</dd>
+      <div className="min-w-0 p-5 sm:p-6">
+        <h2 className="mb-3 text-sm font-semibold">Ringkasan {formatMonth(data.month)}</h2>
+        <dl className="space-y-2 text-sm">
+          {rows.map(([label, value, tone]) => (
+            <div key={label} className="flex items-baseline justify-between gap-3">
+              <dt className="min-w-0 text-muted">{label}</dt>
+              <dd className={cx("shrink-0 font-medium tabular-nums", value > 0 && tone)}>{formatRupiah(value)}</dd>
+            </div>
+          ))}
+          <div className="flex items-baseline justify-between gap-3 border-t border-line pt-3">
+            <dt className="font-semibold">Saldo akhir bulan</dt>
+            <dd className="shrink-0 font-bold tabular-nums">{formatRupiah(data.closing)}</dd>
           </div>
-        ))}
-        <div className="mt-1 flex justify-between gap-3 border-t border-line pt-1.5">
-          <dt className="font-semibold">Saldo akhir {monthName}</dt>
-          <dd className="font-bold tabular-nums">{formatRupiah(data.closing)}</dd>
-        </div>
-      </dl>
+        </dl>
+      </div>
     </Card>
   );
 }
@@ -173,12 +181,13 @@ function Deposits({ nights, tonight }: { nights: Night[]; tonight: string }) {
   const [editing, setEditing] = useState<string | null>(null);
   return (
     <section aria-labelledby="setoran">
-      <h2 id="setoran" className="font-semibold">
-        Setoran per malam
+      <h2 id="setoran" className="flex flex-wrap items-center gap-2 font-semibold">
+        Setoran jimpitan
+        {nights.length > 0 && <span className="rounded-full bg-idle-soft px-2 py-0.5 text-xs font-medium text-muted">{nights.length} malam</span>}
       </h2>
-      <p className="mb-2 text-sm text-muted">Uang yang diterima bendahara dari petugas jaga, dibanding jimpitan yang tercatat malam itu.</p>
+      <p className="mb-3 mt-1 text-sm text-muted">Setoran yang diterima bendahara dibandingkan dengan catatan petugas.</p>
       {nights.length === 0 ? (
-        <Card className="text-center text-sm text-muted">Belum ada jimpitan tercatat bulan ini.</Card>
+        <Card className="py-6 text-center text-sm text-muted">Belum ada jimpitan tercatat bulan ini.</Card>
       ) : (
         <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
           {nights.map((n) => (
@@ -209,8 +218,8 @@ function NightRow({
 }) {
   const { date, recorded, filled, deposit } = night;
   return (
-    <li className={cx("px-4 py-3", editing && "bg-idle-soft/50")}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+    <li className={cx("px-4 py-4", editing && "bg-idle-soft/50")}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-x-2 font-semibold">
             <Link to={`/admin/riwayat/${date}`} className="hover:underline">
@@ -218,19 +227,19 @@ function NightRow({
             </Link>
             {isTonight && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">Malam ini</span>}
           </p>
-          <p className="text-sm text-muted">
+          <p className="mt-0.5 text-sm text-muted">
             Tercatat <span className="font-semibold text-fg tabular-nums">{formatRupiah(recorded)}</span>
-            {filled > 0 && ` · ${filled} rumah ada isinya`}
+            {filled > 0 && ` · ${filled} rumah`}
           </p>
           {deposit && (deposit.note || deposit.recordedByName) && (
-            <p className="text-xs text-muted">
+            <p className="mt-1 break-words text-xs text-muted">
               {[deposit.note, deposit.recordedByName && `dicatat ${deposit.recordedByName}`].filter(Boolean).join(" · ")}
             </p>
           )}
         </div>
         {deposit ? (
-          <div className="flex items-center gap-2">
-            <div className="text-right">
+          <div className="flex items-center justify-between gap-3 sm:justify-end">
+            <div className="sm:text-right">
               <p className="text-sm font-semibold tabular-nums">Disetor {formatRupiah(deposit.amount)}</p>
               <Difference value={deposit.amount - recorded} />
             </div>
@@ -248,9 +257,9 @@ function NightRow({
           </div>
         ) : (
           !editing && (
-            <div className="flex items-center gap-2">
-              {!isTonight && <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn">Belum disetor</span>}
-              <Button variant="secondary" size="sm" onClick={() => onEdit(true)}>
+            <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
+              {!isTonight && <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn">Belum dicatat</span>}
+              <Button variant="secondary" size="sm" aria-expanded={editing} onClick={() => onEdit(true)}>
                 Catat setoran
               </Button>
             </div>
@@ -327,7 +336,7 @@ function DepositForm({ night, onDone }: { night: Night; onDone: () => void }) {
           Batal
         </Button>
         <Button type="submit" size="sm" disabled={save.isPending || amount === null}>
-          {save.isPending ? "Menyimpan…" : "Simpan"}
+          {save.isPending ? "Menyimpan…" : "Simpan setoran"}
         </Button>
       </div>
     </form>
@@ -337,19 +346,27 @@ function DepositForm({ night, onDone }: { night: Night; onDone: () => void }) {
 function Entries({ entries, onOpen, onAdd }: { entries: Entry[]; onOpen: (entry: Entry) => void; onAdd: () => void }) {
   return (
     <section aria-labelledby="transaksi">
-      <div className="mb-2 flex items-end justify-between gap-3">
-        <div>
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h2 id="transaksi" className="font-semibold">
-            Pengeluaran & pemasukan lain
+            Transaksi kas
           </h2>
-          <p className="text-sm text-muted">Mis. lampu pos ronda, konsumsi, atau saldo awal kas.</p>
+          <p className="mt-1 text-sm text-muted">Pengeluaran dan pemasukan lain di luar setoran jimpitan.</p>
         </div>
-        <Button variant="secondary" size="sm" className="shrink-0" onClick={onAdd}>
-          <Plus className="size-4" /> Tambah
+        <Button variant="secondary" size="sm" className="self-start sm:shrink-0" onClick={onAdd}>
+          <Plus className="size-4" aria-hidden /> Catat transaksi
         </Button>
       </div>
       {entries.length === 0 ? (
-        <Card className="text-center text-sm text-muted">Belum ada pengeluaran atau pemasukan lain bulan ini.</Card>
+        <Card className="flex items-start gap-3 py-5">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-idle-soft/60 text-muted">
+            <ReceiptText className="size-5" aria-hidden />
+          </span>
+          <div>
+            <p className="text-sm font-medium">Belum ada transaksi bulan ini</p>
+            <p className="mt-1 text-sm text-muted">Pengeluaran dan pemasukan lain akan tampil di sini setelah dicatat.</p>
+          </div>
+        </Card>
       ) : (
         <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
           {entries.map((e) => {
@@ -359,24 +376,24 @@ function Entries({ entries, onOpen, onAdd }: { entries: Entry[]; onOpen: (entry:
                 <Button
                   variant="plain"
                   onClick={() => onOpen(e)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-idle-soft/50"
+                  className="grid w-full grid-cols-[2rem_minmax(0,1fr)] items-start gap-x-3 gap-y-1 px-4 py-4 text-left hover:bg-idle-soft/50 sm:grid-cols-[2rem_minmax(0,1fr)_auto] sm:items-center"
                 >
                   <span
                     className={cx(
-                      "flex size-8 shrink-0 items-center justify-center rounded-full",
+                      "row-span-2 flex size-8 items-center justify-center rounded-full sm:row-span-1",
                       out ? "bg-empty-soft text-empty" : "bg-filled-soft text-filled",
                     )}
                   >
                     {out ? <ArrowUpRight className="size-4" aria-label="Pengeluaran" /> : <ArrowDownLeft className="size-4" aria-label="Pemasukan" />}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{e.description}</span>
-                    <span className="block text-xs text-muted">
+                    <span className="block break-words font-medium">{e.description}</span>
+                    <span className="mt-0.5 block break-words text-xs text-muted">
                       {formatDateShort(e.date)}
                       {e.recordedByName && ` · dicatat ${e.recordedByName}`}
                     </span>
                   </span>
-                  <span className={cx("shrink-0 font-semibold tabular-nums", out ? "text-empty" : "text-filled")}>
+                  <span className={cx("col-start-2 font-semibold tabular-nums sm:col-start-auto sm:text-right", out ? "text-empty" : "text-filled")}>
                     {out ? "−" : "+"}
                     {formatRupiah(e.amount)}
                   </span>
@@ -391,14 +408,19 @@ function Entries({ entries, onOpen, onAdd }: { entries: Entry[]; onOpen: (entry:
 }
 
 const DIRECTIONS: RadioCardOption<Direction>[] = [
-  { value: "out", label: "Pengeluaran", hint: "Uang kas dipakai" },
-  { value: "in", label: "Pemasukan lain", hint: "Mis. saldo awal, sumbangan" },
+  { value: "out", label: "Pengeluaran", hint: "Uang keluar dari kas" },
+  { value: "in", label: "Pemasukan lain", hint: "Saldo awal atau sumbangan" },
 ];
 
 /** Tambah (tanpa `entry`) atau ubah satu pengeluaran/pemasukan lain. */
 function EntryDialog({ entry, open, onClose }: { entry?: Entry; open: boolean; onClose: () => void }) {
   return (
-    <Dialog open={open} onClose={onClose} title={entry ? "Ubah catatan kas" : "Catat pengeluaran atau pemasukan"}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={entry ? "Ubah transaksi kas" : "Catat transaksi"}
+      description="Pengeluaran atau pemasukan lain di luar setoran jimpitan."
+    >
       <EntryForm key={entry?.id ?? "baru"} entry={entry} onDone={onClose} />
     </Dialog>
   );
@@ -439,7 +461,7 @@ function EntryForm({ entry, onDone }: { entry?: Entry; onDone: () => void }) {
         save.mutate();
       }}
     >
-      <RadioCards legend="Jenis" value={direction} onValueChange={setDirection} options={DIRECTIONS} />
+      <RadioCards legend="Jenis transaksi" value={direction} onValueChange={setDirection} options={DIRECTIONS} className="grid-cols-1 min-[360px]:grid-cols-2" />
       <Field label="Keterangan">
         <Input
           value={description}
@@ -450,13 +472,11 @@ function EntryForm({ entry, onDone }: { entry?: Entry; onDone: () => void }) {
           data-autofocus
         />
       </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Jumlah">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Nominal">
           <RupiahInput value={amount} onValueChange={setAmount} required />
         </Field>
-        <Field label="Tanggal" hint={date && date <= today ? formatDateLong(date) : undefined}>
-          <Input type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} required />
-        </Field>
+        <DatePicker label="Tanggal transaksi" value={date} onValueChange={setDate} today={today} />
       </div>
       {error && <Alert>{error.message}</Alert>}
       <div className="flex items-center gap-2">
@@ -475,7 +495,7 @@ function EntryForm({ entry, onDone }: { entry?: Entry; onDone: () => void }) {
           Batal
         </Button>
         <Button type="submit" disabled={save.isPending || !amount}>
-          {save.isPending ? "Menyimpan…" : "Simpan"}
+          {save.isPending ? "Menyimpan…" : "Simpan transaksi"}
         </Button>
       </div>
     </form>

@@ -21,6 +21,7 @@ export function Calendar({
   onMonthChange,
   selected,
   today,
+  todayLabel = "malam ini",
   max,
   marks,
   markLabels,
@@ -30,6 +31,8 @@ export function Calendar({
   onMonthChange: (month: string) => void;
   selected?: string;
   today: string;
+  /** Kalender transaksi memakai "hari ini", kalender ronda memakai "malam ini". */
+  todayLabel?: string;
   max: string;
   marks?: Record<string, CalendarMark>;
   /** Keterangan tiap tanda untuk pembaca layar, mis. { full: "lengkap" }. */
@@ -86,7 +89,7 @@ export function Calendar({
   const weeks = Array.from({ length: cells.length / 7 }, (_, i) => cells.slice(i * 7, i * 7 + 7));
 
   return (
-    <div className="w-[17.5rem] select-none">
+    <div className="w-[17.5rem] max-w-full select-none">
       <div className="mb-2 flex items-center justify-between gap-2">
         <Button variant="ghost" size="icon-sm" onClick={() => changeMonth(-1)} aria-label={`Bulan sebelumnya, ${formatMonth(shiftMonth(month, -1))}`}>
           <ChevronLeft className="size-4" />
@@ -130,7 +133,7 @@ export function Calendar({
                     tabIndex={date === active ? 0 : -1}
                     disabled={disabled}
                     aria-current={isToday ? "date" : undefined}
-                    aria-label={[formatDateLong(date), isToday && "malam ini", !disabled && markText].filter(Boolean).join(", ")}
+                    aria-label={[formatDateLong(date), isToday && todayLabel, !disabled && markText].filter(Boolean).join(", ")}
                     onClick={() => onSelect(date)}
                     onFocus={() => setFocused(date)}
                     className={cx(
