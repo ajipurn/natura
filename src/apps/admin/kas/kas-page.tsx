@@ -9,7 +9,7 @@ import { DatePicker } from "@/components/date-picker";
 import { Dialog } from "@/components/dialog";
 import { QueryState } from "@/components/query-state";
 import { RupiahInput } from "@/components/rupiah-input";
-import { Alert, Button, Card, Field, Input, PageHeader, cx } from "@/components/ui";
+import { Alert, Button, Card, Field, Input, PageTitle, cx } from "@/components/ui";
 import { formatDateShort, formatMonth, isMonth, localDate, rondaDate, shiftMonth } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import type { CashMonth } from "@/server/kas";
@@ -45,15 +45,16 @@ export function KasPage() {
 
   return (
     <>
-      <PageHeader
-        title="Kas"
-        subtitle="Kelola setoran jimpitan, pemasukan lain, dan pengeluaran kas."
-      />
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <MonthNav month={month} thisMonth={thisMonth} />
+      <PageTitle title="Kas" />
+      <header className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
+        <h1 className="text-2xl font-bold tracking-tight">Kas</h1>
         <Button size="sm" onClick={() => openEntry()}>
           <Plus className="size-4" aria-hidden /> Catat transaksi
         </Button>
+        <p className="col-span-2 text-sm text-muted">Kelola setoran jimpitan, pemasukan lain, dan pengeluaran kas.</p>
+      </header>
+      <div className="mb-4">
+        <MonthNav month={month} thisMonth={thisMonth} />
       </div>
 
       <QueryState query={query}>
