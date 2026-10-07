@@ -11,7 +11,7 @@ import { Button, Card, Input, PageHeader, buttonClass, cx } from "@/components/u
 import { fitGeoTransform } from "@/lib/geo";
 import type { MarkerState } from "@/lib/house-state";
 import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
-import { CADENCE_LABEL } from "@/lib/payments";
+import { PaymentCadenceBadge } from "@/components/payment-cadence-badge";
 import { matchPlan } from "@/lib/site-plan";
 import { SITE_PLAN } from "@/site-plan";
 import { housesQuery, planAnchorsQuery, usersQuery } from "../queries";
@@ -223,7 +223,6 @@ function BlockSection({
 
 function HouseTile({ house, hasAccount, onOpen }: { house: AdminHouse; hasAccount: boolean; onOpen: () => void }) {
   const vacant = house.status === "vacant";
-  const cadenceLabel = CADENCE_LABEL[house.paymentCadence];
   return (
     <Button
       variant="plain"
@@ -246,14 +245,7 @@ function HouseTile({ house, hasAccount, onOpen }: { house: AdminHouse; hasAccoun
           <span className="italic text-muted/70">Belum ada nama</span>
         )}
       </span>
-      {cadenceLabel && (
-        <span
-          className="mt-1 self-start rounded-full bg-idle-soft px-2 py-0.5 text-[11px] font-medium text-fg/80"
-          aria-label={`Jimpitan ${cadenceLabel.toLowerCase()}`}
-        >
-          {cadenceLabel}
-        </span>
-      )}
+      <PaymentCadenceBadge cadence={house.paymentCadence} className="mt-1 self-start" />
     </Button>
   );
 }
@@ -289,6 +281,7 @@ function HouseMap({
         houses={houses}
         markers={markers}
         highlight={highlight}
+        fitToView
         highlightMissing
         onHouseClick={(h) => onOpen(h.id)}
         onMissingClick={(lot) => onAdd({ block: lot.block, number: lot.number ?? "" })}

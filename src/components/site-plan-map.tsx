@@ -50,6 +50,7 @@ export function SitePlanMap({
   pick,
   onPlanClick,
   className,
+  fitToView = false,
 }: {
   plan: SitePlan;
   houses: HouseDTO[];
@@ -79,6 +80,8 @@ export function SitePlanMap({
   /** Ketuk di mana saja pada denah (kavling tidak bisa diketuk selama ini dipasang). */
   onPlanClick?: (point: PlanPoint) => void;
   className?: string;
+  /** Tampilkan seluruh denah saat dibuka, tanpa memperbesar otomatis untuk keterbacaan. */
+  fitToView?: boolean;
 }) {
   const id = useId().replace(/:/g, "");
   const { lotHouse } = useMemo(() => matchPlan(plan, houses), [plan, houses]);
@@ -94,7 +97,7 @@ export function SitePlanMap({
   }
 
   return (
-    <ZoomPane className={className} readableWidth={680} focus={zoomFocus}>
+    <ZoomPane className={className} aspectRatio={w / h} readableWidth={fitToView ? undefined : 680} focus={zoomFocus}>
       <svg
         viewBox={`${x} ${y} ${w} ${h}`}
         className={cx("block h-auto w-full select-none", onPlanClick && "cursor-crosshair")}

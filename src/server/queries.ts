@@ -1,15 +1,16 @@
-import { and, asc, desc, eq, gte, isNotNull, lte, max, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, lte, max, ne, or, sql } from "drizzle-orm";
 import { daysInMonth, localDate, rondaDate } from "@/lib/dates";
 import type { GeoAnchor } from "@/lib/geo";
 import { compareHouses } from "@/lib/houses";
-import { planAt, type PaymentCadence } from "@/lib/payments";
+import { billingPeriods, planAt, type PaymentCadence } from "@/lib/payments";
+import { summarize } from "@/lib/recap";
 import type { CollectionDTO, HouseDTO, MonthCell, MonthRecap, RondaSnapshot } from "@/lib/types";
 import type { SessionUser } from "./auth";
 import type { Db } from "./db";
 import { houseName } from "./house-name";
 import { guardDaysByUser, listSchedule } from "./schedule";
 import { collectionLogs, collections, houses, paymentPlans, payments, patrols, settings, users } from "./schema";
-import { getPaymentMonth } from "./payments";
+import { getPaymentData, getPaymentMonth } from "./payments";
 
 export const DEFAULT_SETTINGS = { communityName: "Lingkungan Kita", defaultAmount: 500 };
 
@@ -183,6 +184,11 @@ export type PatrolSummary = {
   date: string;
   filled: number;
   empty: number;
+  checked: number;
+  unchecked: number;
+  expected: number;
+  /** Rumah dengan uang yang benar-benar diambil saat ronda, untuk rincian setoran kas. */
+  collectedHouses: number;
   total: number;
   collectors: string | null;
 };
@@ -190,26 +196,48 @@ export type PatrolSummary = {
 /** Malam-malam ronda terbaru, atau semua malam di satu bulan ("YYYY-MM") kalau `month` diisi. */
 export async function listPatrols(db: Db, limit = 90, month?: string): Promise<PatrolSummary[]> {
   const days = month ? daysInMonth(month) : null;
-  const rows = await db
-    .select({
-      date: patrols.date,
-      filled: sql<number>`count(${collections.id}) filter (where ${collections.status} = 'filled')`.mapWith(Number),
-      empty: sql<number>`count(${collections.id}) filter (where ${collections.status} = 'empty' and ${houses.status} = 'active')`.mapWith(Number),
-      total: sql<number>`coalesce(sum(${collections.amount}) filter (where ${collections.status} = 'filled'), 0)`.mapWith(Number),
-      // Array JSON supaya nama yang mengandung koma tetap utuh.
-      collectors: sql<string[] | null>`json_agg(distinct ${users.name}) filter (where ${users.name} is not null)`,
-    })
+  const nights = await db
+    .select({ id: patrols.id, date: patrols.date })
     .from(patrols)
-    .leftJoin(collections, eq(collections.patrolId, patrols.id))
-    .leftJoin(houses, eq(houses.id, collections.houseId))
-    .leftJoin(users, eq(users.id, collections.collectedBy))
     .where(days ? and(gte(patrols.date, days[0]), lte(patrols.date, days[days.length - 1])) : undefined)
-    .groupBy(patrols.id)
     .orderBy(desc(patrols.date))
     .limit(days ? days.length : limit);
-  return rows.map((r) => {
-    const names = [...(r.collectors ?? [])].sort((a, b) => a.localeCompare(b, "id"));
-    return { ...r, collectors: names.length ? names.join(", ") : null };
+  if (!nights.length) return [];
+  const [houseRows, collectionRows, paymentData] = await Promise.all([
+    listHouses(db),
+    db.select({
+      patrolId: collections.patrolId,
+      houseId: collections.houseId,
+      status: collections.status,
+      amount: collections.amount,
+      collectorName: users.name,
+    }).from(collections).leftJoin(users, eq(users.id, collections.collectedBy))
+      .where(inArray(collections.patrolId, nights.map((p) => p.id))),
+    getPaymentData(db),
+  ]);
+  const byNight = new Map<number, typeof collectionRows>();
+  for (const row of collectionRows) {
+    const entries = byNight.get(row.patrolId) ?? [];
+    entries.push(row);
+    byNight.set(row.patrolId, entries);
+  }
+  const periods = billingPeriods(paymentData.plans, paymentData.cells, paymentData.dailyCells,
+    localDate(new Date()), nights[nights.length - 1].date, nights[0].date);
+  return nights.map((night) => {
+    const entries = byNight.get(night.id) ?? [];
+    // Aturan yang sama dengan detail malam: periode dibayar = ada, belum dibayar = kosong.
+    const summary = summarize(houseRows, entries, periods.filter((p) => p.start <= night.date && p.end >= night.date));
+    return {
+      date: night.date,
+      filled: summary.filled.length,
+      empty: summary.empty.length,
+      checked: summary.checked,
+      unchecked: summary.unchecked.length,
+      expected: summary.expected,
+      collectedHouses: entries.filter((c) => c.status === "filled").length,
+      total: summary.total,
+      collectors: summary.collectors.length ? summary.collectors.join(", ") : null,
+    };
   });
 }
 

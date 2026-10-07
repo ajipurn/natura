@@ -48,8 +48,7 @@ export function NightPicker({
 
   const marks: Record<string, CalendarMark> = {};
   if (query.data && !query.isPlaceholderData) {
-    const { patrols, activeHouses } = query.data;
-    for (const p of patrols) marks[p.date] = activeHouses > 0 && p.filled + p.empty >= activeHouses ? "full" : "partial";
+    for (const p of query.data.patrols) marks[p.date] = p.expected > 0 && p.checked >= p.expected ? "full" : "partial";
   }
 
   function pick(date: string) {

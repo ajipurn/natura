@@ -118,7 +118,7 @@ export async function getCashMonth(db: Db, month: string, tonight: string) {
     }).from(payments).where(and(isNull(payments.cancelledAt), gte(payments.receivedDate, days[0]), lte(payments.receivedDate, days[days.length - 1]))),
   ]);
 
-  const recorded = new Map(patrolRows.map((p) => [p.date, { total: p.total, filled: p.filled }]));
+  const recorded = new Map(patrolRows.map((p) => [p.date, { total: p.total, filled: p.collectedHouses }]));
   const heldByCollectors = new Map<string, number>();
   for (const p of periodRows.filter((p) => p.receivedBy === "collector")) {
     heldByCollectors.set(p.date, (heldByCollectors.get(p.date) ?? 0) + p.amount);

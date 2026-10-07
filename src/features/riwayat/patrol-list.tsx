@@ -23,6 +23,9 @@ type Patrol = {
   date: string;
   filled: number;
   empty: number;
+  checked: number;
+  unchecked: number;
+  expected: number;
   total: number;
   collectors: string | null;
 };
@@ -87,7 +90,7 @@ export function PatrolList({ basePath }: { basePath: string }) {
         }
       />
       <QueryState query={query}>
-        {({ patrols, activeHouses, today }) => {
+        {({ patrols, today }) => {
           if (patrols.length === 0) {
             return (
               <Card className="py-10 text-center">
@@ -110,7 +113,6 @@ export function PatrolList({ basePath }: { basePath: string }) {
                   items={items}
                   basePath={basePath}
                   today={today}
-                  activeHouses={activeHouses}
                   rekapPath={isAdmin ? `/admin/rekap?bulan=${month}` : null}
                 />
               ))}
@@ -127,14 +129,12 @@ function MonthSection({
   items,
   basePath,
   today,
-  activeHouses,
   rekapPath,
 }: {
   month: string;
   items: Item[];
   basePath: string;
   today: string;
-  activeHouses: number;
   rekapPath: string | null;
 }) {
   const nights = items.flatMap((i) => (i.kind === "night" ? [i.patrol] : []));
@@ -183,7 +183,6 @@ function MonthSection({
               patrol={item.patrol}
               to={`${basePath}/${item.patrol.date}`}
               tonight={item.patrol.date === today}
-              activeHouses={activeHouses}
             />
           ) : (
             <GapRow
@@ -203,15 +202,12 @@ function NightRow({
   patrol: p,
   to,
   tonight,
-  activeHouses,
 }: {
   patrol: Patrol;
   to: string;
   tonight: boolean;
-  activeHouses: number;
 }) {
-  const checked = Math.min(activeHouses, p.filled + p.empty);
-  const unchecked = Math.max(0, activeHouses - p.filled - p.empty);
+  const { checked, unchecked, expected } = p;
   return (
     <li>
       <Link
@@ -233,7 +229,7 @@ function NightRow({
               )}
             </p>
             <span className="shrink-0 text-xs text-muted tabular-nums">
-              {checked}/{activeHouses} dicek
+              {checked}/{expected} dicek
             </span>
           </div>
           <div
@@ -242,11 +238,11 @@ function NightRow({
           >
             <div
               className="h-full bg-filled"
-              style={{ width: `${percent(p.filled, activeHouses)}%` }}
+              style={{ width: `${percent(p.filled, expected)}%` }}
             />
             <div
               className="h-full bg-empty"
-              style={{ width: `${percent(p.empty, activeHouses)}%` }}
+              style={{ width: `${percent(p.empty, expected)}%` }}
             />
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">

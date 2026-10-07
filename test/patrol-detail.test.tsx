@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PatrolDetail } from "@/features/riwayat/patrol-detail";
+import { PatrolList } from "@/features/riwayat/patrol-list";
 import type { BillingPeriod } from "@/lib/payments";
 
 const period: BillingPeriod = { houseId: 1, planId: 1, cadence: "monthly", start: "2026-10-01", end: "2026-10-31", expected: 15500, paid: 0, remaining: 15500, status: "unpaid" };
@@ -54,6 +55,19 @@ describe("detail riwayat mengikuti pembayaran periode", () => {
     expect(badge.className).toContain("bg-filled-soft");
     expect(container.textContent).toContain("Rp 0");
     expect(container.textContent).not.toContain("Rp 15.500");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("daftar memakai jumlah pemeriksaan rumah aktif dari API meskipun ada catatan uang dari rumah mudik", async () => {
+    client.setQueryData(["riwayat"], {
+      patrols: [{ date: "2026-10-07", filled: 2, empty: 1, total: 500, checked: 2, unchecked: 1, expected: 3, collectors: null }],
+      activeHouses: 3, today: "2026-10-07",
+    });
+    await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><PatrolList basePath="/admin/riwayat" /></MemoryRouter></QueryClientProvider>));
+    const night = container.querySelector('a[href="/admin/riwayat/2026-10-07"]')!;
+    expect(night.textContent).toContain("2/3 dicek");
+    expect(night.textContent).toContain("1 belum dicek");
+    expect(night.textContent).toContain("Rp 500");
     expect(fetch).not.toHaveBeenCalled();
   });
 });

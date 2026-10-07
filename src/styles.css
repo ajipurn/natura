@@ -18,6 +18,11 @@
   --idle-soft: #e2e8f0;
   --warn: #b45309;
   --warn-soft: #fef3c7;
+  /* Jenis pembayaran; berbeda dari warna status ada/kosong. */
+  --cadence-weekly: #075985;
+  --cadence-weekly-soft: #e0f2fe;
+  --cadence-monthly: #5b21b6;
+  --cadence-monthly-soft: #ede9fe;
   --park: #dcebd3;
   --park-dot: #8fb27e;
   --water: #93c5e8;
@@ -48,6 +53,10 @@
   --idle-soft: #243046;
   --warn: #fbbf24;
   --warn-soft: #3a2a0a;
+  --cadence-weekly: #7dd3fc;
+  --cadence-weekly-soft: #102c3f;
+  --cadence-monthly: #c4b5fd;
+  --cadence-monthly-soft: #2a1b42;
   --park: #1b3022;
   --park-dot: #3d6b45;
   --water: #1f4d70;
@@ -74,6 +83,10 @@
   --color-idle-soft: var(--idle-soft);
   --color-warn: var(--warn);
   --color-warn-soft: var(--warn-soft);
+  --color-cadence-weekly: var(--cadence-weekly);
+  --color-cadence-weekly-soft: var(--cadence-weekly-soft);
+  --color-cadence-monthly: var(--cadence-monthly);
+  --color-cadence-monthly-soft: var(--cadence-monthly-soft);
   --color-park: var(--park);
   --color-park-dot: var(--park-dot);
   --color-water: var(--water);

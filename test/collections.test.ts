@@ -117,7 +117,8 @@ describe("applyEntries", () => {
 
   it("muncul di daftar riwayat dan rekap bulanan", async () => {
     const patrols = await listPatrols(db);
-    expect(patrols[0]).toMatchObject({ date: "2026-10-04", filled: 1, empty: 0, total: 500, collectors: "Budi" });
+    // Dua rumah periode dari tes sebelumnya otomatis kosong meskipun tidak discan.
+    expect(patrols[0]).toMatchObject({ date: "2026-10-04", filled: 1, empty: 2, checked: 3, unchecked: 2, expected: 5, collectedHouses: 1, total: 500, collectors: "Budi" });
 
     const recap = await getMonthRecap(db, "2026-10");
     expect(recap.dates).toEqual(["2026-10-04"]);
