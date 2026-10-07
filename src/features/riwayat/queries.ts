@@ -21,4 +21,4 @@ export const patrolQuery = (date: string) =>
   });
 
 /** Layar yang menampilkan catatan jimpitan: segarkan semuanya setelah admin mengoreksi. */
-export const CORRECTION_REFRESH = [["riwayat"], ["rekap"], ["admin", "ringkasan"], ["admin", "audit"], ["admin", "kas"]];
+export const CORRECTION_REFRESH = [["riwayat"], ["rekap"], ["admin", "ringkasan"], ["admin", "audit"], ["admin", "kas"], ["admin", "pembayaran"]];

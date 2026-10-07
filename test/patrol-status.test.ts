@@ -2,7 +2,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { rondaHouseState } from "@/lib/house-state";
 import type { BillingPeriod } from "@/lib/payments";
 import { summarize } from "@/lib/recap";
-import type { CollectionDTO, HouseDTO } from "@/lib/types";
+import { summarizeMonth } from "@/lib/month-summary";
+import type { CollectionDTO, HouseDTO, MonthRecap } from "@/lib/types";
 import { apiClient, createTestEnv } from "./helpers/db";
 
 const date = "2025-03-07";
@@ -50,5 +51,27 @@ describe("status isi ronda dengan pembayaran bulanan", () => {
     expect(rondaHouseState(house, { status: "empty" }, { status: "unpaid" })).toBe("empty");
     expect(rondaHouseState(house)).toBe("unchecked");
     expect(rondaHouseState({ status: "vacant" }, { status: "filled" }, { status: "unpaid" })).toBe("vacant");
+  });
+
+  it("koreksi admin mengubah uang harian dan sisa bayar; hapus catatan tidak membatalkan pembayaran periode", async () => {
+    const [house] = (await admin.get("/api/admin/rumah")).data.houses as HouseDTO[];
+    const correct = (status: "empty" | "none") => admin.put("/api/admin/riwayat", { entries: [{ date, houseId: house.id, status, amount: 0 }] });
+    expect((await correct("none")).status).toBe(200);
+    let recap = (await admin.get("/api/rekap?bulan=2025-03")).data as MonthRecap;
+    expect(recap.paymentPeriods![0]).toMatchObject({ status: "unpaid", paid: 0, remaining: 15500 });
+    expect(summarizeMonth(recap).rows[0]).toMatchObject({ collectedTotal: 0, monthlyTotal: 0, total: 0 });
+
+    expect((await admin.post("/api/admin/pembayaran", {
+      clientId: crypto.randomUUID(), houseId: house.id, receivedDate: date, periodStart: "2025-03-01", periodEnd: "2025-03-31",
+      cadence: "monthly", amount: 15500, receivedBy: "treasurer", collectorId: null, note: "",
+    })).status).toBe(200);
+    for (const status of ["empty", "none"] as const) {
+      expect((await correct(status)).status).toBe(200);
+      recap = (await admin.get("/api/rekap?bulan=2025-03")).data as MonthRecap;
+      expect(recap.paymentPeriods![0]).toMatchObject({ status: "paid", paid: 15500, remaining: 0 });
+      expect(summarizeMonth(recap).rows[0]).toMatchObject({ collectedTotal: 0, monthlyTotal: 15500, total: 15500 });
+      expect(recap.periodPayments).toHaveLength(1);
+      expect(rondaHouseState(house, recap.cells[`${house.id}:${date}`], recap.paymentPeriods![0])).toBe("filled");
+    }
   });
 });

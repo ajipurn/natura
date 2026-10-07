@@ -424,7 +424,6 @@ function RecapBody({
     for (let row = Math.min(start.row, end.row); row <= Math.max(start.row, end.row); row++) {
       for (let col = Math.min(start.col, end.col); col <= Math.max(start.col, end.col); col++) {
         const k = cellKey(rowOrder[row], editableDates[col]);
-        if (periodAt(rowOrder[row], editableDates[col])) continue;
         if (start.on) next.add(k);
         else next.delete(k);
       }
@@ -458,9 +457,9 @@ function RecapBody({
       setCells([key], !selected.has(key));
     },
   };
-  const rowKeys = (houseId: number) => editableDates.filter((d) => !periodAt(houseId, d)).map((d) => cellKey(houseId, d));
+  const rowKeys = (houseId: number) => editableDates.map((d) => cellKey(houseId, d));
   // Satu malam: rumah yang tampil dan dihuni (rumah mudik tidak dicek).
-  const columnKeys = (date: string) => visible.filter((r) => r.house.status === "active" && !periodAt(r.house.id, date)).map((r) => cellKey(r.house.id, date));
+  const columnKeys = (date: string) => visible.filter((r) => r.house.status === "active").map((r) => cellKey(r.house.id, date));
 
   return (
     <>
@@ -531,6 +530,7 @@ function RecapBody({
             {editing ? "Selesai" : "Ubah catatan"}
           </Button>
         </div>
+        {editing && <p className="mb-3 text-sm text-muted">Mode koreksi menampilkan catatan harian asli, termasuk rumah mingguan/bulanan. Status pembayaran periode tetap otomatis. Catat pembayaran periode melalui tampilan Pembayaran.</p>}
         {nights === 0 && <p className="mb-3 text-sm text-muted">Belum ada ronda tercatat untuk bulan ini.{data.month <= tonight.slice(0, 7) && " Gunakan Ubah catatan untuk mulai mengisi."}</p>}
 
         <div className="flex items-center gap-2">
@@ -756,7 +756,7 @@ function RecapBody({
                           const recorded = patrolDates.has(date);
                           const future = date > tonight;
                           const period = vacant ? undefined : periodAt(r.house.id, date);
-                          const content = future ? null : period && cell?.status !== "filled" ? <PeriodCell period={period} date={date} /> : (
+                          const content = future ? null : !editing && period && cell?.status !== "filled" ? <PeriodCell period={period} date={date} /> : (
                             <Cell
                               cell={cell}
                               vacant={vacant}
@@ -777,7 +777,7 @@ function RecapBody({
                                   : !recorded && !future && "bg-idle-soft/25",
                               )}
                             >
-                              {editing && !future && !period ? (
+                              {editing && !future ? (
                                 // Tombol biasa (bukan Base UI Button): jumlahnya bisa ribuan dalam satu tabel. Diketuk
                                 // atau diseret dipilih lewat `selectHandlers` di tabel.
                                 <button

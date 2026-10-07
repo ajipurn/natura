@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RekapPage } from "@/apps/admin/rekap";
+import { queryClient } from "@/client/query";
 import type { BillingPeriod } from "@/lib/payments";
 import type { HouseDTO } from "@/lib/types";
 
@@ -60,6 +61,96 @@ function headers() {
 }
 
 describe("rekap bulanan yang dikelompokkan", () => {
+  it("admin bisa memilih dan menghapus catatan harian lama pada rumah bulanan", async () => {
+    await click(button("Ubah catatan"));
+    const cell = container.querySelector<HTMLButtonElement>('button[data-cell="2:2026-10-07"]');
+    expect(cell).not.toBeNull();
+    expect(cell!.getAttribute("aria-label")).toContain("Rp 500");
+    expect(container.querySelector('button[data-cell="2:2026-10-08"]')).toBeNull();
+    await click(cell!);
+    expect(container.querySelector('[aria-label="Isi kotak terpilih"]')?.textContent).toContain("1 kotak dipilih");
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ success: "Tersimpan." }), { headers: { "Content-Type": "application/json" } }));
+    await click(button("Hapus catatan"));
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    expect(String(url)).toContain("/api/admin/riwayat");
+    expect(init?.method).toBe("PUT");
+    expect(JSON.parse(init!.body as string)).toEqual({ entries: [{ date: "2026-10-07", houseId: 2, status: "none", amount: 0 }] });
+  });
+
+  it.each(["monthly", "weekly"] as const)("pilihan satu baris dan satu malam mencakup rumah %s, tetapi tidak tanggal mendatang", async (cadence) => {
+    await act(async () => {
+      client.setQueryData(["rekap", month], (previous: Record<string, unknown>) => ({ ...previous, paymentCadences: { 1: ["daily"], 2: [cadence] }, paymentPeriods: [{ ...bill, cadence }] }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await click(button("Ubah catatan"));
+    const row = container.querySelector<HTMLButtonElement>('[aria-label="Pilih semua malam AF-13"]')!;
+    await click(row);
+    expect(container.querySelector('[aria-label="Isi kotak terpilih"]')?.textContent).toContain("7 kotak dipilih");
+    expect(container.querySelector('button[data-cell="2:2026-10-07"]')?.getAttribute("aria-pressed")).toBe("true");
+    expect(container.querySelector('button[data-cell="2:2026-10-08"]')).toBeNull();
+    await click(row);
+    await click(container.querySelector<HTMLButtonElement>('[aria-label="Pilih semua rumah Rab, 7 Okt"]')!);
+    expect(container.querySelector('[aria-label="Isi kotak terpilih"]')?.textContent).toContain("2 kotak dipilih");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("seretan pilihan menyertakan kotak rumah bulanan", async () => {
+    await click(button("Ubah catatan"));
+    const start = container.querySelector<HTMLButtonElement>('button[data-cell="1:2026-10-07"]')!;
+    const end = container.querySelector<HTMLButtonElement>('button[data-cell="2:2026-10-07"]')!;
+    await act(async () => {
+      start.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse", button: 0, buttons: 1 }));
+      end.dispatchEvent(new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse", buttons: 1 }));
+      window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerType: "mouse" }));
+    });
+    expect(start.getAttribute("aria-pressed")).toBe("true");
+    expect(end.getAttribute("aria-pressed")).toBe("true");
+    expect(container.querySelector('[aria-label="Isi kotak terpilih"]')?.textContent).toContain("2 kotak dipilih");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("koreksi menampilkan kosong asli sementara periode lunas kembali hijau setelah selesai", async () => {
+    await act(async () => {
+      client.setQueryData(["rekap", month], (previous: { cells: Record<string, unknown> }) => ({ ...previous, cells: { ...previous.cells, "2:2026-10-07": { status: "empty", amount: 0 } }, paymentPeriods: [{ ...bill, status: "paid", paid: bill.expected, remaining: 0 }] }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(container.querySelector('span[title*="Bulanan · Sudah bayar"]')?.className).toContain("bg-filled-soft");
+    await click(button("Ubah catatan"));
+    const cell = container.querySelector<HTMLButtonElement>('button[data-cell="2:2026-10-07"]')!;
+    expect(cell.getAttribute("aria-label")).toContain("kosong");
+    expect(cell.querySelector("span")?.className).toContain("bg-empty-soft");
+    expect(container.textContent).toContain("Mode koreksi menampilkan catatan harian asli");
+    await click(button("Selesai"));
+    expect(container.querySelector('span[title*="Bulanan · Sudah bayar"]')?.className).toContain("bg-filled-soft");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("menghapus uang harian juga menyegarkan sisa pembayaran yang sudah tersimpan di cache", async () => {
+    const previousClient = client;
+    queryClient.clear();
+    for (const query of previousClient.getQueryCache().getAll()) queryClient.setQueryData(query.queryKey, query.state.data);
+    client = queryClient;
+    await act(async () => root.render(<QueryClientProvider key="correction-cache" client={client}><MemoryRouter initialEntries={["/admin/rekap"]}><RekapPage /></MemoryRouter></QueryClientProvider>));
+    previousClient.clear();
+    const updatedRecap = { ...client.getQueryData<Record<string, unknown>>(["rekap", month])!, cells: { "1:2026-10-06": { status: "filled", amount: 500 }, "1:2026-10-07": { status: "empty", amount: 0 } }, paymentPeriods: [{ ...bill, paid: 0, remaining: bill.expected }] };
+    const updatedPayments = { ...client.getQueryData<Record<string, unknown>>(["admin", "pembayaran", month])!, bills: updatedRecap.paymentPeriods };
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const path = String(input);
+      const data = init?.method === "PUT" ? { success: "Tersimpan." } : path.includes("pembayaran") ? updatedPayments : path.includes("rekap") ? updatedRecap : null;
+      if (!data) throw new Error(`Unexpected request: ${path}`);
+      return new Response(JSON.stringify(data), { headers: { "Content-Type": "application/json" } });
+    });
+    await click(button("Ubah catatan"));
+    await click(container.querySelector<HTMLButtonElement>('button[data-cell="2:2026-10-07"]')!);
+    await click(button("Hapus catatan"));
+    await vi.waitFor(() => expect(client.getQueryData(["rekap", month])).toEqual(updatedRecap));
+    expect(client.getQueryState(["admin", "pembayaran", month])?.isInvalidated).toBe(true);
+    await click(button("Pembayaran"));
+    await vi.waitFor(() => expect(container.textContent).toContain("Sisa pembayaranRp 12.500"));
+    expect(client.getQueryData(["admin", "pembayaran", month])).toEqual(updatedPayments);
+  });
+
   it("menyederhanakan tanggal tanpa menghilangkan tanggal untuk koreksi, lalu membersihkan pilihan saat pindah tampilan", async () => {
     expect(headers()).toHaveLength(7); // Rumah, dua malam, Terisi, Harian, Bulanan, Total.
     expect(headers()).not.toContain("Mingguan");
