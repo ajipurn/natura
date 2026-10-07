@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, isNotNull, lte, max, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, lte, max, ne, or, sql } from "drizzle-orm";
 import { daysInMonth, rondaDate } from "@/lib/dates";
 import type { GeoAnchor } from "@/lib/geo";
 import { compareHouses } from "@/lib/houses";
@@ -200,7 +200,8 @@ export async function listPatrols(db: Db, limit = 90, month?: string): Promise<P
 }
 
 /**
- * Riwayat jimpitan satu rumah: malam-malam ronda terakhir sejak rumah didaftarkan.
+ * Riwayat jimpitan satu rumah: malam-malam ronda terakhir sejak rumah didaftarkan,
+ * juga catatan yang diisi admin untuk tanggal sebelum rumah didaftarkan.
  * Pakai tanggal malam ronda, supaya rumah yang didaftarkan pagi hari tetap ikut malam sebelumnya.
  */
 export async function getHouseHistory(db: Db, house: { id: number; createdAt: Date }, limit = 30) {
@@ -212,7 +213,7 @@ export async function getHouseHistory(db: Db, house: { id: number; createdAt: Da
     })
     .from(patrols)
     .leftJoin(collections, and(eq(collections.patrolId, patrols.id), eq(collections.houseId, house.id)))
-    .where(gte(patrols.date, rondaDate(house.createdAt)))
+    .where(or(gte(patrols.date, rondaDate(house.createdAt)), isNotNull(collections.id)))
     .orderBy(desc(patrols.date))
     .limit(limit);
 }

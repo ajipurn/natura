@@ -80,7 +80,8 @@ export const wargaRoutes = new Hono<AppEnv>()
 
   /**
    * Riwayat jimpitan satu rumah (tanpa nama warga): malam-malam ronda sekitar 3 bulan terakhir sejak
-   * rumah itu terdaftar. `status` null = malam itu rumahnya tidak dicek petugas.
+   * rumah itu terdaftar, termasuk catatan yang diisi untuk tanggal sebelumnya.
+   * `status` null = malam itu rumahnya tidak dicek petugas.
    */
   .get("/rumah/:id", requireWarga, idParam(), async (c) => {
     const db = c.var.db;
