@@ -5,7 +5,6 @@ import {
   Home,
   KeyRound,
   LayoutDashboard,
-  LogIn,
   Megaphone,
   MessageCircle,
   Phone,
@@ -45,7 +44,7 @@ export function BerandaPage() {
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-16 pt-6">
       <PageTitle title="Info warga" />
-      <header className="flex items-start justify-between gap-3">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           {access.data?.logoUrl && (
             <img src={access.data.logoUrl} alt="" className="size-14 shrink-0 rounded-xl object-contain" />
@@ -57,9 +56,9 @@ export function BerandaPage() {
             <h1 className="text-3xl font-bold tracking-tight">Info warga</h1>
           </div>
         </div>
-        <div className="mt-1 flex shrink-0 gap-2">
+        <div className="mt-1 flex flex-wrap items-center gap-2 sm:shrink-0">
           <ThemeButton />
-          <AppLink />
+          <AppLinks />
         </div>
       </header>
       <div className="mt-5">
@@ -84,23 +83,21 @@ export function BerandaPage() {
 }
 
 /**
- * Untuk petugas dan pengurus (warga cukup memakai kode). Yang sudah masuk langsung dibawa ke
- * app-nya, bukan ke layar masuk lagi.
+ * Akses app petugas selalu tersedia; pengurus yang sudah masuk juga bisa membuka dashboard.
  */
-function AppLink() {
+function AppLinks() {
   const user = useAuth().data?.user;
-  if (!user) {
-    return (
-      <a href="/petugas/" aria-label="Masuk petugas / pengurus" title="Masuk petugas / pengurus" className={buttonClass("secondary", "sm")}>
-        <LogIn className="size-4" /> Masuk
-      </a>
-    );
-  }
-  const admin = user.role === "admin";
   return (
-    <a href={admin ? "/admin/" : "/petugas/"} title={`Masuk sebagai ${user.name}`} className={buttonClass("secondary", "sm")}>
-      {admin ? <LayoutDashboard className="size-4" /> : <ScanLine className="size-4" />} {admin ? "Dashboard" : "App petugas"}
-    </a>
+    <>
+      <a href="/petugas/" className={buttonClass("secondary", "sm")}>
+        <ScanLine className="size-4" aria-hidden /> App petugas
+      </a>
+      {user?.role === "admin" && (
+        <a href="/admin/" title={`Masuk sebagai ${user.name}`} className={buttonClass("secondary", "sm")}>
+          <LayoutDashboard className="size-4" aria-hidden /> Dashboard
+        </a>
+      )}
+    </>
   );
 }
 
