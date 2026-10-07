@@ -10,11 +10,12 @@ import { QrSvg } from "@/components/qr-svg";
 import { Alert, Button, Field, Input, buttonClass, cx } from "@/components/ui";
 import { houseLabelLong, normalizeHouseField, parseNumberList } from "@/lib/houses";
 import { houseUrl } from "@/lib/qr";
+import type { PaymentCadence } from "@/lib/payments";
 import type { HouseDTO, HouseStatus } from "@/lib/types";
 import { HOUSE_REFRESH } from "../queries";
 import { PaymentPlanSection } from "../payments/plan-section";
 
-export type AdminHouse = HouseDTO & { collectionCount: number; paymentCount: number };
+export type AdminHouse = HouseDTO & { collectionCount: number; paymentCount: number; paymentCadence: PaymentCadence };
 
 
 const STATUSES: { value: HouseStatus; label: string; hint: string }[] = [

@@ -1,13 +1,14 @@
 import { and, asc, desc, eq, gte, isNotNull, lte, max, ne, or, sql } from "drizzle-orm";
-import { daysInMonth, rondaDate } from "@/lib/dates";
+import { daysInMonth, localDate, rondaDate } from "@/lib/dates";
 import type { GeoAnchor } from "@/lib/geo";
 import { compareHouses } from "@/lib/houses";
+import type { PaymentCadence } from "@/lib/payments";
 import type { CollectionDTO, HouseDTO, MonthCell, MonthRecap, RondaSnapshot } from "@/lib/types";
 import type { SessionUser } from "./auth";
 import type { Db } from "./db";
 import { houseName } from "./house-name";
 import { guardDaysByUser, listSchedule } from "./schedule";
-import { collectionLogs, collections, houses, payments, patrols, settings, users } from "./schema";
+import { collectionLogs, collections, houses, paymentPlans, payments, patrols, settings, users } from "./schema";
 import { getPaymentMonth } from "./payments";
 
 export const DEFAULT_SETTINGS = { communityName: "Lingkungan Kita", defaultAmount: 500 };
@@ -106,13 +107,18 @@ export async function listHouses(db: Db): Promise<HouseDTO[]> {
   return rows.sort(compareHouses);
 }
 
-/** Rumah beserta jumlah catatan jimpitannya (untuk tahu boleh dihapus atau tidak). */
-export async function listHousesWithUsage(db: Db) {
+/** Rumah beserta cara pembayaran yang sedang berlaku dan jumlah catatan jimpitannya. */
+export async function listHousesWithUsage(db: Db, today = localDate(new Date())) {
   const rows = await db
     .select({
       ...houseColumns,
       collectionCount: sql<number>`count(${collections.id})`.mapWith(Number),
       paymentCount: sql<number>`(select count(*) from ${payments} where ${payments.houseId} = ${houses.id})`.mapWith(Number),
+      paymentCadence: sql<PaymentCadence>`coalesce((
+        select ${paymentPlans.cadence} from ${paymentPlans}
+        where ${paymentPlans.houseId} = ${houses.id} and ${paymentPlans.effectiveFrom} <= ${today}
+        order by ${paymentPlans.effectiveFrom} desc limit 1
+      ), 'daily')`,
     })
     .from(houses)
     .leftJoin(collections, eq(collections.houseId, houses.id))
