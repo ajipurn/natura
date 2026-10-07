@@ -1,5 +1,13 @@
-import { Tooltip } from "@base-ui/react/tooltip";
-import { cx } from "./ui";
+import {
+  Bar as RechartsBar,
+  BarChart as RechartsBarChart,
+  CartesianGrid,
+  Rectangle,
+  Tooltip,
+  XAxis,
+  YAxis,
+  type BarShapeProps,
+} from "recharts";
 
 export type Bar = {
   key: string;
@@ -13,83 +21,93 @@ export type Bar = {
   blank?: boolean;
 };
 
-/**
- * Grafik batang sederhana. Informasi tiap batang tampil saat hover atau fokus keyboard,
- * dengan tabel tersembunyi untuk pembaca layar.
- */
+/** Grafik jimpitan bersama: Recharts menangani ukuran, sumbu, tooltip, dan navigasi keyboard. */
 export function BarChart({
   bars,
   caption,
   className,
   size = "md",
   labelEvery = Math.ceil(bars.length / 10),
+  formatValue,
 }: {
   bars: Bar[];
   caption: string;
   className?: string;
-  size?: "md" | "sm";
-  /** Label ditulis tiap sekian batang supaya tidak berdempet. */
+  size?: "md" | "sm" | "lg";
+  /** Kandidat label ditulis tiap sekian batang; Recharts menyembunyikan yang bertabrakan. */
   labelEvery?: number;
+  /** Tampilkan skala nominal dan garis bantu, dengan grafik selebar card. */
+  formatValue?: (value: number) => string;
 }) {
+  const height = size === "sm" ? 108 : size === "lg" ? 208 : 156;
   const max = Math.max(1, ...bars.map((b) => b.value));
+  const ticks = bars.filter((_, i) => i % Math.max(1, labelEvery) === 0 || i === bars.length - 1).map((b) => b.key);
+
   return (
     <figure className={className}>
-      <Tooltip.Provider delay={0}>
-        <div
-          className="mx-auto flex gap-[3px] px-5 sm:gap-1.5"
-          style={{ maxWidth: `${bars.length * 64 + 40}px` }}
+      <div className="mx-auto min-w-0" style={formatValue ? undefined : { maxWidth: `${bars.length * 64 + 40}px` }}>
+        <RechartsBarChart
+          responsive
+          width="100%"
+          height={height}
+          data={bars}
+          title={caption}
+          accessibilityLayer
+          margin={{ top: 8, right: 20, bottom: 0, left: formatValue ? 0 : 20 }}
+          barCategoryGap="24%"
+          className="[&_.recharts-surface]:outline-none [&_.recharts-surface:focus-visible]:rounded-lg [&_.recharts-surface:focus-visible]:ring-2 [&_.recharts-surface:focus-visible]:ring-primary/50"
         >
-          {bars.map((b, i) => (
-            <Tooltip.Root key={b.key}>
-              <Tooltip.Trigger
-                aria-label={b.title}
-                closeOnClick={false}
-                className="group min-w-0 flex-1 text-center outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card"
-              >
-                <span className={cx("flex items-end", size === "sm" ? "h-20" : "h-32")}>
-                  {!b.blank && (
-                    <span
-                      className={cx(
-                        "w-full rounded-t",
-                        b.highlight
-                          ? "bg-primary"
-                          : b.value === 0
-                            ? "bg-line"
-                            : b.faint
-                              ? "bg-primary/20 group-hover:bg-primary/35"
-                              : "bg-primary/45 group-hover:bg-primary/70",
-                      )}
-                      style={{ height: `${Math.max(2, (b.value / max) * 100)}%` }}
-                    />
-                  )}
-                </span>
-                <span className="relative mt-1.5 block h-3.5 text-[10px] leading-3.5 tabular-nums text-muted">
-                  {/* Label tetap di tengah batang; boleh melebar tanpa mengubah lebar kolom. */}
-                  {i % labelEvery === 0 && (
-                    <span
-                      className={cx(
-                        "absolute left-1/2 top-0 -translate-x-1/2 whitespace-nowrap",
-                        bars.length > 10 && labelEvery < 5 && (i / labelEvery) % 2 === 1 && "max-sm:hidden",
-                      )}
-                    >
-                      {b.label}
-                    </span>
-                  )}
-                </span>
-              </Tooltip.Trigger>
-              <Tooltip.Portal>
-                <Tooltip.Positioner sideOffset={8} collisionPadding={16} className="z-60">
-                  <Tooltip.Popup role="tooltip" className="max-w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-line bg-card px-3 py-2 text-xs leading-relaxed text-fg shadow-lg">
-                    {b.title}
-                  </Tooltip.Popup>
-                </Tooltip.Positioner>
-              </Tooltip.Portal>
-            </Tooltip.Root>
-          ))}
-        </div>
-      </Tooltip.Provider>
+          {formatValue && <CartesianGrid vertical={false} stroke="var(--line)" strokeOpacity={0.7} />}
+          <XAxis
+            dataKey="key"
+            ticks={ticks}
+            tickFormatter={(key) => bars.find((b) => b.key === key)?.label ?? key}
+            interval="preserveStartEnd"
+            minTickGap={12}
+            tick={{ fill: "var(--muted)" }}
+            fontSize={10}
+            tickMargin={8}
+            height={24}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis
+            hide={!formatValue}
+            width={formatValue ? "auto" : 0}
+            domain={[0, formatValue ? "auto" : max]}
+            tickFormatter={formatValue}
+            tick={{ fill: "var(--muted)" }}
+            fontSize={10}
+            tickCount={3}
+            allowDecimals={false}
+            tickLine={false}
+            axisLine={false}
+          />
+          <Tooltip
+            isAnimationActive={false}
+            cursor={{ fill: "var(--primary)", fillOpacity: 0.06 }}
+            wrapperStyle={{ zIndex: 60 }}
+            content={({ active, label }) => {
+              const bar = bars.find((b) => b.key === label);
+              return active && bar ? (
+                <div role="tooltip" className="max-w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-line bg-card px-3 py-2 text-xs leading-relaxed text-fg shadow-lg">
+                  {bar.title}
+                </div>
+              ) : null;
+            }}
+          />
+          <RechartsBar
+            dataKey="value"
+            maxBarSize={40}
+            minPointSize={2}
+            isAnimationActive={false}
+            shape={ChartBar}
+            activeBar={ChartBar}
+          />
+        </RechartsBarChart>
+      </div>
       <figcaption className="sr-only">{caption}</figcaption>
-      {/* `sr-only` di pembungkus: tabel tidak bisa lebih sempit dari isinya, jadi bisa melebarkan halaman. */}
+      {/* Pembungkus menjaga tabel pembaca layar agar tidak melebarkan halaman. */}
       <div className="sr-only">
         <table>
           <tbody>
@@ -102,5 +120,18 @@ export function BarChart({
         </table>
       </div>
     </figure>
+  );
+}
+
+function ChartBar(props: BarShapeProps) {
+  const bar = props.payload as Bar;
+  if (bar.blank) return null;
+  return (
+    <Rectangle
+      {...props}
+      radius={[3, 3, 0, 0]}
+      fill={bar.value === 0 && !bar.highlight ? "var(--line)" : "var(--primary)"}
+      fillOpacity={bar.highlight || bar.value === 0 ? 1 : props.isActive ? 0.7 : bar.faint ? 0.2 : 0.45}
+    />
   );
 }

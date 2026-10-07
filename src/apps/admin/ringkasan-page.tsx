@@ -18,7 +18,7 @@ import { GuardChip } from "@/components/guard-chip";
 import { QueryState } from "@/components/query-state";
 import { Card, PageHeader, cx } from "@/components/ui";
 import { formatDateLong, formatDateShort, formatMonth } from "@/lib/dates";
-import { formatRupiah } from "@/lib/format";
+import { formatAmountShort, formatRupiah } from "@/lib/format";
 import { dayLabel, scheduleDay } from "@/lib/schedule";
 import { dashboardQuery } from "./queries";
 
@@ -119,24 +119,30 @@ export function RingkasanPage() {
             </div>
 
             <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_20rem]">
-              <Card>
+              <Card className="min-w-0">
                 <h2 className="flex items-center gap-2 font-semibold">
                   <TrendingUp className="size-5 text-primary" /> 30 malam terakhir
                 </h2>
                 {d.trend.length === 0 ? (
                   <p className="py-8 text-center text-sm text-muted">Belum ada catatan ronda.</p>
                 ) : (
-                  <BarChart
-                    className="mt-4"
-                    caption="Jimpitan terkumpul per malam, 30 malam terakhir"
-                    bars={d.trend.map((n) => ({
-                      key: n.date,
-                      label: formatDateShort(n.date).split(" ").slice(0, 2).join(" "),
-                      value: n.total,
-                      highlight: n.date === d.date,
-                      title: `${formatDateShort(n.date)}: ${formatRupiah(n.total)} · ${n.filled} ada, ${n.empty} kosong`,
-                    }))}
-                  />
+                  <>
+                    <p className="mt-1 text-xs text-muted">Jimpitan per malam · {d.trend.length} malam tercatat</p>
+                    <BarChart
+                      className="mt-5"
+                      size="lg"
+                      formatValue={(value) => `Rp ${formatAmountShort(value)}`}
+                      labelEvery={Math.ceil(d.trend.length / 6)}
+                      caption="Jimpitan terkumpul per malam, 30 malam terakhir"
+                      bars={d.trend.map((n) => ({
+                        key: n.date,
+                        label: formatDateShort(n.date).split(", ")[1],
+                        value: n.total,
+                        highlight: n.date === d.date,
+                        title: `${formatDateShort(n.date)}: ${formatRupiah(n.total)} · ${n.filled} ada, ${n.empty} kosong`,
+                      }))}
+                    />
+                  </>
                 )}
               </Card>
 
