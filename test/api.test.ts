@@ -524,7 +524,8 @@ describe("halaman warga", () => {
     expect(wargaSchedule.some((s) => s.name === "Pak Putih")).toBe(false);
     expect(wargaSchedule.every((s) => s.name)).toBe(true);
     const rekap = await warga.get("/api/warga/rekap");
-    expect(rekap.data).toMatchObject({ nights: 1, total: 1000 });
+    // Kalender warga menghitung dari tanggal 1, meski baru satu malam punya catatan ronda.
+    expect(rekap.data).toMatchObject({ nights: Number(String(rekap.data.today).slice(8)), total: 1000 });
     // Rekap warga tanpa nama KK.
     expect(JSON.stringify(rekap.data)).not.toMatch(/ownerName|Nino/);
 

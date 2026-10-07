@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, gte, inArray, isNotNull, lte, max, ne, or, sql } from "drizzle-orm";
-import { daysInMonth, localDate, rondaDate } from "@/lib/dates";
+import { daysInMonth, localDate, rondaDate, shiftMonth } from "@/lib/dates";
 import type { GeoAnchor } from "@/lib/geo";
 import { compareHouses } from "@/lib/houses";
 import { billingPeriods, planAt, type PaymentCadence } from "@/lib/payments";
@@ -245,8 +245,10 @@ export async function listPatrols(db: Db, limit = 90, month?: string): Promise<P
  * Riwayat jimpitan satu rumah: malam-malam ronda terakhir sejak rumah didaftarkan,
  * juga catatan yang diisi admin untuk tanggal sebelum rumah didaftarkan.
  * Pakai tanggal malam ronda, supaya rumah yang didaftarkan pagi hari tetap ikut malam sebelumnya.
+ * Kalender warga dapat memilih bulan beserta dua bulan sebelumnya, tanpa terpotong riwayat terbaru.
  */
-export async function getHouseHistory(db: Db, house: { id: number; createdAt: Date }, limit = 30) {
+export async function getHouseHistory(db: Db, house: { id: number; createdAt: Date }, limit = 30, month?: string) {
+  const days = month ? daysInMonth(month) : undefined;
   return db
     .select({
       date: patrols.date,
@@ -255,7 +257,9 @@ export async function getHouseHistory(db: Db, house: { id: number; createdAt: Da
     })
     .from(patrols)
     .leftJoin(collections, and(eq(collections.patrolId, patrols.id), eq(collections.houseId, house.id)))
-    .where(or(gte(patrols.date, rondaDate(house.createdAt)), isNotNull(collections.id)))
+    .where(month && days
+      ? and(gte(patrols.date, daysInMonth(shiftMonth(month, -2))[0]), lte(patrols.date, days[days.length - 1]))
+      : or(gte(patrols.date, rondaDate(house.createdAt)), isNotNull(collections.id)))
     .orderBy(desc(patrols.date))
     .limit(limit);
 }

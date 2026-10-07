@@ -39,10 +39,3 @@ export function useMyHouse(): [number | null, (id: number | null) => void] {
   );
   return [id, save];
 }
-
-/** Teks singkat status bulan ini untuk satu rumah ("12/14 malam ada isinya"). */
-export function houseMonthText(h: { status: "active" | "vacant"; filled: number; empty: number }) {
-  const checked = h.filled + h.empty;
-  if (h.status === "vacant") return "ditandai mudik";
-  return checked ? `${h.filled}/${checked} malam ada isinya` : "belum dicek bulan ini";
-}

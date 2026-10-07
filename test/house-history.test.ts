@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Db } from "@/server/db";
+import { addDays } from "@/lib/dates";
 import { houses } from "@/server/schema";
 import { apiClient, createTestEnv } from "./helpers/db";
 
@@ -32,10 +33,11 @@ beforeAll(async () => {
 });
 
 describe("riwayat rumah dan rekap warga", () => {
-  it("menampilkan enam catatan di detail saat rekap menunjukkan 6/6, termasuk isian tanggal sebelum rumah didaftarkan", async () => {
+  it("menampilkan enam catatan dari 31 malam berjalan, termasuk isian sebelum rumah didaftarkan", async () => {
     const recap = await warga.get("/api/warga/rekap?bulan=2025-03");
     const stats = (recap.data.perHouse as HouseStats[]).find((h) => h.id === house.id)!;
     expect(stats).toMatchObject({ filled: 6, empty: 0, total: 3000 });
+    expect(recap.data.nights).toBe(31);
 
     const detail = await warga.get(`/api/warga/rumah/${house.id}`);
     expect(detail.status).toBe(200);
@@ -79,5 +81,15 @@ describe("riwayat rumah dan rekap warga", () => {
 
     const detail = await warga.get(`/api/warga/rumah/${third.id}`);
     expect(detail.data.history).toEqual(dates.slice(3).reverse().map((date) => ({ date, status: null, amount: null })));
+  });
+
+  it("bulan yang dipilih tetap lengkap walaupun ada lebih dari 100 catatan setelahnya", async () => {
+    const saved = await admin.put("/api/admin/riwayat", { entries: Array.from({ length: 105 }, (_, i) => ({ date: addDays("2025-04-01", i), houseId: house.id, status: "filled", amount: 500 })) });
+    expect(saved.status).toBe(200);
+    const detail = await warga.get(`/api/warga/rumah/${house.id}?bulan=2025-03`);
+    expect(detail.status).toBe(200);
+    expect((detail.data.history as Night[]).map((n) => n.date)).toEqual([...dates].reverse());
+    expect(JSON.stringify(detail.data)).not.toMatch(/ownerName|token/);
+    expect((await warga.get(`/api/warga/rumah/${house.id}?bulan=2025-13`)).status).toBe(400);
   });
 });

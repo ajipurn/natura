@@ -1,7 +1,8 @@
 import { asc, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
+import { validator } from "hono/validator";
 import { z } from "zod";
-import { rondaDate } from "@/lib/dates";
+import { daysInMonth, rondaDate } from "@/lib/dates";
 import { monthStats } from "@/lib/month-stats";
 import { scheduleDay } from "@/lib/schedule";
 import { endWargaAccess, hasWargaAccess, requireWarga, startWargaAccess } from "../auth";
@@ -65,11 +66,10 @@ export const wargaRoutes = new Hono<AppEnv>()
       communityName: settingsRow.communityName,
       date,
       tonight: scheduleDay(date),
-      // Baris rumah yang belum ada nama warganya dan baris putih (tidak ikut ronda, sama dengan app
-      // petugas) tidak ditampilkan ke warga (juga tidak dihitung).
+      // Jadwal warga hanya memuat penjaga yang bisa ikut; roster admin tetap lengkap.
       schedule: schedule.flatMap((s) => {
         const name = s.name ?? s.ownerName;
-        return name && s.color !== null
+        return name && s.color !== null && s.color !== "blue"
           ? [{ id: s.id, day: s.day, position: s.position, houseId: s.houseId, block: s.block, number: s.number, name }]
           : [];
       }),
@@ -84,7 +84,10 @@ export const wargaRoutes = new Hono<AppEnv>()
    * rumah itu terdaftar, termasuk catatan yang diisi untuk tanggal sebelumnya.
    * `status` null = malam itu rumahnya tidak dicek petugas.
    */
-  .get("/rumah/:id", requireWarga, idParam(), async (c) => {
+  .get("/rumah/:id", requireWarga, idParam(), validator("query", (value, c) => {
+    const parsed = z.object({ bulan: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional() }).safeParse(value);
+    return parsed.success ? parsed.data : c.json({ error: "Bulan tidak valid." }, 400);
+  }), async (c) => {
     const db = c.var.db;
     const [house] = await db
       .select({ id: houses.id, block: houses.block, number: houses.number, status: houses.status, createdAt: houses.createdAt })
@@ -92,7 +95,7 @@ export const wargaRoutes = new Hono<AppEnv>()
       .where(eq(houses.id, c.req.valid("param").id))
       .limit(1);
     if (!house) return c.json({ error: "Rumah tidak ditemukan." }, 404);
-    const history = await getHouseHistory(db, house, HISTORY_NIGHTS);
+    const history = await getHouseHistory(db, house, HISTORY_NIGHTS, c.req.valid("query").bulan);
     const paymentInfo = await getHousePaymentInfo(db, house.id, rondaDate(new Date()));
     const { createdAt: _createdAt, ...rest } = house;
     return c.json({ house: rest, today: rondaDate(new Date()), history, paymentInfo });
@@ -102,6 +105,8 @@ export const wargaRoutes = new Hono<AppEnv>()
   .get("/rekap", requireWarga, monthQuery, async (c) => {
     const month = c.req.valid("query").bulan;
     const recap = await getMonthRecap(c.var.db, month);
-    const stats = monthStats(recap);
-    return c.json({ month, today: rondaDate(new Date()), ...stats, paymentPeriods: recap.paymentPeriods ?? [] });
+    const today = rondaDate(new Date());
+    // Kalender warga menunjukkan seluruh malam yang sudah berjalan, termasuk yang belum dicatat.
+    const stats = monthStats({ ...recap, dates: daysInMonth(month).filter((date) => date <= today) });
+    return c.json({ month, today, ...stats, paymentPeriods: recap.paymentPeriods ?? [] });
   });

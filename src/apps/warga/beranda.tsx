@@ -2,7 +2,6 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ChevronLeft,
   ChevronRight,
-  Home,
   KeyRound,
   LayoutDashboard,
   Megaphone,
@@ -11,7 +10,6 @@ import {
   PiggyBank,
   Pin,
   ScanLine,
-  Search,
   ShieldCheck,
   Star,
   Wallet,
@@ -29,12 +27,10 @@ import { SegmentedControl } from "@/components/toggle-group";
 import { Alert, Button, Card, Input, PageTitle, SectionTitle, buttonClass, cx } from "@/components/ui";
 import { addDays, daysInMonth, formatDateLong, formatDateShort, formatMonth, shiftMonth } from "@/lib/dates";
 import { formatRupiah, phoneDigits, whatsappNumber } from "@/lib/format";
-import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
 import { DAY_NAMES, NIGHT_OF, slotHouseLabel } from "@/lib/schedule";
 import type { CashPublic } from "@/server/kas";
-import { HouseHistoryDialog } from "./house-history";
-import { houseMonthText, useMyHouse } from "./my-house";
-import { BILLING_LABEL, CADENCE_LABEL, type BillingPeriod } from "@/lib/payments";
+import { HouseStatus } from "./house-status";
+import { useMyHouse } from "./my-house";
 
 const accessQuery = { queryKey: ["warga", "akses"], queryFn: () => call(api.warga.akses.$get()) };
 
@@ -329,6 +325,9 @@ function MonthRecap({ today, children }: { today: string; children?: ReactNode }
     placeholderData: (previous) => previous,
   });
 
+  const dataMonth = recap.data?.month ?? month;
+  const through = dataMonth === thisMonth ? (recap.data?.today ?? today) : daysInMonth(dataMonth).at(-1)!;
+
   return (
     <>
       <SectionTitle>
@@ -369,10 +368,9 @@ function MonthRecap({ today, children }: { today: string; children?: ReactNode }
               </div>
             ) : (
               <>
-                <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                  <Stat label="Untuk periode ini" value={formatRupiah(data.total)} />
-                  <Stat label="Malam ronda" value={String(data.nights)} />
-                  <Stat label="Rata-rata/malam" value={formatRupiah(data.average)} />
+                <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
+                  <div><p className="text-xs text-muted">Total jimpitan</p><p className="mt-1 text-2xl font-bold tracking-tight tabular-nums sm:text-3xl">{formatRupiah(data.total)}</p></div>
+                  <div className="flex gap-6 text-right"><Stat label="Malam berjalan" value={String(data.nights)} /><Stat label="Rata-rata ronda/malam" value={formatRupiah(data.average)} /></div>
                 </div>
                 <BarChart
                   className="mt-5"
@@ -387,19 +385,19 @@ function MonthRecap({ today, children }: { today: string; children?: ReactNode }
                         value: night?.total ?? 0,
                         highlight: date === data.today,
                         title: night
-                          ? `${formatDateShort(date)}: ${formatRupiah(night.total)} dari ${night.filled} rumah`
+                          ? `${formatDateShort(date)}: hasil ronda ${formatRupiah(night.total)}`
                           : `${formatDateShort(date)}: tidak ada catatan ronda`,
                       };
                     })}
                 />
-                <p className="mt-1 text-center text-xs text-muted">Grafik menunjukkan uang hasil ronda. Total periode termasuk pembayaran mingguan dan bulanan.</p>
+                <p className="mt-3 border-t border-line pt-3 text-xs text-muted">Grafik: uang yang diambil saat ronda. Total bulan juga mencakup pembayaran mingguan dan bulanan.</p>
               </>
             )
           }
         </QueryState>
       </Card>
       {children}
-      {recap.data && (recap.data.nights > 0 || recap.data.total > 0 || recap.data.paymentPeriods.length > 0) && <HouseStatus perHouse={recap.data.perHouse.map((h) => ({ ...h, paymentPeriod: recap.data.paymentPeriods.find((p) => p.houseId === h.id && p.cadence !== "daily") }))} month={recap.data.month} />}
+      {recap.data && (recap.data.nights > 0 || recap.data.total > 0 || recap.data.paymentPeriods.length > 0) && <HouseStatus perHouse={recap.data.perHouse.map((h) => ({ ...h, paymentPeriod: recap.data.paymentPeriods.find((p) => h.status === "active" && p.houseId === h.id && p.cadence !== "daily" && p.start <= through && p.end >= through) }))} month={recap.data.month} nights={recap.data.nights} through={through} />}
     </>
   );
 }
@@ -415,9 +413,8 @@ function CashCard({ cash }: { cash: CashPublic }) {
         </span>
       </SectionTitle>
       <Card>
-        <p className="text-xs text-muted">Saldo kas sekarang</p>
-        <p className="text-3xl font-bold tabular-nums">{formatRupiah(cash.balance)}</p>
-        <div className="mt-4 grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
+        <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs text-muted">Saldo kas sekarang</p><p className="mt-1 text-3xl font-bold tracking-tight tabular-nums">{formatRupiah(cash.balance)}</p></div><span className="rounded-full bg-idle-soft px-3 py-1 text-xs font-medium text-muted">{formatMonth(cash.month)}</span></div>
+        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-line pt-4 sm:grid-cols-4">
           <Stat label={`Setoran ${monthName}`} value={formatRupiah(cash.deposits)} />
           <Stat label="Pembayaran langsung" value={formatRupiah(cash.directPayments)} />
           <Stat label="Pemasukan lain" value={formatRupiah(cash.income)} />
@@ -444,137 +441,11 @@ function CashCard({ cash }: { cash: CashPublic }) {
   );
 }
 
-type HouseRow = { id: number; block: string; number: string; status: "active" | "vacant"; filled: number; empty: number; periodTotal?: number; paymentPeriod?: BillingPeriod };
-
-/** Status tiap rumah bulan ini, tanpa nama warga. Ketuk rumah untuk melihat riwayatnya. */
-function HouseStatus({ perHouse, month }: { perHouse: HouseRow[]; month: string }) {
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState<HouseRow | null>(null);
-  const [myHouse, setMyHouse] = useMyHouse();
-  const mine = perHouse.find((h) => h.id === myHouse);
-  const shown = query.trim() ? searchHouses(perHouse, query, perHouse.length) : perHouse;
-
-  return (
-    <>
-      <SectionTitle>
-        <span className="inline-flex items-center gap-1.5">
-          <Home className="size-4" /> Status per rumah
-        </span>
-      </SectionTitle>
-      <Card className="space-y-4">
-        <p className="text-sm text-muted">
-          Berapa malam wadah jimpitan ada isinya di {formatMonth(month)}, dari malam-malam rumah itu dicek petugas. Ketuk
-          rumah untuk melihat riwayatnya.
-        </p>
-        <p className="text-xs text-muted">Rumah dengan pembayaran mingguan/bulanan menampilkan status pembayaran. Wadah kosong tidak berarti belum bayar.</p>
-        {mine && (
-          <Button
-            variant="plain"
-            onClick={() => setOpen(mine)}
-            className="flex w-full items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2.5 text-left"
-          >
-            <Star className="size-5 shrink-0 fill-current text-primary" aria-hidden />
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold">Rumah saya · {houseLabel(mine)}</span>
-              <span className="block text-sm text-muted">{houseMonthText(mine)}</span>
-              {mine.paymentPeriod && <span className="block text-xs text-primary">{CADENCE_LABEL[mine.paymentPeriod.cadence]} · {BILLING_LABEL[mine.paymentPeriod.status]}</span>}
-            </span>
-            <span className="shrink-0 text-sm font-semibold text-primary">Riwayat</span>
-          </Button>
-        )}
-        <label className="relative block">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted" />
-          <Input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Cari rumah, mis. AD3"
-            aria-label="Cari rumah"
-            className="pl-10"
-          />
-        </label>
-        {shown.length === 0 ? (
-          <p className="py-4 text-center text-sm text-muted">Tidak ada rumah yang cocok.</p>
-        ) : (
-          <div className="space-y-4">
-            {groupByBlock(shown).map(([block, list]) => (
-              <section key={block} aria-label={`Blok ${block}`}>
-                <h3 className="mb-1.5 text-sm font-semibold">Blok {block}</h3>
-                <ul className="grid grid-cols-4 gap-1.5 sm:grid-cols-8">
-                  {list.map((h) => {
-                    // Malam yang rumah ini tidak dicek tidak dihitung, supaya tidak terlihat seperti kosong.
-                    const checked = h.filled + h.empty;
-                    const ratio = checked ? h.filled / checked : null;
-                    return (
-                      <li key={h.id}>
-                        <Button
-                          variant="plain"
-                          onClick={() => setOpen(h)}
-                          aria-label={`${houseLabel(h)}: ${houseMonthText(h)}. Lihat riwayat`}
-                          className={cx(
-                            "relative w-full rounded-lg border px-1 py-1.5 text-center transition active:scale-95",
-                            h.paymentPeriod && h.status === "active"
-                              ? h.paymentPeriod.status === "paid" ? "border-filled/40 bg-filled-soft text-filled" : "border-empty/40 bg-empty-soft text-empty"
-                              : h.status === "vacant" || ratio === null
-                              ? "border-dashed border-line text-muted hover:border-muted"
-                              : ratio >= 0.8
-                                ? "border-filled/40 bg-filled-soft text-filled hover:border-filled"
-                                : ratio >= 0.5
-                                  ? "border-warn/40 bg-warn-soft text-warn hover:border-warn"
-                                  : "border-empty/40 bg-empty-soft text-empty hover:border-empty",
-                            h.id === myHouse && "ring-2 ring-primary ring-offset-1 ring-offset-card",
-                          )}
-                        >
-                          <span className="block text-sm font-bold">{h.number}</span>
-                          <span className="block text-[11px]">
-                            {h.status === "vacant" ? "mudik" : h.paymentPeriod ? h.paymentPeriod.status === "paid" ? "sudah bayar" : "belum bayar" : checked ? `${h.filled}/${checked}` : "–"}
-                          </span>
-                        </Button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            ))}
-          </div>
-        )}
-        <Legend />
-      </Card>
-      <HouseHistoryDialog
-        houseId={open?.id ?? null}
-        label={open ? houseLabel(open) : ""}
-        onClose={() => setOpen(null)}
-        myHouse={myHouse}
-        onMyHouse={setMyHouse}
-      />
-    </>
-  );
-}
-
-function Legend() {
-  const items: [string, ReactNode][] = [
-    ["bg-filled-soft border-filled/40", "≥ 80% ada isinya"],
-    ["bg-warn-soft border-warn/40", "50–79%"],
-    ["bg-empty-soft border-empty/40", "< 50%"],
-    ["border-dashed border-line", "belum dicek"],
-  ];
-  return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-      {items.map(([cls, label]) => (
-        <span key={cls} className="flex items-center gap-1.5">
-          <span className={cx("inline-block size-3 rounded border", cls)} />
-          {label}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-lg font-bold leading-tight">{value}</p>
-      <p className="text-xs text-muted">{label}</p>
+      <p className="text-lg font-bold leading-tight tabular-nums">{value}</p>
+      <p className="mt-1 text-xs text-muted">{label}</p>
     </div>
   );
 }

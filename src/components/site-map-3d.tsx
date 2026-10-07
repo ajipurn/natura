@@ -33,7 +33,7 @@ const MIN_LABEL_PX = 16;
 const TAP_TOLERANCE_PX = 8;
 const HOUSE_LABEL_CLASS = "rounded border border-line bg-card/90 px-1 text-[10px] font-bold leading-tight text-fg shadow-sm";
 
-type SceneApi = { setMarkers: (markers: Record<number, MarkerState>) => void; resetView: () => void };
+type SceneApi = { setMarkers: (markers: Record<number, MarkerState>, roofColors?: Record<number, string>) => void; resetView: () => void };
 type HouseMeshes = { body: THREE.Mesh; roof: THREE.Mesh };
 type Bounds = { minX: number; maxX: number; minZ: number; maxZ: number };
 
@@ -64,12 +64,17 @@ export default function SiteMap3D({
   houses,
   plan,
   markers,
+  roofColors,
+  houseActionLabel = "Ketuk rumah untuk mencatat.",
   onHouseClick,
   className,
 }: {
   houses: HouseDTO[];
   plan: SitePlan;
   markers: Record<number, MarkerState>;
+  /** Warna ringkasan per rumah, misalnya kuning untuk bulan yang belum lengkap. */
+  roofColors?: Record<number, string>;
+  houseActionLabel?: string;
   onHouseClick?: (house: HouseDTO) => void;
   className?: string;
 }) {
@@ -77,6 +82,7 @@ export default function SiteMap3D({
   const apiRef = useRef<SceneApi | null>(null);
   const housesRef = useRef(houses);
   const markersRef = useRef(markers);
+  const roofColorsRef = useRef(roofColors);
   const onHouseClickRef = useRef(onHouseClick);
   const [error, setError] = useState<string | null>(null);
   const theme = useTheme();
@@ -84,6 +90,7 @@ export default function SiteMap3D({
   useEffect(() => {
     housesRef.current = houses;
     markersRef.current = markers;
+    roofColorsRef.current = roofColors;
     onHouseClickRef.current = onHouseClick;
   });
 
@@ -144,6 +151,7 @@ export default function SiteMap3D({
     const roofMats = Object.fromEntries(
       Object.entries(ROOF_COLORS).map(([state, color]) => [state, material(color, state === "vacant")]),
     ) as Record<MarkerState, THREE.MeshLambertMaterial>;
+    const customRoofs = new Map<string, THREE.MeshLambertMaterial>();
 
     const ctx: BuildContext = {
       scene,
@@ -249,16 +257,21 @@ export default function SiteMap3D({
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
     renderer.domElement.addEventListener("pointerup", onPointerUp);
 
-    const setMarkers = (next: Record<number, MarkerState>) => {
+    const setMarkers = (next: Record<number, MarkerState>, colors?: Record<number, string>) => {
       for (const [id, { body, roof }] of meshes) {
         const state = next[id] ?? "neutral";
-        roof.material = roofMats[state];
+        const color = colors?.[id];
+        if (color) {
+          const key = `${state === "vacant"}:${color}`;
+          if (!customRoofs.has(key)) customRoofs.set(key, material(color, state === "vacant"));
+          roof.material = customRoofs.get(key)!;
+        } else roof.material = roofMats[state];
         body.material = state === "vacant" ? ghostWallMat : wallMat;
       }
       requestRender();
     };
     apiRef.current = { setMarkers, resetView };
-    setMarkers(markersRef.current);
+    setMarkers(markersRef.current, roofColorsRef.current);
     resize();
     resetView();
 
@@ -280,8 +293,8 @@ export default function SiteMap3D({
   }, [layoutKey, plan, theme]);
 
   useEffect(() => {
-    apiRef.current?.setMarkers(markers);
-  }, [markers]);
+    apiRef.current?.setMarkers(markers, roofColors);
+  }, [markers, roofColors]);
 
   const houseCount = matchPlan(plan, houses).lotHouse.size;
   // Tinggi bingkai mengikuti bentuk denah (sedikit lebih tinggi untuk sudut pandang miring),
@@ -289,13 +302,13 @@ export default function SiteMap3D({
   const [aspectW, aspectH] = [plan.viewBox[2], plan.viewBox[3]];
 
   return (
-    <div className={cx("overflow-hidden rounded-2xl border border-line bg-card", className)}>
+    <div className={cx("isolate overflow-hidden rounded-2xl border border-line bg-card", className)}>
       <div
         ref={containerRef}
         className="relative max-h-[60vh] min-h-72 w-full"
         style={{ aspectRatio: `${aspectW} / ${Math.round(aspectH * 1.15)}` }}
         role="img"
-        aria-label={`Denah 3D, ${houseCount} rumah. Ketuk rumah untuk mencatat.`}
+        aria-label={`Denah 3D, ${houseCount} rumah. ${houseActionLabel}`}
       >
         {error && <p className="absolute inset-0 flex items-center justify-center p-6 text-center text-muted">{error}</p>}
       </div>
