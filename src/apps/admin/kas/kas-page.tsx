@@ -9,7 +9,7 @@ import { DatePicker } from "@/components/date-picker";
 import { Dialog } from "@/components/dialog";
 import { QueryState } from "@/components/query-state";
 import { RupiahInput } from "@/components/rupiah-input";
-import { Alert, Button, Card, Field, Input, PageTitle, cx } from "@/components/ui";
+import { Alert, Button, Card, Field, Input, PageHeader, buttonClass, cx } from "@/components/ui";
 import { formatDateShort, formatMonth, isMonth, localDate, rondaDate, shiftMonth } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import type { CashMonth } from "@/server/kas";
@@ -45,16 +45,12 @@ export function KasPage() {
 
   return (
     <>
-      <PageTitle title="Kas" />
-      <header className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">Kas</h1>
-        <Button size="sm" onClick={() => openEntry()}>
+      <PageHeader title="Kas" subtitle="Kelola setoran jimpitan, pemasukan lain, dan pengeluaran kas." />
+      <div className="mb-4 flex items-center justify-between gap-2 sm:gap-3">
+        <MonthNav month={month} thisMonth={thisMonth} />
+        <Button size="sm" className="shrink-0" onClick={() => openEntry()}>
           <Plus className="size-4" aria-hidden /> Catat transaksi
         </Button>
-        <p className="col-span-2 text-sm text-muted">Kelola setoran jimpitan, pemasukan lain, dan pengeluaran kas.</p>
-      </header>
-      <div className="mb-4">
-        <MonthNav month={month} thisMonth={thisMonth} />
       </div>
 
       <QueryState query={query}>
@@ -85,26 +81,33 @@ export function KasPage() {
 
 function MonthNav({ month, thisMonth }: { month: string; thisMonth: string }) {
   const link = (m: string) => (m === thisMonth ? "/admin/kas" : `/admin/kas?bulan=${m}`);
+  const monthLabel = formatMonth(month);
+  const shortMonth = monthLabel.split(" ")[0].slice(0, 3);
   return (
-    <nav aria-label="Pilih bulan" className="inline-flex items-center rounded-xl border border-line bg-card p-0.5">
+    <nav aria-label="Pilih bulan" className="flex min-w-0 flex-1 items-center rounded-xl border border-line bg-card p-px sm:flex-none">
       <Link
         to={link(shiftMonth(month, -1))}
-        className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-idle-soft"
+        className={buttonClass("ghost", "icon-sm")}
         aria-label={`Bulan sebelumnya (${formatMonth(shiftMonth(month, -1))})`}
       >
         <ChevronLeft className="size-5" />
       </Link>
-      <span className="min-w-36 px-2 text-center font-semibold">{formatMonth(month)}</span>
+      <span className="min-w-0 flex-1 whitespace-nowrap text-center text-sm font-semibold sm:min-w-36 sm:px-1 sm:text-base">
+        <span className="sr-only">{monthLabel}</span>
+        <span aria-hidden className="min-[360px]:hidden">{shortMonth} {month.slice(2, 4)}</span>
+        <span aria-hidden className="hidden min-[360px]:inline sm:hidden">{shortMonth} {month.slice(0, 4)}</span>
+        <span aria-hidden className="hidden sm:inline">{monthLabel}</span>
+      </span>
       {month < thisMonth ? (
         <Link
           to={link(shiftMonth(month, 1))}
-          className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-idle-soft"
+          className={buttonClass("ghost", "icon-sm")}
           aria-label={`Bulan berikutnya (${formatMonth(shiftMonth(month, 1))})`}
         >
           <ChevronRight className="size-5" />
         </Link>
       ) : (
-        <span aria-hidden className="flex size-9 items-center justify-center text-muted/40">
+        <span aria-hidden className={cx(buttonClass("ghost", "icon-sm"), "pointer-events-none text-muted/40")}>
           <ChevronRight className="size-5" />
         </span>
       )}
