@@ -1,5 +1,6 @@
 import { formatDateLong } from "./dates";
 import { formatRupiah } from "./format";
+import { rondaHouseState } from "./house-state";
 import { compareHouses, houseLabel, type HouseRef } from "./houses";
 import type { CollectionStatus, HouseStatus } from "./types";
 import type { BillingPeriod } from "./payments";
@@ -57,8 +58,8 @@ export function summarize(
 
     summary.expected++;
     const period = periods.find((p) => p.houseId === house.id);
-    const status = period ? period.status === "paid" ? "filled" : "empty" : c?.status;
-    if (!status) {
+    const status = rondaHouseState(house, c, period);
+    if (status === "unchecked") {
       summary.unchecked.push(house);
       continue;
     }

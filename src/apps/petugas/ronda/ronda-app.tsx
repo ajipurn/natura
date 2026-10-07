@@ -22,7 +22,7 @@ import { SegmentedControl } from "@/components/toggle-group";
 import { Alert, Button, Card, buttonClass, cx } from "@/components/ui";
 import { formatDateLong, formatTime } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
-import type { MarkerState } from "@/lib/house-state";
+import { rondaHouseState, type MarkerState } from "@/lib/house-state";
 import { houseLabel } from "@/lib/houses";
 import { parseQrToken } from "@/lib/qr";
 import { CADENCE_LABEL, rondaPaymentPeriods } from "@/lib/payments";
@@ -90,7 +90,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
     const result: Record<number, MarkerState> = {};
     for (const h of houses) {
       const period = paymentPeriods.find((p) => p.houseId === h.id);
-      result[h.id] = h.status === "vacant" ? "vacant" : period ? period.status === "paid" ? "filled" : "empty" : store.collections.get(h.id)?.status ?? "unchecked";
+      result[h.id] = rondaHouseState(h, store.collections.get(h.id), period);
     }
     return result;
   }, [houses, store.collections, paymentPeriods]);

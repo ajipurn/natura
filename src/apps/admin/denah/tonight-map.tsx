@@ -9,7 +9,7 @@ import { Card, cx } from "@/components/ui";
 import { patrolQuery } from "@/features/riwayat/queries";
 import { formatDateLong, formatTime, rondaDate } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
-import type { MarkerState } from "@/lib/house-state";
+import { rondaHouseState, type MarkerState } from "@/lib/house-state";
 import { summarize } from "@/lib/recap";
 import { SITE_PLAN } from "@/site-plan";
 import { HouseChips, HousePanel, MapWithPanel } from "./house-panel";
@@ -28,7 +28,7 @@ export function TonightMap() {
         const markers: Record<number, MarkerState> = Object.fromEntries(
           houses.map((h) => {
             const period = paymentPeriods?.find((p) => p.houseId === h.id);
-            return [h.id, h.status === "vacant" ? "vacant" : period ? period.status === "paid" ? "filled" : "empty" : byHouse.get(h.id)?.status ?? "unchecked"];
+            return [h.id, rondaHouseState(h, byHouse.get(h.id), period)];
           }),
         );
         const emptyCount = summary.empty.length;

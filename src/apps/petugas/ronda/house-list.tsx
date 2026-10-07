@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ScrollArea } from "@/components/scroll-area";
 import { Button, cx } from "@/components/ui";
 import { formatAmountShort, formatRupiah } from "@/lib/format";
+import { rondaHouseState } from "@/lib/house-state";
 import { groupByBlock, houseLabel } from "@/lib/houses";
 import type { HouseDTO } from "@/lib/types";
 import type { MergedCollection } from "./use-ronda-store";
@@ -163,8 +164,9 @@ function HouseTile({
   paymentCell?: PaymentCell;
 }) {
   const vacant = house.status === "vacant";
-  const state = vacant ? "vacant" : paymentPeriod ? paymentPeriod.status === "paid" ? "filled" : "empty" : collection?.status ?? "unchecked";
-  const stateText = paymentPeriod && !vacant ? paymentPeriod.status === "paid" ? "sudah bayar" : "belum bayar" : {
+  const state = rondaHouseState(house, collection, paymentPeriod);
+  const recordedFilled = collection?.status === "filled";
+  const stateText = paymentPeriod && !vacant && !recordedFilled ? paymentPeriod.status === "paid" ? "sudah bayar" : "belum bayar" : {
     filled: `ada ${collection ? formatRupiah(collection.amount) : ""}`,
     empty: "kosong",
     vacant: "rumah kosong/mudik",
@@ -187,7 +189,7 @@ function HouseTile({
       )}
     >
       {houseLabel(house)}
-      {state === "filled" && collection && !paymentPeriod && (
+      {state === "filled" && collection && recordedFilled && (
         <span className="mt-1 text-[10px] font-semibold">{formatAmountShort(collection.amount)}</span>
       )}
       {paymentPeriod && !vacant && <span className="mt-1 text-[10px] font-semibold">{paid ? "sudah bayar" : "belum bayar"}</span>}
