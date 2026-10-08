@@ -23,6 +23,7 @@ import { formatAmountShort, formatRupiah } from "@/lib/format";
 import { dayLabel, scheduleDay } from "@/lib/schedule";
 import { dashboardQuery } from "./queries";
 import { TonightCard } from "./tonight-card";
+import { HouseWatchCard } from "./house-watch-card";
 
 export function RingkasanPage() {
   const query = useQuery(dashboardQuery);
@@ -106,7 +107,7 @@ export function RingkasanPage() {
               </Card>
             </div>
 
-            <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_20rem]">
+            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
               <Card className="min-w-0">
                 <h2 className="flex items-center gap-2 font-semibold">
                   <TrendingUp className="size-5 text-primary" /> 30 malam terakhir
@@ -134,27 +135,7 @@ export function RingkasanPage() {
                 )}
               </Card>
 
-              <Card>
-                <h2 className="font-semibold">Wadah harian sering kosong</h2>
-                <p className="mt-1 text-xs text-muted">Hasil pemeriksaan {formatMonth(d.month)}</p>
-                {d.oftenEmpty.length === 0 ? (
-                  <p className="mt-3 text-sm text-muted">Belum ada wadah harian tercatat kosong.</p>
-                ) : (
-                  <ul className="mt-2 divide-y divide-line">
-                    {d.oftenEmpty.map((h) => (
-                      <li key={h.id} className="flex items-center justify-between py-1.5 text-sm">
-                        <span className="font-semibold">{h.label}</span>
-                        <span className="text-empty">
-                          {h.empty}× kosong · {h.nights}× dicek
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <Link to="/admin/rekap" className="mt-3 inline-block text-sm font-semibold text-primary">
-                  Rekap lengkap
-                </Link>
-              </Card>
+              <HouseWatchCard houses={d.oftenEmpty} month={d.month} today={d.date} />
             </div>
 
           </>

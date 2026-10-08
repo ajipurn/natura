@@ -6,6 +6,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RingkasanPage } from "@/apps/admin/ringkasan-page";
 import type { Dashboard } from "@/server/dashboard";
+import { houseWatch } from "@/lib/house-watch";
 
 let root: Root;
 let container: HTMLDivElement;
@@ -32,8 +33,8 @@ afterEach(async () => {
   container.remove();
   vi.unstubAllGlobals();
 });
-async function render(tonight = fixture.tonight) {
-  client.setQueryData(["admin", "ringkasan"], { ...fixture, tonight });
+async function render(tonight = fixture.tonight, oftenEmpty = fixture.oftenEmpty) {
+  client.setQueryData(["admin", "ringkasan"], { ...fixture, tonight, oftenEmpty });
   await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><RingkasanPage /></MemoryRouter></QueryClientProvider>));
 }
 describe("indikator ronda di ringkasan", () => {
@@ -71,5 +72,25 @@ describe("indikator ronda di ringkasan", () => {
     await render({ ...fixture.tonight, expected: 0, checked: 0, filled: 0, empty: 0, unchecked: 0, automatic: 0, daily: { expected: 0, checked: 0, unchecked: 0 } });
     expect(container.textContent).toContain("Belum ada rumah aktif");
     expect(container.querySelector('[role="progressbar"]')).toBeNull();
+  });
+  it("baris pantauan membuka kalender rumah dengan celah pemeriksaan dan tautan rekap yang tersaring", async () => {
+    const data = {
+      month: "2026-10", defaultAmount: 500, communityName: "Natura",
+      houses: [{ id: 1, block: "AB", number: "3", ownerName: "Nama warga", status: "active" as const, token: "EXAMPLE" }],
+      dates: ["2026-10-06", "2026-10-07"],
+      cells: { "1:2026-10-06": { status: "empty" as const, amount: 0 }, "1:2026-10-07": { status: "empty" as const, amount: 0 } },
+    };
+    client.setQueryData(["rekap", "2026-10"], data);
+    await render(fixture.tonight, houseWatch(data, fixture.date));
+    const trigger = container.querySelector<HTMLButtonElement>('button[aria-label^="Buka kalender AB-3"]')!;
+    expect(trigger.textContent).toContain("Nama warga");
+    await act(async () => trigger.click());
+    const dialog = document.querySelector('[role="dialog"]')!;
+    expect(dialog.textContent).toContain("Rumah AB-3");
+    expect(dialog.textContent).toContain("8 malam berjalan");
+    expect(dialog.querySelectorAll('[role="listitem"][aria-label$=": kosong"]')).toHaveLength(2);
+    expect(dialog.querySelectorAll('[role="listitem"][aria-label$=": belum dicatat"]')).toHaveLength(6);
+    expect(dialog.querySelector('a')?.getAttribute("href")).toBe("/admin/rekap?bulan=2026-10&cari=AB-3");
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

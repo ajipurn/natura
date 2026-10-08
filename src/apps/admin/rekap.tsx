@@ -261,7 +261,8 @@ function RecapBody({
   onEditingChange: (editing: boolean) => void;
   tonight: string;
 }) {
-  const [search, setSearch] = useState("");
+  const [params] = useSearchParams();
+  const [search, setSearch] = useState(params.get("cari") ?? "");
   const [filter, setFilter] = useState<Filter>("semua");
   const [cadence, setCadence] = useState<CadenceFilter>("all");
   const [sort, setSort] = useState<Sort>("rumah");

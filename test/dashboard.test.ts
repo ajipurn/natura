@@ -17,6 +17,7 @@ beforeAll(async () => {
   await admin.post("/api/admin/rumah", { block: "A", numbers: "1-6" });
   const homes = (await admin.get("/api/admin/rumah")).data.houses as HouseDTO[];
   homeIds = homes.map((h) => h.id);
+  await admin.post("/api/admin/petugas", { name: "Nama akun warga", pin: "5678", role: "petugas", houseId: homeIds[1] });
   await admin.patch(`/api/admin/rumah/${homeIds[5]}`, { block: "A", number: "6", ownerName: null, status: "vacant" });
   for (const houseId of homeIds.slice(2, 4)) await admin.put(`/api/admin/pembayaran/kesepakatan/${houseId}`, { effectiveFrom: "2026-10-01", cadence: "monthly", ratePerNight: 500 });
   await admin.post("/api/admin/pembayaran", { clientId: crypto.randomUUID(), houseId: homeIds[3], receivedDate: "2026-10-07", periodStart: "2026-10-01", periodEnd: "2026-10-31", cadence: "monthly", amount: 15500, receivedBy: "treasurer", collectorId: null, note: "" });
@@ -42,7 +43,7 @@ describe("angka ringkasan sesuai jenis pemeriksaan", () => {
   });
   it("sering kosong hanya dari hasil harian; periode belum bayar dan rumah mudik tidak masuk", async () => {
     const d = await getDashboard(db, new Date());
-    expect(d.oftenEmpty).toEqual([{ id: homeIds[1], label: "A-2", empty: 1, nights: 2 }]);
+    expect(d.oftenEmpty).toMatchObject([{ id: homeIds[1], label: "A-2", ownerName: "Nama akun warga", empty: 1, nights: 2, emptyStreak: 1, lastChecked: "2026-10-07" }]);
   });
   it("pembayaran mingguan mengubah warna status tanpa menambah progres scan atau uang ronda", async () => {
     await admin.put(`/api/admin/pembayaran/kesepakatan/${homeIds[4]}`, { effectiveFrom: "2026-10-01", cadence: "weekly", ratePerNight: 500 });

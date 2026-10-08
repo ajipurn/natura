@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { localDate, rondaDate } from "@/lib/dates";
-import { houseLabel } from "@/lib/houses";
+import { houseWatch } from "@/lib/house-watch";
 import { monthStats } from "@/lib/month-stats";
 import { summarize } from "@/lib/recap";
 import { scheduleDay, slotHouseLabel } from "@/lib/schedule";
@@ -49,16 +49,7 @@ export async function getDashboard(db: Db, now: Date) {
   const day = scheduleDay(date);
   const plan = matchPlan(SITE_PLAN, houseRows);
 
-  // Wadah harian yang benar-benar diperiksa kosong, terpisah dari periode belum bayar.
-  const oftenEmpty = activeHouses
-    .map((h) => {
-      const checked = recap.dates.filter((day) => day <= date && !recap.paymentPeriods?.some((p) => p.houseId === h.id && p.start <= day && p.end >= day))
-        .flatMap((day) => recap.cells[`${h.id}:${day}`] ? [recap.cells[`${h.id}:${day}`]] : []);
-      return { id: h.id, label: houseLabel(h), empty: checked.filter((c) => c.status === "empty").length, nights: checked.length };
-    })
-    .filter((h) => h.empty > 0)
-    .sort((a, b) => b.empty - a.empty || a.nights - b.nights)
-    .slice(0, 6);
+  const oftenEmpty = houseWatch(recap, date);
 
   return {
     communityName: settingsRow.communityName,
