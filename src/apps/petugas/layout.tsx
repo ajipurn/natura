@@ -2,12 +2,13 @@ import { CalendarDays, History, ScanLine, UserRound, type LucideIcon } from "luc
 import type { ReactNode } from "react";
 import { NavLink } from "react-router";
 import { cx } from "@/components/ui";
+import { petugasPath } from "@/lib/app-paths";
 
 const ITEMS: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
-  { to: "/petugas", label: "Ronda", icon: ScanLine, end: true },
-  { to: "/petugas/riwayat", label: "Riwayat", icon: History },
-  { to: "/petugas/jadwal", label: "Jadwal", icon: CalendarDays },
-  { to: "/petugas/akun", label: "Akun", icon: UserRound },
+  { to: petugasPath(), label: "Ronda", icon: ScanLine, end: true },
+  { to: petugasPath("/riwayat"), label: "Riwayat", icon: History },
+  { to: petugasPath("/jadwal"), label: "Jadwal", icon: CalendarDays },
+  { to: petugasPath("/akun"), label: "Akun", icon: UserRound },
 ];
 
 /** Kerangka app petugas: tampilan satu kolom dan navigasi bawah pada semua ukuran layar. */

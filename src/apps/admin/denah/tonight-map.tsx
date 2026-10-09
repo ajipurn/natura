@@ -13,6 +13,7 @@ import { rondaHouseState, type MarkerState } from "@/lib/house-state";
 import { summarize } from "@/lib/recap";
 import { SITE_PLAN } from "@/site-plan";
 import { HouseChips, HousePanel, MapWithPanel } from "./house-panel";
+import { adminPath } from "@/lib/app-paths";
 
 /** Peta ronda malam ini: catatan harian dan status otomatis pembayaran periode. */
 export function TonightMap() {
@@ -43,7 +44,7 @@ export function TonightMap() {
                 <p className="font-semibold">{formatDateLong(date)}</p>
                 <p className="flex items-center gap-3 text-xs text-muted">
                   <span>Diperbarui {formatTime(new Date(query.dataUpdatedAt))}</span>
-                  <Link to={`/admin/riwayat/${date}`} className="flex items-center font-semibold text-primary">
+                  <Link to={adminPath(`/riwayat/${date}`)} className="flex items-center font-semibold text-primary">
                     Detail & koreksi <ChevronRight className="size-4" />
                   </Link>
                 </p>

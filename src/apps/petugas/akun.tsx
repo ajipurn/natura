@@ -11,6 +11,7 @@ import { Collapsible } from "@/components/collapsible";
 import { ChangePinForm } from "@/features/auth/change-pin-form";
 import { MySchedule } from "./my-schedule";
 import { Alert, Button, Card, PageHeader, SectionTitle, cx } from "@/components/ui";
+import { adminPath, petugasPath, wargaPath } from "@/lib/app-paths";
 
 export function AkunPage() {
   const user = useAuth().data?.user;
@@ -23,7 +24,7 @@ export function AkunPage() {
       try {
         localStorage.removeItem("jimpitan:auth");
       } catch {}
-      navigate("/petugas/masuk", { replace: true });
+      navigate(petugasPath("/masuk"), { replace: true });
     },
   });
   if (!user) return null;
@@ -47,7 +48,7 @@ export function AkunPage() {
 
       <nav aria-label="Akses cepat" className={cx("mt-3 grid gap-3", user.role === "admin" && "sm:grid-cols-2")}>
         <a
-          href="/"
+          href={wargaPath()}
           className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:bg-primary/15"
         >
           <Megaphone className="size-5 shrink-0 text-primary" aria-hidden />
@@ -59,7 +60,7 @@ export function AkunPage() {
         </a>
         {user.role === "admin" && (
           <a
-            href="/admin/"
+            href={adminPath("/")}
             className="flex items-center gap-3 rounded-2xl border border-line bg-card p-4 transition-colors hover:bg-idle-soft/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:bg-idle-soft"
           >
             <LayoutDashboard className="size-5 shrink-0 text-primary" aria-hidden />

@@ -14,6 +14,7 @@ import { formatDateShort, formatMonth, isMonth, localDate, rondaDate, shiftMonth
 import { formatRupiah } from "@/lib/format";
 import type { CashMonth } from "@/server/kas";
 import { CASH_REFRESH, cashQuery, settingsQuery } from "../queries";
+import { adminPath } from "@/lib/app-paths";
 
 type Night = CashMonth["nights"][number];
 type Entry = CashMonth["entries"][number];
@@ -59,14 +60,14 @@ export function KasPage() {
             <Summary data={data} />
             {data.undeposited.length > 0 && <Undeposited dates={data.undeposited} month={month} />}
             <Deposits nights={data.nights} tonight={tonight} />
-            {data.directReceipts.length > 0 && <section aria-label="Pembayaran langsung bendahara"><h2 className="font-semibold">Pembayaran langsung bendahara</h2><p className="mt-1 text-sm text-muted">Sudah masuk kas pada tanggal diterima. Koreksi di Rekap bulanan.</p><ul className="mt-3 divide-y divide-line rounded-2xl border border-line bg-card">{data.directReceipts.map((p) => <li key={p.id} className="flex flex-wrap justify-between gap-2 px-4 py-3"><div><p className="text-sm font-semibold">Diterima {formatDateShort(p.date)}</p><p className="text-xs text-muted">Periode {formatDateShort(p.periodStart)} – {formatDateShort(p.periodEnd)} <Link to="/admin/rekap" className="font-semibold text-primary underline">Lihat pembayaran</Link></p></div><span className="text-sm font-semibold text-filled">{formatRupiah(p.amount)}</span></li>)}</ul></section>}
+            {data.directReceipts.length > 0 && <section aria-label="Pembayaran langsung bendahara"><h2 className="font-semibold">Pembayaran langsung bendahara</h2><p className="mt-1 text-sm text-muted">Sudah masuk kas pada tanggal diterima. Koreksi di Rekap bulanan.</p><ul className="mt-3 divide-y divide-line rounded-2xl border border-line bg-card">{data.directReceipts.map((p) => <li key={p.id} className="flex flex-wrap justify-between gap-2 px-4 py-3"><div><p className="text-sm font-semibold">Diterima {formatDateShort(p.date)}</p><p className="text-xs text-muted">Periode {formatDateShort(p.periodStart)} – {formatDateShort(p.periodEnd)} <Link to={adminPath("/rekap")} className="font-semibold text-primary underline">Lihat pembayaran</Link></p></div><span className="text-sm font-semibold text-filled">{formatRupiah(p.amount)}</span></li>)}</ul></section>}
             <Entries entries={data.entries} onOpen={openEntry} onAdd={() => openEntry()} />
             {cashPublic !== undefined && (
               <p className="text-xs text-muted">
                 {cashPublic
                   ? "Saldo, jumlah bulan ini, dan rincian pemasukan/pengeluaran tampil di halaman warga (tanpa nama pencatat)."
                   : "Kas tidak ditampilkan di halaman warga."}{" "}
-                <Link to="/admin/pengaturan" className="font-semibold text-primary">
+                <Link to={adminPath("/pengaturan")} className="font-semibold text-primary">
                   Ubah di Pengaturan
                 </Link>
               </p>
@@ -81,7 +82,7 @@ export function KasPage() {
 }
 
 function MonthNav({ month, thisMonth }: { month: string; thisMonth: string }) {
-  const link = (m: string) => (m === thisMonth ? "/admin/kas" : `/admin/kas?bulan=${m}`);
+  const link = (m: string) => (m === thisMonth ? adminPath("/kas") : adminPath(`/kas?bulan=${m}`));
   const monthLabel = formatMonth(month);
   const shortMonth = monthLabel.split(" ")[0].slice(0, 3);
   return (
@@ -171,7 +172,7 @@ function Undeposited({ dates, month }: { dates: string[]; month: string }) {
             {d.startsWith(month) ? (
               dayMonth(d)
             ) : (
-              <Link to={`/admin/kas?bulan=${d.slice(0, 7)}`} className="underline">
+              <Link to={adminPath(`/kas?bulan=${d.slice(0, 7)}`)} className="underline">
                 {dayMonth(d)}
               </Link>
             )}
@@ -228,7 +229,7 @@ function NightRow({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-x-2 font-semibold">
-            <Link to={`/admin/riwayat/${date}`} className="hover:underline">
+            <Link to={adminPath(`/riwayat/${date}`)} className="hover:underline">
               {formatDateShort(date)}
             </Link>
             {isTonight && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">Malam ini</span>}

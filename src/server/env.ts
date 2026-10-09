@@ -6,7 +6,7 @@ export type Bindings = {
   db: Db;
   /** Kunci acak ≥ 32 karakter untuk menandatangani sesi login. */
   AUTH_SECRET?: string;
-  /** Alamat publik aplikasi untuk QR yang dicetak, mis. https://jimpitan-natura.vercel.app */
+  /** Alamat Info warga untuk QR/link yang dicetak, mis. https://info.clusternatura.com */
   APP_URL?: string;
   /** "1" saat `bun run dev`: cookie tanpa Secure dan secret bawaan boleh dipakai. */
   DEV?: string;

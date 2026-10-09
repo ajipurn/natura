@@ -25,6 +25,7 @@ import { ThemeSwitch } from "@/components/theme-toggle";
 import { Button, cx } from "@/components/ui";
 import type { SessionUser } from "@/server/auth";
 import { requestsQuery, settingsQuery } from "./queries";
+import { adminPath, petugasPath } from "@/lib/app-paths";
 
 type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean };
 
@@ -33,25 +34,25 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: "Ronda",
     items: [
-      { to: "/admin", label: "Ringkasan", icon: LayoutDashboard, end: true },
-      { to: "/admin/denah", label: "Peta ronda", icon: MapIcon },
-      { to: "/admin/riwayat", label: "Riwayat", icon: History },
-      { to: "/admin/rekap", label: "Rekap bulanan", icon: Table2 },
-      { to: "/admin/kas", label: "Kas", icon: Wallet },
+      { to: adminPath(), label: "Ringkasan", icon: LayoutDashboard, end: true },
+      { to: adminPath("/denah"), label: "Peta ronda", icon: MapIcon },
+      { to: adminPath("/riwayat"), label: "Riwayat", icon: History },
+      { to: adminPath("/rekap"), label: "Rekap bulanan", icon: Table2 },
+      { to: adminPath("/kas"), label: "Kas", icon: Wallet },
     ],
   },
   {
     group: "Kelola",
     items: [
-      { to: "/admin/jadwal", label: "Jadwal ronda", icon: CalendarDays },
-      { to: "/admin/petugas", label: "Petugas", icon: Users },
-      { to: "/admin/rumah", label: "Rumah & QR", icon: Home },
-      { to: "/admin/info", label: "Info warga", icon: Megaphone },
+      { to: adminPath("/jadwal"), label: "Jadwal ronda", icon: CalendarDays },
+      { to: adminPath("/petugas"), label: "Petugas", icon: Users },
+      { to: adminPath("/rumah"), label: "Rumah & QR", icon: Home },
+      { to: adminPath("/info"), label: "Info warga", icon: Megaphone },
     ],
   },
 ];
 
-const SETTINGS: NavItem = { to: "/admin/pengaturan", label: "Pengaturan", icon: Settings };
+const SETTINGS: NavItem = { to: adminPath("/pengaturan"), label: "Pengaturan", icon: Settings };
 
 /** Kerangka dashboard admin: menu samping di layar lebar, menu geser di HP. */
 export function AdminLayout({ user, children }: { user: SessionUser; children: ReactNode }) {
@@ -117,7 +118,7 @@ function Sidebar({ user }: { user: SessionUser }) {
       try {
         localStorage.removeItem("jimpitan:auth");
       } catch {}
-      navigate("/admin/masuk", { replace: true });
+      navigate(adminPath("/masuk"), { replace: true });
     },
   });
 
@@ -139,7 +140,7 @@ function Sidebar({ user }: { user: SessionUser }) {
                 {items.map((item) => (
                   <li key={item.to}>
                     <SidebarLink item={item}>
-                      {item.to === "/admin/jadwal" && pendingRequests > 0 && (
+                      {item.to === adminPath("/jadwal") && pendingRequests > 0 && (
                         <span
                           className="ml-auto rounded-full bg-warn px-2 py-0.5 text-xs font-bold text-card"
                           aria-label={`${pendingRequests} permintaan ubah jadwal`}
@@ -158,7 +159,7 @@ function Sidebar({ user }: { user: SessionUser }) {
       <div className="space-y-1 border-t border-line p-3">
         <SidebarLink item={SETTINGS} />
         <ThemeSwitch />
-        <a href="/petugas/" className="flex items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium hover:bg-idle-soft">
+        <a href={petugasPath("/")} className="flex items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium hover:bg-idle-soft">
           <ScanLine className="size-5 text-primary" /> Buka app petugas
         </a>
         <Button

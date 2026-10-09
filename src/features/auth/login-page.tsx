@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router";
 import { api, call, errorMessage } from "@/client/api";
-import { safeNext, useAuth } from "@/client/auth";
+import { loginNext, useAuth } from "@/client/auth";
 import { clearCache, queryClient } from "@/client/query";
 import { ErrorCard } from "@/components/query-state";
 import { Select } from "@/components/select";
@@ -21,7 +21,7 @@ function lastUser(): string {
 /** Layar masuk dengan nama + PIN (dipakai app petugas dan admin). */
 export function LoginPage({ title, homePath, setupPath }: { title: string; homePath: string; setupPath: string }) {
   const [params] = useSearchParams();
-  const next = safeNext(params.get("next"), homePath);
+  const next = loginNext(params.get("next"), homePath);
   const navigate = useNavigate();
   const auth = useAuth();
   const users = useQuery({ queryKey: ["auth", "users"], queryFn: () => call(api.auth.users.$get()) });
@@ -68,7 +68,7 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-10">
       <PageTitle title="Masuk" />
-      <p className="text-sm font-medium text-primary">Jimpitan</p>
+      <p className="text-sm font-medium text-primary">Cluster Natura</p>
       <h1 className="mt-1 text-3xl font-bold tracking-tight">{title}</h1>
       {users.isError ? (
         <div className="mt-6">

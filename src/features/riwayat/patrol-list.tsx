@@ -18,6 +18,7 @@ import {
 import { formatRupiah } from "@/lib/format";
 import { NightPicker } from "./night-picker";
 import { patrolsQuery } from "./queries";
+import { adminPath } from "@/lib/app-paths";
 
 type Patrol = {
   date: string;
@@ -64,7 +65,7 @@ function timeline(patrols: Patrol[], today: string) {
 export function PatrolList({ basePath }: { basePath: string }) {
   const query = useQuery(patrolsQuery);
   // Rekap bulanan dan pengisian catatan hanya ada di dashboard admin.
-  const isAdmin = basePath.startsWith("/admin");
+  const isAdmin = basePath === adminPath("/riwayat");
 
   return (
     <>
@@ -113,7 +114,7 @@ export function PatrolList({ basePath }: { basePath: string }) {
                   items={items}
                   basePath={basePath}
                   today={today}
-                  rekapPath={isAdmin ? `/admin/rekap?bulan=${month}` : null}
+                  rekapPath={isAdmin ? adminPath(`/rekap?bulan=${month}`) : null}
                 />
               ))}
             </div>

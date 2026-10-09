@@ -14,6 +14,7 @@ import { houseLabel } from "@/lib/houses";
 import { BILLING_LABEL, CADENCE_LABEL } from "@/lib/payments";
 import { housesQuery, paymentsQuery, PAYMENT_REFRESH } from "../queries";
 import { PaymentDialog, type AdminPayment } from "./payment-dialog";
+import { adminPath } from "@/lib/app-paths";
 
 const billColumns = "@2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)_8rem]";
 
@@ -57,7 +58,7 @@ export function PaymentPanel({ month }: { month: string }) {
               <div>
                 <h3 className="text-sm font-semibold">Status per rumah</h3>
                 {bills.some((b) => b.end < month + "-01") && <p className="mt-1 text-xs text-muted">Termasuk periode sebelumnya yang belum lunas.</p>}
-                {bills.length === 0 ? <p className="mt-3 rounded-xl bg-idle-soft/30 px-4 py-5 text-pretty text-sm text-muted">Belum ada kesepakatan mingguan atau bulanan. Atur cara bayar di <Link to="/admin/rumah" className="font-semibold text-primary underline underline-offset-2">Rumah & QR</Link>.</p> : (
+                {bills.length === 0 ? <p className="mt-3 rounded-xl bg-idle-soft/30 px-4 py-5 text-pretty text-sm text-muted">Belum ada kesepakatan mingguan atau bulanan. Atur cara bayar di <Link to={adminPath("/rumah")} className="font-semibold text-primary underline underline-offset-2">Rumah & QR</Link>.</p> : (
                   <div className="mt-3">
                     <div aria-hidden className={cx("hidden items-center gap-4 rounded-lg bg-idle-soft/40 px-3 py-2 text-xs font-medium text-muted @2xl:grid", billColumns)}>
                       <span>Rumah</span><span>Periode</span><span className="text-right">Terbayar / Total</span><span className="text-right">Status</span>

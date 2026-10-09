@@ -18,6 +18,7 @@ import { housesQuery, planAnchorsQuery, usersQuery } from "../queries";
 import { AddHouseDialog, EditHouseDialog, type AdminHouse } from "./house-dialog";
 import { PlanCalibration } from "./plan-calibration";
 import { RegisterPlanHouses } from "./register-plan-houses";
+import { adminPath } from "@/lib/app-paths";
 
 type Filter = "semua" | "dihuni" | "kosong" | "petugas" | "tanpa-nama";
 type View = "daftar" | "denah";
@@ -73,7 +74,7 @@ export function RumahPage() {
               action={
                 <div className="flex shrink-0 gap-2">
                   {houses.length > 0 && (
-                    <Link to="/admin/rumah/cetak" className={buttonClass("secondary", "sm")} title="Cetak QR">
+                    <Link to={adminPath("/rumah/cetak")} className={buttonClass("secondary", "sm")} title="Cetak QR">
                       <Printer className="size-4" /> <span className="max-sm:sr-only">Cetak QR</span>
                     </Link>
                   )}
@@ -105,7 +106,7 @@ export function RumahPage() {
             ) : calibrating ? (
               <>
                 <Link
-                  to="/admin/rumah?tampilan=denah"
+                  to={adminPath("/rumah?tampilan=denah")}
                   className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-fg"
                 >
                   <ArrowLeft className="size-4" /> Kembali ke denah rumah
@@ -203,7 +204,7 @@ function BlockSection({
           </span>
         </h2>
         <Link
-          to={`/admin/rumah/cetak?blok=${encodeURIComponent(block)}`}
+          to={adminPath(`/rumah/cetak?blok=${encodeURIComponent(block)}`)}
           className={cx(buttonClass("ghost", "sm"), "-mr-2")}
           title={`Cetak QR blok ${block}`}
         >
@@ -333,7 +334,7 @@ function LocationStatus() {
           </span>
         </span>
       </p>
-      <Link to="/admin/rumah?tampilan=denah&lokasi=1" onClick={() => window.scrollTo(0, 0)} className={buttonClass("secondary", "sm")}>
+      <Link to={adminPath("/rumah?tampilan=denah&lokasi=1")} onClick={() => window.scrollTo(0, 0)} className={buttonClass("secondary", "sm")}>
         Atur
       </Link>
     </div>

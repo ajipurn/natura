@@ -10,6 +10,7 @@ import { Card, cx } from "@/components/ui";
 import { formatTime, isIsoDate, rondaDate } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { auditQuery } from "../queries";
+import { adminPath } from "@/lib/app-paths";
 
 type Filter = "semua" | "scan" | "manual" | "koreksi" | "luar";
 
@@ -89,7 +90,7 @@ export function NightLog({ date }: { date: string }) {
                           "belum dicek"
                         )}
                       </span>
-                      <Link to={`/admin/riwayat/${data.date}`} className="text-xs font-semibold text-primary">
+                      <Link to={adminPath(`/riwayat/${data.date}`)} className="text-xs font-semibold text-primary">
                         Koreksi
                       </Link>
                     </li>
@@ -226,7 +227,7 @@ export function AuditRedirect() {
   const tonight = rondaDate(new Date());
   const tanggal = params.get("tanggal") ?? "";
   const date = isIsoDate(tanggal) && tanggal <= tonight ? tanggal : tonight;
-  return <Navigate to={`/admin/riwayat/${date}?tab=log`} replace />;
+  return <Navigate to={adminPath(`/riwayat/${date}?tab=log`)} replace />;
 }
 
 function StatusText({ status, amount, className }: { status: "filled" | "empty" | "none"; amount: number; className?: string }) {

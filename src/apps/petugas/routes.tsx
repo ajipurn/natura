@@ -8,13 +8,14 @@ import { AkunPage } from "./akun";
 import { PetugasLayout } from "./layout";
 import { JadwalPetugas } from "./jadwal";
 import { RondaPage } from "./ronda/ronda-page";
+import { adminPath, petugasPath } from "@/lib/app-paths";
 
 export const router = createBrowserRouter([
-  { path: "/petugas/masuk", element: <LoginPage title="Masuk petugas" homePath="/petugas" setupPath="/admin/setup" /> },
+  { path: petugasPath("/masuk"), element: <LoginPage title="Masuk petugas" homePath={petugasPath()} setupPath={adminPath("/setup")} /> },
   {
-    path: "/petugas",
+    path: petugasPath(),
     element: (
-      <RequireAuth loginPath="/petugas/masuk">
+      <RequireAuth loginPath={petugasPath("/masuk")}>
         {() => (
           <PetugasLayout>
             <Outlet />
@@ -24,11 +25,11 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <RondaPage /> },
-      { path: "riwayat", element: <PatrolList basePath="/petugas/riwayat" /> },
-      { path: "riwayat/:tanggal", element: <PatrolDetail basePath="/petugas/riwayat" canCorrect={false} /> },
+      { path: "riwayat", element: <PatrolList basePath={petugasPath("/riwayat")} /> },
+      { path: "riwayat/:tanggal", element: <PatrolDetail basePath={petugasPath("/riwayat")} canCorrect={false} /> },
       { path: "jadwal", element: <JadwalPetugas /> },
       { path: "akun", element: <AkunPage /> },
-      { path: "*", element: <NotFound home="/petugas" /> },
+      { path: "*", element: <NotFound home={petugasPath()} /> },
     ],
   },
 ]);

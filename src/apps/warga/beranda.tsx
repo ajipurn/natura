@@ -31,6 +31,7 @@ import { DAY_NAMES, NIGHT_OF, slotHouseLabel } from "@/lib/schedule";
 import type { CashPublic } from "@/server/kas";
 import { HouseStatus } from "./house-status";
 import { useMyHouse } from "./my-house";
+import { adminPath, petugasPath } from "@/lib/app-paths";
 
 const accessQuery = { queryKey: ["warga", "akses"], queryFn: () => call(api.warga.akses.$get()) };
 
@@ -48,7 +49,7 @@ export function BerandaPage() {
           )}
           <div className="min-w-0">
             <p className="text-sm font-medium text-primary">
-              Jimpitan{access.data?.communityName ? ` ${access.data.communityName}` : ""}
+              {access.data?.communityName || "Cluster Natura"}
             </p>
             <h1 className="text-3xl font-bold tracking-tight">Info warga</h1>
           </div>
@@ -86,11 +87,11 @@ function AppLinks() {
   const user = useAuth().data?.user;
   return (
     <>
-      <a href="/petugas/" className={buttonClass("secondary", "sm")}>
+      <a href={petugasPath("/")} className={buttonClass("secondary", "sm")}>
         <ScanLine className="size-4" aria-hidden /> App petugas
       </a>
       {user?.role === "admin" && (
-        <a href="/admin/" title={`Masuk sebagai ${user.name}`} className={buttonClass("secondary", "sm")}>
+        <a href={adminPath("/")} title={`Masuk sebagai ${user.name}`} className={buttonClass("secondary", "sm")}>
           <LayoutDashboard className="size-4" aria-hidden /> Dashboard
         </a>
       )}

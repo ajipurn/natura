@@ -16,6 +16,7 @@ import { randomPin } from "@/lib/random-pin";
 import { DAY_NAMES } from "@/lib/schedule";
 import type { Role } from "@/lib/types";
 import { housesQuery, usersQuery } from "../queries";
+import { adminPath, petugasPath } from "@/lib/app-paths";
 
 export type Petugas = {
   id: number;
@@ -139,7 +140,8 @@ function CreateForm({ onDone }: { onDone: () => void }) {
 /** Setelah petugas dibuat: PIN ditampilkan sekali untuk dibagikan. */
 function SharePin({ name, pin, onDone }: { name: string; pin: string; onDone: () => void }) {
   const [copied, setCopied] = useState(false);
-  const message = `Halo ${name}, akun petugas ronda jimpitan sudah dibuat.\nBuka ${location.origin}/petugas/ lalu pilih nama "${name}" dan masukkan PIN: ${pin}\nPIN bisa diganti sendiri di menu Akun.`;
+  const url = new URL(petugasPath("/"), location.origin).href;
+  const message = `Halo ${name}, akun petugas ronda sudah dibuat.\nBuka ${url} lalu pilih nama "${name}" dan masukkan PIN: ${pin}\nPIN bisa diganti sendiri di menu Akun.`;
   return (
     <div className="space-y-4 text-center">
       <KeyRound className="mx-auto size-10 text-primary" />
@@ -356,7 +358,7 @@ function GuardFields({
           <span className={cx(nights.length === 0 && "text-muted")}>
             {nights.length ? nights.map((d) => DAY_NAMES[d]).join(", ") : "Belum dijadwalkan"}
           </span>
-          <Link to="/admin/jadwal" className="font-semibold text-primary">
+          <Link to={adminPath("/jadwal")} className="font-semibold text-primary">
             Atur di Jadwal ronda
           </Link>
         </div>

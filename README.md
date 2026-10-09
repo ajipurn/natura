@@ -1,16 +1,21 @@
-# Jimpitan
+# Cluster Natura
 
-Aplikasi jimpitan ronda Cluster Natura. Setiap rumah punya stiker QR di dekat wadah jimpitan. Petugas ronda scan QR-nya, tekan **Ada** atau **Kosong**, dan rekapnya langsung tersusun.
+Sistem informasi dan layanan warga Cluster Natura. Saat ini mencakup jimpitan, ronda, kas, data rumah, pengumuman, dan kontak pengurus. Fitur berikutnya dikembangkan bertahap memakai data rumah dan akun yang sama.
 
-Satu aplikasi, tiga bagian:
+Untuk jimpitan, setiap rumah punya stiker QR di dekat wadahnya. Petugas ronda scan QR-nya, tekan **Ada** atau **Kosong**, dan rekapnya langsung tersusun.
 
-| Alamat | Untuk | Isi |
-| --- | --- | --- |
-| `/petugas/` | Petugas ronda (HP) | Scan QR, catat manual, denah 2D/3D, jaga malam ini, riwayat, jadwal. Tetap jalan tanpa sinyal. |
-| `/admin/` | Pengurus (laptop/HP) | Ringkasan, peta ronda, riwayat & koreksi (dengan log catatan), rekap bulanan, kas, jadwal, petugas, data rumah & cetak QR, info warga, pengaturan. |
-| `/` | Warga | Pengumuman, jaga malam ini & jadwal seminggu, rekap jimpitan per bulan, status per rumah, kas, kontak pengurus. Dibuka dengan **kode warga**. |
+Satu project dan database, empat pintu masuk:
 
-Stiker QR berisi alamat `/r/<kode>`: dibuka pakai kamera HP biasa, warga melihat riwayat jimpitan rumah itu, dan petugas yang sudah masuk bisa langsung mencatat.
+| Alamat production | Alamat dev/preview | Untuk | Isi |
+| --- | --- | --- | --- |
+| `app.clusternatura.com` | `/petugas/` | Petugas ronda (HP) | Scan QR, catat manual, denah 2D/3D, jaga malam ini, riwayat, jadwal. Tetap jalan tanpa sinyal. |
+| `dashboard.clusternatura.com` | `/admin/` | Pengurus (laptop/HP) | Ringkasan, peta ronda, riwayat & koreksi (dengan log catatan), rekap bulanan, kas, jadwal, petugas, data rumah & cetak QR, info warga, pengaturan. |
+| `info.clusternatura.com` | `/` | Warga | Pengumuman, jaga malam ini & jadwal seminggu, rekap jimpitan per bulan, status per rumah, kas, kontak pengurus. Dibuka dengan **kode warga**. |
+| `clusternatura.com` | `/landing/` | Pengunjung | Halaman sementara **Under maintenance** dengan tautan ke layanan yang tersedia. |
+
+Di subdomain, setiap app dimulai di `/`: misalnya `dashboard.clusternatura.com/rekap` dan `app.clusternatura.com/jadwal`. Sesi login berlaku di subdomain Natura yang sama; API tetap di `/api/*` pada masing-masing host dan memeriksa peran akun. Dev/preview dan domain Vercel memakai alamat lama agar tetap bisa dicoba tanpa DNS khusus.
+
+Stiker QR berisi alamat `https://info.clusternatura.com/r/<kode>`: dibuka pakai kamera HP biasa, warga melihat riwayat jimpitan rumah itu, dan petugas yang sudah masuk bisa langsung mencatat. QR lama yang memakai domain Vercel tetap bisa dibuka; login di domain berbeda tidak ikut berpindah.
 
 ## Fitur
 
@@ -103,7 +108,7 @@ Untuk mencoba scan dari HP di jaringan yang sama, kamera butuh HTTPS. Pakai tunn
 
 ## Deploy ke Vercel + Supabase
 
-Ketiga app (hasil build Vite) dilayani sebagai file statis, API di `/api/*` berjalan sebagai satu Vercel Function (Node), dan datanya di Postgres Supabase. `bun run build` menyusun semuanya di `.vercel/output` (Build Output API); `vercel.json` membuat Vercel memakai Bun dan perintah build itu.
+Keempat bagian (hasil build Vite) dilayani sebagai file statis, API di `/api/*` berjalan sebagai satu Vercel Function (Node), dan datanya di Postgres Supabase. `bun run build` menyusun semuanya di `.vercel/output` (Build Output API); `vercel.json` membuat Vercel memakai Bun dan perintah build itu. Routing host ada di `scripts/app-routing.ts`, dipakai juga oleh dev/preview.
 
 1. **Supabase:** buat project (mis. region Singapore, `ap-southeast-1`) atau pakai yang sudah ada. Di **Connect** ada dua connection string:
    - **Transaction pooler** (port 6543) untuk aplikasi di Vercel,
@@ -116,12 +121,21 @@ Ketiga app (hasil build Vite) dilayani sebagai file statis, API di `/api/*` berj
 3. **Vercel:** import repo ini (Framework Preset: Other; sisanya diatur `vercel.json`). Di **Settings → Environment Variables** isi:
    - `DATABASE_URL`: Transaction pooler dari Supabase,
    - `AUTH_SECRET`: kunci acak minimal 32 karakter (`openssl rand -base64 32`),
-   - `APP_URL` (opsional): alamat tetap aplikasi. Kosong = domain production Vercel.
+   - `APP_URL`: `https://info.clusternatura.com`, untuk QR rumah, link kode warga, dan ekspor. Saat domain Natura dipakai, link publik otomatis menuju Info warga walaupun dibuka dari dashboard.
 4. Deploy (push ke `main`, atau `bunx vercel --prod`). Function otomatis berjalan di region Vercel yang terdekat dengan database, dibaca dari alamat pooler di `DATABASE_URL` (mis. `ap-south-1` → `bom1` Mumbai; kalau tidak terbaca: `sin1`). Bisa dipaksa lewat environment variable `FUNCTION_REGION`.
 5. Buka `/admin/setup` di alamat production untuk membuat admin, lalu isi data awal dari komputer: `bun run seed:remote`.
 6. Pastikan alamat production sudah final (isi `APP_URL` kalau pakai domain sendiri, lalu deploy ulang), baru cetak stiker QR.
 
 Paket gratis Vercel (Hobby) dan Supabase cukup untuk satu perumahan. Project Supabase gratis di-pause kalau 7 hari tidak dipakai; karena app dipakai tiap malam, ini tidak terjadi.
+
+### Domain Cluster Natura di Cloudflare
+
+1. Tambahkan `clusternatura.com`, `app.clusternatura.com`, `dashboard.clusternatura.com`, dan `info.clusternatura.com` di **Vercel → project natura → Settings → Domains**, semuanya ke environment Production project yang sama. Domain utama memakai landing, bukan redirect ke subdomain. Jika menambahkan `www.clusternatura.com`, arahkan ke domain utama.
+2. Di **Cloudflare → clusternatura.com → DNS → Records**, gunakan nilai yang ditampilkan Vercel untuk project ini. Untuk Cloudflare, Vercel meminta record **CNAME** dengan nama `@`, `app`, `dashboard`, dan `info`, dengan **Proxy disabled / DNS only**; Cloudflare melakukan flattening untuk CNAME di domain utama. Nama dan target harus sama dengan petunjuk Vercel. Record email memakai nilainya sendiri.
+3. Setelah Vercel menunjukkan konfigurasi valid dan sertifikat siap, deploy hasil build baru. Periksa halaman utama, masuk petugas, dashboard, Info warga, QR rumah, dan pemasangan PWA. App petugas perlu dibuka sekali saat online di alamat baru agar bisa dipakai offline.
+4. Sebelum pindah dari domain Vercel, kirim semua antrean catatan offline dari alamat lama. Penyimpanan HP dan pemasangan PWA terikat ke origin; salinannya tidak otomatis pindah ke subdomain baru. Akun, PIN, jadwal, dan riwayat di database tetap sama. Petugas cukup masuk lagi dan memasang app dari alamat baru.
+
+Rujukan konfigurasi DNS: [Vercel — Adding & Configuring a Custom Domain](https://vercel.com/docs/domains/working-with-domains/add-a-domain).
 
 ### Membuka database di DBeaver
 

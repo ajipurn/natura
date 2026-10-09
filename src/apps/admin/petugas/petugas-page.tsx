@@ -12,6 +12,7 @@ import { compareHouses } from "@/lib/houses";
 import { DAY_NAMES, DAY_SHORT, dayLabel, scheduleDay } from "@/lib/schedule";
 import { usersQuery } from "../queries";
 import { PetugasDialog, type Petugas } from "./petugas-dialog";
+import { adminPath } from "@/lib/app-paths";
 
 type Filter = "semua" | "admin" | "tanpa-jadwal" | "terkunci" | "nonaktif";
 
@@ -147,7 +148,7 @@ function NightSummary({
         <h2 id="jaga-per-malam" className="text-sm font-semibold">
           Jaga per malam <span className="font-normal text-muted">· malam ini {DAY_NAMES[tonight]}</span>
         </h2>
-        <Link to="/admin/jadwal" className="flex items-center gap-1 text-sm font-semibold text-primary">
+        <Link to={adminPath("/jadwal")} className="flex items-center gap-1 text-sm font-semibold text-primary">
           <CalendarDays className="size-4" /> Jadwal ronda
         </Link>
       </div>

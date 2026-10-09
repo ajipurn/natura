@@ -60,6 +60,7 @@ import type { MonthCell, MonthRecap } from "@/lib/types";
 import { recapQuery } from "./queries";
 import { SheetsLinkDialog } from "./sheets-link";
 import { PaymentPanel } from "./payments/payment-panel";
+import { adminPath } from "@/lib/app-paths";
 
 type Filter = "semua" | "kosong" | "tidak-dicek";
 type RecapData = MonthRecap & { month: string; defaultAmount: number };
@@ -203,7 +204,7 @@ export function RekapPage() {
         className="mb-4 inline-flex items-center rounded-xl border border-line bg-card p-0.5"
       >
         <Link
-          to={`/admin/rekap?bulan=${shiftMonth(month, -1)}`}
+          to={adminPath(`/rekap?bulan=${shiftMonth(month, -1)}`)}
           className={buttonClass("ghost", "icon-sm")}
           aria-label={`Bulan sebelumnya (${formatMonth(shiftMonth(month, -1))})`}
         >
@@ -214,7 +215,7 @@ export function RekapPage() {
         </span>
         {month < shiftMonth(thisMonth, 12) ? (
           <Link
-            to={`/admin/rekap?bulan=${shiftMonth(month, 1)}`}
+            to={adminPath(`/rekap?bulan=${shiftMonth(month, 1)}`)}
             className={buttonClass("ghost", "icon-sm")}
             aria-label={`Bulan berikutnya (${formatMonth(shiftMonth(month, 1))})`}
           >
@@ -973,7 +974,7 @@ function RecapBody({
                               </span>
                             ) : (
                               <Link
-                                to={`/admin/riwayat/${d}`}
+                                to={adminPath(`/riwayat/${d}`)}
                                 title={`Buka riwayat ${formatDateShort(d)}${patrolDates.has(d) ? "" : " (belum ada catatan)"}`}
                                 aria-label={`Buka riwayat ${formatDateShort(d)}`}
                                 className={cx(

@@ -17,16 +17,17 @@ import { RingkasanPage } from "./ringkasan-page";
 import { CetakPage } from "./rumah/cetak";
 import { RumahPage } from "./rumah/rumah-page";
 import { SetupPage } from "./setup";
+import { adminPath } from "@/lib/app-paths";
 
 const NIGHT_LOG = { Alerts: NightLogAlerts, Log: NightLog };
 
 export const router = createBrowserRouter([
-  { path: "/admin/masuk", element: <LoginPage title="Masuk admin" homePath="/admin" setupPath="/admin/setup" /> },
-  { path: "/admin/setup", element: <SetupPage /> },
+  { path: adminPath("/masuk"), element: <LoginPage title="Masuk admin" homePath={adminPath()} setupPath={adminPath("/setup")} /> },
+  { path: adminPath("/setup"), element: <SetupPage /> },
   {
-    path: "/admin",
+    path: adminPath(),
     element: (
-      <RequireAuth loginPath="/admin/masuk" adminOnly>
+      <RequireAuth loginPath={adminPath("/masuk")} adminOnly>
         {(user) => (
           <AdminLayout user={user}>
             <Outlet />
@@ -36,8 +37,8 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <RingkasanPage /> },
-      { path: "riwayat", element: <PatrolList basePath="/admin/riwayat" /> },
-      { path: "riwayat/:tanggal", element: <PatrolDetail basePath="/admin/riwayat" canCorrect log={NIGHT_LOG} /> },
+      { path: "riwayat", element: <PatrolList basePath={adminPath("/riwayat")} /> },
+      { path: "riwayat/:tanggal", element: <PatrolDetail basePath={adminPath("/riwayat")} canCorrect log={NIGHT_LOG} /> },
       // Audit catatan sekarang tab "Log catatan" di detail malam Riwayat.
       { path: "audit", element: <AuditRedirect /> },
       { path: "rekap", element: <RekapPage /> },
@@ -49,7 +50,7 @@ export const router = createBrowserRouter([
       { path: "petugas", element: <PetugasPage /> },
       { path: "info", element: <InfoPage /> },
       { path: "pengaturan", element: <PengaturanPage /> },
-      { path: "*", element: <NotFound home="/admin" /> },
+      { path: "*", element: <NotFound home={adminPath()} /> },
     ],
   },
 ]);

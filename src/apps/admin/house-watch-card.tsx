@@ -9,6 +9,7 @@ import { Button, Card, buttonClass, cx } from "@/components/ui";
 import { formatDateShort, formatMonth } from "@/lib/dates";
 import type { HouseWatch } from "@/lib/house-watch";
 import { recapQuery } from "./queries";
+import { adminPath } from "@/lib/app-paths";
 
 export function HouseWatchCard({ houses, month, today }: { houses: HouseWatch[]; month: string; today: string }) {
   const [selected, setSelected] = useState<HouseWatch | null>(null);
@@ -59,14 +60,14 @@ export function HouseWatchCard({ houses, month, today }: { houses: HouseWatch[];
             <p className="mt-2 text-[11px] text-muted">Pola hingga 7 malam, berakhir saat pemeriksaan terakhir. Kotak putus-putus: belum dicek.</p>
           </>
         )}
-        <Link to={`/admin/rekap?bulan=${month}`} className="mt-3 inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-primary hover:underline">Lihat semua rumah <ChevronRight className="size-4" aria-hidden /></Link>
+        <Link to={adminPath(`/rekap?bulan=${month}`)} className="mt-3 inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-primary hover:underline">Lihat semua rumah <ChevronRight className="size-4" aria-hidden /></Link>
       </Card>
       <Dialog
         open={selected !== null}
         onClose={() => setSelected(null)}
         title={`Rumah ${selected?.label ?? ""}`}
         description={selected?.ownerName ?? "Kalender jimpitan harian"}
-        footer={selected && <Link to={`/admin/rekap?bulan=${month}&cari=${encodeURIComponent(selected.label)}`} className={buttonClass("secondary", "sm")}>Rekap rumah <ChevronRight className="size-4" aria-hidden /></Link>}
+        footer={selected && <Link to={adminPath(`/rekap?bulan=${month}&cari=${encodeURIComponent(selected.label)}`)} className={buttonClass("secondary", "sm")}>Rekap rumah <ChevronRight className="size-4" aria-hidden /></Link>}
       >
         {selected && <WatchCalendar houseId={selected.id} month={month} today={today} />}
       </Dialog>

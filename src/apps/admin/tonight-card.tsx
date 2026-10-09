@@ -2,6 +2,7 @@ import { ChevronRight, House, ScanLine } from "lucide-react";
 import { Link } from "react-router";
 import { Card, cx } from "@/components/ui";
 import type { Dashboard } from "@/server/dashboard";
+import { adminPath } from "@/lib/app-paths";
 
 /** Status rumah mencakup pembayaran otomatis; progres pemeriksaan hanya untuk rumah harian. */
 export function TonightCard({ tonight: t, date }: { tonight: Dashboard["tonight"]; date: string }) {
@@ -11,7 +12,7 @@ export function TonightCard({ tonight: t, date }: { tonight: Dashboard["tonight"
       <Card className="h-full">
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-semibold">Ronda malam ini</h2>
-          <Link to={`/admin/riwayat/${date}`} className="inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-primary hover:underline">
+          <Link to={adminPath(`/riwayat/${date}`)} className="inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-primary hover:underline">
             Detail <ChevronRight className="size-4" aria-hidden />
           </Link>
         </div>

@@ -36,6 +36,7 @@ import { HouseSearch } from "./house-search";
 import { HouseSheet } from "./house-sheet";
 import { TonightGuards } from "./tonight-guards";
 import { useRondaStore, type MergedCollection, type SyncStatus } from "./use-ronda-store";
+import { adminPath, petugasPath } from "@/lib/app-paths";
 
 type Toast = { text: string; tone: "ok" | "error" };
 type View = "list" | "map" | "3d";
@@ -280,7 +281,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                 {isAdmin && (
                   <p className="mt-1 text-xs">Koreksi catatan tersedia di Riwayat pada dashboard admin.</p>
                 )}
-                <Link to="/petugas/jadwal" className="mt-2 inline-block font-semibold underline">
+                <Link to={petugasPath("/jadwal")} className="mt-2 inline-block font-semibold underline">
                   Lihat jadwal atau minta ubah jadwal
                 </Link>
               </div>
@@ -316,7 +317,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
             <p className="font-semibold">Belum ada data rumah</p>
             <p className="mt-1 text-sm text-muted">Admin perlu menambahkan rumah dan mencetak QR-nya dulu.</p>
             {isAdmin && (
-              <a href="/admin/rumah" className={cx(buttonClass("primary"), "mt-4")}>
+              <a href={adminPath("/rumah")} className={cx(buttonClass("primary"), "mt-4")}>
                 Tambah rumah
               </a>
             )}
@@ -358,7 +359,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                   <p className="mt-2 font-semibold">Rumah belum terdaftar</p>
                   <p className="mt-1 text-sm text-muted">Admin perlu mendaftarkan rumah dari denah dulu.</p>
                   {isAdmin && (
-                    <a href="/admin/rumah?tampilan=denah" className={cx(buttonClass("primary"), "mt-4")}>
+                    <a href={adminPath("/rumah?tampilan=denah")} className={cx(buttonClass("primary"), "mt-4")}>
                       Buka Rumah & QR di admin
                     </a>
                   )}
@@ -375,7 +376,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                       anchors={snapshot.planAnchors ?? []}
                       calibrateHint={
                         isAdmin ? (
-                          <a href="/admin/rumah?tampilan=denah&lokasi=1" className="font-semibold underline">
+                          <a href={adminPath("/rumah?tampilan=denah&lokasi=1")} className="font-semibold underline">
                             Atur di Admin → Rumah & QR
                           </a>
                         ) : (
@@ -578,7 +579,7 @@ function StatusNotice({ status }: { status: SyncStatus }) {
       <div>
         <p className="font-semibold">Sesi login habis</p>
         <p>Catatan tetap aman di HP ini dan akan terkirim setelah kamu masuk lagi.</p>
-        <Link to="/petugas/masuk?next=/petugas" className="mt-2 inline-flex items-center gap-1 font-semibold underline">
+        <Link to={petugasPath("/masuk?next=/petugas")} className="mt-2 inline-flex items-center gap-1 font-semibold underline">
           <LogIn className="size-4" /> Masuk lagi
         </Link>
       </div>

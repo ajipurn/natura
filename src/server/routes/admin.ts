@@ -2,6 +2,7 @@ import { and, asc, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { z } from "zod";
+import { appSurface, wargaOrigin } from "@/lib/app-paths";
 import { isIsoDate, localDate, rondaDate } from "@/lib/dates";
 import { normalizeHouseField, parseNumberList } from "@/lib/houses";
 import { newToken } from "@/lib/qr";
@@ -123,7 +124,8 @@ const MAX_SCHEDULE_ENTRIES = 1000;
 /** Alamat publik aplikasi untuk QR. Set APP_URL supaya QR tidak bergantung pada alamat yang dipakai admin. */
 function appOrigin(c: { env: AppEnv["Bindings"]; req: { url: string } }) {
   const fromEnv = c.env.APP_URL?.trim();
-  return fromEnv ? { origin: fromEnv.replace(/\/+$/, ""), fromEnv: true } : { origin: new URL(c.req.url).origin, fromEnv: false };
+  const request = new URL(c.req.url);
+  return { origin: wargaOrigin(appSurface(request.hostname) ? request.origin : fromEnv || request.origin), fromEnv: Boolean(fromEnv) };
 }
 
 /** Kode warga: huruf/angka yang mudah dibaca, tanpa 0/O dan 1/I/L. */

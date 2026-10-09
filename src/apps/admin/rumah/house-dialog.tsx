@@ -14,6 +14,7 @@ import type { PaymentCadence } from "@/lib/payments";
 import type { HouseDTO, HouseStatus } from "@/lib/types";
 import { HOUSE_REFRESH } from "../queries";
 import { PaymentPlanSection } from "../payments/plan-section";
+import { adminPath } from "@/lib/app-paths";
 
 export type AdminHouse = HouseDTO & { collectionCount: number; paymentCount: number; paymentCadence: PaymentCadence };
 
@@ -220,7 +221,7 @@ function EditForm({ house, accounts, origin, onDone }: { house: AdminHouse; acco
             </div>
             <p className="mt-1.5 text-xs text-muted">
               Nama dari akun petugas; ubah di{" "}
-              <Link to="/admin/petugas" className="font-semibold text-primary underline">
+              <Link to={adminPath("/petugas")} className="font-semibold text-primary underline">
                 Petugas
               </Link>
               .
@@ -283,7 +284,7 @@ function QrSection({ house, origin }: { house: AdminHouse; origin: string }) {
             <a href={url} target="_blank" rel="noopener" className={buttonClass("secondary", "sm")}>
               <ExternalLink className="size-4" /> Buka
             </a>
-            <Link to={`/admin/rumah/cetak?blok=${encodeURIComponent(house.block)}`} className={buttonClass("secondary", "sm")}>
+            <Link to={adminPath(`/rumah/cetak?blok=${encodeURIComponent(house.block)}`)} className={buttonClass("secondary", "sm")}>
               <Printer className="size-4" /> Cetak
             </Link>
             <Button

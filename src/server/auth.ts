@@ -4,6 +4,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { createMiddleware } from "hono/factory";
 import { jwtVerify, SignJWT } from "jose";
 import type { Role } from "@/lib/types";
+import { COMMUNITY_DOMAIN, appSurface } from "@/lib/app-paths";
 import type { AppEnv } from "./env";
 import { settings, users } from "./schema";
 
@@ -54,6 +55,8 @@ function cookieOptions(c: Ctx, days: number) {
     secure: !isDev(c),
     sameSite: "Lax" as const,
     path: "/",
+    // Satu sesi untuk app petugas, dashboard, dan info; preview/dev tetap host-only.
+    domain: appSurface(new URL(c.req.url).hostname) ? COMMUNITY_DOMAIN : undefined,
     maxAge: days * DAY_SECONDS,
   };
 }
@@ -64,7 +67,14 @@ export async function startSession(c: Ctx, user: { id: number; sessionVersion: n
 }
 
 export function endSession(c: Ctx) {
-  deleteCookie(c, SESSION_COOKIE, { path: "/" });
+  endCookie(c, SESSION_COOKIE);
+}
+
+function endCookie(c: Ctx, name: string) {
+  const { path, domain, secure, httpOnly, sameSite } = cookieOptions(c, 0);
+  deleteCookie(c, name, { path, domain, secure, httpOnly, sameSite });
+  // Hapus juga cookie host-only dari versi sebelum memakai subdomain.
+  if (domain) deleteCookie(c, name, { path, secure, httpOnly, sameSite });
 }
 
 type Session = { user: SessionUser; sessionVersion: number; issuedAt: number };
@@ -127,7 +137,7 @@ export async function startWargaAccess(c: Ctx, codeVersion: number) {
 }
 
 export function endWargaAccess(c: Ctx) {
-  deleteCookie(c, WARGA_COOKIE, { path: "/" });
+  endCookie(c, WARGA_COOKIE);
 }
 
 /** Warga dengan kode yang masih berlaku, atau petugas/admin yang sedang login. */

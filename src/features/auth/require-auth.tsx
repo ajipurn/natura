@@ -6,6 +6,7 @@ import { useAuth } from "@/client/auth";
 import type { SessionUser } from "@/server/auth";
 import { ErrorCard, LoadingCards } from "@/components/query-state";
 import { Card, buttonClass, cx } from "@/components/ui";
+import { adminPath, petugasPath } from "@/lib/app-paths";
 
 /**
  * Halaman yang perlu login. Belum login → layar masuk (lalu kembali ke sini);
@@ -29,13 +30,13 @@ export function RequireAuth({
   }
   if (auth.data.setupNeeded) {
     return adminOnly ? (
-      <Navigate to="/admin/setup" replace />
+      <Navigate to={adminPath("/setup")} replace />
     ) : (
       <Centered>
         <Card className="text-center">
           <p className="font-semibold">Aplikasi belum disiapkan</p>
           <p className="mt-1 text-sm text-muted">Admin perlu menyiapkan aplikasi dulu.</p>
-          <a href="/admin/setup" className={cx(buttonClass("primary"), "mt-4")}>
+          <a href={adminPath("/setup")} className={cx(buttonClass("primary"), "mt-4")}>
             Siapkan sebagai admin
           </a>
         </Card>
@@ -54,7 +55,7 @@ export function RequireAuth({
           <ShieldAlert className="mx-auto size-10 text-warn" />
           <p className="mt-2 font-semibold">Khusus admin</p>
           <p className="mt-1 text-sm text-muted">Akun {user.name} adalah petugas ronda.</p>
-          <a href="/petugas/" className={cx(buttonClass("primary"), "mt-4")}>
+          <a href={petugasPath("/")} className={cx(buttonClass("primary"), "mt-4")}>
             Buka app petugas
           </a>
         </Card>

@@ -13,6 +13,7 @@ import { monthStats, type HouseMonthStats } from "@/lib/month-stats";
 import { SITE_PLAN } from "@/site-plan";
 import { recapQuery } from "../queries";
 import { HouseChips, HousePanel, MapWithPanel } from "./house-panel";
+import { adminPath } from "@/lib/app-paths";
 
 /**
  * Seberapa sering status kosong, dari malam yang tercatat. Satu warna (merah "kosong"), makin pekat
@@ -50,7 +51,7 @@ export function MonthMap() {
   const month = isMonth(bulan) ? bulan : current;
   const query = useQuery({ ...recapQuery(month), placeholderData: (previous) => previous });
   const [selected, setSelected] = useState<number | null>(null);
-  const link = (m: string) => `/admin/denah?mode=bulan&bulan=${m}`;
+  const link = (m: string) => adminPath(`/denah?mode=bulan&bulan=${m}`);
 
   return (
     <>

@@ -1,6 +1,7 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import type { SessionUser } from "@/server/auth";
 import { api, call } from "./api";
+import { appPath, appSurface, wargaPath } from "@/lib/app-paths";
 
 export type AuthStatus = { setupNeeded: boolean; user: SessionUser | null };
 
@@ -44,4 +45,14 @@ export function useAuth() {
 export function safeNext(value: string | null | undefined, fallback: string): string {
   if (!value || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return fallback;
   return value;
+}
+
+/** Tautan login lama tetap bisa dipakai; hanya bagian milik Natura yang boleh dituju antarhost. */
+export function loginNext(value: string | null | undefined, fallback: string, hostname = typeof location === "undefined" ? "" : location.hostname): string {
+  const next = safeNext(value, fallback);
+  if (next.startsWith("/r/")) return wargaPath(next, hostname);
+  const legacy = next.match(/^\/(petugas|admin)(?=\/|[?#]|$)/);
+  if (appSurface(hostname) === "admin" && legacy?.[1] === "petugas") return next;
+  if (legacy) return appPath(legacy[1] as "petugas" | "admin", next.slice(legacy[0].length), hostname);
+  return next;
 }

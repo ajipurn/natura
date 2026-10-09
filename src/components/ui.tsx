@@ -132,5 +132,5 @@ export function SectionTitle({ children }: { children: ReactNode }) {
 
 /** Judul tab browser (React memindahkan <title> ke <head>). */
 export function PageTitle({ title }: { title: string }) {
-  return <title>{`${title} · Jimpitan`}</title>;
+  return <title>{`${title} · Cluster Natura`}</title>;
 }

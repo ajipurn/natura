@@ -1,9 +1,10 @@
 // Service worker Jimpitan: app petugas tetap bisa dibuka walau sinyal hilang.
 // Data catatan disimpan di HP (localStorage) oleh layar Ronda dan dikirim saat online.
 
-const CACHE = "jimpitan-v4";
-/** Kerangka app petugas (SPA): semua alamat /petugas/* memakai halaman ini. */
-const SHELL = "/petugas/";
+const CACHE = "jimpitan-v5";
+const APP_DOMAIN = self.location.hostname === "app.clusternatura.com";
+/** Kerangka app petugas: / di subdomain, /petugas/ di alamat dev/preview lama. */
+const SHELL = APP_DOMAIN ? "/" : "/petugas/";
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener("install", (event) => {
@@ -34,7 +35,9 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
-    const inPetugas = url.pathname === "/petugas" || url.pathname.startsWith("/petugas/");
+    const inPetugas = APP_DOMAIN
+      ? !/^\/(?:r|admin|api)(?:\/|$)/.test(url.pathname) && !/\.[a-z0-9]+$/i.test(url.pathname)
+      : url.pathname === "/petugas" || url.pathname.startsWith("/petugas/");
     event.respondWith(inPetugas ? networkFirstShell(request) : fetch(request).catch(() => offlineResponse()));
   }
 });
@@ -93,7 +96,7 @@ function offlineResponse() {
     "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'><title>Offline</title>" +
       "<body style='font-family:system-ui;padding:24px;line-height:1.5'><h1>Sedang offline</h1>" +
       "<p>Halaman ini butuh internet. App petugas tetap bisa dipakai offline kalau sudah pernah dibuka saat ada sinyal.</p>" +
-      "<p><a href='/petugas/'>Buka app petugas</a></p></body>",
+      `<p><a href='${SHELL}'>Buka app petugas</a></p></body>`,
     { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } },
   );
 }

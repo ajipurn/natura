@@ -11,6 +11,7 @@ import { myRequestsQuery, scheduleQuery } from "@/features/jadwal/queries";
 import { REQUEST_STATUS, requestChange } from "@/lib/request-text";
 import { DAY_NAMES, dayLabel, slotHouseLabel } from "@/lib/schedule";
 import { SwapRequestForm } from "./swap-request-form";
+import { adminPath } from "@/lib/app-paths";
 
 /** Malam jaga petugas yang sedang masuk, plus permintaan ubah jadwal ke admin. */
 export function MySchedule() {
@@ -72,7 +73,7 @@ export function MySchedule() {
           )}
         </div>
       ) : user.role === "admin" ? (
-        <a href="/admin/jadwal" className={cx(buttonClass("secondary", "sm"), "min-h-11 h-auto w-full py-2")}>
+        <a href={adminPath("/jadwal")} className={cx(buttonClass("secondary", "sm"), "min-h-11 h-auto w-full py-2")}>
           <LayoutDashboard className="size-4 shrink-0" aria-hidden /> Ubah jadwal jaga
         </a>
       ) : (

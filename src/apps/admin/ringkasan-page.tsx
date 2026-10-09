@@ -24,6 +24,7 @@ import { dayLabel, scheduleDay } from "@/lib/schedule";
 import { dashboardQuery } from "./queries";
 import { TonightCard } from "./tonight-card";
 import { HouseWatchCard } from "./house-watch-card";
+import { adminPath } from "@/lib/app-paths";
 
 export function RingkasanPage() {
   const query = useQuery(dashboardQuery);
@@ -70,17 +71,17 @@ export function RingkasanPage() {
                 label="Saldo kas"
                 value={formatRupiah(d.cash.balance)}
                 hint={d.cash.undeposited ? `${d.cash.undeposited} malam belum disetor` : "Semua malam sudah disetor"}
-                to="/admin/kas"
+                to={adminPath("/kas")}
               />
             </div>
 
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Link to="/admin/rekap" className="flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-3 transition-colors hover:border-primary/40">
+              <Link to={adminPath("/rekap")} className="flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-3 transition-colors hover:border-primary/40">
                 <Wallet className="size-5 shrink-0 text-primary" aria-hidden />
                 <div className="min-w-0 flex-1"><p className="text-xs text-muted">Pembayaran periode diterima hari ini</p><p className="mt-0.5 text-sm font-semibold tabular-nums">{formatRupiah(d.paymentOverview.receivedToday)}</p></div>
                 <ChevronRight className="size-4 text-muted" aria-hidden />
               </Link>
-              <Link to="/admin/rekap" className="flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-3 transition-colors hover:border-primary/40">
+              <Link to={adminPath("/rekap")} className="flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-3 transition-colors hover:border-primary/40">
                 <CalendarClock className="size-5 shrink-0 text-primary" aria-hidden />
                 <div className="min-w-0 flex-1"><p className="text-xs text-muted">Belum bayar periode berjalan</p><p className="mt-0.5 text-sm font-semibold tabular-nums">{d.paymentOverview.unpaidHouses} rumah · {formatRupiah(d.paymentOverview.unpaidAmount)}</p></div>
                 <ChevronRight className="size-4 text-muted" aria-hidden />
@@ -161,23 +162,23 @@ function todoItems(
   const items: { to: string; text: string; icon: LucideIcon }[] = [];
   if (todo.offDuty > 0) {
     items.push({
-      to: `/admin/riwayat/${date}?tab=log`,
+      to: adminPath(`/riwayat/${date}?tab=log`),
       icon: ShieldAlert,
       text: `${todo.offDuty} catatan malam ini oleh petugas yang tidak dijadwalkan`,
     });
   }
   if (todo.undeposited > 0) {
-    items.push({ to: "/admin/kas", icon: Wallet, text: `${todo.undeposited} malam belum dicatat setorannya ke bendahara` });
+    items.push({ to: adminPath("/kas"), icon: Wallet, text: `${todo.undeposited} malam belum dicatat setorannya ke bendahara` });
   }
   if (todo.pendingRequests > 0) {
-    items.push({ to: "/admin/jadwal", icon: CalendarClock, text: `${todo.pendingRequests} permintaan ubah jadwal menunggu keputusan` });
+    items.push({ to: adminPath("/jadwal"), icon: CalendarClock, text: `${todo.pendingRequests} permintaan ubah jadwal menunggu keputusan` });
   }
   if (todo.planMissing > 0) {
-    items.push({ to: "/admin/rumah?tampilan=denah", icon: MapIcon, text: `Daftarkan ${todo.planMissing} rumah dari denah` });
+    items.push({ to: adminPath("/rumah?tampilan=denah"), icon: MapIcon, text: `Daftarkan ${todo.planMissing} rumah dari denah` });
   }
-  if (todo.onlyOneUser) items.push({ to: "/admin/petugas", icon: Users, text: "Tambahkan petugas ronda" });
-  if (todo.noSchedule) items.push({ to: "/admin/jadwal", icon: CalendarDays, text: "Impor jadwal ronda" });
-  if (todo.noWargaCode) items.push({ to: "/admin/info", icon: KeyRound, text: "Buka halaman warga (buat kode warga)" });
+  if (todo.onlyOneUser) items.push({ to: adminPath("/petugas"), icon: Users, text: "Tambahkan petugas ronda" });
+  if (todo.noSchedule) items.push({ to: adminPath("/jadwal"), icon: CalendarDays, text: "Impor jadwal ronda" });
+  if (todo.noWargaCode) items.push({ to: adminPath("/info"), icon: KeyRound, text: "Buka halaman warga (buat kode warga)" });
   return items;
 }
 

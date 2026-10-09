@@ -4,6 +4,7 @@ import { api, call } from "@/client/api";
 import { invalidate } from "@/client/query";
 import { Alert, Button, cx } from "@/components/ui";
 import { formatRupiah } from "@/lib/format";
+import { petugasPath } from "@/lib/app-paths";
 
 export function QuickRecord({
   token,
@@ -59,7 +60,7 @@ export function QuickRecord({
       {record.isError && <Alert>{record.error.message}</Alert>}
       <p className="text-center text-xs text-muted">
         Nominal lain atau scan banyak rumah lebih cepat lewat{" "}
-        <a href="/petugas/" className="font-semibold underline">
+        <a href={petugasPath("/")} className="font-semibold underline">
           app petugas
         </a>{" "}
         → Scan QR.

@@ -6,6 +6,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { defineConfig, loadEnv, type Connect, type Plugin, type ViteDevServer } from "vite";
 import { DEV_SEED_PATH, DEV_TOKEN_HEADER, removeDevServerInfo, writeDevServerInfo } from "./scripts/dev-server-info";
+import { domainRedirect, pageShell } from "./scripts/app-routing";
+import { NATURA_HOSTS } from "./src/lib/app-paths";
 
 const src = fileURLToPath(new URL("./src", import.meta.url));
 /** Function API hasil `bun run build` (lihat scripts/build-vercel.ts). */
@@ -14,20 +16,21 @@ const builtApi = fileURLToPath(new URL("./.vercel/output/functions/api.func/inde
 type Handler = (req: IncomingMessage, res: ServerResponse) => Promise<unknown>;
 
 /**
- * Halaman HTML tiap app (SPA): /petugas/* → petugas, /admin/* → admin, selebihnya warga (/).
- * Sama dengan aturan routes di scripts/build-vercel.ts.
+ * Halaman HTML tiap app (SPA), berdasarkan subdomain atau path development.
+ * Sama dengan aturan routes di scripts/app-routing.ts.
  */
 function appShell(): Connect.NextHandleFunction {
-  return (req, _res, next) => {
-    const [pathname, query] = (req.url ?? "/").split("?");
+  return (req, res, next) => {
+    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
     const isPage = (req.method === "GET" || req.method === "HEAD") && req.headers.accept?.includes("text/html");
-    // Alamat berbentuk file (pakai titik) dan alamat internal Vite (/@vite, /@fs, …) dibiarkan.
-    if (isPage && !/\.[a-z0-9]+$/i.test(pathname) && !pathname.startsWith("/@")) {
-      for (const app of ["/petugas", "/admin"]) {
-        if (pathname === app || (pathname.startsWith(`${app}/`) && pathname !== `${app}/`)) {
-          req.url = `${app}/${query ? `?${query}` : ""}`;
-        }
+    if (isPage) {
+      const redirect = domainRedirect(url);
+      if (redirect) {
+        res.writeHead(308, { Location: redirect });
+        return res.end();
       }
+      const shell = pageShell(url.pathname, url.hostname);
+      if (shell) req.url = `${shell}${url.search}`;
     }
     next();
   };
@@ -125,6 +128,8 @@ function apiServer(): Plugin {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), apiServer()],
+  server: { allowedHosts: NATURA_HOSTS },
+  preview: { allowedHosts: NATURA_HOSTS },
   resolve: { alias: { "@": src } },
   // Penanda versi app untuk salinan cache di HP (src/client/query.ts); baru setiap build/server dev.
   define: { __BUILD_ID__: JSON.stringify(Date.now().toString(36)) },
@@ -132,11 +137,12 @@ export default defineConfig({
     // three.js (tampilan 3D) memang besar, tapi hanya dimuat saat tab 3D dibuka.
     chunkSizeWarningLimit: 650,
     rolldownOptions: {
-      // Tiga app dalam satu build: warga (/), petugas (/petugas/), admin (/admin/).
+      // Empat bagian dalam satu build; subdomain memilih HTML masing-masing.
       input: {
         warga: fileURLToPath(new URL("./index.html", import.meta.url)),
         petugas: fileURLToPath(new URL("./petugas/index.html", import.meta.url)),
         admin: fileURLToPath(new URL("./admin/index.html", import.meta.url)),
+        landing: fileURLToPath(new URL("./landing/index.html", import.meta.url)),
       },
     },
   },

@@ -11,6 +11,7 @@ import { dayLabel, scheduleDay } from "@/lib/schedule";
 import { QuickRecord } from "./quick-record";
 import { PaymentNotice } from "@/components/payment-notice";
 import { CADENCE_LABEL } from "@/lib/payments";
+import { petugasPath, wargaPath } from "@/lib/app-paths";
 
 /** Halaman yang terbuka saat QR rumah di-scan pakai kamera HP biasa. */
 export function HousePage() {
@@ -57,7 +58,7 @@ export function HousePage() {
                     <p className="mt-3 rounded-xl bg-warn-soft px-3 py-2.5 text-sm text-warn">
                       Bukan jadwal jagamu malam ini ({dayLabel(scheduleDay(tonight))}). Catatan hanya bisa diisi petugas
                       yang jaga.{" "}
-                      <a href="/petugas/jadwal" className="font-semibold underline">
+                      <a href={petugasPath("/jadwal")} className="font-semibold underline">
                         Lihat jadwal
                       </a>
                     </p>
@@ -103,15 +104,15 @@ export function HousePage() {
 
               <div className="mt-8 flex flex-col items-center gap-2 text-center">
                 {user ? (
-                  <a href="/petugas/" className={buttonClass("secondary")}>
+                  <a href={petugasPath("/")} className={buttonClass("secondary")}>
                     Ke app petugas
                   </a>
                 ) : (
-                  <a href={`/petugas/masuk?next=${encodeURIComponent(`/r/${house.token}`)}`} className={cx(buttonClass("ghost", "sm"))}>
+                  <a href={petugasPath(`/masuk?next=${encodeURIComponent(`/r/${house.token}`)}`)} className={cx(buttonClass("ghost", "sm"))}>
                     <LogIn className="size-4" /> Petugas ronda? Masuk
                   </a>
                 )}
-                <a href="/" className="text-sm font-semibold text-primary">
+                <a href={wargaPath()} className="text-sm font-semibold text-primary">
                   Info warga
                 </a>
               </div>

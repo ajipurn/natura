@@ -6,6 +6,7 @@ import { Button, cx } from "@/components/ui";
 import { shownToGuards } from "@/lib/guard-color";
 import { NIGHT_OF, scheduleDay, slotHouseLabel } from "@/lib/schedule";
 import type { ScheduleDTO } from "@/lib/types";
+import { petugasPath } from "@/lib/app-paths";
 
 /**
  * Siapa yang dijadwalkan jaga di malam ronda ini, diringkas jadi satu baris
@@ -53,7 +54,7 @@ export function TonightGuards({ schedule, date, userId }: { schedule: ScheduleDT
           <div className="flex items-baseline justify-between gap-2">
             {/* Tanggalnya sudah ada di kartu ringkasan. */}
             <p className="text-xs text-muted">Malam {NIGHT_OF[day]}</p>
-            <Link to="/petugas/jadwal" className="shrink-0 text-xs font-semibold text-primary">
+            <Link to={petugasPath("/jadwal")} className="shrink-0 text-xs font-semibold text-primary">
               Jadwal lengkap
             </Link>
           </div>

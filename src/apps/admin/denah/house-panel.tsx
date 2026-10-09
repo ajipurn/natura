@@ -14,6 +14,7 @@ import { monthHouseNights } from "@/lib/month-summary";
 import { monthStats } from "@/lib/month-stats";
 import type { CollectionDTO, HouseDTO } from "@/lib/types";
 import { recapQuery } from "../queries";
+import { adminPath } from "@/lib/app-paths";
 
 /**
  * Denah + panel samping. Di layar lebar panel menempel di kanan; di layar sempit panel ada di
@@ -165,7 +166,7 @@ export function HousePanel({
             <>
               <PaymentNotice period={tonight.period} />
               <p className="mt-2 text-sm text-muted">Status otomatis dari pembayaran periode; tidak perlu dicatat saat ronda.</p>
-              <Link to="/admin/rekap" className={cx(buttonClass("secondary", "sm"), "mt-2.5")}>Lihat pembayaran</Link>
+              <Link to={adminPath("/rekap")} className={cx(buttonClass("secondary", "sm"), "mt-2.5")}>Lihat pembayaran</Link>
             </>
           ) : (
             <>
@@ -226,7 +227,7 @@ export function HousePanel({
                 return (
                   <li key={date}>
                     <Link
-                      to={`/admin/riwayat/${date}`}
+                      to={adminPath(`/riwayat/${date}`)}
                       title={`${formatDateShort(date)}: ${text}`}
                       aria-label={`${formatDateShort(date)}: ${text}`}
                       className={cx(
@@ -253,13 +254,13 @@ export function HousePanel({
 
       <div className="flex flex-wrap gap-2 border-t border-line pt-3">
         <Link
-          to={`/admin/rumah?ubah=${house.id}`}
+          to={adminPath(`/rumah?ubah=${house.id}`)}
           className={buttonClass("secondary", "sm")}
         >
           <Pencil className="size-4" /> Ubah data rumah
         </Link>
         <Link
-          to={`/admin/rekap?bulan=${month}`}
+          to={adminPath(`/rekap?bulan=${month}`)}
           className={buttonClass("ghost", "sm")}
         >
           <Table2 className="size-4" /> Rekap

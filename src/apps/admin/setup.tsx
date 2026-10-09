@@ -6,6 +6,7 @@ import { int, str, type FormState } from "@/client/form";
 import { queryClient } from "@/client/query";
 import { SubmitButton } from "@/components/submit-button";
 import { Alert, Card, Field, Input, PageTitle } from "@/components/ui";
+import { adminPath } from "@/lib/app-paths";
 
 async function setupAction(_prev: FormState, formData: FormData): Promise<FormState> {
   try {
@@ -33,12 +34,12 @@ export function SetupPage() {
   const auth = useAuth();
   const [state, formAction] = useActionState(setupAction, undefined);
 
-  if (auth.data && !auth.data.setupNeeded) return <Navigate to="/admin" replace />;
+  if (auth.data && !auth.data.setupNeeded) return <Navigate to={adminPath()} replace />;
 
   return (
     <main className="mx-auto w-full max-w-md px-4 py-10">
       <PageTitle title="Mulai" />
-      <p className="text-sm font-medium text-primary">Jimpitan</p>
+      <p className="text-sm font-medium text-primary">Cluster Natura</p>
       <h1 className="mt-1 text-3xl font-bold tracking-tight">Siapkan aplikasi</h1>
       <p className="mt-2 text-muted">Isi sekali saja. Setelah ini kamu bisa menambah rumah dan petugas ronda.</p>
       <form action={formAction} className="mt-6 space-y-4">

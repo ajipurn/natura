@@ -7,6 +7,7 @@ import { Button, PageHeader, cx } from "@/components/ui";
 import { compareHouses } from "@/lib/houses";
 import { houseUrl } from "@/lib/qr";
 import { housesQuery } from "../queries";
+import { adminPath } from "@/lib/app-paths";
 
 export function CetakPage() {
   const query = useQuery(housesQuery);
@@ -36,9 +37,9 @@ export function CetakPage() {
               />
 
               <div className="mb-4 flex flex-wrap gap-2">
-                <BlockChip to="/admin/rumah/cetak" active={!selected} label="Semua blok" />
+                <BlockChip to={adminPath("/rumah/cetak")} active={!selected} label="Semua blok" />
                 {blocks.map((b) => (
-                  <BlockChip key={b} to={`/admin/rumah/cetak?blok=${encodeURIComponent(b)}`} active={selected === b} label={`Blok ${b}`} />
+                  <BlockChip key={b} to={adminPath(`/rumah/cetak?blok=${encodeURIComponent(b)}`)} active={selected === b} label={`Blok ${b}`} />
                 ))}
               </div>
 

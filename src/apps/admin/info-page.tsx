@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { api, call } from "@/client/api";
+import { wargaPath } from "@/lib/app-paths";
 import { checked, str } from "@/client/form";
 import { invalidate } from "@/client/query";
 import { CheckboxField } from "@/components/choice";
@@ -39,7 +40,7 @@ export function InfoPage() {
         title="Info warga"
         subtitle="Pengumuman, kontak pengurus, dan akses halaman warga"
         action={
-          <a href="/" target="_blank" rel="noopener" className={buttonClass("secondary", "sm")}>
+          <a href={wargaPath()} target="_blank" rel="noopener" className={buttonClass("secondary", "sm")}>
             <ExternalLink className="size-4" /> <span className="max-sm:hidden">Lihat halaman warga</span>
             <span className="sm:hidden">Lihat</span>
           </a>
