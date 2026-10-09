@@ -4,12 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 
 const script = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
 
-function worker(hostname: string, shell: string) {
+function worker(hostname: string, shell: string, assets: Record<string, string> = {}) {
   const handlers = new Map<string, (event: Record<string, unknown>) => void>();
-  const cached = new Map([[shell, new Response("<html>App petugas tersimpan</html>")]]);
+  const cached = new Map([[shell, new Response("<html>App petugas tersimpan</html>")], ...Object.entries(assets).map(([path, content]) => [path, new Response(content)] as const)]);
+  const cacheKey = (key: string | { url: string }) => typeof key === "string" ? key : new URL(key.url).pathname + new URL(key.url).search;
   const cache = {
-    match: async (key: string) => cached.get(key)?.clone(),
-    put: async (key: string, response: Response) => { cached.set(key, response); },
+    match: async (key: string | { url: string }) => cached.get(cacheKey(key))?.clone(),
+    put: async (key: string | { url: string }, response: Response) => { cached.set(cacheKey(key), response); },
     add: vi.fn(async () => {}),
   };
   const network = vi.fn(async () => { throw new Error("offline"); });
@@ -50,5 +51,14 @@ describe("app petugas bisa dibuka offline setelah pindah subdomain", () => {
     expect(qr?.status).toBe(503);
     expect(await qr?.text()).toContain("href='/'");
     expect((await sw.navigate("/api/auth"))?.status).toBe(503);
+  });
+
+  it("logo bawaan yang sudah disimpan tetap tampil saat offline", async () => {
+    const logo = '<svg xmlns="http://www.w3.org/2000/svg"><title>Cluster Natura</title></svg>';
+    const sw = worker("app.clusternatura.com", "/", { "/natura-logo.svg": logo });
+    const response = await sw.navigate("/natura-logo.svg");
+    expect(response?.status).toBe(200);
+    expect(await response?.text()).toBe(logo);
+    expect(sw.network).not.toHaveBeenCalled();
   });
 });

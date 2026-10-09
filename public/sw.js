@@ -1,7 +1,9 @@
 // Service worker Jimpitan: app petugas tetap bisa dibuka walau sinyal hilang.
 // Data catatan disimpan di HP (localStorage) oleh layar Ronda dan dikirim saat online.
 
-const CACHE = "jimpitan-v5";
+const CACHE = "jimpitan-v6";
+// Logo ikut disimpan untuk offline; naikkan versi CACHE saat aset bawaan diganti.
+const BRAND_ASSETS = ["/natura-logo.svg", "/icon.svg", "/apple-icon.png"];
 const APP_DOMAIN = self.location.hostname === "app.clusternatura.com";
 /** Kerangka app petugas: / di subdomain, /petugas/ di alamat dev/preview lama. */
 const SHELL = APP_DOMAIN ? "/" : "/petugas/";
@@ -29,7 +31,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   // File hasil build Vite punya nama unik per versi, aman disimpan selamanya.
-  if (url.pathname.startsWith("/assets/") || url.pathname.startsWith("/icons/")) {
+  if (url.pathname.startsWith("/assets/") || url.pathname.startsWith("/icons/") || BRAND_ASSETS.includes(url.pathname)) {
     event.respondWith(cacheFirst(request));
     return;
   }
@@ -49,7 +51,7 @@ async function precacheShell(response) {
   if (!res.ok || res.redirected) return;
   const html = await res.clone().text();
   await cache.put(SHELL, res);
-  const assets = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]);
+  const assets = [...BRAND_ASSETS, ...[...html.matchAll(/(?:src|href)="(\/(?:assets\/|apple-icon\.png)[^"]*)"/g)].map((m) => m[1])];
   await Promise.all(
     assets.map(async (asset) => {
       if (!(await cache.match(asset))) await cache.add(asset);

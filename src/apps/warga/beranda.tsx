@@ -33,6 +33,7 @@ import { HouseStatus } from "./house-status";
 import { useMyHouse } from "./my-house";
 import { adminPath, petugasPath } from "@/lib/app-paths";
 import { isManager } from "@/lib/permissions";
+import { DEFAULT_LOGO_URL } from "@/lib/branding";
 
 const accessQuery = { queryKey: ["warga", "akses"], queryFn: () => call(api.warga.akses.$get()) };
 
@@ -45,9 +46,7 @@ export function BerandaPage() {
       <PageTitle title="Info warga" />
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
-          {access.data?.logoUrl && (
-            <img src={access.data.logoUrl} alt="" className="size-14 shrink-0 rounded-xl object-contain" />
-          )}
+          <img src={access.data?.logoUrl ?? DEFAULT_LOGO_URL} alt="" className="size-14 shrink-0 rounded-xl object-contain" />
           <div className="min-w-0">
             <p className="text-sm font-medium text-primary">
               {access.data?.communityName || "Cluster Natura"}

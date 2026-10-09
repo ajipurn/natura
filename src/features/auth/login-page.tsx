@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Eye, EyeOff, Leaf, LoaderCircle } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router";
 import { api, call, errorMessage } from "@/client/api";
@@ -9,6 +9,7 @@ import { ErrorCard } from "@/components/query-state";
 import { Select } from "@/components/select";
 import { ThemeButton } from "@/components/theme-toggle";
 import { Alert, Button, cx, Field, Input, PageTitle } from "@/components/ui";
+import { DEFAULT_LOGO_URL } from "@/lib/branding";
 
 const LAST_USER_KEY = "jimpitan:last-user";
 
@@ -76,9 +77,7 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
       <PageTitle title={title} />
       <header className="mb-6 flex items-center justify-between gap-4 px-1">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-fg">
-            <Leaf className="size-6" aria-hidden />
-          </span>
+          <img src={DEFAULT_LOGO_URL} alt="" className="h-11 w-14 shrink-0 object-contain" />
           <div>
             <p className="font-semibold tracking-tight">Cluster Natura</p>
             <p className="text-xs text-muted">Jimpitan & ronda</p>

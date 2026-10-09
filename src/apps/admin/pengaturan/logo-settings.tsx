@@ -1,11 +1,12 @@
 import { useMutation } from "@tanstack/react-query";
-import { ImageIcon, Trash2, Upload } from "lucide-react";
+import { RotateCcw, Upload } from "lucide-react";
 import { useRef } from "react";
 import { api, call, errorMessage } from "@/client/api";
 import { refreshFavicon } from "@/client/favicon";
 import { resizeLogo } from "@/client/logo-image";
 import { invalidate } from "@/client/query";
 import { Alert, Button } from "@/components/ui";
+import { DEFAULT_LOGO_URL } from "@/lib/branding";
 
 /** Logo lingkungan: langsung tersimpan begitu dipilih (diperkecil dulu di browser) atau dihapus. */
 export function LogoSettings({ logoUrl }: { logoUrl: string | null }) {
@@ -24,27 +25,23 @@ export function LogoSettings({ logoUrl }: { logoUrl: string | null }) {
     <div className="flex items-start gap-4">
       {/* Latar putih (juga di mode gelap): sama seperti di stiker, logo transparan tetap terlihat. */}
       <div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-2xl border border-line bg-white">
-        {logoUrl ? (
-          <img src={logoUrl} alt="Logo saat ini" className="size-full object-contain p-1.5" />
-        ) : (
-          <ImageIcon className="size-8 text-slate-400" aria-hidden />
-        )}
+        <img src={logoUrl ?? DEFAULT_LOGO_URL} alt={logoUrl ? "Logo saat ini" : "Logo bawaan Cluster Natura"} className="size-full object-contain p-1.5" />
       </div>
       <div className="min-w-0 space-y-2">
         <div>
           <p className="text-sm font-medium">Logo</p>
           <p className="text-xs text-muted">
-            Tampil di stiker QR, halaman warga, dan dashboard admin. PNG atau JPG; diperkecil otomatis dan langsung
-            tersimpan.
+            Tampil di stiker QR, halaman warga, dashboard, dan ikon tab. PNG, JPG, WebP, atau SVG;
+            diperkecil otomatis dan langsung tersimpan.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" size="sm" disabled={save.isPending} onClick={() => inputRef.current?.click()}>
-            <Upload className="size-4" /> {save.isPending ? "Menyimpan…" : logoUrl ? "Ganti logo" : "Pilih logo"}
+            <Upload className="size-4" /> {save.isPending ? "Menyimpan…" : "Ganti logo"}
           </Button>
           {logoUrl && (
             <Button variant="ghost" size="sm" disabled={save.isPending} onClick={() => save.mutate(null)}>
-              <Trash2 className="size-4" /> Hapus
+              <RotateCcw className="size-4" /> Gunakan logo bawaan
             </Button>
           )}
         </div>

@@ -1,13 +1,12 @@
-import { ArrowUpRight, Leaf, ScanLine } from "lucide-react";
+import { ArrowUpRight, ScanLine } from "lucide-react";
 import { APP_DOMAINS } from "@/lib/app-paths";
+import { DEFAULT_LOGO_URL } from "@/lib/branding";
 
 export function LandingPage() {
   return (
     <div className="mx-auto flex min-h-svh max-w-6xl flex-col px-6 sm:px-10">
       <header className="flex items-center gap-3 py-7 sm:py-9">
-        <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-fg">
-          <Leaf className="size-6" aria-hidden />
-        </span>
+        <img src={DEFAULT_LOGO_URL} alt="" className="h-10 w-14 shrink-0 object-contain" />
         <span className="text-lg font-semibold tracking-tight">Cluster Natura</span>
       </header>
 

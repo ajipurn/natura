@@ -19,6 +19,7 @@ Stiker QR berisi alamat `https://info.clusternatura.com/r/<kode>`: dibuka pakai 
 
 ## Fitur
 
+- **Logo bawaan Natura:** logo rumah dan dua daun dipakai pada halaman masuk, landing page, dashboard, info warga, stiker QR, favicon, dan ikon app di HP. Dashboard, halaman warga, stiker QR, dan favicon dapat memakai logo unggahan melalui **Pengaturan → Logo**; pilih **Gunakan logo bawaan** untuk kembali ke logo Natura.
 - **Warga per orang:** tambah/edit nama dan nomor telepon, cari warga, saring per blok atau tanpa rumah. Rumah boleh ditentukan nanti; satu rumah dapat memiliki beberapa warga. Daftar ini hanya bisa dibuka Admin, Ketua, dan Sekretaris.
 - **Warga dan akun terhubung:** buat akun petugas untuk warga yang sudah didata tanpa membuat orang baru. Warga boleh tidak memiliki akun. Profil yang terhubung akun membaca nama dan rumah langsung dari akun; perubahan di Warga atau Akun petugas langsung konsisten. Nomor telepon tidak ditampilkan di info warga atau QR.
 - **Keluarga dan hunian:** menu **Warga** memiliki tab **Daftar warga** dan **Keluarga**. Kelompok keluarga memilih kepala, pasangan, anak, orang tua, atau anggota lainnya dari orang yang sama; satu rumah dapat menampung beberapa keluarga. Status hunian dicatat per orang (pemilik, penyewa, anggota keluarga, lainnya), beserta tanggal mulai tinggal dan riwayat perpindahan. Memindahkan keluarga memperbarui rumah seluruh anggota, termasuk akun petugas dan jadwalnya. Kepala keluarga dipindahkan bersama anggota; anggota yang pindah sendiri dilepas dari keluarga lama.

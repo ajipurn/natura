@@ -12,6 +12,7 @@ import { QuickRecord } from "./quick-record";
 import { PaymentNotice } from "@/components/payment-notice";
 import { CADENCE_LABEL } from "@/lib/payments";
 import { petugasPath, wargaPath } from "@/lib/app-paths";
+import { DEFAULT_LOGO_URL } from "@/lib/branding";
 
 /** Halaman yang terbuka saat QR rumah di-scan pakai kamera HP biasa. */
 export function HousePage() {
@@ -35,7 +36,7 @@ export function HousePage() {
             <>
               <PageTitle title={houseLabelLong(house)} />
               <p className="flex items-center gap-2 text-sm font-medium text-primary">
-                {logoUrl && <img src={logoUrl} alt="" className="size-8 shrink-0 rounded-md object-contain" />}
+                <img src={logoUrl ?? DEFAULT_LOGO_URL} alt="" className="size-8 shrink-0 rounded-md object-contain" />
                 Jimpitan {communityName}
               </p>
               <h1 className="mt-1 text-3xl font-bold tracking-tight">{houseLabelLong(house)}</h1>

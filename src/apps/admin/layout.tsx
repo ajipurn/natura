@@ -29,6 +29,7 @@ import type { SessionUser } from "@/server/auth";
 import { requestsQuery, settingsQuery } from "./queries";
 import { adminPath, petugasPath } from "@/lib/app-paths";
 import { can, ROLE_LABEL, type Resource } from "@/lib/permissions";
+import { DEFAULT_LOGO_URL } from "@/lib/branding";
 
 type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; resource?: Resource; write?: boolean };
 
@@ -173,13 +174,11 @@ function Sidebar({ user }: { user: SessionUser }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 px-5 pb-3 pt-5">
-        {logoUrl && (
-          <img
-            src={logoUrl}
-            alt=""
-            className="size-10 shrink-0 rounded-lg object-contain"
-          />
-        )}
+        <img
+          src={logoUrl ?? DEFAULT_LOGO_URL}
+          alt=""
+          className="h-10 w-12 shrink-0 rounded-lg object-contain"
+        />
         <div className="min-w-0">
           <p className="text-lg font-bold tracking-tight">Cluster Natura</p>
           <p className="mt-0.5 text-xs font-medium text-muted">Dashboard · {ROLE_LABEL[user.role]}</p>
