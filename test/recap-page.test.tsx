@@ -28,6 +28,7 @@ beforeEach(async () => {
   document.body.append(container);
   root = createRoot(container);
   client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
+  client.setQueryData(["auth"], { setupNeeded: false, user: { id: 1, name: "Admin", role: "admin" } });
   client.setQueryData(["rekap", month], {
     month, communityName: "Natura", defaultAmount: 500, houses, dates: ["2026-10-06", "2026-10-07"],
     cells: { "1:2026-10-06": { status: "filled", amount: 500 }, "1:2026-10-07": { status: "empty", amount: 0 }, "2:2026-10-07": { status: "filled", amount: 500 } },
@@ -61,6 +62,17 @@ function headers() {
 }
 
 describe("rekap bulanan yang dikelompokkan", () => {
+  it("sekretaris membaca rekap tanpa kontrol koreksi, pembayaran, atau token ekspor", async () => {
+    await act(async () => {
+      client.setQueryData(["auth"], { setupNeeded: false, user: { id: 2, name: "Sekretaris", role: "sekretaris" } });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(container.textContent).not.toContain("Ubah catatan");
+    expect(container.querySelector('[aria-label="Tampilan rekap"]')).toBeNull();
+    expect(container.querySelectorAll("[data-cell]")).toHaveLength(0);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("admin bisa memilih dan menghapus catatan harian lama pada rumah bulanan", async () => {
     await click(button("Ubah catatan"));
     const cell = container.querySelector<HTMLButtonElement>('button[data-cell="2:2026-10-07"]');

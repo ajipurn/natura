@@ -16,6 +16,7 @@ import { groupByBlock, houseLabel } from "@/lib/houses";
 import { randomPin } from "@/lib/random-pin";
 import { DAY_NAMES } from "@/lib/schedule";
 import type { Role } from "@/lib/types";
+import { ROLES as ROLE_VALUES, ROLE_LABEL, ROLE_HINT, isManager } from "@/lib/permissions";
 import { housesQuery, residentsQuery, usersQuery } from "../queries";
 import type { Resident } from "../warga/warga-dialog";
 import { adminPath, petugasPath } from "@/lib/app-paths";
@@ -37,10 +38,7 @@ export type Petugas = {
 /** Data petugas ikut tampil di jadwal, ronda, ringkasan, dan data rumah (nama warga). */
 const REFRESH = [["admin"], ["jadwal"], ["ronda"], ["auth", "users"]];
 
-const ROLES: RadioCardOption<Role>[] = [
-  { value: "petugas", label: "Petugas", hint: "Mencatat jimpitan" },
-  { value: "admin", label: "Admin", hint: "Juga mengelola data" },
-];
+const ROLES: RadioCardOption<Role>[] = ROLE_VALUES.map((value) => ({ value, label: ROLE_LABEL[value], hint: ROLE_HINT[value] }));
 
 /** Tambah petugas (`petugas` kosong) atau ubah petugas. */
 export function PetugasDialog({
@@ -60,8 +58,8 @@ export function PetugasDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      title={petugas ? `Ubah ${petugas.name}` : "Buat akun petugas"}
-      description={petugas ? undefined : "Petugas masuk ke app petugas dengan nama dan PIN ini."}
+      title={petugas ? `Ubah ${petugas.name}` : "Buat akun"}
+      description={petugas ? undefined : "Pilih warga dan perannya. Akun masuk memakai nama dan PIN."}
     >
       {petugas ? <EditForm petugas={petugas} isSelf={isSelf} onDone={onClose} /> : <CreateForm initialResidentId={initialResidentId} onDone={onClose} />}
     </Dialog>
@@ -91,7 +89,7 @@ function CreateAccountForm({ residents, initialResidentId, onDone }: { residents
   });
 
   if (create.isSuccess) {
-    return <SharePin name={name.trim()} pin={pin} onDone={onDone} />;
+    return <SharePin name={name.trim()} role={role} pin={pin} onDone={onDone} />;
   }
 
   return (
@@ -120,7 +118,7 @@ function CreateAccountForm({ residents, initialResidentId, onDone }: { residents
           placeholder="Pak Andi"
         />
       </Field>
-      <Field label="PIN (4–6 angka)" hint="Sudah dibuatkan PIN acak. Petugas bisa menggantinya sendiri di menu Akun.">
+      <Field label="PIN (4–6 angka)" hint="Sudah dibuatkan PIN acak. PIN bisa diganti di menu Akun pada app petugas.">
         <div className="flex gap-2">
           <Input
             value={pin}
@@ -157,10 +155,10 @@ function CreateAccountForm({ residents, initialResidentId, onDone }: { residents
 }
 
 /** Setelah petugas dibuat: PIN ditampilkan sekali untuk dibagikan. */
-function SharePin({ name, pin, onDone }: { name: string; pin: string; onDone: () => void }) {
+function SharePin({ name, role, pin, onDone }: { name: string; role: Role; pin: string; onDone: () => void }) {
   const [copied, setCopied] = useState(false);
-  const url = new URL(petugasPath("/"), location.origin).href;
-  const message = `Halo ${name}, akun petugas ronda sudah dibuat.\nBuka ${url} lalu pilih nama "${name}" dan masukkan PIN: ${pin}\nPIN bisa diganti sendiri di menu Akun.`;
+  const url = new URL(isManager(role) ? adminPath("/") : petugasPath("/"), location.origin).href;
+  const message = `Halo ${name}, akun ${ROLE_LABEL[role]} sudah dibuat.\nBuka ${url} lalu pilih nama "${name}" dan masukkan PIN: ${pin}\nPIN bisa diganti sendiri di menu Akun pada app petugas.`;
   return (
     <div className="space-y-4 text-center">
       <KeyRound className="mx-auto size-10 text-primary" />
@@ -262,7 +260,7 @@ function ResetPin({ petugas, locked }: { petugas: Petugas; locked: string | null
   if (reset.isSuccess) {
     return (
       <div className="border-t border-line pt-4">
-        <SharePin name={petugas.name} pin={pin} onDone={() => reset.reset()} />
+        <SharePin name={petugas.name} role={petugas.role} pin={pin} onDone={() => reset.reset()} />
       </div>
     );
   }
@@ -305,7 +303,7 @@ function ResetPin({ petugas, locked }: { petugas: Petugas; locked: string | null
           {reset.isPending ? "Menyimpan…" : "Atur ulang"}
         </Button>
       </form>
-      <p className="mt-1 text-xs text-muted">Untuk petugas yang lupa PIN atau terkunci. Sesi lamanya di HP lain akan keluar.</p>
+      <p className="mt-1 text-xs text-muted">Untuk akun yang lupa PIN atau terkunci. Sesi lamanya di HP lain akan keluar.</p>
       {reset.isError && <Alert>{reset.error.message}</Alert>}
     </Collapsible>
   );

@@ -1,3 +1,4 @@
+import { can } from "@/lib/permissions";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowRightLeft, CalendarClock, CalendarDays, LayoutDashboard } from "lucide-react";
 import { useState } from "react";
@@ -72,7 +73,7 @@ export function MySchedule() {
             </Button>
           )}
         </div>
-      ) : user.role === "admin" ? (
+      ) : can(user.role, "schedule", true) ? (
         <a href={adminPath("/jadwal")} className={cx(buttonClass("secondary", "sm"), "min-h-11 h-auto w-full py-2")}>
           <LayoutDashboard className="size-4 shrink-0" aria-hidden /> Ubah jadwal jaga
         </a>

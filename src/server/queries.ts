@@ -9,7 +9,7 @@ import type { SessionUser } from "./auth";
 import type { Db } from "./db";
 import { houseName } from "./house-name";
 import { guardDaysByUser, listSchedule } from "./schedule";
-import { collectionLogs, collections, houses, paymentPlans, payments, patrols, settings, users } from "./schema";
+import { collectionLogs, collections, duesInvoices, houses, paymentPlans, payments, patrols, residenceMoves, settings, users } from "./schema";
 import { getPaymentData, getPaymentMonth } from "./payments";
 import { listResidents } from "./residents";
 
@@ -116,6 +116,8 @@ export async function listHousesWithUsage(db: Db, today = localDate(new Date()))
       ...houseColumns,
       collectionCount: sql<number>`count(${collections.id})`.mapWith(Number),
       paymentCount: sql<number>`(select count(*) from ${payments} where ${payments.houseId} = ${houses.id})`.mapWith(Number),
+      duesCount: sql<number>`(select count(*) from ${duesInvoices} where ${duesInvoices.houseId} = ${houses.id})`.mapWith(Number),
+      residenceMoveCount: sql<number>`(select count(*) from ${residenceMoves} where ${residenceMoves.fromHouseId} = ${houses.id} or ${residenceMoves.toHouseId} = ${houses.id})`.mapWith(Number),
       paymentCadence: sql<PaymentCadence>`coalesce((
         select ${paymentPlans.cadence} from ${paymentPlans}
         where ${paymentPlans.houseId} = ${houses.id} and ${paymentPlans.effectiveFrom} <= ${today}
@@ -128,7 +130,7 @@ export async function listHousesWithUsage(db: Db, today = localDate(new Date()))
   const people = await listResidents(db);
   return rows.sort(compareHouses).map((house) => ({
     ...house,
-    residents: people.filter((r) => r.houseId === house.id).map(({ id, name, userId }) => ({ id, name, userId })),
+    residents: people.filter((r) => r.houseId === house.id).map(({ id, name, userId, familyId }) => ({ id, name, userId, familyId })),
   }));
 }
 

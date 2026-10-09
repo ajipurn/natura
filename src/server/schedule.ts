@@ -5,7 +5,9 @@ import { houseKey } from "@/lib/site-plan";
 import type { ScheduleDTO } from "@/lib/types";
 import { runBatch, type Db, type Executor, type Statement } from "./db";
 import { houseName } from "./house-name";
-import { houses, rondaSchedule, users } from "./schema";
+import { houses, residents, rondaSchedule, users } from "./schema";
+import { localDate } from "@/lib/dates";
+import { moveResident } from "./residence";
 import { setHouseResident } from "./residents";
 
 /** Jadwal lengkap dengan nama dan rumah dari akun petugas atau data rumah. */
@@ -200,7 +202,9 @@ export async function saveSchedule(
   await db.transaction(async (tx) => {
     for (const statement of [tx.delete(rondaSchedule), ...insertSlots(tx, slots)]) await statement;
     for (const [userId, houseId] of homed) {
-      await tx.update(users).set({ houseId }).where(eq(users.id, userId));
+      const [profile] = await tx.select({ id: residents.id }).from(residents).where(eq(residents.userId, userId));
+      if (profile) await moveResident(tx, profile.id, houseId, null, localDate(new Date()));
+      else await tx.update(users).set({ houseId }).where(eq(users.id, userId));
       await tx.update(houses).set({ ownerName: null }).where(eq(houses.id, houseId));
     }
     for (const n of names) await setHouseResident(tx, n.id, n.name);

@@ -12,6 +12,7 @@ import { ChangePinForm } from "@/features/auth/change-pin-form";
 import { MySchedule } from "./my-schedule";
 import { Alert, Button, Card, PageHeader, SectionTitle, cx } from "@/components/ui";
 import { adminPath, petugasPath, wargaPath } from "@/lib/app-paths";
+import { isManager, ROLE_LABEL } from "@/lib/permissions";
 
 export function AkunPage() {
   const user = useAuth().data?.user;
@@ -42,11 +43,11 @@ export function AkunPage() {
         </div>
         <div className="min-w-0">
           <h2 className="text-xl font-semibold tracking-tight [overflow-wrap:anywhere]">{user.name}</h2>
-          <p className="mt-1 text-sm text-muted">{user.role === "admin" ? "Admin" : "Petugas ronda"}</p>
+          <p className="mt-1 text-sm text-muted">{ROLE_LABEL[user.role]}</p>
         </div>
       </Card>
 
-      <nav aria-label="Akses cepat" className={cx("mt-3 grid gap-3", user.role === "admin" && "sm:grid-cols-2")}>
+      <nav aria-label="Akses cepat" className={cx("mt-3 grid gap-3", isManager(user.role) && "sm:grid-cols-2")}>
         <a
           href={wargaPath()}
           className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:bg-primary/15"
@@ -58,14 +59,14 @@ export function AkunPage() {
           </span>
           <ChevronRight className="size-4 shrink-0 text-primary" aria-hidden />
         </a>
-        {user.role === "admin" && (
+        {isManager(user.role) && (
           <a
             href={adminPath("/")}
             className="flex items-center gap-3 rounded-2xl border border-line bg-card p-4 transition-colors hover:bg-idle-soft/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:bg-idle-soft"
           >
             <LayoutDashboard className="size-5 shrink-0 text-primary" aria-hidden />
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold">Buka dashboard admin</span>
+              <span className="block text-sm font-semibold">Buka dashboard pengurus</span>
               <span className="mt-0.5 block text-xs text-muted">Kelola jimpitan dan ronda</span>
             </span>
             <ChevronRight className="size-4 shrink-0 text-muted" aria-hidden />

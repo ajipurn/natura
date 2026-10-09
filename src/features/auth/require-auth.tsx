@@ -7,6 +7,7 @@ import type { SessionUser } from "@/server/auth";
 import { ErrorCard, LoadingCards } from "@/components/query-state";
 import { Card, buttonClass, cx } from "@/components/ui";
 import { adminPath, petugasPath } from "@/lib/app-paths";
+import { isManager } from "@/lib/permissions";
 
 /**
  * Halaman yang perlu login. Belum login → layar masuk (lalu kembali ke sini);
@@ -48,12 +49,12 @@ export function RequireAuth({
     const next = location.pathname + location.search;
     return <Navigate to={`${loginPath}?next=${encodeURIComponent(next)}`} replace />;
   }
-  if (adminOnly && user.role !== "admin") {
+  if (adminOnly && !isManager(user.role)) {
     return (
       <Centered>
         <Card className="text-center">
           <ShieldAlert className="mx-auto size-10 text-warn" />
-          <p className="mt-2 font-semibold">Khusus admin</p>
+          <p className="mt-2 font-semibold">Khusus pengurus</p>
           <p className="mt-1 text-sm text-muted">Akun {user.name} adalah petugas ronda.</p>
           <a href={petugasPath("/")} className={cx(buttonClass("primary"), "mt-4")}>
             Buka app petugas

@@ -26,6 +26,10 @@ export const residentsQuery = queryOptions({
   queryFn: () => call(api.admin.warga.$get()),
 });
 
+export const familiesQuery = queryOptions({ queryKey: ["admin", "keluarga"], queryFn: () => call(api.admin.keluarga.$get()) });
+export const duesQuery = (month: string) => queryOptions({ queryKey: ["admin", "iuran", month], queryFn: () => call(api.admin.iuran.$get({ query: { bulan: month } })) });
+export const DUES_REFRESH = [["admin", "iuran"], ["admin", "iuran-log"], ["admin", "kas"], ["admin", "ringkasan"], ["warga"]];
+
 export const settingsQuery = queryOptions({
   queryKey: ["admin", "pengaturan"],
   queryFn: () => call(api.admin.pengaturan.$get()),

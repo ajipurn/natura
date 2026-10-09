@@ -84,7 +84,7 @@ describe("pendataan warga per orang", () => {
     expect((await admin.patch("/api/admin/warga/0", { name: "Tidak ada" })).status).toBe(400);
   });
 
-  it("hapus warga tidak menghapus rumahnya, dan hapus rumah mempertahankan warga tanpa hubungan rumah", async () => {
+  it("hapus warga mempertahankan rumah; rumah dengan riwayat hunian tetap tersimpan", async () => {
     const id = await add("Warga dihapus", b1);
     expect((await admin.delete(`/api/admin/warga/${id}`)).status).toBe(200);
     expect((await directory()).find((r) => r.id === id)).toBeUndefined();
@@ -93,8 +93,8 @@ describe("pendataan warga per orang", () => {
     expect(created.status).toBe(200);
     const home = (await listHouses(db)).find((h) => h.block === "Z")!;
     const person = await add("Rumah dilepas", home.id);
-    expect((await admin.delete(`/api/admin/rumah/${home.id}`)).status).toBe(200);
-    expect((await directory()).find((r) => r.id === person)).toMatchObject({ name: "Rumah dilepas", houseId: null });
+    expect((await admin.delete(`/api/admin/rumah/${home.id}`)).status).toBe(409);
+    expect((await directory()).find((r) => r.id === person)).toMatchObject({ name: "Rumah dilepas", houseId: home.id });
   });
 });
 
@@ -160,12 +160,13 @@ it("migrasi memindahkan nama lama sambil mempertahankan akun, rumah, QR, dan PIN
     { block: "M", number: "2", ownerName: "Nama rumah yang diabaikan", token: "MIGRATE2" },
   ]).returning();
   const [account] = await legacy.db.insert(users).values({ name: "Nama akun asli", pinHash: "existing-hash", role: "petugas", houseId: h2.id }).returning();
-  await legacy.db.execute(sql`drop table residents`);
+  await legacy.db.execute(sql`drop table residents cascade`); // Hanya database tes yang terisolasi.
   const migration = readFileSync(new URL("../drizzle/0007_residents.sql", import.meta.url), "utf8");
   await legacy.db.transaction(async (tx) => {
     for (const statement of migration.split("--> statement-breakpoint")) await tx.execute(sql.raw(statement));
   });
-  expect(await listResidents(legacy.db)).toEqual(expect.arrayContaining([
+  const migrated = (await legacy.db.execute(sql`select coalesce(r.name, u.name) as name, coalesce(r.house_id, u.house_id) as "houseId", r.user_id as "userId" from residents r left join users u on u.id = r.user_id`)).rows;
+  expect(migrated).toEqual(expect.arrayContaining([
     expect.objectContaining({ name: "Warga lama", houseId: h1.id, userId: null }),
     expect.objectContaining({ name: "Nama akun asli", houseId: h2.id, userId: account.id }),
   ]));

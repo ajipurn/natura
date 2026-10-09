@@ -1,5 +1,7 @@
 import { and, asc, eq, isNull, ne, or, sql } from "drizzle-orm";
 import type { Executor } from "./db";
+import { localDate } from "@/lib/dates";
+import { moveResident } from "./residence";
 import { houses, residents, users } from "./schema";
 
 const residentHouse = sql<number | null>`coalesce(${residents.houseId}, ${users.houseId})`;
@@ -16,6 +18,10 @@ export async function listResidents(db: Executor) {
     userId: residents.userId,
     role: users.role,
     accountActive: users.active,
+    familyId: residents.familyId,
+    familyRelation: residents.familyRelation,
+    housingStatus: residents.housingStatus,
+    residentSince: residents.residentSince,
   }).from(residents)
     .leftJoin(users, eq(users.id, residents.userId))
     .leftJoin(houses, eq(houses.id, residentHouse))
@@ -23,14 +29,14 @@ export async function listResidents(db: Executor) {
 }
 
 /** Nama utama rumah tanpa akun. Nama-nama lain dikelola satu per satu melalui Warga. */
-export async function setHouseResident(db: Executor, houseId: number, name: string | null) {
+export async function setHouseResident(db: Executor, houseId: number, name: string | null, actorId: number | null = null) {
   const rows = await db.select({ id: residents.id }).from(residents)
     .where(eq(residents.houseId, houseId)).orderBy(asc(residents.id));
   if (rows.length > 1) return;
   if (rows.length === 1) {
     if (name) await db.update(residents).set({ name }).where(eq(residents.id, rows[0].id));
     // Mengosongkan nama di Rumah tidak menghapus orang; lepaskan hubungan rumahnya saja.
-    else await db.update(residents).set({ houseId: null }).where(eq(residents.id, rows[0].id));
+    else await moveResident(db, rows[0].id, null, actorId, localDate(new Date()));
   } else if (name) {
     await db.insert(residents).values({ name, houseId });
   }

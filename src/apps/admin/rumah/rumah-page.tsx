@@ -1,3 +1,4 @@
+import { usePermission } from "@/client/permissions";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Home, LayoutGrid, Map as MapIcon, MapPin, Plus, Printer, Search, UserRound } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -38,12 +39,13 @@ const VIEWS = [
 ] as const;
 
 export function RumahPage() {
+  const canEdit = usePermission("houses", true);
   const query = useQuery(housesQuery);
   const users = useQuery(usersQuery).data?.users ?? [];
   const [params, setParams] = useSearchParams();
   const view: View = params.get("tampilan") === "denah" ? "denah" : "daftar";
   // `?tampilan=denah&lokasi=1`: atur titik acuan GPS di denah (untuk "Lokasi saya" di app petugas).
-  const calibrating = view === "denah" && params.get("lokasi") === "1";
+  const calibrating = canEdit && view === "denah" && params.get("lokasi") === "1";
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("semua");
   // `?ubah=12` (mis. dari Peta ronda) langsung membuka dialog ubah rumah itu.
@@ -78,9 +80,9 @@ export function RumahPage() {
                       <Printer className="size-4" /> <span className="max-sm:sr-only">Cetak QR</span>
                     </Link>
                   )}
-                  <Button size="sm" onClick={() => setAdding({ block: "", number: "" })}>
+                  {canEdit && <Button size="sm" onClick={() => setAdding({ block: "", number: "" })}>
                     <Plus className="size-4" /> Tambah
-                  </Button>
+                  </Button>}
                 </div>
               }
             />
@@ -97,9 +99,9 @@ export function RumahPage() {
                   </p>
                 </div>
                 <div className="flex flex-wrap items-start justify-center gap-2">
-                  <Button size="sm" onClick={() => setAdding({ block: "", number: "" })}>
+                  {canEdit && <Button size="sm" onClick={() => setAdding({ block: "", number: "" })}>
                     <Plus className="size-4" /> Tambah rumah
-                  </Button>
+                  </Button>}
                   <RegisterPlanHouses count={matchPlan(SITE_PLAN, houses).missing.length} />
                 </div>
               </Card>
@@ -266,6 +268,7 @@ function HouseMap({
   onOpen: (id: number) => void;
   onAdd: (house: NewHouse) => void;
 }) {
+  const canEdit = usePermission("houses", true);
   const { missing, notOnPlan } = useMemo(() => matchPlan(SITE_PLAN, houses), [houses]);
   const markers = useMemo(
     () => Object.fromEntries(houses.map((h) => [h.id, h.status === "vacant" ? "vacant" : "neutral"])) as Record<number, MarkerState>,
@@ -285,7 +288,7 @@ function HouseMap({
         fitToView
         highlightMissing
         onHouseClick={(h) => onOpen(h.id)}
-        onMissingClick={(lot) => onAdd({ block: lot.block, number: lot.number ?? "" })}
+        onMissingClick={canEdit ? (lot) => onAdd({ block: lot.block, number: lot.number ?? "" }) : undefined}
       />
       <Legend>
         <LegendItem swatch="border-fg/40 bg-card">Terdaftar</LegendItem>
@@ -293,7 +296,7 @@ function HouseMap({
         {missing.length > 0 && <LegendItem swatch="border-dashed border-warn bg-card">Belum terdaftar ({missing.length})</LegendItem>}
         <LegendItem swatch="border-line bg-[repeating-linear-gradient(45deg,var(--line)_0_2px,transparent_2px_5px)]">Belum dibangun</LegendItem>
         <span className="sm:ml-auto">
-          Ketuk rumah untuk mengubah data atau QR-nya{missing.length > 0 && ", kavling oranye untuk menambahkannya"}.
+          {canEdit ? <>Ketuk rumah untuk mengubah data atau QR-nya{missing.length > 0 && ", kavling oranye untuk menambahkannya"}.</> : "Ketuk rumah untuk melihat data dan QR-nya."}
         </span>
       </Legend>
       <LocationStatus />
@@ -320,6 +323,7 @@ function HouseMap({
 
 /** Status "Lokasi saya" di denah app petugas, dengan tautan ke pengaturan titik acuannya. */
 function LocationStatus() {
+  const canEdit = usePermission("houses", true);
   const anchors = useQuery(planAnchorsQuery).data?.anchors;
   if (!anchors) return null;
   const active = Boolean(fitGeoTransform(anchors));
@@ -334,9 +338,9 @@ function LocationStatus() {
           </span>
         </span>
       </p>
-      <Link to={adminPath("/rumah?tampilan=denah&lokasi=1")} onClick={() => window.scrollTo(0, 0)} className={buttonClass("secondary", "sm")}>
+      {canEdit && <Link to={adminPath("/rumah?tampilan=denah&lokasi=1")} onClick={() => window.scrollTo(0, 0)} className={buttonClass("secondary", "sm")}>
         Atur
-      </Link>
+      </Link>}
     </div>
   );
 }

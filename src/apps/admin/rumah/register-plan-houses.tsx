@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { MapPinPlus } from "lucide-react";
 import { api, call } from "@/client/api";
+import { usePermission } from "@/client/permissions";
 import { invalidate } from "@/client/query";
 import { Alert, Button } from "@/components/ui";
 import { HOUSE_REFRESH } from "../queries";
@@ -10,10 +11,12 @@ import { HOUSE_REFRESH } from "../queries";
  * `banner` = tampil sebagai pemberitahuan di atas denah (tetap terpasang supaya pesan hasilnya terlihat).
  */
 export function RegisterPlanHouses({ count, banner = false }: { count: number; banner?: boolean }) {
+  const canEdit = usePermission("houses", true);
   const register = useMutation({
     mutationFn: () => call(api.admin.rumah["dari-denah"].$post()),
     onSuccess: () => invalidate(...HOUSE_REFRESH),
   });
+  if (!canEdit) return null;
   const button = count > 0 && (
     <Button
       disabled={register.isPending}

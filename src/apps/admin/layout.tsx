@@ -13,6 +13,7 @@ import {
   Table2,
   Users,
   KeyRound,
+  ReceiptText,
   Wallet,
   X,
   type LucideIcon,
@@ -27,8 +28,9 @@ import { Button, cx } from "@/components/ui";
 import type { SessionUser } from "@/server/auth";
 import { requestsQuery, settingsQuery } from "./queries";
 import { adminPath, petugasPath } from "@/lib/app-paths";
+import { can, ROLE_LABEL, type Resource } from "@/lib/permissions";
 
-type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean };
+type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; resource?: Resource; write?: boolean };
 
 /** Data lingkungan terpisah dari kegiatan ronda, kas, dan akses akun. */
 const NAV: { group: string; items: NavItem[] }[] = [
@@ -41,28 +43,28 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: "Lingkungan",
     items: [
-      { to: adminPath("/warga"), label: "Warga", icon: Users },
-      { to: adminPath("/rumah"), label: "Rumah & QR", icon: Home },
-      { to: adminPath("/info"), label: "Info warga", icon: Megaphone },
+      { to: adminPath("/warga"), label: "Warga", icon: Users, resource: "residents" },
+      { to: adminPath("/rumah"), label: "Rumah & QR", icon: Home, resource: "houses" },
+      { to: adminPath("/info"), label: "Info warga", icon: Megaphone, resource: "info" },
     ],
   },
   {
     group: "Ronda & jimpitan",
     items: [
       { to: adminPath("/denah"), label: "Peta ronda", icon: MapIcon },
-      { to: adminPath("/jadwal"), label: "Jadwal ronda", icon: CalendarDays },
+      { to: adminPath("/jadwal"), label: "Jadwal ronda", icon: CalendarDays, resource: "schedule" },
       { to: adminPath("/riwayat"), label: "Riwayat", icon: History },
       { to: adminPath("/rekap"), label: "Rekap bulanan", icon: Table2 },
     ],
   },
   {
     group: "Keuangan",
-    items: [{ to: adminPath("/kas"), label: "Kas", icon: Wallet }],
+    items: [{ to: adminPath("/kas"), label: "Kas", icon: Wallet, resource: "finance" }, { to: adminPath("/iuran"), label: "Iuran", icon: ReceiptText, resource: "finance" }],
   },
   {
     group: "Akses",
     items: [
-      { to: adminPath("/petugas"), label: "Akun petugas", icon: KeyRound },
+      { to: adminPath("/petugas"), label: "Akun & akses", icon: KeyRound, resource: "accounts", write: true },
     ],
   },
 ];
@@ -155,7 +157,7 @@ export function AdminLayout({
 function Sidebar({ user }: { user: SessionUser }) {
   const navigate = useNavigate();
   // Jumlah permintaan ubah jadwal yang menunggu, tampil di menu Jadwal ronda.
-  const pendingRequests = useQuery(requestsQuery).data?.pending ?? 0;
+  const pendingRequests = useQuery({ ...requestsQuery, enabled: can(user.role, "schedule", true) }).data?.pending ?? 0;
   const logoUrl = useQuery(settingsQuery).data?.logoUrl;
   const logout = useMutation({
     mutationFn: () => call(api.auth.logout.$post()),
@@ -180,16 +182,16 @@ function Sidebar({ user }: { user: SessionUser }) {
         )}
         <div className="min-w-0">
           <p className="text-lg font-bold tracking-tight">Cluster Natura</p>
-          <p className="mt-0.5 text-xs font-medium text-muted">Dashboard</p>
+          <p className="mt-0.5 text-xs font-medium text-muted">Dashboard · {ROLE_LABEL[user.role]}</p>
         </div>
       </div>
       <ScrollArea
         element="nav"
-        aria-label="Menu admin"
+        aria-label="Menu dashboard"
         className="min-h-0 flex-1 overflow-y-auto"
       >
         <div className="px-3">
-          {NAV.map(({ group, items }) => (
+          {NAV.map(({ group, items }) => ({ group, items: items.filter((item) => !item.resource || can(user.role, item.resource, item.write)) })).filter(({ items }) => items.length).map(({ group, items }) => (
             <div key={group} className="mb-4">
               <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted">
                 {group}
@@ -216,7 +218,7 @@ function Sidebar({ user }: { user: SessionUser }) {
         </div>
       </ScrollArea>
       <div className="space-y-1 border-t border-line p-3">
-        <SidebarLink item={SETTINGS} />
+        {can(user.role, "settings", true) && <SidebarLink item={SETTINGS} />}
         <ThemeSwitch />
         <a
           href={petugasPath("/")}

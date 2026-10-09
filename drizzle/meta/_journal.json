@@ -57,6 +57,13 @@
       "when": 1791515623055,
       "tag": "0007_residents",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791526373562,
+      "tag": "0008_community_management",
+      "breakpoints": true
     }
   ]
 }

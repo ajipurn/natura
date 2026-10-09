@@ -4,6 +4,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { createMiddleware } from "hono/factory";
 import { jwtVerify, SignJWT } from "jose";
 import type { Role } from "@/lib/types";
+import { can, type Resource } from "@/lib/permissions";
 import { COMMUNITY_DOMAIN, appSurface } from "@/lib/app-paths";
 import type { AppEnv } from "./env";
 import { settings, users } from "./schema";
@@ -124,9 +125,35 @@ export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
 export const requireAdmin = createMiddleware<AppEnv>(async (c, next) => {
   const user = await getSessionUser(c);
   if (!user) return unauthorized(c);
-  if (user.role !== "admin") return c.json({ error: "Khusus admin." }, 403);
+  if (!can(user.role, "accounts", true)) return c.json({ error: "Khusus admin atau ketua." }, 403);
   c.set("user", user);
   await next();
+});
+
+/** Hak akses diperiksa dari peran terkini di database pada setiap permintaan. */
+export function requireResource(resource: Resource, write?: boolean) {
+  return createMiddleware<AppEnv>(async (c, next) => {
+    const user = await getSessionUser(c);
+    if (!user) return unauthorized(c);
+    if (!can(user.role, resource, write ?? !["GET", "HEAD"].includes(c.req.method))) {
+      return c.json({ error: "Peran akunmu tidak memiliki akses ke tindakan ini." }, 403);
+    }
+    c.set("user", user);
+    await next();
+  });
+}
+
+/** Satu pemetaan untuk seluruh rute dashboard lama; rute baru memakai requireResource langsung. */
+export const requireDashboardResource = createMiddleware<AppEnv>(async (c, next) => {
+  const section = c.req.path.match(/\/admin\/([^/]+)/)?.[1];
+  const resources: Record<string, Resource> = {
+    ringkasan: "overview", rumah: "houses", denah: "houses", petugas: "accounts",
+    pengaturan: "settings", jadwal: "schedule", permintaan: "schedule", audit: "patrols", riwayat: "patrols",
+    kas: "finance", info: "info", pengumuman: "info", kontak: "info",
+  };
+  const resource = c.req.path.endsWith("/pengaturan/kode-warga") ? "info" : resources[section ?? ""];
+  if (!resource) return requireAdmin(c, next);
+  return requireResource(resource)(c, next);
 });
 
 /* ---------- Akses halaman warga (pakai kode bersama) ---------- */

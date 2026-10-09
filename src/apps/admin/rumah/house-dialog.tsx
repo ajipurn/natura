@@ -3,6 +3,7 @@ import { ExternalLink, Printer, RefreshCw, Trash2, UserRound } from "lucide-reac
 import { useId, useState } from "react";
 import { Link } from "react-router";
 import { api, call } from "@/client/api";
+import { usePermission } from "@/client/permissions";
 import { invalidate } from "@/client/query";
 import { RadioCards } from "@/components/choice";
 import { Dialog } from "@/components/dialog";
@@ -16,7 +17,7 @@ import { HOUSE_REFRESH } from "../queries";
 import { PaymentPlanSection } from "../payments/plan-section";
 import { adminPath } from "@/lib/app-paths";
 
-export type AdminHouse = HouseDTO & { collectionCount: number; paymentCount: number; paymentCadence: PaymentCadence; residents?: { id: number; name: string; userId: number | null }[] };
+export type AdminHouse = HouseDTO & { collectionCount: number; paymentCount: number; duesCount?: number; residenceMoveCount?: number; paymentCadence: PaymentCadence; residents?: { id: number; name: string; userId: number | null; familyId?: number | null }[] };
 
 
 const STATUSES: { value: HouseStatus; label: string; hint: string }[] = [
@@ -178,6 +179,8 @@ export function EditHouseDialog({
 }
 
 function EditForm({ house, accounts, origin, onDone }: { house: AdminHouse; accounts: string[]; origin: string; onDone: () => void }) {
+  const canEdit = usePermission("houses", true);
+  const canFinance = usePermission("finance");
   const [block, setBlock] = useState(house.block);
   const [number, setNumber] = useState(house.number);
   const [ownerName, setOwnerName] = useState(house.ownerName ?? "");
@@ -190,6 +193,8 @@ function EditForm({ house, accounts, origin, onDone }: { house: AdminHouse; acco
       onDone();
     },
   });
+
+  if (!canEdit) return <div className="space-y-5"><p className="text-sm text-muted">{house.status === "active" ? "Dihuni" : "Kosong / mudik"}</p><p className="text-sm">{house.residents?.map((r) => r.name).join(", ") || house.ownerName || "Nama penghuni belum dicatat"}</p>{canFinance && <PaymentPlanSection houseId={house.id} />}<QrSection house={house} origin={origin} /></div>;
 
   return (
     <div className="space-y-5">
@@ -256,7 +261,7 @@ function EditForm({ house, accounts, origin, onDone }: { house: AdminHouse; acco
         </div>
       </form>
 
-      <PaymentPlanSection houseId={house.id} />
+      {canFinance && <PaymentPlanSection houseId={house.id} />}
       <QrSection house={house} origin={origin} />
       <DeleteSection house={house} onDeleted={onDone} />
     </div>
@@ -264,6 +269,7 @@ function EditForm({ house, accounts, origin, onDone }: { house: AdminHouse; acco
 }
 
 function QrSection({ house, origin }: { house: AdminHouse; origin: string }) {
+  const canEdit = usePermission("houses", true);
   const regenerate = useMutation({
     mutationFn: () => call(api.admin.rumah[":id"].token.$post({ param: { id: String(house.id) } })),
     onSuccess: () => invalidate(...HOUSE_REFRESH),
@@ -287,13 +293,13 @@ function QrSection({ house, origin }: { house: AdminHouse; origin: string }) {
             <Link to={adminPath(`/rumah/cetak?blok=${encodeURIComponent(house.block)}`)} className={buttonClass("secondary", "sm")}>
               <Printer className="size-4" /> Cetak
             </Link>
-            <Button
+            {canEdit && <Button
               disabled={regenerate.isPending}
               onClick={() => window.confirm("Buat QR baru? Stiker lama rumah ini tidak bisa dipakai lagi.") && regenerate.mutate()}
               variant="secondary" size="sm"
             >
               <RefreshCw className={cx("size-4", regenerate.isPending && "animate-spin")} /> QR baru
-            </Button>
+            </Button>}
           </div>
         </div>
       </div>
@@ -312,11 +318,10 @@ function DeleteSection({ house, onDeleted }: { house: AdminHouse; onDeleted: () 
     },
   });
 
-  if (house.collectionCount > 0 || house.paymentCount > 0) {
+  if (house.collectionCount > 0 || house.paymentCount > 0 || house.duesCount || house.residenceMoveCount || house.residents?.some((r) => r.familyId)) {
     return (
       <p className="border-t border-line pt-4 text-xs text-muted">
-        Rumah ini sudah punya catatan jimpitan atau pembayaran, jadi tidak bisa dihapus. Tandai kosong/mudik kalau tidak dihuni
-        lagi.
+        Rumah ini sudah memiliki catatan pembayaran atau hunian, jadi tidak bisa dihapus. Tandai kosong/mudik kalau tidak dihuni lagi.
       </p>
     );
   }

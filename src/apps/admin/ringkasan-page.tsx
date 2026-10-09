@@ -1,3 +1,4 @@
+import { usePermission } from "@/client/permissions";
 import { useQuery } from "@tanstack/react-query";
 import {
   CalendarClock,
@@ -28,15 +29,27 @@ import { adminPath } from "@/lib/app-paths";
 
 export function RingkasanPage() {
   const query = useQuery(dashboardQuery);
+  const canFinance = usePermission("finance");
+  const canSchedule = usePermission("schedule", true);
+  const canHouse = usePermission("houses", true);
+  const canAccounts = usePermission("accounts", true);
+  const canInfo = usePermission("info", true);
 
   return (
     <QueryState query={query}>
       {(d) => {
         const t = d.tonight;
-        const todo = todoItems(d.todo, d.date);
+        const todo = todoItems(d.todo, d.date).filter((item) => {
+          if (item.to.includes("/kas")) return canFinance;
+          if (item.to.includes("/jadwal")) return canSchedule;
+          if (item.to.includes("/rumah")) return canHouse;
+          if (item.to.includes("/petugas")) return canAccounts;
+          if (item.to.includes("/info")) return canInfo;
+          return true;
+        });
         return (
           <>
-            <PageHeader title="Ringkasan" subtitle={`Jimpitan ${d.communityName} · ${formatDateLong(d.date)}`} />
+            <PageHeader title="Ringkasan" subtitle={`${d.communityName} · ${formatDateLong(d.date)}`} />
 
             {todo.length > 0 && (
               <Card className="mb-4 border-warn/40">
@@ -71,7 +84,7 @@ export function RingkasanPage() {
                 label="Saldo kas"
                 value={formatRupiah(d.cash.balance)}
                 hint={d.cash.undeposited ? `${d.cash.undeposited} malam belum disetor` : "Semua malam sudah disetor"}
-                to={adminPath("/kas")}
+                to={canFinance ? adminPath("/kas") : undefined}
               />
             </div>
 

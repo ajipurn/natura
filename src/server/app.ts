@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { csrf } from "hono/csrf";
+import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "./env";
 import { adminRoutes } from "./routes/admin";
 import { authRoutes } from "./routes/auth";
@@ -10,6 +11,8 @@ import { rondaRoutes } from "./routes/ronda";
 import { wargaRoutes } from "./routes/warga";
 import { paymentRoutes } from "./routes/payments";
 import { residentRoutes } from "./routes/residents";
+import { duesRoutes } from "./routes/dues";
+import { familyRoutes } from "./routes/families";
 
 /** API di /api/*. Tipe `AppType` dipakai klien (hono/client) supaya pemanggilan API ikut dicek TypeScript. */
 export const app = new Hono<AppEnv>()
@@ -26,13 +29,16 @@ export const app = new Hono<AppEnv>()
   .route("/logo", logoRoutes)
   .route("/warga", wargaRoutes)
   .route("/admin/warga", residentRoutes)
-  .route("/admin", adminRoutes)
+  .route("/admin/keluarga", familyRoutes)
+  .route("/admin/iuran", duesRoutes)
   .route("/admin/pembayaran", paymentRoutes)
+  .route("/admin", adminRoutes)
   .route("/ekspor", eksporRoutes)
   .route("/", rondaRoutes);
 
 app.notFound((c) => c.json({ error: "Tidak ditemukan." }, 404));
 app.onError((err, c) => {
+  if (err instanceof HTTPException) return c.json({ error: err.message }, err.status);
   console.error(err);
   return c.json({ error: "Terjadi kesalahan di server. Coba lagi." }, 500);
 });

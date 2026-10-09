@@ -1,6 +1,7 @@
-import { and, asc, desc, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { appSurface, wargaOrigin } from "@/lib/app-paths";
 import { isIsoDate, localDate, rondaDate } from "@/lib/dates";
@@ -11,7 +12,8 @@ import { GUARD_COLORS } from "@/lib/guard-color";
 import { parseSchedule } from "@/lib/schedule";
 import { matchPlan } from "@/lib/site-plan";
 import { SITE_PLAN } from "@/site-plan";
-import { requireAdmin } from "../auth";
+import { requireDashboardResource } from "../auth";
+import { ROLES, can } from "@/lib/permissions";
 import { MAX_AMOUNT, writeCollections } from "../collections";
 import { runBatch, type Executor } from "../db";
 import type { AppEnv } from "../env";
@@ -21,13 +23,14 @@ import { MAX_LOGO_DATA_URL, parseLogo } from "../logo";
 import { DEFAULT_SETTINGS, getHouseIds, getPlanAnchors, getSettings, listHouses, listHousesWithUsage, listUsers, logoColumns, logoUrl } from "../queries";
 import { countPendingRequests, decideRequest, listRequestsForAdmin } from "../requests";
 import { clearSchedule, houseSlots, replaceSlots, saveSchedule, userDaysStatements } from "../schedule";
-import { announcements, cashDeposits, cashEntries, collections, contacts, houses, payments, rondaSchedule, settings, users } from "../schema";
+import { announcements, cashDeposits, cashEntries, collections, contacts, duesInvoices, houses, payments, residenceMoves, rondaSchedule, settings, users } from "../schema";
 import { getAudit } from "../audit";
 import { getDashboard } from "../dashboard";
 import { getCashMonth, MAX_CASH } from "../kas";
 import { monthQuery } from "./ronda";
-import { accountNameTaken as nameTaken, accountNameTakenError as nameTakenError, setHouseResident } from "../residents";
+import { accountNameTaken as nameTaken, accountNameTakenError as nameTakenError, listResidents, setHouseResident } from "../residents";
 import { residents } from "../schema";
+import { moveResident } from "../residence";
 
 const BLOCK_PATTERN = /^[0-9A-Z][0-9A-Z .\-/]{0,9}$/;
 const NUMBER_PATTERN = /^[0-9A-Z][0-9A-Z\-/]{0,9}$/;
@@ -53,7 +56,7 @@ const updateHouseSchema = z.object({
 });
 
 const userName = trimmed(40, "Isi nama (maks. 40 karakter).").min(1, "Isi nama (maks. 40 karakter).");
-const role = z.enum(["admin", "petugas"]).catch("petugas");
+const role = z.enum(ROLES).default("petugas");
 const day = z.number().int().min(0).max(6);
 /**
  * Rumah dan malam jaga petugas. Malam jaga biasanya diatur di Jadwal ronda: tanpa `days`, malam
@@ -141,7 +144,7 @@ function newExportToken() {
 }
 
 export const adminRoutes = new Hono<AppEnv>()
-  .use(requireAdmin)
+  .use(requireDashboardResource)
 
   .get("/ringkasan", async (c) => c.json(await getDashboard(c.var.db, new Date())))
 
@@ -200,7 +203,7 @@ export const adminRoutes = new Hono<AppEnv>()
     } else {
       await db.transaction(async (tx) => {
         await tx.update(houses).set({ block, number, status }).where(eq(houses.id, id));
-        if (residents.length === 0) await setHouseResident(tx, id, name);
+        if (residents.length === 0) await setHouseResident(tx, id, name, c.var.user.id);
       });
     }
     return c.json({ success: "Tersimpan." });
@@ -220,7 +223,11 @@ export const adminRoutes = new Hono<AppEnv>()
       .from(collections)
       .where(eq(collections.houseId, id));
     const [payment] = await db.select({ id: payments.id }).from(payments).where(eq(payments.houseId, id)).limit(1);
-    if (count > 0 || payment) {
+    const [invoice] = await db.select({ id: duesInvoices.id }).from(duesInvoices).where(eq(duesInvoices.houseId, id)).limit(1);
+    const [move] = await db.select({ id: residenceMoves.id }).from(residenceMoves).where(or(eq(residenceMoves.fromHouseId, id), eq(residenceMoves.toHouseId, id))).limit(1);
+    const familyMember = (await listResidents(db)).some((person) => person.houseId === id && person.familyId);
+    if (move || familyMember) return c.json({ error: "Rumah ini sudah memiliki data keluarga atau riwayat hunian. Tandai sebagai kosong/mudik saja." }, 409);
+    if (count > 0 || payment || invoice) {
       return c.json({ error: "Rumah ini sudah punya catatan jimpitan atau pembayaran. Tandai sebagai kosong/mudik saja." }, 409);
     }
     await db.delete(houses).where(eq(houses.id, id));
@@ -301,6 +308,7 @@ export const adminRoutes = new Hono<AppEnv>()
       if (residentId && !matching.length) return c.json({ error: "Warga tidak ditemukan." }, 404);
       if (matching.some((r) => r.userId !== null)) return c.json({ error: "Warga ini sudah memiliki akun." }, 409);
       if (matching.length > 1) return c.json({ error: "Ada beberapa warga dengan nama yang sama. Pilih warga untuk akun ini." }, 409);
+      if (matching[0]) await moveResident(tx, matching[0].id, houseId, c.var.user.id, localDate(new Date()));
       const [user] = await tx.insert(users).values({ name, pinHash, role: newRole, houseId }).returning({ id: users.id });
       if (matching[0]) await tx.update(residents).set({ name: null, houseId: null, userId: user.id }).where(eq(residents.id, matching[0].id));
       else await tx.insert(residents).values({ userId: user.id });
@@ -320,7 +328,7 @@ export const adminRoutes = new Hono<AppEnv>()
       const { name, role: newRole, active, houseId, days } = c.req.valid("json");
       const db = c.var.db;
       if (await nameTaken(db, name, houseId, id)) return c.json({ error: nameTakenError(name) }, 409);
-      if (id === c.var.user.id && (!active || newRole !== "admin")) {
+      if (id === c.var.user.id && (!active || newRole !== c.var.user.role)) {
         return c.json({ error: "Tidak bisa menonaktifkan atau menurunkan peran akunmu sendiri." }, 400);
       }
       if (!(await houseExists(db, houseId))) return c.json({ error: "Rumah tidak ditemukan." }, 404);
@@ -330,11 +338,22 @@ export const adminRoutes = new Hono<AppEnv>()
       ]);
       const currentDays = current.map((r) => r.day);
       const nights = days ?? [...currentDays, ...slotsOfHouse.map((s) => s.day)];
-      await runBatch(db, (tx) => [
-        tx.update(users).set({ name, role: newRole, active, houseId }).where(eq(users.id, id)),
-        ...moveIntoHouse(tx, houseId),
-        ...userDaysStatements(tx, id, nights, currentDays, slotsOfHouse),
-      ]);
+      await db.transaction(async (tx) => {
+        // Serialkan perubahan akses agar dua pengurus tidak bisa saling menonaktifkan sekaligus.
+        await tx.select({ id: settings.id }).from(settings).where(eq(settings.id, 1)).for("update");
+        const [account] = await tx.select({ role: users.role, active: users.active }).from(users).where(eq(users.id, id));
+        if (!account) throw new HTTPException(404, { message: "Akun tidak ditemukan." });
+        if (account.active && can(account.role, "accounts", true) && (!active || !can(newRole, "accounts", true))) {
+          const remaining = await tx.select({ id: users.id }).from(users).where(and(eq(users.active, true), or(eq(users.role, "admin"), eq(users.role, "ketua")), ne(users.id, id)));
+          if (!remaining.length) throw new HTTPException(409, { message: "Sisakan setidaknya satu Admin atau Ketua yang aktif untuk mengelola akses." });
+        }
+        const [profile] = await tx.select({ id: residents.id }).from(residents).where(eq(residents.userId, id));
+        if (profile) await moveResident(tx, profile.id, houseId, c.var.user.id, localDate(new Date()), undefined, name);
+        await tx.update(users).set({ name, role: newRole, active, houseId,
+          sessionVersion: sql`case when role <> ${newRole} or active <> ${active} then session_version + 1 else session_version end`,
+        }).where(eq(users.id, id));
+        for (const statement of [...moveIntoHouse(tx, houseId), ...userDaysStatements(tx, id, nights, currentDays, slotsOfHouse)]) await statement;
+      });
       return c.json({ success: "Tersimpan." });
     },
   )
@@ -371,8 +390,8 @@ export const adminRoutes = new Hono<AppEnv>()
     return c.json({
       communityName: row?.communityName ?? "",
       defaultAmount: row?.defaultAmount ?? 500,
-      wargaCode: row?.wargaCode ?? null,
-      exportToken: row?.exportToken ?? null,
+      wargaCode: can(c.var.user.role, "info", true) ? row?.wargaCode ?? null : null,
+      exportToken: can(c.var.user.role, "settings", true) ? row?.exportToken ?? null : null,
       cashPublic: row?.cashPublic ?? true,
       logoUrl: logoUrl(row),
       ...appOrigin(c),

@@ -15,7 +15,7 @@ const SIGNATURE: Record<string, (b: Uint8Array) => boolean> = {
 };
 
 /** Data URL logo → jenis dan isi gambarnya, atau null kalau bukan PNG/JPEG/WebP yang sah atau terlalu besar. */
-export function parseLogo(dataUrl: string): { type: string; bytes: Uint8Array<ArrayBuffer> } | null {
+export function parseLogo(dataUrl: string, maxBytes = MAX_LOGO_BYTES): { type: string; bytes: Uint8Array<ArrayBuffer> } | null {
   const match = DATA_URL.exec(dataUrl);
   if (!match) return null;
   let bytes: Uint8Array<ArrayBuffer>;
@@ -24,6 +24,6 @@ export function parseLogo(dataUrl: string): { type: string; bytes: Uint8Array<Ar
   } catch {
     return null;
   }
-  if (bytes.length < 12 || bytes.length > MAX_LOGO_BYTES || !SIGNATURE[match[1]](bytes)) return null;
+  if (bytes.length < 12 || bytes.length > maxBytes || !SIGNATURE[match[1]](bytes)) return null;
   return { type: match[1], bytes };
 }

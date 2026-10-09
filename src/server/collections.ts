@@ -1,3 +1,4 @@
+import { can } from "@/lib/permissions";
 import { and, eq, inArray, lte, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { formatTime, rondaDate } from "@/lib/dates";
@@ -224,7 +225,7 @@ export async function applyEntries(
       fail("Waktu catatan tidak valid.");
     } else if (at.getTime() > now.getTime() + MAX_CLOCK_SKEW_MS) {
       fail("Jam di HP lebih cepat dari jam server. Periksa pengaturan jam HP.");
-    } else if (user.role !== "admin" && at.getTime() < now.getTime() - MAX_AGE_MS) {
+    } else if (!can(user.role, "patrols", true) && at.getTime() < now.getTime() - MAX_AGE_MS) {
       fail("Catatan sudah lebih dari 3 hari. Minta admin untuk mengoreksi.");
     } else if (!known.has(entry.houseId)) {
       fail("Rumah tidak ditemukan (mungkin sudah dihapus).");

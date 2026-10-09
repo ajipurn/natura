@@ -2,7 +2,7 @@ import { and, desc, eq, gte, isNull, lte, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { daysBetween, daysInMonth, isIsoDate, localDate } from "@/lib/dates";
-import { requireAdmin } from "../auth";
+import { requireResource } from "../auth";
 import type { AppEnv } from "../env";
 import { body, idParam } from "../http";
 import { getPaymentMonth, getPaymentPlansForHouse, paymentLogsFor } from "../payments";
@@ -37,7 +37,7 @@ const planSchema = z.object({
   weekStart: z.number().int().min(0).max(6).default(1),
 });
 
-export const paymentRoutes = new Hono<AppEnv>().use(requireAdmin)
+export const paymentRoutes = new Hono<AppEnv>().use(requireResource("finance"))
   .get("/", monthQuery, async (c) => {
     const month = c.req.valid("query").bulan;
     const today = localDate(new Date());

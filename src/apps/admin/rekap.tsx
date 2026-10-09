@@ -1,3 +1,4 @@
+import { usePermission } from "@/client/permissions";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Check,
@@ -122,6 +123,8 @@ async function downloadXlsx(
 }
 
 export function RekapPage() {
+  const canSettings = usePermission("settings", true);
+  const canCorrect = usePermission("patrols", true);
   const [params] = useSearchParams();
   const tonight = rondaDate(new Date());
   const thisMonth = tonight.slice(0, 7);
@@ -182,12 +185,12 @@ export function RekapPage() {
                 onSelect: () => query.data && downloadCsv(month, query.data),
                 disabled: !ready,
               },
-              {
+              ...(canSettings ? [{
                 label: "Google Sheets",
                 hint: "Link IMPORTDATA yang ikut terbarui",
                 icon: <Sheet className="mt-0.5 size-4 shrink-0 text-primary" />,
                 onSelect: () => setSheetsOpen(true),
-              },
+              }] : []),
             ]}
           />
         }
@@ -236,7 +239,7 @@ export function RekapPage() {
           <div className={cx(query.isPlaceholderData && "opacity-60")}>
             <RecapBody
               data={data}
-              editing={editing}
+              editing={editing && canCorrect}
               onEditingChange={setEditing}
               tonight={tonight}
             />
@@ -267,6 +270,8 @@ function RecapBody({
   const [filter, setFilter] = useState<Filter>("semua");
   const [cadence, setCadence] = useState<CadenceFilter>("all");
   const [sort, setSort] = useState<Sort>("rumah");
+  const canFinance = usePermission("finance");
+  const canCorrect = usePermission("patrols", true);
   const [view, setView] = useState<RecapView>("houses");
   const [dateView, setDateView] = useState<DateView>("recorded");
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -683,7 +688,7 @@ function RecapBody({
         )}
       </Card>
 
-      <SegmentedControl
+      {canFinance && <SegmentedControl
         aria-label="Tampilan rekap"
         value={view}
         onValueChange={(next) => {
@@ -697,9 +702,9 @@ function RecapBody({
         ]}
         size="sm"
         className="mb-5 w-fit max-w-full"
-      />
+      />}
 
-      {view === "payments" ? (
+      {canFinance && view === "payments" ? (
         <PaymentPanel key={data.month} month={data.month} />
       ) : (
         <section aria-label="Rekap per rumah">
@@ -716,7 +721,7 @@ function RecapBody({
                   : "Malam yang tercatat"}
               </p>
             </div>
-            <Button
+            {canCorrect && <Button
               variant={editing ? "primary" : "secondary"}
               size="sm"
               className="shrink-0 whitespace-nowrap"
@@ -729,13 +734,13 @@ function RecapBody({
                 <Pencil className="size-4" />
               )}
               {editing ? "Selesai" : "Ubah catatan"}
-            </Button>
+            </Button>}
           </div>
           {editing && <p className="mb-3 text-sm text-muted">Mode koreksi menampilkan catatan harian asli, termasuk rumah mingguan/bulanan. Status pembayaran periode tetap otomatis. Catat pembayaran periode melalui tampilan Pembayaran.</p>}
           {nights === 0 && (
             <p className="mb-3 text-sm text-muted">
               Belum ada ronda tercatat untuk bulan ini.
-              {data.month <= tonight.slice(0, 7) &&
+              {canCorrect && data.month <= tonight.slice(0, 7) &&
                 " Gunakan Ubah catatan untuk mulai mengisi."}
             </p>
           )}

@@ -2,7 +2,7 @@ import type { GeoAnchor } from "./geo";
 import type { GuardColor } from "./guard-color";
 import type { BillingPeriod, PaymentCadence, PaymentCell, PaymentPlanDTO, PeriodPayment } from "./payments";
 
-export type Role = "admin" | "petugas";
+export type Role = "admin" | "ketua" | "sekretaris" | "bendahara" | "petugas";
 export type HouseStatus = "active" | "vacant";
 export type CollectionStatus = "filled" | "empty";
 export type CollectionMethod = "scan" | "manual";

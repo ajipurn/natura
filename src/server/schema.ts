@@ -23,7 +23,7 @@ import {
  */
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 
-export const roleEnum = pgEnum("role", ["admin", "petugas"]);
+export const roleEnum = pgEnum("role", ["admin", "petugas", "ketua", "sekretaris", "bendahara"]);
 /** `vacant` = rumah kosong / penghuni mudik, tidak dihitung sebagai bolong. */
 export const houseStatusEnum = pgEnum("house_status", ["active", "vacant"]);
 /** `filled` = wadah jimpitan ada isinya, `empty` = kosong. */
@@ -103,12 +103,36 @@ export const residents = pgTable("residents", {
   houseId: integer("house_id").references(() => houses.id, { onDelete: "set null" }),
   userId: integer("user_id").references(() => users.id, { onDelete: "restrict" }),
   phone: text("phone"),
+  familyId: integer("family_id").references((): AnyPgColumn => families.id, { onDelete: "set null" }),
+  familyRelation: text("family_relation").$type<"head" | "spouse" | "child" | "parent" | "other">(),
+  housingStatus: text("housing_status").$type<"unknown" | "owner" | "tenant" | "family" | "other">().notNull().default("unknown"),
+  residentSince: date("resident_since", { mode: "string" }),
   createdAt: createdAt(),
 }, (t) => [
   uniqueIndex("residents_user_idx").on(t.userId),
   index("residents_house_idx").on(t.houseId),
+  index("residents_family_idx").on(t.familyId),
+  check("residents_housing_status", sql`${t.housingStatus} in ('unknown', 'owner', 'tenant', 'family', 'other')`),
+  check("residents_family_relation", sql`${t.familyRelation} is null or ${t.familyRelation} in ('head', 'spouse', 'child', 'parent', 'other')`),
   check("residents_name_source", sql`(${t.userId} is null and ${t.name} is not null and length(trim(${t.name})) > 0) or (${t.userId} is not null and ${t.name} is null and ${t.houseId} is null)`),
 ]).enableRLS();
+
+export const families = pgTable("families", {
+  id: serial("id").primaryKey(),
+  headResidentId: integer("head_resident_id").notNull().references((): AnyPgColumn => residents.id, { onDelete: "restrict" }),
+  note: text("note"),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex("families_head_idx").on(t.headResidentId)]).enableRLS();
+
+export const residenceMoves = pgTable("residence_moves", {
+  id: serial("id").primaryKey(),
+  residentId: integer("resident_id").notNull().references(() => residents.id, { onDelete: "cascade" }),
+  fromHouseId: integer("from_house_id").references(() => houses.id, { onDelete: "set null" }),
+  toHouseId: integer("to_house_id").references(() => houses.id, { onDelete: "set null" }),
+  date: date("date", { mode: "string" }).notNull(),
+  recordedBy: integer("recorded_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+}, (t) => [index("residence_moves_resident_idx").on(t.residentId)]).enableRLS();
 
 /** Satu malam ronda. Jam 00:00–05:59 masih dihitung malam sebelumnya. */
 export const patrols = pgTable("patrols", {
@@ -324,6 +348,54 @@ export const paymentLogs = pgTable("payment_logs", {
   payload: jsonb("payload").notNull(),
   createdAt: createdAt(),
 }, (t) => [index("payment_logs_payment_idx").on(t.paymentId)]).enableRLS();
+
+/** Iuran lingkungan; nominal tagihan disimpan saat diterbitkan agar perubahan tarif berlaku ke depan. */
+export const duesTypes = pgTable("dues_types", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  amount: integer("amount").notNull(),
+  cadence: text("cadence").$type<"monthly" | "once">().notNull(),
+  startMonth: text("start_month").notNull(),
+  dueDay: integer("due_day").notNull().default(10),
+  active: boolean("active").notNull().default(true),
+  createdAt: createdAt(),
+}, (t) => [check("dues_types_values", sql`${t.amount} > 0 and ${t.dueDay} between 1 and 31 and ${t.cadence} in ('monthly', 'once')`)]).enableRLS();
+
+export const duesInvoices = pgTable("dues_invoices", {
+  id: serial("id").primaryKey(),
+  typeId: integer("type_id").notNull().references(() => duesTypes.id, { onDelete: "restrict" }),
+  houseId: integer("house_id").notNull().references(() => houses.id, { onDelete: "restrict" }),
+  month: text("month").notNull(),
+  amount: integer("amount").notNull(),
+  dueDate: date("due_date", { mode: "string" }).notNull(),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  recordedBy: integer("recorded_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex("dues_invoices_period_idx").on(t.typeId, t.houseId, t.month), check("dues_invoices_amount", sql`${t.amount} > 0`)]).enableRLS();
+
+export const duesReceipts = pgTable("dues_receipts", {
+  id: serial("id").primaryKey(),
+  clientId: text("client_id").notNull().unique(),
+  invoiceId: integer("invoice_id").notNull().references(() => duesInvoices.id, { onDelete: "restrict" }),
+  amount: integer("amount").notNull(),
+  date: date("date", { mode: "string" }).notNull(),
+  method: text("method").$type<"cash" | "transfer">().notNull(),
+  note: text("note"),
+  proof: text("proof"),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  recordedBy: integer("recorded_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+}, (t) => [index("dues_receipts_invoice_idx").on(t.invoiceId), index("dues_receipts_date_idx").on(t.date), check("dues_receipts_values", sql`${t.amount} > 0 and ${t.method} in ('cash', 'transfer')`)]).enableRLS();
+
+export const duesLogs = pgTable("dues_logs", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").notNull().references(() => duesInvoices.id, { onDelete: "restrict" }),
+  receiptId: integer("receipt_id").references(() => duesReceipts.id, { onDelete: "restrict" }),
+  action: text("action").$type<"issue" | "cancel_invoice" | "receive" | "cancel_receipt">().notNull(),
+  amount: integer("amount").notNull(),
+  recordedBy: integer("recorded_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+}).enableRLS();
 
 export type User = typeof users.$inferSelect;
 export type House = typeof houses.$inferSelect;

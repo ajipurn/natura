@@ -13,12 +13,13 @@ import { DAY_NAMES, DAY_SHORT, dayLabel, scheduleDay } from "@/lib/schedule";
 import { usersQuery } from "../queries";
 import { PetugasDialog, type Petugas } from "./petugas-dialog";
 import { adminPath } from "@/lib/app-paths";
+import { ROLE_LABEL, ROLE_HINT, ROLES, isManager } from "@/lib/permissions";
 
 type Filter = "semua" | "admin" | "tanpa-jadwal" | "terkunci" | "nonaktif";
 
 const FILTERS: { value: Filter; label: string; match: (u: Petugas) => boolean }[] = [
   { value: "semua", label: "Semua", match: (u) => u.active },
-  { value: "admin", label: "Admin", match: (u) => u.active && u.role === "admin" },
+  { value: "admin", label: "Pengurus", match: (u) => u.active && isManager(u.role) },
   { value: "tanpa-jadwal", label: "Belum dijadwalkan", match: (u) => u.active && u.days.length === 0 },
   { value: "terkunci", label: "Terkunci", match: (u) => u.locked },
   { value: "nonaktif", label: "Nonaktif", match: (u) => !u.active },
@@ -68,15 +69,16 @@ export function PetugasPage() {
         return (
           <>
             <PageHeader
-              title="Akun petugas"
-              subtitle={`${counts.semua} aktif · ${counts.admin} admin${counts["tanpa-jadwal"] ? ` · ${counts["tanpa-jadwal"]} belum dijadwalkan` : ""}`}
+              title="Akun & akses"
+              subtitle={`${counts.semua} akun aktif · ${counts.admin} pengurus`}
               action={
                 <Button onClick={() => setEditing("baru")} size="sm">
-                  <UserPlus className="size-4" /> Tambah
+                  <UserPlus className="size-4" /> Buat akun
                 </Button>
               }
             />
 
+            <div className="mb-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{ROLES.map((value) => <Card key={value} className="px-3 py-3"><p className="text-sm font-semibold">{ROLE_LABEL[value]}</p><p className="mt-1 text-xs text-muted">{ROLE_HINT[value]}</p></Card>)}</div>
             <NightSummary users={users.filter((u) => u.active)} today={today} selected={night} onSelect={setNight} />
 
             <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -87,13 +89,13 @@ export function PetugasPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Cari nama atau rumah…"
-                  aria-label="Cari petugas"
+                  aria-label="Cari akun"
                   className="pl-10"
                 />
               </label>
               <ScrollArea className="-mx-4 min-w-0 flex-1 overflow-x-auto lg:mx-0">
                 <ChipGroup
-                  aria-label="Saring petugas"
+                  aria-label="Saring akun"
                   value={filter}
                   onValueChange={setFilter}
                   options={filters.map((f) => ({ value: f.value, label: f.label, count: counts[f.value] }))}
@@ -243,7 +245,7 @@ function PetugasList({
     <>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-sm">
         <p className="text-muted">
-          <span className="font-semibold text-fg">{shown.length}</span> petugas
+          <span className="font-semibold text-fg">{shown.length}</span> akun
           {night !== null && (
             <>
               {` jaga ${dayLabel(night)} · `}
@@ -262,7 +264,7 @@ function PetugasList({
       {shown.length === 0 ? (
         <Card className="py-10 text-center">
           <Users className="mx-auto size-10 text-muted" />
-          <p className="mt-2 font-semibold">{search ? "Tidak ada petugas yang cocok" : "Belum ada petugas di sini"}</p>
+          <p className="mt-2 font-semibold">{search ? "Tidak ada akun yang cocok" : "Belum ada akun di sini"}</p>
           <p className="mt-1 text-sm text-muted">
             {search ? "Coba nama lain, atau kode rumah seperti AD8." : night !== null ? `Belum ada yang jaga ${dayLabel(night)}.` : "Coba saringan lain."}
           </p>
@@ -310,7 +312,7 @@ function PetugasRow({ user: u, isMe, today, onOpen }: { user: Petugas; isMe: boo
           <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
             <span className={cx("truncate font-semibold", !u.active && "text-muted")}>{u.name}</span>
             {isMe && <span className="text-sm text-muted">(kamu)</span>}
-            {u.role === "admin" && <Badge className="bg-primary/15 text-primary">Admin</Badge>}
+            <Badge className="bg-primary/15 text-primary">{ROLE_LABEL[u.role]}</Badge>
             {u.locked && (
               <Badge className="bg-empty-soft text-empty">
                 <Lock className="size-3" aria-hidden /> Terkunci

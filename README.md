@@ -1,6 +1,6 @@
 # Cluster Natura
 
-Sistem informasi dan layanan warga Cluster Natura. Saat ini mencakup pendataan warga, rumah, jimpitan, ronda, kas, pengumuman, dan kontak pengurus. Fitur berikutnya dikembangkan bertahap memakai data warga, rumah, dan akun yang sama.
+Sistem informasi dan layanan warga Cluster Natura. Saat ini mencakup pendataan warga dan keluarga, status hunian, rumah, jimpitan, ronda, kas, iuran, pembagian akses pengurus, pengumuman, dan kontak pengurus. Fitur berikutnya dikembangkan bertahap memakai data warga, rumah, dan akun yang sama.
 
 Untuk jimpitan, setiap rumah punya stiker QR di dekat wadahnya. Petugas ronda scan QR-nya, tekan **Ada** atau **Kosong**, dan rekapnya langsung tersusun.
 
@@ -9,7 +9,7 @@ Satu project dan database, empat pintu masuk:
 | Alamat production | Alamat dev/preview | Untuk | Isi |
 | --- | --- | --- | --- |
 | `app.clusternatura.com` | `/petugas/` | Petugas ronda (HP) | Scan QR, catat manual, denah 2D/3D, jaga malam ini, riwayat, jadwal. Tetap jalan tanpa sinyal. |
-| `dashboard.clusternatura.com` | `/admin/` | Pengurus (laptop/HP) | Ringkasan, peta ronda, riwayat & koreksi (dengan log catatan), rekap bulanan, kas, jadwal, petugas, data rumah & cetak QR, info warga, pengaturan. |
+| `dashboard.clusternatura.com` | `/admin/` | Pengurus (laptop/HP) | Ringkasan, peta ronda, riwayat & koreksi (dengan log catatan), rekap bulanan, kas & iuran, warga & keluarga, jadwal, akun & akses, data rumah & cetak QR, info warga, pengaturan. |
 | `info.clusternatura.com` | `/` | Warga | Pengumuman, jaga malam ini & jadwal seminggu, rekap jimpitan per bulan, status per rumah, kas, kontak pengurus. Dibuka dengan **kode warga**. |
 | `clusternatura.com` | `/landing/` | Pengunjung | Halaman sementara **Under maintenance** dengan tautan ke layanan yang tersedia. |
 
@@ -19,9 +19,12 @@ Stiker QR berisi alamat `https://info.clusternatura.com/r/<kode>`: dibuka pakai 
 
 ## Fitur
 
-- **Warga per orang:** tambah/edit nama dan nomor telepon, cari warga, saring per blok atau tanpa rumah. Rumah boleh ditentukan nanti; satu rumah dapat memiliki beberapa warga. Daftar ini hanya bisa dibuka admin.
+- **Warga per orang:** tambah/edit nama dan nomor telepon, cari warga, saring per blok atau tanpa rumah. Rumah boleh ditentukan nanti; satu rumah dapat memiliki beberapa warga. Daftar ini hanya bisa dibuka Admin, Ketua, dan Sekretaris.
 - **Warga dan akun terhubung:** buat akun petugas untuk warga yang sudah didata tanpa membuat orang baru. Warga boleh tidak memiliki akun. Profil yang terhubung akun membaca nama dan rumah langsung dari akun; perubahan di Warga atau Akun petugas langsung konsisten. Nomor telepon tidak ditampilkan di info warga atau QR.
-- **Dashboard pengurus:** menu Lingkungan (Warga, Rumah & QR, Info warga), Ronda & jimpitan, Keuangan, dan Akses akun petugas.
+- **Keluarga dan hunian:** menu **Warga** memiliki tab **Daftar warga** dan **Keluarga**. Kelompok keluarga memilih kepala, pasangan, anak, orang tua, atau anggota lainnya dari orang yang sama; satu rumah dapat menampung beberapa keluarga. Status hunian dicatat per orang (pemilik, penyewa, anggota keluarga, lainnya), beserta tanggal mulai tinggal dan riwayat perpindahan. Memindahkan keluarga memperbarui rumah seluruh anggota, termasuk akun petugas dan jadwalnya. Kepala keluarga dipindahkan bersama anggota; anggota yang pindah sendiri dilepas dari keluarga lama.
+- **Iuran lingkungan:** tentukan jenis dan nominal per rumah, periode bulanan atau sekali bayar, serta tanggal jatuh tempo. Pengurus menekan **Terbitkan tagihan** untuk bulan yang dipilih, untuk semua rumah terdaftar (termasuk kosong) atau rumah pilihan. Penerbitan ulang tidak menggandakan tagihan; perubahan tarif berlaku untuk tagihan baru. Pembayaran sebagian/lunas, tunai/transfer, tanggal penerimaan, catatan, dan bukti gambar didukung. Pembayaran masuk kas sekali pada tanggal diterima. Tagihan dan penerimaan dibatalkan tanpa menghapus riwayat; bukti hanya bisa dibaca pengelola keuangan.
+- **Akun & akses:** Admin dan Ketua mengelola semua fitur serta akses akun; Sekretaris mengelola warga, keluarga, rumah, jadwal, dan informasi; Bendahara mengelola kas/iuran serta membaca rumah dan riwayat ronda; Petugas menggunakan app ronda. Izin diperiksa di API setiap permintaan, dan perubahan peran/status mencabut sesi lama. Peran atau status akun sendiri tidak dapat diturunkan. Akun yang sudah ada mempertahankan perannya.
+- **Dashboard pengurus:** menu Lingkungan (Warga, Rumah & QR, Info warga), Ronda & jimpitan, Keuangan (Kas, Iuran), dan Akun & akses menyesuaikan izin pengguna.
 - **Scan QR per rumah** dari app petugas. Ada tombol senter untuk HP Android dan mendukung iPhone.
 - **Ada / Kosong + nominal.** Nominal awal bisa diatur dan diubah saat mencatat.
 - **Catat manual kalau QR gagal di-scan:** ketik "A12", "12", atau nama KK. Catatannya ditandai "manual" di riwayat.
@@ -38,7 +41,7 @@ Stiker QR berisi alamat `https://info.clusternatura.com/r/<kode>`: dibuka pakai 
 - **Data petugas dan rumah satu sumber:** nama warga di rumah yang dihuni petugas adalah nama akunnya, dan jadwal hanya menyimpan rujukan ke akun atau rumah. Nama yang diubah di **Petugas** atau di **Rumah & QR** langsung berubah di jadwal, denah, app petugas, dan halaman warga; petugas yang pindah rumah membawa jadwalnya. Nama boleh kembar asal rumahnya beda; di halaman masuk rumahnya ikut ditampilkan.
 - **Dashboard admin:** ringkasan malam ini, total bulan ini, saldo kas, grafik 30 malam terakhir, rumah yang sering kosong, dan daftar hal yang perlu diperhatikan.
 - **Pembayaran mingguan/bulanan:** atur cara bayar tiap rumah di **Rumah & QR** (nominal per hari, tanggal berlaku, awal minggu untuk mingguan). Catat uangnya di **Rekap bulanan → Catat pembayaran**, dengan tanggal diterima dan periode yang dibayar. Status hanya **Sudah bayar** atau **Belum bayar**, tanpa jatuh tempo maupun pilihan bayar awal/akhir. Rumah periode otomatis hijau jika lunas, merah/kosong jika belum; tidak wajib discan dan petugas tidak bisa mencatat Ada/Kosong. Warna otomatis tidak membuat transaksi harian baru. Rekap bisa disaring menurut cara bayar dan memisahkan nominal Harian, Mingguan, Bulanan. Mengubah kesepakatan memakai tanggal berlaku baru agar riwayat sebelumnya tetap tersimpan.
-- **Kas:** uang jimpitan disetor petugas jaga ke bendahara selesai keliling. Bendahara/admin mencatat setoran tiap malam di **Kas**, langsung dibandingkan dengan jimpitan yang tercatat malam itu (sesuai, kurang, atau lebih). Pengeluaran (mis. lampu pos ronda) dan pemasukan lain (mis. saldo awal) ikut dicatat, jadi saldo awal, saldo akhir bulan, dan saldo sekarang terlihat. Malam yang belum dicatat setorannya (sejak setoran pertama) diingatkan di Ringkasan. Ringkasan kas tampil di halaman warga tanpa nama pencatat, bisa dimatikan di Pengaturan.
+- **Kas:** uang jimpitan disetor petugas jaga ke bendahara selesai keliling. Bendahara/admin mencatat setoran tiap malam di **Kas**, langsung dibandingkan dengan jimpitan yang tercatat malam itu (sesuai, kurang, atau lebih). Pengeluaran (mis. lampu pos ronda) dan pemasukan lain (mis. saldo awal) ikut dicatat, jadi saldo awal, saldo akhir bulan, dan saldo sekarang terlihat. Malam yang belum dicatat setorannya (sejak setoran pertama) diingatkan di Ringkasan. Penerimaan iuran ikut dihitung dalam kas tanpa perlu dibuat ulang sebagai pemasukan lain. Ringkasan kas tampil di halaman warga tanpa nama pencatat atau bukti pembayaran, bisa dimatikan di Pengaturan.
 - **Riwayat per malam** (jam, petugas, scan/manual) dan koreksi oleh admin.
 - **Admin bisa mengisi dan mengubah catatan semua rumah untuk tanggal mana pun yang sudah lewat**, juga malam yang belum ada catatannya (mis. dari catatan kertas): buka tanggalnya di Riwayat, lalu ubah per rumah atau **isi semua yang belum dicek sekaligus** (Ada dengan nominal yang sama, atau Kosong). Di Rekap bulanan, tombol **Isi/ubah catatan** membuat setiap kotak rumah × tanggal bisa diketuk. Semua isian admin tercatat di Log catatan sebagai koreksi.
 - **Rekap bulanan** berupa tabel rumah × tanggal per blok seperti kalender sebulan (ada, nominal yang bukan nominal awal, kosong, tidak dicek; malam tanpa catatan tampil pudar), dengan pencarian, saringan, dan urutan. Kolom **Bulanan** terpisah dari pengambilan harian; **Mingguan** muncul saat ada pembayarannya. Bisa diunduh sebagai Excel (.xlsx, lembar per rumah, per malam, dan transaksi periode, berwarna) atau CSV. Kolom periode juga tersedia di Google Sheets.
@@ -189,6 +192,8 @@ test/               Tes Vitest; tes API memakai PGlite (atau Postgres lewat TEST
 | `bun run db:generate` | Buat migrasi baru setelah mengubah `src/server/schema.ts` |
 | `bun run db:migrate` / `db:migrate:remote` | Jalankan migrasi ke `DATABASE_URL` / Supabase (`REMOTE_DATABASE_URL`) |
 | `bun run seed` / `seed:remote` | Isi rumah, jadwal, nama KK, dan akun petugas ke database lokal / Supabase |
+
+Jangan hapus rumah yang sudah mempunyai tagihan, catatan pembayaran, kelompok keluarga, atau riwayat hunian; tandai kosong/mudik bila tidak dihuni.
 
 ## Ide pengembangan berikutnya
 

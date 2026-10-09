@@ -46,7 +46,7 @@ export function KasPage() {
 
   return (
     <>
-      <PageHeader title="Kas" subtitle="Kelola setoran jimpitan, pemasukan lain, dan pengeluaran kas." />
+      <PageHeader title="Kas" subtitle="Setoran jimpitan, penerimaan iuran, dan transaksi lingkungan." action={<Link to={adminPath("/iuran")} className={buttonClass("secondary", "sm")}>Kelola iuran</Link>} />
       <div className="mb-4 flex items-center justify-between gap-2 sm:gap-3">
         <MonthNav month={month} thisMonth={thisMonth} />
         <Button size="sm" className="shrink-0" onClick={() => openEntry()}>
@@ -123,6 +123,7 @@ function Summary({ data }: { data: CashMonth }) {
     ["Saldo awal bulan", data.opening],
     ["+ Setoran jimpitan", data.deposits, "text-filled"],
     ["+ Pembayaran langsung", data.directPayments, "text-filled"],
+    ["+ Iuran lingkungan", data.duesIncome, "text-filled"],
     ["+ Pemasukan lain", data.income, "text-filled"],
     ["− Pengeluaran", data.expenses, "text-empty"],
   ];

@@ -32,6 +32,7 @@ import type { CashPublic } from "@/server/kas";
 import { HouseStatus } from "./house-status";
 import { useMyHouse } from "./my-house";
 import { adminPath, petugasPath } from "@/lib/app-paths";
+import { isManager } from "@/lib/permissions";
 
 const accessQuery = { queryKey: ["warga", "akses"], queryFn: () => call(api.warga.akses.$get()) };
 
@@ -90,7 +91,7 @@ function AppLinks() {
       <a href={petugasPath("/")} className={buttonClass("secondary", "sm")}>
         <ScanLine className="size-4" aria-hidden /> App petugas
       </a>
-      {user?.role === "admin" && (
+      {user && isManager(user.role) && (
         <a href={adminPath("/")} title={`Masuk sebagai ${user.name}`} className={buttonClass("secondary", "sm")}>
           <LayoutDashboard className="size-4" aria-hidden /> Dashboard
         </a>
@@ -418,6 +419,7 @@ function CashCard({ cash }: { cash: CashPublic }) {
         <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-line pt-4 sm:grid-cols-4">
           <Stat label={`Setoran ${monthName}`} value={formatRupiah(cash.deposits)} />
           <Stat label="Pembayaran langsung" value={formatRupiah(cash.directPayments)} />
+          <Stat label="Iuran lingkungan" value={formatRupiah(cash.duesIncome)} />
           <Stat label="Pemasukan lain" value={formatRupiah(cash.income)} />
           <Stat label="Pengeluaran" value={formatRupiah(cash.expenses)} />
         </div>

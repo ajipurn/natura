@@ -1,3 +1,4 @@
+import { can } from "@/lib/permissions";
 import { useAuth } from "@/client/auth";
 import { PageTitle } from "@/components/ui";
 import { RondaApp } from "./ronda-app";
@@ -7,7 +8,7 @@ export function RondaPage() {
   return (
     <>
       <PageTitle title="Ronda" />
-      <RondaApp isAdmin={user?.role === "admin"} />
+      <RondaApp isAdmin={Boolean(user && can(user.role, "patrols", true))} />
     </>
   );
 }
