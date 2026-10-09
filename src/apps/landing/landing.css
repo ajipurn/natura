@@ -1,15 +1,12 @@
 .landing-page {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
-.landing-service-link,
-.landing-scene__toggle {
+.landing-service-link {
   transition: transform 160ms var(--ease-out), background-color 160ms ease, color 160ms ease;
 }
 
-.landing-service-link:active,
-.landing-scene__toggle:active {
+.landing-service-link:active {
   transform: scale(0.97);
 }
 
@@ -20,76 +17,24 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 6%, transparent);
 }
 
-.landing-scene__tree,
-.landing-scene__crown,
-.landing-scene__grass {
-  /* SVG coordinates keep the roots planted while the foliage moves. */
-  transform-box: view-box;
-  animation-timing-function: var(--ease-in-out);
-  animation-iteration-count: infinite;
+.landing-scene__stage canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms var(--ease-out);
 }
 
-.landing-scene__tree {
-  animation-name: natura-tree-sway;
+.landing-scene__stage[data-ready="true"] canvas {
+  opacity: 1;
 }
 
-.landing-scene__tree--left {
-  transform-origin: 44px 231px;
-  animation-duration: 7s;
-  animation-delay: -1.5s;
-}
-
-.landing-scene__tree--right {
-  transform-origin: 313px 226px;
-  animation-duration: 8.5s;
-  animation-delay: -3.8s;
-}
-
-.landing-scene__crown {
-  animation-name: natura-leaf-sway;
-}
-
-.landing-scene__crown--left {
-  transform-origin: 44px 186px;
-  animation-duration: 5.5s;
-  animation-delay: -2.5s;
-}
-
-.landing-scene__crown--right {
-  transform-origin: 313px 193px;
-  animation-duration: 6.5s;
-  animation-delay: -4s;
-}
-
-.landing-scene__grass {
-  transform-origin: 64px 242px;
-  animation: natura-leaf-sway 5s var(--ease-in-out) -1s infinite;
-}
-
-.landing-scene[data-paused="true"] .landing-scene__motion {
-  animation-play-state: paused;
-}
-
-@keyframes natura-tree-sway {
-  0%, 100% { transform: rotate(-1.5deg); }
-  50% { transform: rotate(2.5deg); }
-}
-
-@keyframes natura-leaf-sway {
-  0%, 100% { transform: rotate(-2deg); }
-  50% { transform: rotate(3deg); }
+.landing-scene__stage[data-ready="true"] .landing-scene__fallback {
+  visibility: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .landing-scene__motion {
-    animation: none;
-    transform: none;
-  }
-
-  .landing-scene__toggle {
-    display: none;
-  }
-
   .landing-service-link:active {
     transform: none;
   }
