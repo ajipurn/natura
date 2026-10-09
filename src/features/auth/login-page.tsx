@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { ArrowRight, Eye, EyeOff, Leaf, LoaderCircle } from "lucide-react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router";
 import { api, call, errorMessage } from "@/client/api";
 import { loginNext, useAuth } from "@/client/auth";
 import { clearCache, queryClient } from "@/client/query";
 import { ErrorCard } from "@/components/query-state";
 import { Select } from "@/components/select";
-import { Alert, Button, Field, Input, PageTitle } from "@/components/ui";
+import { ThemeButton } from "@/components/theme-toggle";
+import { Alert, Button, cx, Field, Input, PageTitle } from "@/components/ui";
 
 const LAST_USER_KEY = "jimpitan:last-user";
 
@@ -28,7 +30,10 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
   const [userId, setUserId] = useState(lastUser);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [showPin, setShowPin] = useState(false);
   const pinRef = useRef<HTMLInputElement>(null);
+  const pinId = useId();
+  const errorId = useId();
 
   // PIN salah: kosongkan PIN saja, nama tetap terpilih.
   useEffect(() => {
@@ -46,6 +51,7 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (pending || users.isPending) return;
     const pin = pinRef.current?.value ?? "";
     setPending(true);
     setError(null);
@@ -66,46 +72,97 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
 
   const list = users.data?.users ?? [];
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-10">
-      <PageTitle title="Masuk" />
-      <p className="text-sm font-medium text-primary">Cluster Natura</p>
-      <h1 className="mt-1 text-3xl font-bold tracking-tight">{title}</h1>
-      {users.isError ? (
-        <div className="mt-6">
-          <ErrorCard message={errorMessage(users.error)} onRetry={() => void users.refetch()} />
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-8 sm:py-12">
+      <PageTitle title={title} />
+      <header className="mb-6 flex items-center justify-between gap-4 px-1">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-fg">
+            <Leaf className="size-6" aria-hidden />
+          </span>
+          <div>
+            <p className="font-semibold tracking-tight">Cluster Natura</p>
+            <p className="text-xs text-muted">Jimpitan & ronda</p>
+          </div>
         </div>
-      ) : (
-        <form className="mt-6 space-y-4" onSubmit={submit}>
-          <Select
-            label="Nama"
-            name="userId"
-            required
-            value={list.some((u) => String(u.id) === userId) ? userId : ""}
-            onValueChange={setUserId}
-            // Blok/nomor rumah tampil di samping nama, jadi nama kembar tetap bisa dibedakan.
-            options={list.map((u) => ({ value: String(u.id), label: u.name, hint: u.house ?? undefined }))}
-            placeholder={users.isPending ? "Memuat…" : "Pilih nama…"}
-            disabled={users.isPending}
-          />
-          <Field label="PIN">
-            <Input
-              ref={pinRef}
-              name="pin"
+        <ThemeButton className="size-11 rounded-xl transition-[background-color,color,box-shadow,scale] active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100" />
+      </header>
+
+      <div className="rounded-[2rem] bg-card p-5 shadow-sm ring-1 ring-line sm:p-8">
+        <h1 className="text-balance text-3xl font-semibold tracking-tight">{title}</h1>
+        <p className="mt-2 text-pretty text-sm leading-relaxed text-muted">Pilih nama dan masukkan PIN untuk melanjutkan.</p>
+        {users.isError ? (
+          <div className="mt-7">
+            <ErrorCard message={errorMessage(users.error)} onRetry={() => void users.refetch()} />
+          </div>
+        ) : (
+          <form className="mt-7 space-y-5" onSubmit={submit} aria-busy={pending}>
+            <Select
+              label="Nama"
+              name="userId"
               required
-              type="password"
-              inputMode="numeric"
-              pattern="\d{4,6}"
-              autoComplete="current-password"
-              className="text-center text-2xl tracking-[0.5em]"
+              value={list.some((u) => String(u.id) === userId) ? userId : ""}
+              onValueChange={setUserId}
+              // Blok/nomor rumah tampil di samping nama, jadi nama kembar tetap bisa dibedakan.
+              options={list.map((u) => ({ value: String(u.id), label: u.name, hint: u.house ?? undefined }))}
+              placeholder={users.isPending ? "Memuat nama…" : "Pilih nama kamu"}
+              searchPlaceholder="Cari nama atau rumah…"
+              disabled={users.isPending || pending}
+              className="h-12 bg-bg/50"
             />
-          </Field>
-          {error && <Alert>{error}</Alert>}
-          <Button type="submit" disabled={pending} size="lg" className="w-full">
-            {pending ? "Memeriksa…" : "Masuk"}
-          </Button>
-          <p className="text-center text-sm text-muted">Lupa PIN? Minta admin untuk mengatur ulang.</p>
-        </form>
-      )}
+            <Field label="PIN" hint="Gunakan PIN 4–6 angka.">
+              <div className="relative">
+                <Input
+                  ref={pinRef}
+                  id={pinId}
+                  name="pin"
+                  required
+                  type={showPin ? "text" : "password"}
+                  inputMode="numeric"
+                  pattern="\d{4,6}"
+                  maxLength={6}
+                  autoComplete="current-password"
+                  placeholder="••••"
+                  readOnly={pending}
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? errorId : undefined}
+                  className={cx("h-12 bg-bg/50 pe-14 text-xl tracking-[0.35em]", error && "border-empty focus:border-empty focus:ring-empty/30")}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Tampilkan PIN"
+                  aria-pressed={showPin}
+                  aria-controls={pinId}
+                  title={showPin ? "Sembunyikan PIN" : "Tampilkan PIN"}
+                  disabled={pending}
+                  onClick={() => setShowPin((shown) => !shown)}
+                  className="absolute end-1 top-0.5 size-11 transition-[background-color,color,box-shadow,scale] active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100"
+                >
+                  <Eye className={cx("size-5 transition-[opacity,scale,filter] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none", showPin ? "scale-[0.25] opacity-0 blur-[4px]" : "scale-100 opacity-100 blur-0")} aria-hidden />
+                  <EyeOff className={cx("absolute size-5 transition-[opacity,scale,filter] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none", showPin ? "scale-100 opacity-100 blur-0" : "scale-[0.25] opacity-0 blur-[4px]")} aria-hidden />
+                </Button>
+              </div>
+            </Field>
+            {error && <div id={errorId}><Alert>{error}</Alert></div>}
+            <Button
+              type="submit"
+              disabled={pending || users.isPending}
+              focusableWhenDisabled
+              size="lg"
+              className="w-full text-base transition-[background-color,box-shadow,scale] hover:bg-primary/90 active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100"
+            >
+              {pending ? <LoaderCircle className="size-5 motion-safe:animate-spin" aria-hidden /> : null}
+              {pending ? "Memeriksa…" : "Masuk"}
+              {!pending && <ArrowRight className="size-5" aria-hidden />}
+            </Button>
+          </form>
+        )}
+      </div>
+
+      <p className="mt-6 px-4 text-center text-pretty text-sm leading-relaxed text-muted">
+        <span className="font-medium text-fg">Lupa PIN?</span> Minta admin untuk mengatur ulang.
+      </p>
     </main>
   );
 }
