@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, ChevronRight, Lock, Search, UserPlus, Users } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { QueryState } from "@/components/query-state";
 import { ScrollArea } from "@/components/scroll-area";
 import { Select } from "@/components/select";
@@ -49,12 +49,13 @@ const COMPARE: Record<Sort, (a: Petugas, b: Petugas) => number> = {
 };
 
 export function PetugasPage() {
+  const [params, setParams] = useSearchParams();
   const query = useQuery(usersQuery);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("semua");
   const [night, setNight] = useState<number | null>(null);
   const [sort, setSort] = useState<Sort>("nama");
-  const [editing, setEditing] = useState<number | "baru" | null>(null);
+  const [editing, setEditing] = useState<number | "baru" | null>(() => params.has("warga") ? "baru" : null);
   const today = rondaDate(new Date());
 
   return (
@@ -67,7 +68,7 @@ export function PetugasPage() {
         return (
           <>
             <PageHeader
-              title="Petugas ronda"
+              title="Akun petugas"
               subtitle={`${counts.semua} aktif · ${counts.admin} admin${counts["tanpa-jadwal"] ? ` · ${counts["tanpa-jadwal"]} belum dijadwalkan` : ""}`}
               action={
                 <Button onClick={() => setEditing("baru")} size="sm">
@@ -116,7 +117,8 @@ export function PetugasPage() {
 
             <PetugasDialog
               open={editing !== null && (editing === "baru" || Boolean(editingUser))}
-              onClose={() => setEditing(null)}
+              onClose={() => { setEditing(null); if (params.has("warga")) setParams({}, { replace: true }); }}
+              initialResidentId={Number(params.get("warga")) || undefined}
               petugas={editingUser}
               isSelf={editingUser?.id === me.id}
             />

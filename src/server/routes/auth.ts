@@ -7,7 +7,7 @@ import type { AppEnv } from "../env";
 import { body, pinField, trimmed } from "../http";
 import { hashPin, verifyPin } from "../pin";
 import { hasAnyUser, listLoginUsers } from "../queries";
-import { settings, users } from "../schema";
+import { residents, settings, users } from "../schema";
 
 const MAX_ATTEMPTS = 5;
 const LOCK_MINUTES = 15;
@@ -123,6 +123,7 @@ export const authRoutes = new Hono<AppEnv>()
         .insert(users)
         .values({ name, pinHash, role: "admin" })
         .returning({ id: users.id, name: users.name, role: users.role, sessionVersion: users.sessionVersion });
+      await tx.insert(residents).values({ userId: created.id });
       return created;
     });
     await startSession(c, user);

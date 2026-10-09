@@ -12,6 +12,7 @@ import {
   Settings,
   Table2,
   Users,
+  KeyRound,
   Wallet,
   X,
   type LucideIcon,
@@ -29,33 +30,57 @@ import { adminPath, petugasPath } from "@/lib/app-paths";
 
 type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean };
 
-/** "Ronda" untuk memantau sehari-hari, "Kelola" untuk data yang jarang berubah. Pengaturan di bawah. */
+/** Data lingkungan terpisah dari kegiatan ronda, kas, dan akses akun. */
 const NAV: { group: string; items: NavItem[] }[] = [
   {
-    group: "Ronda",
+    group: "Utama",
     items: [
       { to: adminPath(), label: "Ringkasan", icon: LayoutDashboard, end: true },
-      { to: adminPath("/denah"), label: "Peta ronda", icon: MapIcon },
-      { to: adminPath("/riwayat"), label: "Riwayat", icon: History },
-      { to: adminPath("/rekap"), label: "Rekap bulanan", icon: Table2 },
-      { to: adminPath("/kas"), label: "Kas", icon: Wallet },
     ],
   },
   {
-    group: "Kelola",
+    group: "Lingkungan",
     items: [
-      { to: adminPath("/jadwal"), label: "Jadwal ronda", icon: CalendarDays },
-      { to: adminPath("/petugas"), label: "Petugas", icon: Users },
+      { to: adminPath("/warga"), label: "Warga", icon: Users },
       { to: adminPath("/rumah"), label: "Rumah & QR", icon: Home },
       { to: adminPath("/info"), label: "Info warga", icon: Megaphone },
     ],
   },
+  {
+    group: "Ronda & jimpitan",
+    items: [
+      { to: adminPath("/denah"), label: "Peta ronda", icon: MapIcon },
+      { to: adminPath("/jadwal"), label: "Jadwal ronda", icon: CalendarDays },
+      { to: adminPath("/riwayat"), label: "Riwayat", icon: History },
+      { to: adminPath("/rekap"), label: "Rekap bulanan", icon: Table2 },
+    ],
+  },
+  {
+    group: "Keuangan",
+    items: [{ to: adminPath("/kas"), label: "Kas", icon: Wallet }],
+  },
+  {
+    group: "Akses",
+    items: [
+      { to: adminPath("/petugas"), label: "Akun petugas", icon: KeyRound },
+    ],
+  },
 ];
 
-const SETTINGS: NavItem = { to: adminPath("/pengaturan"), label: "Pengaturan", icon: Settings };
+const SETTINGS: NavItem = {
+  to: adminPath("/pengaturan"),
+  label: "Pengaturan",
+  icon: Settings,
+};
 
 /** Kerangka dashboard admin: menu samping di layar lebar, menu geser di HP. */
-export function AdminLayout({ user, children }: { user: SessionUser; children: ReactNode }) {
+export function AdminLayout({
+  user,
+  children,
+}: {
+  user: SessionUser;
+  children: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const location = useLocation();
 
@@ -80,10 +105,26 @@ export function AdminLayout({ user, children }: { user: SessionUser; children: R
       </aside>
 
       {open && (
-        <div className="fixed inset-0 z-40 lg:hidden print:hidden" role="dialog" aria-modal="true" aria-label="Menu">
-          <Button variant="plain" aria-label="Tutup menu" className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
+        <div
+          className="fixed inset-0 z-40 lg:hidden print:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu"
+        >
+          <Button
+            variant="plain"
+            aria-label="Tutup menu"
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setOpen(false)}
+          />
           <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-card shadow-xl">
-            <Button variant="ghost" size="icon" aria-label="Tutup menu" onClick={() => setOpen(false)} className="absolute right-2 top-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Tutup menu"
+              onClick={() => setOpen(false)}
+              className="absolute right-2 top-3"
+            >
               <X className="size-5" />
             </Button>
             <Sidebar user={user} />
@@ -93,10 +134,15 @@ export function AdminLayout({ user, children }: { user: SessionUser; children: R
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-line bg-card/95 px-3 py-2 backdrop-blur lg:hidden print:hidden">
-          <Button variant="ghost" size="icon" onClick={() => setOpen(true)} aria-label="Buka menu">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setOpen(true)}
+            aria-label="Buka menu"
+          >
             <Menu className="size-6" />
           </Button>
-          <span className="font-semibold">Admin Jimpitan</span>
+          <span className="font-semibold">Cluster Natura</span>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-5 lg:px-8 lg:pt-8 print:max-w-none print:p-0">
           {children}
@@ -125,29 +171,42 @@ function Sidebar({ user }: { user: SessionUser }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 px-5 pb-3 pt-5">
-        {logoUrl && <img src={logoUrl} alt="" className="size-10 shrink-0 rounded-lg object-contain" />}
+        {logoUrl && (
+          <img
+            src={logoUrl}
+            alt=""
+            className="size-10 shrink-0 rounded-lg object-contain"
+          />
+        )}
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Jimpitan</p>
-          <p className="text-lg font-bold">Admin</p>
+          <p className="text-lg font-bold tracking-tight">Cluster Natura</p>
+          <p className="mt-0.5 text-xs font-medium text-muted">Dashboard</p>
         </div>
       </div>
-      <ScrollArea element="nav" aria-label="Menu admin" className="min-h-0 flex-1 overflow-y-auto">
+      <ScrollArea
+        element="nav"
+        aria-label="Menu admin"
+        className="min-h-0 flex-1 overflow-y-auto"
+      >
         <div className="px-3">
           {NAV.map(({ group, items }) => (
             <div key={group} className="mb-4">
-              <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted">{group}</p>
+              <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted">
+                {group}
+              </p>
               <ul className="space-y-1">
                 {items.map((item) => (
                   <li key={item.to}>
                     <SidebarLink item={item}>
-                      {item.to === adminPath("/jadwal") && pendingRequests > 0 && (
-                        <span
-                          className="ml-auto rounded-full bg-warn px-2 py-0.5 text-xs font-bold text-card"
-                          aria-label={`${pendingRequests} permintaan ubah jadwal`}
-                        >
-                          {pendingRequests}
-                        </span>
-                      )}
+                      {item.to === adminPath("/jadwal") &&
+                        pendingRequests > 0 && (
+                          <span
+                            className="ml-auto rounded-full bg-warn px-2 py-0.5 text-xs font-bold text-card"
+                            aria-label={`${pendingRequests} permintaan ubah jadwal`}
+                          >
+                            {pendingRequests}
+                          </span>
+                        )}
                     </SidebarLink>
                   </li>
                 ))}
@@ -159,7 +218,10 @@ function Sidebar({ user }: { user: SessionUser }) {
       <div className="space-y-1 border-t border-line p-3">
         <SidebarLink item={SETTINGS} />
         <ThemeSwitch />
-        <a href={petugasPath("/")} className="flex items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium hover:bg-idle-soft">
+        <a
+          href={petugasPath("/")}
+          className="flex items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium hover:bg-idle-soft"
+        >
           <ScanLine className="size-5 text-primary" /> Buka app petugas
         </a>
         <Button
@@ -169,14 +231,22 @@ function Sidebar({ user }: { user: SessionUser }) {
           className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-sm font-medium text-empty hover:bg-empty-soft"
         >
           <LogOut className="size-5" /> Keluar
-          <span className="ml-auto truncate text-xs font-normal text-muted">{user.name}</span>
+          <span className="ml-auto truncate text-xs font-normal text-muted">
+            {user.name}
+          </span>
         </Button>
       </div>
     </div>
   );
 }
 
-function SidebarLink({ item: { to, label, icon: Icon, end }, children }: { item: NavItem; children?: ReactNode }) {
+function SidebarLink({
+  item: { to, label, icon: Icon, end },
+  children,
+}: {
+  item: NavItem;
+  children?: ReactNode;
+}) {
   return (
     <NavLink
       to={to}
@@ -184,7 +254,9 @@ function SidebarLink({ item: { to, label, icon: Icon, end }, children }: { item:
       className={({ isActive }) =>
         cx(
           "flex items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium",
-          isActive ? "bg-primary/12 text-primary" : "text-fg hover:bg-idle-soft",
+          isActive
+            ? "bg-primary/12 text-primary"
+            : "text-fg hover:bg-idle-soft",
         )
       }
     >

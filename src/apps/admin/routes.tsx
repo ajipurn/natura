@@ -17,6 +17,7 @@ import { RingkasanPage } from "./ringkasan-page";
 import { CetakPage } from "./rumah/cetak";
 import { RumahPage } from "./rumah/rumah-page";
 import { SetupPage } from "./setup";
+import { WargaPage } from "./warga/warga-page";
 import { adminPath } from "@/lib/app-paths";
 
 const NIGHT_LOG = { Alerts: NightLogAlerts, Log: NightLog };
@@ -48,6 +49,7 @@ export const router = createBrowserRouter([
       { path: "rumah/cetak", element: <CetakPage /> },
       { path: "denah", element: <DenahPage /> },
       { path: "petugas", element: <PetugasPage /> },
+      { path: "warga", element: <WargaPage /> },
       { path: "info", element: <InfoPage /> },
       { path: "pengaturan", element: <PengaturanPage /> },
       { path: "*", element: <NotFound home={adminPath()} /> },

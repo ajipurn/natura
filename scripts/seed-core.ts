@@ -26,6 +26,8 @@ import type { Db, Executor, Statement } from "../src/server/db";
 import { hashPin } from "../src/server/pin";
 import { houses, rondaSchedule, users } from "../src/server/schema";
 import { SITE_PLAN } from "../src/site-plan";
+import { houseName } from "../src/server/house-name";
+import { adoptLegacyResidents } from "../src/server/residents";
 
 const MAX_NAME = 40;
 const COLOR_CODES: Record<string, GuardColor> = { H: "green", K: "yellow", O: "orange", B: "blue" };
@@ -61,7 +63,7 @@ export async function seed(db: Db, { root, label, remote, replaceSchedule, log }
       .values(newLots.map((lot) => ({ block: lot.block, number: lot.number!, token: newToken() })))
       .onConflictDoNothing();
   }
-  const houseRows = await db.select({ id: houses.id, block: houses.block, number: houses.number, ownerName: houses.ownerName }).from(houses);
+  const houseRows = await db.select({ id: houses.id, block: houses.block, number: houses.number, ownerName: houseName }).from(houses);
   const byKey = new Map(houseRows.map((h) => [houseKey(h), h]));
 
   const { entries, warnings } = parseSchedule(readFileSync(path.join(root, "scripts/jadwal-natura.tsv"), "utf8"));
@@ -146,6 +148,7 @@ export async function seed(db: Db, { root, label, remote, replaceSchedule, log }
   }
   await db.transaction(async (tx) => {
     for (const statement of statements) await statement(tx);
+    await adoptLegacyResidents(tx);
   });
 
   log(`\n✓ ${newLots.length} rumah baru dari denah (${houseRows.length} rumah terdaftar).`);

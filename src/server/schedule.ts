@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, notInArray, sql } from "drizzle-orm";
+import { and, asc, eq, notInArray, sql } from "drizzle-orm";
 import { NEW_SLOT_COLOR, type GuardColor } from "@/lib/guard-color";
 import { analyzeSchedule, matchGuardAccount, resolveEntry, type ScheduleEntry, type SlotSource } from "@/lib/schedule";
 import { houseKey } from "@/lib/site-plan";
@@ -6,6 +6,7 @@ import type { ScheduleDTO } from "@/lib/types";
 import { runBatch, type Db, type Executor, type Statement } from "./db";
 import { houseName } from "./house-name";
 import { houses, rondaSchedule, users } from "./schema";
+import { setHouseResident } from "./residents";
 
 /** Jadwal lengkap dengan nama dan rumah dari akun petugas atau data rumah. */
 export async function listSchedule(db: Db): Promise<ScheduleDTO[]> {
@@ -118,7 +119,7 @@ export function userDaysStatements(
 }
 
 /** Baris jadwal rumah tanpa akun (belum dihubungkan ke petugas). */
-export function houseSlots(db: Db, houseId: number | null) {
+export function houseSlots(db: Executor, houseId: number | null) {
   if (!houseId) return Promise.resolve([]);
   return db.select({ id: rondaSchedule.id, day: rondaSchedule.dayOfWeek }).from(rondaSchedule).where(eq(rondaSchedule.houseId, houseId));
 }
@@ -163,7 +164,7 @@ export async function saveSchedule(
   options: { fillNames: boolean; overwriteNames: boolean },
 ): Promise<ScheduleImportSummary> {
   const [houseRows, accounts] = await Promise.all([
-    db.select({ id: houses.id, block: houses.block, number: houses.number, ownerName: houses.ownerName }).from(houses),
+    db.select({ id: houses.id, block: houses.block, number: houses.number, ownerName: houseName }).from(houses),
     db.select({ id: users.id, name: users.name, houseId: users.houseId }).from(users),
   ]);
   const byKey = new Map(houseRows.map((h) => [houseKey(h), h]));
@@ -196,28 +197,13 @@ export async function saveSchedule(
   }
 
   // Satu transaksi: semua berhasil atau semua batal.
-  await runBatch(db, (tx) => {
-    const statements: Statement[] = [tx.delete(rondaSchedule), ...insertSlots(tx, slots)];
+  await db.transaction(async (tx) => {
+    for (const statement of [tx.delete(rondaSchedule), ...insertSlots(tx, slots)]) await statement;
     for (const [userId, houseId] of homed) {
-      statements.push(
-        tx.update(users).set({ houseId }).where(eq(users.id, userId)),
-        tx.update(houses).set({ ownerName: null }).where(eq(houses.id, houseId)),
-      );
+      await tx.update(users).set({ houseId }).where(eq(users.id, userId));
+      await tx.update(houses).set({ ownerName: null }).where(eq(houses.id, houseId));
     }
-    if (names.length) {
-      // Satu UPDATE untuk banyak rumah (CASE id ...).
-      const cases = sql.join(
-        names.map((n) => sql`when ${n.id} then ${n.name}`),
-        sql` `,
-      );
-      statements.push(
-        tx
-          .update(houses)
-          .set({ ownerName: sql`case ${houses.id} ${cases} end` })
-          .where(inArray(houses.id, names.map((n) => n.id))),
-      );
-    }
-    return statements;
+    for (const n of names) await setHouseResident(tx, n.id, n.name);
   });
 
   return {

@@ -11,6 +11,7 @@ import { houseName } from "./house-name";
 import { guardDaysByUser, listSchedule } from "./schedule";
 import { collectionLogs, collections, houses, paymentPlans, payments, patrols, settings, users } from "./schema";
 import { getPaymentData, getPaymentMonth } from "./payments";
+import { listResidents } from "./residents";
 
 export const DEFAULT_SETTINGS = { communityName: "Lingkungan Kita", defaultAmount: 500 };
 
@@ -124,7 +125,11 @@ export async function listHousesWithUsage(db: Db, today = localDate(new Date()))
     .from(houses)
     .leftJoin(collections, eq(collections.houseId, houses.id))
     .groupBy(houses.id);
-  return rows.sort(compareHouses);
+  const people = await listResidents(db);
+  return rows.sort(compareHouses).map((house) => ({
+    ...house,
+    residents: people.filter((r) => r.houseId === house.id).map(({ id, name, userId }) => ({ id, name, userId })),
+  }));
 }
 
 export async function getHouseByToken(db: Db, token: string) {

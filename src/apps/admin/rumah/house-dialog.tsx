@@ -16,7 +16,7 @@ import { HOUSE_REFRESH } from "../queries";
 import { PaymentPlanSection } from "../payments/plan-section";
 import { adminPath } from "@/lib/app-paths";
 
-export type AdminHouse = HouseDTO & { collectionCount: number; paymentCount: number; paymentCadence: PaymentCadence };
+export type AdminHouse = HouseDTO & { collectionCount: number; paymentCount: number; paymentCadence: PaymentCadence; residents?: { id: number; name: string; userId: number | null }[] };
 
 
 const STATUSES: { value: HouseStatus; label: string; hint: string }[] = [
@@ -114,7 +114,7 @@ function AddForm({ houses, initial, onDone }: { houses: HouseDTO[]; initial: { b
         <p className="-mt-2 text-xs text-muted">Satu nomor (12), rentang (1-20), atau daftar (1, 3, 5A).</p>
       )}
 
-      <Field label="Nama KK (opsional)" hint={single ? undefined : "Hanya dipakai kalau menambah satu rumah."}>
+      <Field label="Nama warga (opsional)" hint={single ? "Warga ini akan terdaftar di menu Warga." : "Hanya dipakai kalau menambah satu rumah."}>
         <Input
           value={single ? ownerName : ""}
           onChange={(e) => setOwnerName(e.target.value)}
@@ -209,27 +209,27 @@ function EditForm({ house, accounts, origin, onDone }: { house: AdminHouse; acco
           </Field>
         </div>
 
-        {accounts.length > 1 ? (
+        {(house.residents?.length ?? 0) > 1 || accounts.length > 1 ? (
           <div>
             <p className="mb-1.5 text-sm font-medium">Penghuni</p>
             <div className="flex flex-wrap gap-1.5">
-              {accounts.map((name) => (
-                <span key={name} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-sm text-primary">
+              {(house.residents?.map((r) => r.name) ?? accounts).map((name, index) => (
+                <span key={index} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-sm text-primary">
                   <UserRound className="size-3.5" /> {name}
                 </span>
               ))}
             </div>
             <p className="mt-1.5 text-xs text-muted">
-              Nama dari akun petugas; ubah di{" "}
-              <Link to={adminPath("/petugas")} className="font-semibold text-primary underline">
-                Petugas
+              Kelola penghuni di{" "}
+              <Link to={adminPath(`/warga?rumah=${house.id}`)} className="font-semibold text-primary underline">
+                Warga
               </Link>
               .
             </p>
           </div>
         ) : (
           <Field
-            label={accounts.length ? "Nama penghuni" : "Nama KK"}
+            label="Nama warga"
             hint={accounts.length ? "Sama dengan nama akun petugasnya: mengubah di sini ikut mengubah nama akun itu." : undefined}
           >
             <Input

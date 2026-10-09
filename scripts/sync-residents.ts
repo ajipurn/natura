@@ -7,6 +7,8 @@ import { newToken } from "../src/lib/qr";
 import type { Db } from "../src/server/db";
 import { houses, paymentPlans, users } from "../src/server/schema";
 import { openTarget } from "./db-target";
+import { adoptLegacyResidents, setHouseResident } from "../src/server/residents";
+import { houseName } from "../src/server/house-name";
 
 /** Berkas input lokal; daftar warga tidak ikut diterbitkan bersama source aplikasi. */
 const sourceSchema = z.object({
@@ -25,15 +27,16 @@ export type ResidentSource = z.infer<typeof sourceSchema>;
 /** Pembaruan nama mengikuti sumber akun/rumah yang sama dengan aplikasi; tidak mengubah PIN atau malam jaga. */
 export async function syncResidents(db: Db, source: ResidentSource) {
   return db.transaction(async (tx) => {
+    await adoptLegacyResidents(tx);
     const changed: string[] = [];
     const added: string[] = [];
     const [admin] = await tx.select({ id: users.id }).from(users).where(and(eq(users.role, "admin"), eq(users.active, true))).orderBy(asc(users.id)).limit(1);
     if (!admin) throw new Error("Tidak ada akun admin aktif.");
     for (const resident of source.residents) {
       const label = resident.block + "-" + resident.number;
-      let [house] = await tx.select().from(houses).where(and(eq(houses.block, resident.block), eq(houses.number, resident.number))).for("update");
+      let [house] = await tx.select({ id: houses.id, ownerName: houseName, status: houses.status }).from(houses).where(and(eq(houses.block, resident.block), eq(houses.number, resident.number))).for("update");
       if (!house) {
-        [house] = await tx.insert(houses).values({ block: resident.block, number: resident.number, ownerName: resident.name ?? null, status: resident.status ?? "active", token: newToken() }).returning();
+        [house] = await tx.insert(houses).values({ block: resident.block, number: resident.number, status: resident.status ?? "active", token: newToken() }).returning();
         added.push(label);
       }
       const residents = await tx.select({ id: users.id, name: users.name }).from(users).where(eq(users.houseId, house.id)).for("update");
@@ -44,7 +47,8 @@ export async function syncResidents(db: Db, source: ResidentSource) {
         if (nameChanged) await tx.update(users).set({ name: resident.name }).where(eq(users.id, residents[0].id));
         await tx.update(houses).set({ ownerName: null, ...(resident.status && { status: resident.status }) }).where(eq(houses.id, house.id));
       } else if (resident.name || resident.status) {
-        await tx.update(houses).set({ ...(resident.name && residents.length === 0 && { ownerName: resident.name }), ...(resident.status && { status: resident.status }) }).where(eq(houses.id, house.id));
+        if (resident.name && residents.length === 0) await setHouseResident(tx, house.id, resident.name);
+        if (resident.status) await tx.update(houses).set({ status: resident.status }).where(eq(houses.id, house.id));
       }
       if (nameChanged || statusChanged) changed.push(label);
       const plans = source.plans.filter((p) => p.house === label);

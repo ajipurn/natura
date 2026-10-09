@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { z } from "zod";
@@ -26,6 +26,8 @@ import { getAudit } from "../audit";
 import { getDashboard } from "../dashboard";
 import { getCashMonth, MAX_CASH } from "../kas";
 import { monthQuery } from "./ronda";
+import { accountNameTaken as nameTaken, accountNameTakenError as nameTakenError, setHouseResident } from "../residents";
+import { residents } from "../schema";
 
 const BLOCK_PATTERN = /^[0-9A-Z][0-9A-Z .\-/]{0,9}$/;
 const NUMBER_PATTERN = /^[0-9A-Z][0-9A-Z\-/]{0,9}$/;
@@ -161,13 +163,15 @@ export const adminRoutes = new Hono<AppEnv>()
     const db = c.var.db;
     // Nama KK hanya dipakai kalau menambah satu rumah.
     const name = numbers.length === 1 ? c.req.valid("json").ownerName : null;
-    const inserted = (
-      await db
+    const inserted = await db.transaction(async (tx) => {
+      const added = await tx
         .insert(houses)
-        .values(numbers.map((number) => ({ block, number, ownerName: name, token: newToken() })))
+        .values(numbers.map((number) => ({ block, number, token: newToken() })))
         .onConflictDoNothing({ target: [houses.block, houses.number] })
-        .returning({ id: houses.id })
-    ).length;
+        .returning({ id: houses.id });
+      if (name && added.length === 1) await tx.insert(residents).values({ name, houseId: added[0].id });
+      return added.length;
+    });
     if (inserted === 0) return c.json({ error: `Semua nomor di blok ${block} sudah terdaftar.` }, 409);
     const skipped = numbers.length - inserted;
     return c.json({ success: `${inserted} rumah ditambahkan ke blok ${block}.${skipped ? ` ${skipped} sudah ada, dilewati.` : ""}` });
@@ -194,10 +198,10 @@ export const adminRoutes = new Hono<AppEnv>()
         tx.update(users).set({ name: parsed.data }).where(eq(users.id, residents[0].id)),
       ]);
     } else {
-      await db
-        .update(houses)
-        .set({ block, number, status, ...(residents.length === 0 && { ownerName: name }) })
-        .where(eq(houses.id, id));
+      await db.transaction(async (tx) => {
+        await tx.update(houses).set({ block, number, status }).where(eq(houses.id, id));
+        if (residents.length === 0) await setHouseResident(tx, id, name);
+      });
     }
     return c.json({ success: "Tersimpan." });
   })
@@ -280,19 +284,31 @@ export const adminRoutes = new Hono<AppEnv>()
 
   .get("/petugas", async (c) => c.json({ users: await listUsers(c.var.db), me: c.var.user }))
 
-  .post("/petugas", body(z.object({ name: userName, pin: pinField(), role, ...guardFields })), async (c) => {
-    const { name, pin, role: newRole, houseId, days } = c.req.valid("json");
+  .post("/petugas", body(z.object({ name: userName, pin: pinField(), role, ...guardFields, residentId: z.number().int().positive().nullable().optional() })), async (c) => {
+    const { name, pin, role: newRole, houseId, days, residentId } = c.req.valid("json");
     const db = c.var.db;
     if (await nameTaken(db, name, houseId)) return c.json({ error: nameTakenError(name) }, 409);
     if (!(await houseExists(db, houseId))) return c.json({ error: "Rumah tidak ditemukan." }, 404);
-    const [user] = await db
-      .insert(users)
-      .values({ name, pinHash: await hashPin(pin), role: newRole, houseId })
-      .returning({ id: users.id });
-    const slotsOfHouse = await houseSlots(db, houseId);
-    const nights = days ?? slotsOfHouse.map((s) => s.day);
-    await runBatch(db, (tx) => [...moveIntoHouse(tx, houseId), ...userDaysStatements(tx, user.id, nights, [], slotsOfHouse)]);
-    return c.json({ success: `${name} ditambahkan. Beri tahu PIN-nya secara langsung.`, id: user.id });
+    const pinHash = await hashPin(pin);
+    return db.transaction(async (tx) => {
+      // Pemanggil lama belum mengenal Warga: akun pertama menggantikan nama utama rumah.
+      const existingAccounts = houseId ? await tx.select({ id: users.id }).from(users).where(eq(users.houseId, houseId)) : [];
+      const matching = residentId === null ? [] : await tx.select().from(residents).where(residentId
+        ? eq(residents.id, residentId)
+        : and(isNull(residents.userId), houseId ? eq(residents.houseId, houseId) : isNull(residents.houseId),
+          houseId && !existingAccounts.length ? undefined : sql`lower(${residents.name}) = lower(${name})`))
+        .for("update");
+      if (residentId && !matching.length) return c.json({ error: "Warga tidak ditemukan." }, 404);
+      if (matching.some((r) => r.userId !== null)) return c.json({ error: "Warga ini sudah memiliki akun." }, 409);
+      if (matching.length > 1) return c.json({ error: "Ada beberapa warga dengan nama yang sama. Pilih warga untuk akun ini." }, 409);
+      const [user] = await tx.insert(users).values({ name, pinHash, role: newRole, houseId }).returning({ id: users.id });
+      if (matching[0]) await tx.update(residents).set({ name: null, houseId: null, userId: user.id }).where(eq(residents.id, matching[0].id));
+      else await tx.insert(residents).values({ userId: user.id });
+      const slotsOfHouse = await houseSlots(tx, houseId);
+      const nights = days ?? slotsOfHouse.map((s) => s.day);
+      for (const statement of [...moveIntoHouse(tx, houseId), ...userDaysStatements(tx, user.id, nights, [], slotsOfHouse)]) await statement;
+      return c.json({ success: `${name} ditambahkan. Beri tahu PIN-nya secara langsung.`, id: user.id });
+    });
   })
 
   .patch(
@@ -670,26 +686,6 @@ async function houseExists(db: Db, id: number | null) {
 /** Rumah yang mulai dihuni petugas memakai nama akunnya; nama KK lamanya tidak disimpan lagi. */
 function moveIntoHouse(db: Executor, houseId: number | null) {
   return houseId ? [db.update(houses).set({ ownerName: null }).where(eq(houses.id, houseId))] : [];
-}
-
-/** Nama boleh kembar asal rumahnya beda (dan keduanya punya rumah), supaya tetap bisa dibedakan. */
-async function nameTaken(db: Db, name: string, houseId: number | null, exceptId?: number) {
-  const rows = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(
-      and(
-        sql`lower(${users.name}) = lower(${name})`,
-        houseId ? or(eq(users.houseId, houseId), isNull(users.houseId)) : undefined,
-        exceptId ? ne(users.id, exceptId) : undefined,
-      ),
-    )
-    .limit(1);
-  return rows.length > 0;
-}
-
-function nameTakenError(name: string) {
-  return `Nama "${name}" sudah dipakai. Nama kembar boleh asal rumahnya diisi dan berbeda.`;
 }
 
 /**

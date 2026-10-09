@@ -86,7 +86,7 @@ export const houses = pgTable(
     id: serial("id").primaryKey(),
     block: text("block").notNull(),
     number: text("number").notNull(),
-    /** Nama KK untuk rumah tanpa akun petugas. Rumah yang dihuni petugas memakai nama akunnya (lihat `houseName`). */
+    /** Kolom format lama untuk impor/seed; dipindahkan ke residents. Nama utama dibaca lewat houseName. */
     ownerName: text("owner_name"),
     /** Kode acak yang dicetak di QR. */
     token: text("token").notNull().unique(),
@@ -95,6 +95,20 @@ export const houses = pgTable(
   },
   (t) => [uniqueIndex("houses_block_number_idx").on(t.block, t.number)],
 ).enableRLS();
+
+/** Satu orang warga. Profil yang terhubung akun mengambil nama dan rumah dari akun tersebut. */
+export const residents = pgTable("residents", {
+  id: serial("id").primaryKey(),
+  name: text("name"),
+  houseId: integer("house_id").references(() => houses.id, { onDelete: "set null" }),
+  userId: integer("user_id").references(() => users.id, { onDelete: "restrict" }),
+  phone: text("phone"),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("residents_user_idx").on(t.userId),
+  index("residents_house_idx").on(t.houseId),
+  check("residents_name_source", sql`(${t.userId} is null and ${t.name} is not null and length(trim(${t.name})) > 0) or (${t.userId} is not null and ${t.name} is null and ${t.houseId} is null)`),
+]).enableRLS();
 
 /** Satu malam ronda. Jam 00:00–05:59 masih dihitung malam sebelumnya. */
 export const patrols = pgTable("patrols", {

@@ -21,6 +21,11 @@ export const usersQuery = queryOptions({
   queryFn: () => call(api.admin.petugas.$get()),
 });
 
+export const residentsQuery = queryOptions({
+  queryKey: ["admin", "warga"],
+  queryFn: () => call(api.admin.warga.$get()),
+});
+
 export const settingsQuery = queryOptions({
   queryKey: ["admin", "pengaturan"],
   queryFn: () => call(api.admin.pengaturan.$get()),

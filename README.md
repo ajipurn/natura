@@ -1,6 +1,6 @@
 # Cluster Natura
 
-Sistem informasi dan layanan warga Cluster Natura. Saat ini mencakup jimpitan, ronda, kas, data rumah, pengumuman, dan kontak pengurus. Fitur berikutnya dikembangkan bertahap memakai data rumah dan akun yang sama.
+Sistem informasi dan layanan warga Cluster Natura. Saat ini mencakup pendataan warga, rumah, jimpitan, ronda, kas, pengumuman, dan kontak pengurus. Fitur berikutnya dikembangkan bertahap memakai data warga, rumah, dan akun yang sama.
 
 Untuk jimpitan, setiap rumah punya stiker QR di dekat wadahnya. Petugas ronda scan QR-nya, tekan **Ada** atau **Kosong**, dan rekapnya langsung tersusun.
 
@@ -19,6 +19,9 @@ Stiker QR berisi alamat `https://info.clusternatura.com/r/<kode>`: dibuka pakai 
 
 ## Fitur
 
+- **Warga per orang:** tambah/edit nama dan nomor telepon, cari warga, saring per blok atau tanpa rumah. Rumah boleh ditentukan nanti; satu rumah dapat memiliki beberapa warga. Daftar ini hanya bisa dibuka admin.
+- **Warga dan akun terhubung:** buat akun petugas untuk warga yang sudah didata tanpa membuat orang baru. Warga boleh tidak memiliki akun. Profil yang terhubung akun membaca nama dan rumah langsung dari akun; perubahan di Warga atau Akun petugas langsung konsisten. Nomor telepon tidak ditampilkan di info warga atau QR.
+- **Dashboard pengurus:** menu Lingkungan (Warga, Rumah & QR, Info warga), Ronda & jimpitan, Keuangan, dan Akses akun petugas.
 - **Scan QR per rumah** dari app petugas. Ada tombol senter untuk HP Android dan mendukung iPhone.
 - **Ada / Kosong + nominal.** Nominal awal bisa diatur dan diubah saat mencatat.
 - **Catat manual kalau QR gagal di-scan:** ketik "A12", "12", atau nama KK. Catatannya ditandai "manual" di riwayat.
@@ -52,7 +55,8 @@ Semua waktu memakai WIB. Ronda yang lewat tengah malam tetap dihitung malam sebe
 1. Buka `/admin/` pertama kali, lalu isi nama lingkungan, nominal jimpitan, dan akun admin.
 2. Jalankan seed awal (`bun run seed`, atau `bun run seed:remote` untuk Supabase). Lihat [Seed awal](#seed-awal). Setelah itu rumah, jadwal, nama KK, dan akun petugas sudah terisi; sisanya tinggal mengikuti daftar **Yang perlu disiapkan** di Ringkasan. Tanpa seed, semuanya juga bisa diisi lewat dashboard:
    - **Rumah & QR → Denah → Daftarkan rumah dari denah.** Semua kavling berpenghuni langsung jadi data rumah. Nama KK bisa diisi di **Rumah & QR**.
-   - **Petugas:** buat akun tiap petugas dan pilih rumahnya.
+   - **Warga:** daftarkan tiap orang dan pilih rumahnya bila sudah diketahui. Anggota keluarga dapat memakai rumah yang sama.
+   - **Akun petugas:** pilih warga yang sudah didata untuk membuat akun, atau pilih Warga baru.
    - **Jadwal ronda:** impor tabel jadwal (judul hari seperti "AHAD (MALAM SENIN)", isi "NAMA (BLOK-NO)"), lalu rapikan langsung di halaman Jadwal.
    - **Info warga:** buat kode warga, lalu kirim link-nya ke grup WA. Tambahkan pengumuman dan kontak pengurus.
 3. **Rumah & QR → Cetak QR**, cetak di kertas stiker (sebaiknya vinyl atau dilaminasi), lalu tempel dekat wadah jimpitan.

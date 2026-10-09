@@ -7,6 +7,7 @@ import { invalidate } from "@/client/query";
 import { RadioCards, SwitchField, type RadioCardOption } from "@/components/choice";
 import { Collapsible } from "@/components/collapsible";
 import { Dialog } from "@/components/dialog";
+import { QueryState } from "@/components/query-state";
 import { Select } from "@/components/select";
 import { Alert, Button, Field, Input, buttonClass, cx } from "@/components/ui";
 import { scheduleQuery } from "@/features/jadwal/queries";
@@ -15,7 +16,8 @@ import { groupByBlock, houseLabel } from "@/lib/houses";
 import { randomPin } from "@/lib/random-pin";
 import { DAY_NAMES } from "@/lib/schedule";
 import type { Role } from "@/lib/types";
-import { housesQuery, usersQuery } from "../queries";
+import { housesQuery, residentsQuery, usersQuery } from "../queries";
+import type { Resident } from "../warga/warga-dialog";
 import { adminPath, petugasPath } from "@/lib/app-paths";
 
 export type Petugas = {
@@ -46,31 +48,45 @@ export function PetugasDialog({
   onClose,
   petugas,
   isSelf = false,
+  initialResidentId,
 }: {
   open: boolean;
   onClose: () => void;
   petugas?: Petugas;
   isSelf?: boolean;
+  initialResidentId?: number;
 }) {
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      title={petugas ? `Ubah ${petugas.name}` : "Tambah petugas"}
+      title={petugas ? `Ubah ${petugas.name}` : "Buat akun petugas"}
       description={petugas ? undefined : "Petugas masuk ke app petugas dengan nama dan PIN ini."}
     >
-      {petugas ? <EditForm petugas={petugas} isSelf={isSelf} onDone={onClose} /> : <CreateForm onDone={onClose} />}
+      {petugas ? <EditForm petugas={petugas} isSelf={isSelf} onDone={onClose} /> : <CreateForm initialResidentId={initialResidentId} onDone={onClose} />}
     </Dialog>
   );
 }
 
-function CreateForm({ onDone }: { onDone: () => void }) {
-  const [name, setName] = useState("");
+function CreateForm({ onDone, initialResidentId }: { onDone: () => void; initialResidentId?: number }) {
+  const query = useQuery(residentsQuery);
+  return <QueryState query={query}>{({ residents }) => {
+    const available = residents.filter((r) => !r.userId);
+    return initialResidentId && !available.some((r) => r.id === initialResidentId)
+      ? <Alert>Warga ini sudah memiliki akun atau datanya tidak tersedia. <Link to={adminPath("/warga")} className="font-semibold underline">Kembali ke Warga</Link></Alert>
+      : <CreateAccountForm residents={available} initialResidentId={initialResidentId} onDone={onDone} />;
+  }}</QueryState>;
+}
+
+function CreateAccountForm({ residents, initialResidentId, onDone }: { residents: Resident[]; initialResidentId?: number; onDone: () => void }) {
+  const initial = residents.find((r) => r.id === initialResidentId);
+  const [residentId, setResidentId] = useState<number | null>(initial?.id ?? null);
+  const [name, setName] = useState(initial?.name ?? "");
   const [pin, setPin] = useState(randomPin);
   const [role, setRole] = useState<Role>("petugas");
-  const [houseId, setHouseId] = useState<number | null>(null);
+  const [houseId, setHouseId] = useState<number | null>(initial?.houseId ?? null);
   const create = useMutation({
-    mutationFn: () => call(api.admin.petugas.$post({ json: { name: name.trim(), pin, role, houseId } })),
+    mutationFn: () => call(api.admin.petugas.$post({ json: { name: name.trim(), pin, role, houseId, residentId } })),
     onSuccess: () => invalidate(...REFRESH),
   });
 
@@ -86,6 +102,14 @@ function CreateForm({ onDone }: { onDone: () => void }) {
         create.mutate();
       }}
     >
+      <Select label="Warga" value={residentId === null ? "baru" : String(residentId)}
+        options={[{ value: "baru", label: "Warga baru" }, ...residents.map((r) => ({ value: String(r.id), label: r.name, hint: r.block ? `${r.block}-${r.number}` : "Belum terhubung" }))]}
+        onValueChange={(value) => {
+          const selected = residents.find((r) => String(r.id) === value);
+          setResidentId(selected?.id ?? null);
+          setName(selected?.name ?? "");
+          setHouseId(selected?.houseId ?? null);
+        }} searchPlaceholder="Cari warga…" />
       <Field label="Nama">
         <Input
           value={name}
@@ -114,13 +138,8 @@ function CreateForm({ onDone }: { onDone: () => void }) {
         </div>
       </Field>
       <GuardFields
-        name={name}
         houseId={houseId}
-        onHouse={(id, ownerName) => {
-          setHouseId(id);
-          // Rumah tanpa akun yang sudah punya nama KK: namanya dipakai untuk akun baru.
-          if (ownerName && !name.trim()) setName(ownerName);
-        }}
+        onHouse={setHouseId}
         days={[]}
       />
       <RoleField role={role} onRole={setRole} />
@@ -130,7 +149,7 @@ function CreateForm({ onDone }: { onDone: () => void }) {
           Batal
         </Button>
         <Button type="submit" disabled={create.isPending}>
-          {create.isPending ? "Menyimpan…" : "Tambah petugas"}
+          {create.isPending ? "Menyimpan…" : "Buat akun"}
         </Button>
       </div>
     </form>
@@ -203,7 +222,6 @@ function EditForm({ petugas, isSelf, onDone }: { petugas: Petugas; isSelf: boole
           <Input value={name} onChange={(e) => setName(e.target.value)} required maxLength={40} />
         </Field>
         <GuardFields
-          name={name}
           userId={petugas.id}
           houseId={houseId}
           onHouse={(id) => setHouseId(id)}
@@ -294,21 +312,19 @@ function ResetPin({ petugas, locked }: { petugas: Petugas; locked: string | null
 }
 
 /**
- * Rumah petugas dan malam jaganya. Rumah yang dipilih memakai nama akun ini sebagai nama warganya,
+ * Rumah petugas dan malam jaganya. Nama akun ikut ditampilkan pada data rumah,
  * dan jadwal rumah itu (kalau sudah ada) jadi jadwal petugas ini. Malam jaga hanya diubah di Jadwal
  * ronda; di sini cukup terlihat.
  */
 function GuardFields({
-  name,
   userId,
   houseId,
   onHouse,
   days,
 }: {
-  name: string;
   userId?: number;
   houseId: number | null;
-  onHouse: (id: number | null, ownerName: string | null) => void;
+  onHouse: (id: number | null) => void;
   /** Malam jaga sekarang. */
   days: number[];
 }) {
@@ -322,19 +338,13 @@ function GuardFields({
   // Setelah disimpan: malam jaga sekarang ditambah jadwal rumah yang dipilih.
   const nights = [...new Set([...days, ...scheduled])].sort();
 
-  function pick(id: number | null) {
-    const picked = houses.find((h) => h.id === id);
-    const hasAccount = users.some((u) => u.houseId === id && u.id !== userId);
-    onHouse(id, picked && !hasAccount ? picked.ownerName : null);
-  }
-
   return (
     <>
       <div>
         <Select
           label="Rumah"
           value={houseId ? String(houseId) : ""}
-          onValueChange={(v) => pick(v ? Number(v) : null)}
+          onValueChange={(v) => onHouse(v ? Number(v) : null)}
           options={[{ value: "", label: "Tanpa rumah" }]}
           groups={groupByBlock(houses).map(([block, list]) => ({
             label: `Blok ${block}`,
@@ -345,9 +355,7 @@ function GuardFields({
           <span className="mt-1 block text-xs text-muted">
             {others.length > 0
               ? `Rumah ini juga dihuni ${others.map((u) => u.name).join(", ")}.`
-              : house.ownerName && house.ownerName !== name.trim() && !users.some((u) => u.id === userId && u.houseId === house.id)
-                ? `Nama KK rumah ini (${house.ownerName}) diganti nama akun ini.`
-                : "Nama warga rumah ini ikut nama akun ini."}
+              : "Nama akun ikut ditampilkan di data rumah. Warga lain tetap tercatat."}
             {scheduled.length > 0 && ` Jadwal rumah ini (${scheduled.map((d) => DAY_NAMES[d]).join(", ")}) jadi jadwal petugas ini.`}
           </span>
         )}
