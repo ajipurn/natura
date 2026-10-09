@@ -45,12 +45,15 @@ describe("app petugas bisa dibuka offline setelah pindah subdomain", () => {
     expect((await sw.navigate("/admin/rekap"))?.status).toBe(503);
   });
 
-  it("QR dan API tidak menerima salinan halaman ronda sebagai respons", async () => {
+  it("QR, dashboard, info, dan API tidak menerima salinan halaman ronda sebagai respons", async () => {
     const sw = worker("app.clusternatura.com", "/");
     const qr = await sw.navigate("/r/TOKEN");
     expect(qr?.status).toBe(503);
     expect(await qr?.text()).toContain("href='/'");
     expect((await sw.navigate("/api/auth"))?.status).toBe(503);
+    for (const path of ["/dashboard", "/dashboard/rekap", "/dashboard/petugas", "/info", "/info/r/TOKEN"]) {
+      expect((await sw.navigate(path))?.status).toBe(503);
+    }
   });
 
   it("logo bawaan yang sudah disimpan tetap tampil saat offline", async () => {

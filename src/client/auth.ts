@@ -51,8 +51,10 @@ export function safeNext(value: string | null | undefined, fallback: string): st
 export function loginNext(value: string | null | undefined, fallback: string, hostname = typeof location === "undefined" ? "" : location.hostname): string {
   const next = safeNext(value, fallback);
   if (next.startsWith("/r/")) return wargaPath(next, hostname);
+  const current = next.match(/^\/(dashboard|info)(?=\/|[?#]|$)/);
+  if (current) return appPath(current[1] === "dashboard" ? "admin" : "warga", next.slice(current[0].length), hostname);
   const legacy = next.match(/^\/(petugas|admin)(?=\/|[?#]|$)/);
-  if (appSurface(hostname) === "admin" && legacy?.[1] === "petugas") return next;
+  if (appSurface(hostname, fallback) === "admin" && legacy?.[1] === "petugas") return appPath("admin", next, hostname);
   if (legacy) return appPath(legacy[1] as "petugas" | "admin", next.slice(legacy[0].length), hostname);
   return next;
 }

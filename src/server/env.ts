@@ -6,7 +6,7 @@ export type Bindings = {
   db: Db;
   /** Kunci acak ≥ 32 karakter untuk menandatangani sesi login. */
   AUTH_SECRET?: string;
-  /** Alamat Info warga untuk QR/link yang dicetak, mis. https://info.clusternatura.com */
+  /** Alamat Info warga untuk QR/link yang dicetak, mis. https://clusternatura.com/info */
   APP_URL?: string;
   /** "1" saat `bun run dev`: cookie tanpa Secure dan secret bawaan boleh dipakai. */
   DEV?: string;

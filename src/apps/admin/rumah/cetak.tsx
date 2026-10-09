@@ -72,10 +72,10 @@ export function CetakPage() {
                     <img src={logoUrl ?? DEFAULT_LOGO_URL} alt="" className="h-7 w-auto max-w-16 object-contain print:h-[7mm] print:max-w-[18mm]" />
                     <p className="text-[11px] font-medium uppercase tracking-wide text-gray-600">Jimpitan {communityName}</p>
                   </div>
-                  {/* Dengan logo, baris judulnya lebih tinggi: QR sedikit diperkecil supaya stiker tetap 68 mm. */}
+                  {/* QR 34 mm menyisakan ruang untuk logo dan alamat pada stiker 68 mm. */}
                   <QrSvg
                     text={houseUrl(origin, house.token)}
-                    className="my-2 w-full max-w-44 print:w-[38mm] print:max-w-none"
+                    className="my-2 w-full max-w-40 print:w-[34mm] print:max-w-none"
                   />
                   <p className="text-2xl font-black leading-tight">
                     Blok {house.block} · No. {house.number}

@@ -40,7 +40,7 @@ describe("cara pembayaran di Data rumah", () => {
   });
 
   it("rekap mengikuti kesepakatan pada bulan yang dipilih, termasuk perubahan di tengah bulan", async () => {
-    const rows = await db.insert(houses).values(Array.from({ length: 3 }, (_, i) => ({
+    const rows = await db.insert(houses).values(Array.from({ length: 4 }, (_, i) => ({
       block: "Y", number: String(i + 1), token: "RECAP-CADENCE" + i,
     }))).returning({ id: houses.id });
     await db.insert(paymentPlans).values(([
@@ -49,14 +49,17 @@ describe("cara pembayaran di Data rumah", () => {
       { houseId: rows[1].id, cadence: "weekly", effectiveFrom: "2026-10-08" },
       { houseId: rows[1].id, cadence: "monthly", effectiveFrom: "2026-10-15" },
       { houseId: rows[2].id, cadence: "weekly", effectiveFrom: "2026-11-01" },
+      { houseId: rows[3].id, cadence: "monthly", effectiveFrom: "2026-10-01" },
+      { houseId: rows[3].id, cadence: "daily", effectiveFrom: "2026-10-09" },
+      { houseId: rows[3].id, cadence: "monthly", effectiveFrom: "2026-10-20" },
     ] as const).map((plan) => ({ ...plan, ratePerNight: 500, dueTiming: "start" as const })));
     const october = await admin.get("/api/rekap?bulan=2026-10");
     expect(october.status).toBe(200);
     const octoberCadences = october.data.paymentCadences as Record<number, string[]>;
-    expect(rows.map((h) => octoberCadences[h.id])).toEqual([["monthly"], ["daily", "weekly", "monthly"], ["daily"]]);
+    expect(rows.map((h) => octoberCadences[h.id])).toEqual([["monthly"], ["daily", "weekly", "monthly"], ["daily"], ["monthly", "daily", "monthly"]]);
     const november = await admin.get("/api/rekap?bulan=2026-11");
     expect(november.status).toBe(200);
     const novemberCadences = november.data.paymentCadences as Record<number, string[]>;
-    expect(rows.map((h) => novemberCadences[h.id])).toEqual([["daily"], ["monthly"], ["weekly"]]);
+    expect(rows.map((h) => novemberCadences[h.id])).toEqual([["daily"], ["monthly"], ["weekly"], ["monthly"]]);
   });
 });

@@ -10,6 +10,7 @@ import { Select } from "@/components/select";
 import { ThemeButton } from "@/components/theme-toggle";
 import { Alert, Button, cx, Field, Input, PageTitle } from "@/components/ui";
 import { DEFAULT_LOGO_URL } from "@/lib/branding";
+import { sameAppPath } from "@/lib/app-paths";
 
 const LAST_USER_KEY = "jimpitan:last-user";
 
@@ -45,7 +46,7 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
   }, [error]);
 
   // Alamat di luar app ini (mis. /r/KODE dari halaman rumah) dibuka sebagai halaman baru.
-  const go = (to: string) => (to.startsWith(homePath) ? navigate(to, { replace: true }) : window.location.replace(to));
+  const go = (to: string) => (sameAppPath(to, homePath) ? navigate(to, { replace: true }) : window.location.replace(to));
 
   if (auth.data?.setupNeeded) return <ExternalOrRoute to={setupPath} homePath={homePath} />;
   if (auth.data?.user && !pending) return <ExternalOrRoute to={next} homePath={homePath} />;
@@ -167,7 +168,7 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
 }
 
 function ExternalOrRoute({ to, homePath }: { to: string; homePath: string }) {
-  const external = !to.startsWith(homePath);
+  const external = !sameAppPath(to, homePath);
   useEffect(() => {
     if (external) window.location.replace(to);
   }, [external, to]);

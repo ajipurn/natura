@@ -9,13 +9,13 @@ Satu project dan database, empat pintu masuk:
 | Alamat production | Alamat dev/preview | Untuk | Isi |
 | --- | --- | --- | --- |
 | `app.clusternatura.com` | `/petugas/` | Petugas ronda (HP) | Scan QR, catat manual, denah 2D/3D, jaga malam ini, riwayat, jadwal. Tetap jalan tanpa sinyal. |
-| `dashboard.clusternatura.com` | `/admin/` | Pengurus (laptop/HP) | Ringkasan, peta ronda, riwayat & koreksi (dengan log catatan), rekap bulanan, kas & iuran, warga & keluarga, jadwal, akun & akses, data rumah & cetak QR, info warga, pengaturan. |
-| `info.clusternatura.com` | `/` | Warga | Pengumuman, jaga malam ini & jadwal seminggu, rekap jimpitan per bulan, status per rumah, kas, kontak pengurus. Dibuka dengan **kode warga**. |
+| `app.clusternatura.com/dashboard` | `/admin/` | Pengurus (laptop/HP) | Ringkasan, peta ronda, riwayat & koreksi (dengan log catatan), rekap bulanan, kas & iuran, warga & keluarga, jadwal, akun & akses, data rumah & cetak QR, info warga, pengaturan. |
+| `clusternatura.com/info` | `/` | Warga | Pengumuman, jaga malam ini & jadwal seminggu, rekap jimpitan per bulan, status per rumah, kas, kontak pengurus. Dibuka dengan **kode warga**. |
 | `clusternatura.com` | `/landing/` | Pengunjung | Halaman sementara **Under maintenance** dengan tautan ke layanan yang tersedia. |
 
-Di subdomain, setiap app dimulai di `/`: misalnya `dashboard.clusternatura.com/rekap` dan `app.clusternatura.com/jadwal`. Sesi login berlaku di subdomain Natura yang sama; API tetap di `/api/*` pada masing-masing host dan memeriksa peran akun. Dev/preview dan domain Vercel memakai alamat lama agar tetap bisa dicoba tanpa DNS khusus.
+App petugas dimulai di `/`, dashboard di `/dashboard`, dan info warga di `/info`: misalnya `app.clusternatura.com/dashboard/rekap` dan `app.clusternatura.com/jadwal`. Sesi login berlaku di domain Natura yang sama; API tetap di `/api/*` pada masing-masing host dan memeriksa peran akun. Dev/preview dan domain Vercel memakai alamat lama agar tetap bisa dicoba tanpa DNS khusus. Subdomain lama `dashboard.clusternatura.com` dan `info.clusternatura.com` diarahkan ke alamat baru, termasuk filter dan kode warga pada query string.
 
-Stiker QR berisi alamat `https://info.clusternatura.com/r/<kode>`: dibuka pakai kamera HP biasa, warga melihat riwayat jimpitan rumah itu, dan petugas yang sudah masuk bisa langsung mencatat. QR lama yang memakai domain Vercel tetap bisa dibuka; login di domain berbeda tidak ikut berpindah.
+Stiker QR berisi alamat `https://clusternatura.com/info/r/<kode>`: dibuka pakai kamera HP biasa, warga melihat riwayat jimpitan rumah itu, dan petugas yang sudah masuk bisa langsung mencatat. QR lama di `/r/<kode>` pada domain Natura diarahkan ke alamat baru. QR yang memakai domain Vercel tetap bisa dibuka; login di domain berbeda tidak ikut berpindah.
 
 ## Fitur
 
@@ -129,7 +129,7 @@ Keempat bagian (hasil build Vite) dilayani sebagai file statis, API di `/api/*` 
 3. **Vercel:** import repo ini (Framework Preset: Other; sisanya diatur `vercel.json`). Di **Settings → Environment Variables** isi:
    - `DATABASE_URL`: Transaction pooler dari Supabase,
    - `AUTH_SECRET`: kunci acak minimal 32 karakter (`openssl rand -base64 32`),
-   - `APP_URL`: `https://info.clusternatura.com`, untuk QR rumah, link kode warga, dan ekspor. Saat domain Natura dipakai, link publik otomatis menuju Info warga walaupun dibuka dari dashboard.
+   - `APP_URL`: `https://clusternatura.com/info`, untuk QR rumah dan link kode warga. Link ekspor tetap memakai `/api/ekspor/...` di root domain. Saat domain Natura dipakai, link publik otomatis menuju Info warga walaupun dibuka dari dashboard.
 4. Deploy (push ke `main`, atau `bunx vercel --prod`). Function otomatis berjalan di region Vercel yang terdekat dengan database, dibaca dari alamat pooler di `DATABASE_URL` (mis. `ap-south-1` → `bom1` Mumbai; kalau tidak terbaca: `sin1`). Bisa dipaksa lewat environment variable `FUNCTION_REGION`.
 5. Buka `/admin/setup` di alamat production untuk membuat admin, lalu isi data awal dari komputer: `bun run seed:remote`.
 6. Pastikan alamat production sudah final (isi `APP_URL` kalau pakai domain sendiri, lalu deploy ulang), baru cetak stiker QR.
@@ -138,7 +138,7 @@ Paket gratis Vercel (Hobby) dan Supabase cukup untuk satu perumahan. Project Sup
 
 ### Domain Cluster Natura di Cloudflare
 
-1. Tambahkan `clusternatura.com`, `app.clusternatura.com`, `dashboard.clusternatura.com`, dan `info.clusternatura.com` di **Vercel → project natura → Settings → Domains**, semuanya ke environment Production project yang sama. Domain utama memakai landing, bukan redirect ke subdomain. Jika menambahkan `www.clusternatura.com`, arahkan ke domain utama.
+1. Tambahkan `clusternatura.com` dan `app.clusternatura.com` di **Vercel → project natura → Settings → Domains**, keduanya ke environment Production project yang sama. Domain utama memakai landing di `/` dan Info warga di `/info`; subdomain app memakai petugas di `/` dan dashboard di `/dashboard`. Pertahankan domain lama `dashboard.clusternatura.com` dan `info.clusternatura.com` pada project yang sama supaya redirect dan stiker lama tetap bekerja. Jika menambahkan `www.clusternatura.com`, arahkan ke domain utama.
 2. Di **Cloudflare → clusternatura.com → DNS → Records**, gunakan nilai yang ditampilkan Vercel untuk project ini. Untuk Cloudflare, Vercel meminta record **CNAME** dengan nama `@`, `app`, `dashboard`, dan `info`, dengan **Proxy disabled / DNS only**; Cloudflare melakukan flattening untuk CNAME di domain utama. Nama dan target harus sama dengan petunjuk Vercel. Record email memakai nilainya sendiri.
 3. Setelah Vercel menunjukkan konfigurasi valid dan sertifikat siap, deploy hasil build baru. Periksa halaman utama, masuk petugas, dashboard, Info warga, QR rumah, dan pemasangan PWA. App petugas perlu dibuka sekali saat online di alamat baru agar bisa dipakai offline.
 4. Sebelum pindah dari domain Vercel, kirim semua antrean catatan offline dari alamat lama. Penyimpanan HP dan pemasangan PWA terikat ke origin; salinannya tidak otomatis pindah ke subdomain baru. Akun, PIN, jadwal, dan riwayat di database tetap sama. Petugas cukup masuk lagi dan memasang app dari alamat baru.

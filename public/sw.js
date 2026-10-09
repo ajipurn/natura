@@ -1,7 +1,7 @@
 // Service worker Jimpitan: app petugas tetap bisa dibuka walau sinyal hilang.
 // Data catatan disimpan di HP (localStorage) oleh layar Ronda dan dikirim saat online.
 
-const CACHE = "jimpitan-v6";
+const CACHE = "jimpitan-v7";
 // Logo ikut disimpan untuk offline; naikkan versi CACHE saat aset bawaan diganti.
 const BRAND_ASSETS = ["/natura-logo.svg", "/icon.svg", "/apple-icon.png"];
 const APP_DOMAIN = self.location.hostname === "app.clusternatura.com";
@@ -38,7 +38,7 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     const inPetugas = APP_DOMAIN
-      ? !/^\/(?:r|admin|api)(?:\/|$)/.test(url.pathname) && !/\.[a-z0-9]+$/i.test(url.pathname)
+      ? !/^\/(?:r|admin|dashboard|info|api)(?:\/|$)/.test(url.pathname) && !/\.[a-z0-9]+$/i.test(url.pathname)
       : url.pathname === "/petugas" || url.pathname.startsWith("/petugas/");
     event.respondWith(inPetugas ? networkFirstShell(request) : fetch(request).catch(() => offlineResponse()));
   }

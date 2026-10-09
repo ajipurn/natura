@@ -90,6 +90,6 @@ export type MonthRecap = {
   paymentCells?: Record<string, PaymentCell>;
   paymentPeriods?: BillingPeriod[];
   periodPayments?: PeriodPayment[];
-  /** Cara bayar yang berlaku selama bulan rekap; bisa lebih dari satu jika berubah di tengah bulan. */
+  /** Urutan perubahan cara bayar selama bulan rekap; cara yang sama bisa muncul kembali. */
   paymentCadences?: Record<number, PaymentCadence[]>;
 };

@@ -11,6 +11,6 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
     .catch((err) => console.warn("Service worker gagal didaftarkan", err));
 }
 
-if (import.meta.env.PROD && appSurface(location.hostname) === "petugas") {
+if (import.meta.env.PROD && appSurface(location.hostname, location.pathname) === "petugas") {
   document.querySelector<HTMLLinkElement>('link[rel="manifest"]')!.href = "/petugas-domain.webmanifest";
 }

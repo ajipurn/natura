@@ -74,6 +74,7 @@ describe("QR", () => {
   it("membaca kode dari URL atau teks mentah", () => {
     expect(parseQrToken(houseUrl("https://jimpitan.example/", "ABCD234567"))).toBe("ABCD234567");
     expect(parseQrToken("https://domain-lama.example/r/abcd234567/")).toBe("ABCD234567");
+    expect(parseQrToken(houseUrl("https://clusternatura.com/info", "ABCD234567"))).toBe("ABCD234567");
     expect(parseQrToken("  ABCD234567 ")).toBe("ABCD234567");
     expect(parseQrToken("https://example.com/lain/ABCD234567")).toBeNull();
     expect(parseQrToken("A-12")).toBeNull();

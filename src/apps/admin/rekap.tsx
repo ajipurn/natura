@@ -1116,22 +1116,20 @@ function RecapBody({
                                 </span>
                                 {r.cadences.some((c) => c !== "daily") && (
                                   <span
-                                    className="mt-0.5 flex flex-wrap gap-1"
+                                    className="mt-0.5 block"
                                     title={`Cara bayar yang berlaku pada ${formatMonth(data.month)}${r.cadences.length > 1 ? "; berubah dalam bulan ini" : ""}`}
                                   >
-                                    {r.cadences
-                                      .filter(
-                                        (c) =>
-                                          c !== "daily" ||
-                                          r.cadences.length > 1,
-                                      )
-                                      .map((c) => (
-                                        <PaymentCadenceBadge
-                                          key={c}
-                                          cadence={c}
-                                          className="px-1.5 text-[10px] leading-3"
-                                        />
-                                      ))}
+                                    {r.cadences.length > 1 ? (
+                                      <span className="text-[10px] font-medium leading-3 text-muted">
+                                        <span aria-hidden>{r.cadences.map((c) => CADENCE_LABEL[c]).join(" → ")}</span>
+                                        <span className="sr-only">Cara bayar berubah dari {r.cadences.map((c) => CADENCE_LABEL[c]).join(" menjadi ")}.</span>
+                                      </span>
+                                    ) : (
+                                      <PaymentCadenceBadge
+                                        cadence={r.cadences[0]}
+                                        className="px-1.5 text-[10px] leading-3"
+                                      />
+                                    )}
                                   </span>
                                 )}
                               </RowLabel>

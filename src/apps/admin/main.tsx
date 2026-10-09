@@ -4,6 +4,6 @@ import { appSurface } from "@/lib/app-paths";
 
 mount(router, "admin");
 
-if (import.meta.env.PROD && appSurface(location.hostname) === "admin") {
+if (import.meta.env.PROD && appSurface(location.hostname, location.pathname) === "admin") {
   document.querySelector<HTMLLinkElement>('link[rel="manifest"]')!.href = "/admin-domain.webmanifest";
 }

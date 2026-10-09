@@ -5,7 +5,7 @@ import { createTestEnv } from "./helpers/db";
 
 let env: Bindings;
 let session: string;
-const dashboard = "dashboard.clusternatura.com";
+const dashboard = "app.clusternatura.com";
 const cookiePair = (cookie: string) => cookie.split(";")[0];
 
 function request(host: string, path: string, method = "GET", json?: unknown, cookie?: string) {
@@ -33,7 +33,7 @@ describe("sesi antar-subdomain Natura", () => {
     expect(session).toContain("Secure");
     expect(session).toContain("HttpOnly");
     expect(session).toContain("SameSite=Lax");
-    for (const host of [dashboard, "app.clusternatura.com", "info.clusternatura.com"]) {
+    for (const host of [dashboard, "clusternatura.com", "dashboard.clusternatura.com", "info.clusternatura.com"]) {
       const auth = await request(host, "/api/auth", "GET", undefined, cookiePair(session));
       expect(await auth.json()).toMatchObject({ user: { name: "Admin", role: "admin" } });
     }
@@ -42,14 +42,14 @@ describe("sesi antar-subdomain Natura", () => {
   it("QR dan link warga dari dashboard memakai Info warga walau konfigurasi lama masih ada", async () => {
     for (const path of ["/api/admin/rumah", "/api/admin/pengaturan"]) {
       const response = await request(dashboard, path, "GET", undefined, cookiePair(session));
-      expect(await response.json()).toMatchObject({ origin: "https://info.clusternatura.com" });
+      expect(await response.json()).toMatchObject({ origin: "https://clusternatura.com/info" });
     }
   });
 
   it("kode warga memakai cookie bersama tetapi tidak membuka API petugas atau admin", async () => {
     const created = await request(dashboard, "/api/admin/pengaturan/kode-warga", "POST", { enabled: true }, cookiePair(session));
     const { wargaCode } = await created.json();
-    const entered = await request("info.clusternatura.com", "/api/warga/masuk", "POST", { code: wargaCode });
+    const entered = await request("clusternatura.com", "/api/warga/masuk", "POST", { code: wargaCode });
     expect(entered.status).toBe(200);
     const cookie = entered.headers.getSetCookie().find((value) => value.startsWith("jimpitan_warga="))!;
     expect(cookie).toContain("Domain=clusternatura.com");
@@ -57,7 +57,7 @@ describe("sesi antar-subdomain Natura", () => {
     expect(await access.json()).toMatchObject({ access: true });
     expect((await request("app.clusternatura.com", "/api/ronda", "GET", undefined, cookiePair(cookie))).status).toBe(401);
     expect((await request(dashboard, "/api/admin/rumah", "GET", undefined, cookiePair(cookie))).status).toBe(401);
-    const logout = await request("info.clusternatura.com", "/api/warga/keluar", "POST", {}, cookiePair(cookie));
+    const logout = await request("clusternatura.com", "/api/warga/keluar", "POST", {}, cookiePair(cookie));
     expect(logout.headers.getSetCookie()).toEqual(expect.arrayContaining([
       expect.stringMatching(/jimpitan_warga=;.*Domain=clusternatura\.com/),
       expect.stringMatching(/jimpitan_warga=;.*Path=\//),
@@ -79,7 +79,7 @@ describe("sesi antar-subdomain Natura", () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       const crossOrigin = await app.request(`https://${dashboard}/api/auth/logout`, {
-        method: "POST", headers: { Origin: "https://app.clusternatura.com", "Content-Type": "text/plain", Cookie: cookiePair(session) }, body: "{}",
+        method: "POST", headers: { Origin: "https://clusternatura.com", "Content-Type": "text/plain", Cookie: cookiePair(session) }, body: "{}",
       }, env);
       expect(crossOrigin.ok).toBe(false);
       expect(crossOrigin.headers.getSetCookie()).toHaveLength(0);

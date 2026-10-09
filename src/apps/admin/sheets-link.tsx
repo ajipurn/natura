@@ -125,7 +125,7 @@ export function SheetsLinkDialog({
           }
 
           const fixed = pastMonth && fixedMonth;
-          const link = `${origin}/api/ekspor/${token}/rekap.csv${fixed ? `?bulan=${month}` : ""}`;
+          const link = new URL(`/api/ekspor/${token}/rekap.csv${fixed ? `?bulan=${month}` : ""}`, origin).href;
           const formula = `=IMPORTDATA("${link}")`;
           // Google Sheets mengambil link dari servernya sendiri, jadi alamat lokal tidak bisa dipakai.
           const isLocal = /\/\/(localhost|127\.|192\.168\.|10\.|\[::1\])/.test(origin);
