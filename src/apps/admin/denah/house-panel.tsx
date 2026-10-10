@@ -243,7 +243,7 @@ export function HousePanel({
             </ul>
             <p className="mt-2 text-xs text-muted">
               {automatic
-                ? `Status mingguan/bulanan otomatis dari pembayaran. Total jimpitan ${formatRupiah(total)}.`
+                ? `Status periode otomatis dari pembayaran. Total jimpitan ${formatRupiah(total)}.`
                 : filled + empty > 0
                 ? `Kosong ${Math.round((empty / (filled + empty)) * 100)}% dari ${filled + empty} malam yang dicek · ${formatRupiah(total)}`
                 : "Belum pernah dicek bulan ini."}

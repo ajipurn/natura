@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { getDashboard } from "@/server/dashboard";
 import type { Db } from "@/server/db";
+import { paymentPlans, payments } from "@/server/schema";
 import type { HouseDTO } from "@/lib/types";
 import { apiClient, createTestEnv } from "./helpers/db";
 
@@ -46,9 +47,9 @@ describe("angka ringkasan sesuai jenis pemeriksaan", () => {
     expect(d.oftenEmpty).toMatchObject([{ id: homeIds[1], label: "A-2", ownerName: "Nama akun warga", empty: 1, nights: 2, emptyStreak: 1, lastChecked: "2026-10-07" }]);
   });
   it("pembayaran mingguan mengubah warna status tanpa menambah progres scan atau uang ronda", async () => {
-    await admin.put(`/api/admin/pembayaran/kesepakatan/${homeIds[4]}`, { effectiveFrom: "2026-10-01", cadence: "weekly", ratePerNight: 500 });
+    await db.insert(paymentPlans).values({ houseId: homeIds[4], effectiveFrom: "2026-10-01", cadence: "weekly", ratePerNight: 500, dueTiming: "end" });
     expect((await getDashboard(db, new Date())).tonight).toMatchObject({ automatic: 3, filled: 2, empty: 3, unchecked: 0, daily: { expected: 2, checked: 2, unchecked: 0 } });
-    await admin.post("/api/admin/pembayaran", { clientId: crypto.randomUUID(), houseId: homeIds[4], receivedDate: "2026-10-07", periodStart: "2026-10-05", periodEnd: "2026-10-11", cadence: "weekly", amount: 3500, receivedBy: "treasurer" });
+    await db.insert(payments).values({ clientId: crypto.randomUUID(), houseId: homeIds[4], receivedDate: "2026-10-07", periodStart: "2026-10-05", periodEnd: "2026-10-11", cadence: "weekly", amount: 3500, receivedBy: "treasurer" });
     expect((await getDashboard(db, new Date())).tonight).toMatchObject({ automatic: 3, filled: 3, empty: 2, total: 1500, collectedHouses: 2, daily: { expected: 2, checked: 2, unchecked: 0 } });
   });
 });

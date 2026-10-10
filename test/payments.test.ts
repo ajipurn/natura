@@ -7,7 +7,7 @@ import { getMonthRecap } from "@/server/queries";
 import { getDashboard } from "@/server/dashboard";
 import { getPaymentMonth } from "@/server/payments";
 import type { Db } from "@/server/db";
-import { rondaSchedule } from "@/server/schema";
+import { paymentPlans, payments, rondaSchedule } from "@/server/schema";
 import { scheduleDay } from "@/lib/schedule";
 import { apiClient, createTestEnv } from "./helpers/db";
 import { profileForUser } from "./helpers/residents";
@@ -146,7 +146,7 @@ describe("API pembayaran dan kas", () => {
   });
   it("pembayaran ke petugas masuk pencocokan setoran; saldo bertambah sekali setelah disetor", async () => {
     const before = Number((await admin.get("/api/admin/kas?bulan=" + month)).data.balance);
-    const input = makePayment(houseIds[2], { cadence: "weekly", periodStart: today, periodEnd: addDays(today, 6), amount: 3500, receivedBy: "collector", collectorId });
+    const input = makePayment(houseIds[2], { periodStart: today, periodEnd: addDays(today, 6), amount: 3500, receivedBy: "collector", collectorId });
     expect((await admin.post("/api/admin/pembayaran", input)).status).toBe(200);
     let cash = (await admin.get("/api/admin/kas?bulan=" + month)).data;
     expect(cash.balance).toBe(before);
@@ -213,7 +213,10 @@ describe("API pembayaran dan kas", () => {
     const houses = ((await admin.get("/api/admin/rumah")).data.houses as { id: number; block: string; number: string; token: string }[]).filter((h) => h.block === "QR");
     for (const [index, cadence] of (["daily", "monthly", "weekly"] as const).entries()) {
       const house = houses.find((h) => h.number === String(index + 1))!;
-      if (cadence !== "daily") {
+      if (cadence === "weekly") {
+        // Kesepakatan mingguan lama tetap dibaca; API baru tidak membuatnya lagi.
+        await db.insert(paymentPlans).values({ houseId: house.id, effectiveFrom: days[0], cadence, ratePerNight: 500, dueTiming: "end" });
+      } else if (cadence !== "daily") {
         expect((await admin.put("/api/admin/pembayaran/kesepakatan/" + house.id, { effectiveFrom: days[0], cadence, ratePerNight: 500, dueTiming: "end" })).status).toBe(200);
       }
       const qr = await staff.get("/api/rumah/" + house.token);
@@ -228,5 +231,39 @@ describe("API pembayaran dan kas", () => {
         }
       }
     }
+  });
+
+  it("menolak kesepakatan dan penerimaan mingguan baru tanpa mengubah data", async () => {
+    const beforePlans = await db.select().from(paymentPlans);
+    const beforePayments = await db.select().from(payments);
+    const plan = await admin.put("/api/admin/pembayaran/kesepakatan/" + houseIds[3], { effectiveFrom: today, cadence: "weekly", ratePerNight: 500 });
+    expect(plan.status).toBe(400);
+    expect(plan.data.error).toContain("Harian atau Bulanan");
+    const received = await admin.post("/api/admin/pembayaran", makePayment(houseIds[3], { cadence: "weekly", periodEnd: addDays(days[0], 6), amount: 3500 }));
+    expect(received.status).toBe(400);
+    expect(received.data.error).toContain("mingguan sudah dihapus");
+    expect(await db.select().from(paymentPlans)).toEqual(beforePlans);
+    expect(await db.select().from(payments)).toEqual(beforePayments);
+  });
+
+  it("penerimaan bulanan tidak bisa diubah menjadi mingguan baru", async () => {
+    const [previous] = (await db.select().from(payments)).filter((p) => p.cadence === "monthly" && !p.cancelledAt);
+    const corrected = await admin.patch("/api/admin/pembayaran/" + previous.id, makePayment(previous.houseId, { cadence: "weekly" }));
+    expect(corrected.status).toBe(400);
+    expect(corrected.data.error).toContain("mingguan sudah dihapus");
+    expect((await db.select().from(payments)).find((p) => p.id === previous.id)).toEqual(previous);
+  });
+
+  it("penerimaan mingguan lama tetap dapat dikirim ulang, dikoreksi, dan dibatalkan", async () => {
+    const input = makePayment(houseIds[3], { cadence: "weekly", periodEnd: addDays(days[0], 6), amount: 3500 });
+    const [previous] = await db.insert(payments).values({ clientId: input.clientId, houseId: houseIds[3], cadence: "weekly", receivedDate: today, periodStart: days[0], periodEnd: addDays(days[0], 6), amount: 3500, receivedBy: "treasurer" }).returning();
+    expect((await admin.post("/api/admin/pembayaran", input)).status).toBe(200);
+    expect((await admin.patch("/api/admin/pembayaran/" + previous.id, { ...input, amount: 3000, note: "Koreksi lama" })).status).toBe(200);
+    expect((await db.select().from(payments)).find((p) => p.id === previous.id)).toMatchObject({ cadence: "weekly", amount: 3000, note: "Koreksi lama" });
+    expect((await admin.patch("/api/admin/pembayaran/" + previous.id, { ...input, houseId: houseIds[0] })).status).toBe(400);
+    expect((await admin.get("/api/admin/pembayaran/" + previous.id + "/log")).data.logs).toEqual([expect.objectContaining({ action: "update" })]);
+    expect((await admin.delete("/api/admin/pembayaran/" + previous.id)).status).toBe(200);
+    const history = (await admin.get("/api/admin/pembayaran?bulan=" + month)).data.history;
+    expect(history).toEqual(expect.arrayContaining([expect.objectContaining({ id: previous.id, cadence: "weekly", cancelledAt: expect.any(String) })]));
   });
 });

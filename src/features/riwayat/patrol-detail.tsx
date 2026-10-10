@@ -323,7 +323,7 @@ function NightDetail({
               " Isi semua rumah sekaligus, lalu ubah yang berbeda lewat tombol koreksi di daftar."}
           </p>
         )}
-        {paymentPeriods.length > 0 && <p className="mt-3 text-xs text-muted">Mingguan/bulanan otomatis dari pembayaran periode; tidak perlu discan. Nominal terkumpul hanya uang yang diambil saat ronda.</p>}
+        {paymentPeriods.length > 0 && <p className="mt-3 text-xs text-muted">Status periode otomatis dari pembayaran; tidak perlu discan. Nominal terkumpul hanya uang yang diambil saat ronda.</p>}
         {canCorrect &&
           summary.unchecked.length > 0 &&
           (bulkFilling ? (

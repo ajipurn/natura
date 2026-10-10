@@ -124,7 +124,7 @@ export function HouseCalendarLegend() {
           {text}
         </span>
       ))}
-      <p className="w-full pt-1">Tanggal redup belum tiba. ✓ = pembayaran mingguan/bulanan, R = rapel. Catatan ronda asli tetap tersimpan.</p>
+      <p className="w-full pt-1">Tanggal redup belum tiba. ✓ = pembayaran periode, R = rapel. Catatan ronda asli tetap tersimpan.</p>
     </div>
   );
 }

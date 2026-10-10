@@ -2,6 +2,7 @@ import { and, desc, eq, gte, isNull, lte, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { daysBetween, daysInMonth, isIsoDate, localDate } from "@/lib/dates";
+import { PAYMENT_PLAN_CADENCES } from "@/lib/payments";
 import { requireResource } from "../auth";
 import type { AppEnv } from "../env";
 import type { Executor } from "../db";
@@ -12,6 +13,7 @@ import { monthQuery } from "./ronda";
 
 const date = z.string().refine(isIsoDate, "Isi tanggal yang benar.");
 const cadence = z.enum(["daily", "weekly", "monthly"], "Pilih cara pembayaran.");
+const weeklyRetired = "Pembayaran mingguan sudah dihapus. Gunakan Harian atau Bulanan.";
 const paymentSchema = z.object({
   houseId: z.number().int().positive(),
   receivedDate: date,
@@ -53,7 +55,7 @@ async function validateRapel(db: Executor, values: z.infer<typeof paymentSchema>
 }
 
 const planSchema = z.object({
-  effectiveFrom: date, cadence,
+  effectiveFrom: date, cadence: z.enum(PAYMENT_PLAN_CADENCES, "Pilih Harian atau Bulanan."),
   ratePerNight: z.number().int().positive("Isi nominal per hari.").max(1_000_000),
   // Kompatibilitas data lama; status periode tidak memakai jatuh tempo lagi.
   dueTiming: z.enum(["start", "end"]).default("end"),
@@ -120,6 +122,7 @@ export const paymentRoutes = new Hono<AppEnv>().use(requireResource("finance"))
           key === "allocations" ? JSON.stringify(previous.allocations) === JSON.stringify(value) : previous[key as keyof typeof previous] === value);
         return same ? { success: "Pembayaran sudah tersimpan." } : { error: "Catatan pembayaran ini sudah dipakai. Muat ulang lalu coba lagi." };
       }
+      if (values.cadence === "weekly") return { error: weeklyRetired };
       if (values.receivedBy === "collector") {
         const [collector] = await tx.select({ id: users.id }).from(users).where(and(eq(users.id, values.collectorId!), eq(users.active, true)));
         if (!collector) return { error: "Petugas penerima tidak aktif atau tidak ditemukan." };
@@ -140,6 +143,7 @@ export const paymentRoutes = new Hono<AppEnv>().use(requireResource("finance"))
     const error = await c.var.db.transaction(async (tx) => {
       const [previous] = await tx.select().from(payments).where(eq(payments.id, c.req.valid("param").id)).for("update");
       if (!previous || previous.cancelledAt) return "Pembayaran tidak ditemukan atau sudah dibatalkan.";
+      if (values.cadence === "weekly" && (previous.cadence !== "weekly" || previous.houseId !== values.houseId)) return weeklyRetired;
       const [house] = await tx.select({ id: houses.id }).from(houses).where(eq(houses.id, values.houseId)).for("update");
       if (!house) return "Rumah tidak ditemukan.";
       if (values.receivedBy === "collector") {

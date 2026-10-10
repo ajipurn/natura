@@ -58,7 +58,7 @@ describe("indikator ronda di ringkasan", () => {
     await render();
     const ronda = container.querySelector('section[aria-label="Ronda malam ini"]')!;
     expect(ronda.textContent).toContain("0/53");
-    expect(ronda.textContent).toContain("5 rumah mingguan/bulanan otomatis");
+    expect(ronda.textContent).toContain("5 rumah dengan pembayaran periode otomatis");
     const bar = ronda.querySelector('[role="progressbar"]')!;
     expect(bar.getAttribute("aria-valuenow")).toBe("5");
     expect(bar.getAttribute("aria-valuemax")).toBe("58");

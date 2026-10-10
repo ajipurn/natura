@@ -56,7 +56,7 @@ export function TonightCard({ tonight: t, date }: { tonight: Dashboard["tonight"
           </div>
           {t.automatic > 0 && (
             <p className="rounded-lg bg-primary/5 px-3 py-2 text-xs text-muted">
-              <span className="font-medium text-fg">{t.automatic} rumah mingguan/bulanan otomatis.</span> Hijau jika sudah bayar, merah jika belum; tidak wajib discan.
+              <span className="font-medium text-fg">{t.automatic} rumah dengan pembayaran periode otomatis.</span> Hijau jika sudah bayar, merah jika belum; tidak wajib discan.
             </p>
           )}
           <div className="flex flex-wrap justify-between gap-x-4 gap-y-2 text-xs text-muted">

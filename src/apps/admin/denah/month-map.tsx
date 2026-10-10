@@ -129,7 +129,7 @@ export function MonthMap() {
                       <LegendItem swatch="border-fg/25 bg-idle-soft">Belum dicek</LegendItem>
                       <LegendItem swatch="border-dashed border-muted bg-card">Mudik</LegendItem>
                     </Legend>
-                    <p className="text-xs text-muted">Harian mengikuti catatan ronda. Mingguan/bulanan otomatis dari pembayaran periode.</p>
+                    <p className="text-xs text-muted">Harian mengikuti catatan ronda. Status periode otomatis dari pembayaran.</p>
                   </>
                 }
                 panel={

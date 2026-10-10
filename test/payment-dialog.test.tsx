@@ -73,26 +73,59 @@ it("meminta jenis pembayaran terlebih dahulu dan menahan pengiriman sebelum memi
   expect(fetch).not.toHaveBeenCalled();
 });
 
-it("bulanan mengikuti kesepakatan pada periode, termasuk kesepakatan yang berakhir di tengah bulan", async () => {
+it.each([
+  { label: "Bulanan", previous: "monthly", current: "daily" },
+  { label: "Bulanan", previous: "monthly", current: "weekly" },
+] as const)("pembayaran $label tetap menawarkan periode lama setelah rumah beralih dari $previous ke $current", async ({ label, previous, current }) => {
+  const changedPlans = [plan(1, previous, "2026-09-01"), plan(5, previous, "2026-09-01"), { ...plan(5, current, "2026-10-09"), id: 7 }];
+  for (const value of ["2026-09", month]) client.setQueryData(["admin", "pembayaran", value], { plans: changedPlans, payments: [], dailyCells: {} });
+  await render();
+  await choose("Jenis pembayaran", label);
+  expect(await houseOptions()).toEqual(["A-1 Warga 1", "A-5 Warga 5"]);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it("bulanan mengikuti kesepakatan pada periode, termasuk sisa tagihan sebelum beralih ke harian", async () => {
+  client.setQueryData(["admin", "pembayaran", month], { plans, payments: [], dailyCells: { "5:2026-10-01": { status: "filled", amount: 3000 } } });
   await render(); await choose("Jenis pembayaran", "Bulanan");
   expect(await houseOptions()).toEqual(["A-1 Warga 1", "A-5 Warga 5"]);
   await choose("Rumah", "A-5");
   expect(control("Jenis pembayaran").textContent).toBe("Bulanan");
   expect(control("Periode sampai").textContent).toContain("8 Okt 2026");
-  expect(dialog().textContent).toContain("8 hari · nominal periode Rp 4.000");
+  expect(dialog().textContent).toContain("8 hari · nominal periode Rp 4.000 · sudah tercatat Rp 3.000");
   await submit();
-  expect(payload()).toMatchObject({ houseId: 5, cadence: "monthly", amount: 4000, periodStart: "2026-10-01", periodEnd: "2026-10-08", allocations: null });
+  expect(payload()).toMatchObject({ houseId: 5, cadence: "monthly", amount: 1000, periodStart: "2026-10-01", periodEnd: "2026-10-08", allocations: null });
   expect(onClose).toHaveBeenCalled();
 });
 
-it("mingguan hanya menawarkan rumah mingguan dan mengikuti awal minggu rumah tersebut", async () => {
-  await render(); await choose("Jenis pembayaran", "Mingguan");
-  expect(await houseOptions()).toEqual(["A-2 Warga 2"]);
-  await choose("Rumah", "A-2");
-  expect(control("Periode dari").textContent).toContain("26 Sep 2026");
-  expect(control("Periode sampai").textContent).toContain("2 Okt 2026");
-  await submit();
-  expect(payload()).toMatchObject({ houseId: 2, cadence: "weekly", amount: 3500, periodStart: "2026-09-26", periodEnd: "2026-10-02" });
+it.each([
+  { effectiveFrom: "2026-10-01", options: ["A-1 Warga 1"] },
+  { effectiveFrom: "2026-10-10", options: ["A-1 Warga 1", "A-5 Warga 5"] },
+  { effectiveFrom: "2026-10-11", options: ["A-1 Warga 1", "A-5 Warga 5"] },
+])("peralihan ke harian mulai $effectiveFrom mengikuti tanggal berlakunya", async ({ effectiveFrom, options }) => {
+  client.setQueryData(["admin", "pembayaran", month], { plans: [plan(1, "monthly"), plan(5, "monthly", "2026-09-01"), { ...plan(5, "daily", effectiveFrom), id: 7 }], payments: [], dailyCells: {} });
+  await render(); await choose("Jenis pembayaran", "Bulanan");
+  expect(await houseOptions()).toEqual(options);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it("perubahan kesepakatan saat form terbuka menghapus pilihan rumah bila tidak ada lagi periode bulanan yang sesuai", async () => {
+  await render(); await choose("Jenis pembayaran", "Bulanan"); await choose("Rumah", "A-1");
+  expect(save().disabled).toBe(false);
+  await act(async () => {
+    client.setQueryData(["admin", "pembayaran", month], { plans: plans.map((p) => p.houseId === 1 ? { ...p, cadence: "daily" } : p), payments: [], dailyCells: {} });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  expect(control("Rumah").textContent).toContain("Pilih rumah");
+  expect(await houseOptions()).toEqual(["A-5 Warga 5"]);
+  expect(save().disabled).toBe(true);
+  await submit(); expect(fetch).not.toHaveBeenCalled();
+});
+
+it("pembayaran baru hanya menyediakan Bulanan dan Rapel meskipun ada kesepakatan mingguan lama", async () => {
+  await render(); await click(control("Jenis pembayaran"));
+  expect([...document.querySelectorAll('[role="option"]')].map((o) => o.textContent)).toEqual(["Bulanan", "Rapel"]);
+  expect(fetch).not.toHaveBeenCalled();
 });
 
 it("rumah bulanan yang sudah lunas tetap tersedia tanpa menyarankan pembayaran tambahan", async () => {
@@ -104,14 +137,13 @@ it("rumah bulanan yang sudah lunas tetap tersedia tanpa menyarankan pembayaran t
   expect(save().disabled).toBe(true);
 });
 
-it("perubahan periode menghapus rumah yang cara bayarnya tidak lagi sesuai", async () => {
+it("perubahan periode menghapus rumah bila kesepakatan bulanan tidak mencakup periode pilihan", async () => {
   await render(); await choose("Jenis pembayaran", "Bulanan"); await choose("Rumah", "A-5");
   await click(control("Periode dari"));
   await click(document.querySelector<HTMLButtonElement>('button[data-date="2026-10-09"]')!);
-  expect(control("Rumah").textContent).toContain("Pilih rumah");
-  expect(dialog().textContent).toContain("Pilih periode berurutan");
   await click(control("Periode sampai"));
   await click(document.querySelector<HTMLButtonElement>('button[data-date="2026-10-31"]')!);
+  expect(control("Rumah").textContent).toContain("Pilih rumah");
   expect(await houseOptions()).toEqual(["A-1 Warga 1"]);
   expect(save().disabled).toBe(true);
   await submit(); expect(fetch).not.toHaveBeenCalled();
@@ -212,6 +244,25 @@ it("pembayaran lama tetap bisa dikoreksi walau rumah tidak lagi memiliki kesepak
   await submit();
   expect(vi.mocked(fetch).mock.calls[0][1]?.method).toBe("PATCH");
   expect(payload()).toMatchObject({ houseId: 6, cadence: "monthly", amount: 1000, note: "Catatan lama" });
+});
+
+it("koreksi pembayaran bulanan lama mempertahankan rumah yang sekarang harian", async () => {
+  await render({ ...receipt, houseId: 5, periodEnd: "2026-10-08", amount: 4000 });
+  expect(control("Rumah").textContent).toContain("A-5");
+  expect(await houseOptions()).toEqual(["A-1 Warga 1", "A-5 Warga 5"]);
+  await submit();
+  expect(vi.mocked(fetch).mock.calls[0][1]?.method).toBe("PATCH");
+  expect(payload()).toMatchObject({ houseId: 5, cadence: "monthly", amount: 4000, periodEnd: "2026-10-08" });
+});
+
+it("koreksi pembayaran mingguan lama tetap menyimpan jenis dan periode aslinya setelah beralih ke harian", async () => {
+  client.setQueryData(["admin", "pembayaran", month], { plans: [...plans, { ...plan(2, "daily", "2026-10-10"), id: 8 }], payments: [], dailyCells: {} });
+  await render({ ...receipt, houseId: 2, cadence: "weekly", periodStart: "2026-10-03", periodEnd: "2026-10-09", amount: 3500 });
+  expect(control("Jenis pembayaran").textContent).toContain("Mingguan");
+  expect(control("Rumah").textContent).toContain("A-2");
+  await submit();
+  expect(vi.mocked(fetch).mock.calls[0][1]?.method).toBe("PATCH");
+  expect(payload()).toMatchObject({ houseId: 2, cadence: "weekly", periodStart: "2026-10-03", periodEnd: "2026-10-09", amount: 3500 });
 });
 
 it("koreksi rapel mempertahankan rumah dan tanggal yang sudah lunas", async () => {

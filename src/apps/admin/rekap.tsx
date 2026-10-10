@@ -680,7 +680,7 @@ function RecapBody({
             />
             <p className="text-xs text-muted">
               Grafik hanya menunjukkan uang yang diambil saat ronda. Pembayaran
-              mingguan dan bulanan dihitung terpisah.
+              periode dihitung terpisah.
             </p>
           </div>
         )}
@@ -734,7 +734,7 @@ function RecapBody({
               {editing ? "Selesai" : "Ubah catatan"}
             </Button>}
           </div>
-          {editing && <p className="mb-3 text-sm text-muted">Mode koreksi menampilkan catatan harian asli, termasuk rumah mingguan/bulanan. Status pembayaran periode tetap otomatis. Catat pembayaran periode melalui tampilan Pembayaran.</p>}
+          {editing && <p className="mb-3 text-sm text-muted">Mode koreksi menampilkan catatan harian asli, termasuk rumah dengan pembayaran periode. Status pembayaran periode tetap otomatis. Catat pembayaran periode melalui tampilan Pembayaran.</p>}
           {nights === 0 && (
             <p className="mb-3 text-sm text-muted">
               Belum ada ronda tercatat untuk bulan ini.
@@ -812,7 +812,7 @@ function RecapBody({
                   setCadence(next);
                   setSelected(new Set());
                 }}
-                options={CADENCE_FILTERS.map((f) => ({
+                options={CADENCE_FILTERS.filter((f) => f.value !== "weekly" || stats.some((r) => r.cadences.includes("weekly"))).map((f) => ({
                   ...f,
                   hint: String(
                     stats.filter(
@@ -894,7 +894,7 @@ function RecapBody({
           </div>
           {/* {guideOpen && <div id={guideId} className="mb-3 rounded-xl bg-idle-soft/50 px-3 pb-3 pt-px">
           <Legend editing={editing} defaultAmount={data.defaultAmount} />
-          <p className="mt-2 text-xs text-muted">Harian menunjukkan uang hasil ronda. Rumah mingguan/bulanan mengikuti status pembayaran periode, kecuali sudah tercatat ada isinya saat ronda. Lihat rinciannya di tampilan Pembayaran.</p>
+          <p className="mt-2 text-xs text-muted">Harian menunjukkan uang hasil ronda. Rumah dengan pembayaran periode mengikuti status pembayaran, kecuali sudah tercatat ada isinya saat ronda. Lihat rinciannya di tampilan Pembayaran.</p>
         </div>} */}
 
           {visible.length === 0 ? (

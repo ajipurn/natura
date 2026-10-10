@@ -3,6 +3,7 @@ import path from "node:path";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { isIsoDate } from "../src/lib/dates";
+import { PAYMENT_PLAN_CADENCES } from "../src/lib/payments";
 import { newToken } from "../src/lib/qr";
 import type { Db } from "../src/server/db";
 import { houses, paymentPlans, users } from "../src/server/schema";
@@ -17,7 +18,7 @@ const sourceSchema = z.object({
     name: z.string().trim().min(1).max(100).optional(), status: z.enum(["active", "vacant"]).optional(),
   })).min(1),
   plans: z.array(z.object({
-    house: z.string().min(1), effectiveFrom: z.string().refine(isIsoDate), cadence: z.enum(["daily", "weekly", "monthly"]),
+    house: z.string().min(1), effectiveFrom: z.string().refine(isIsoDate), cadence: z.enum(PAYMENT_PLAN_CADENCES),
     ratePerNight: z.number().int().positive().max(1_000_000), dueTiming: z.enum(["start", "end"]).default("end"),
     graceDays: z.number().int().min(0).max(31).default(0), weekStart: z.number().int().min(0).max(6).default(1),
   })).default([]),

@@ -3,6 +3,7 @@ import { summarize } from "@/lib/recap";
 import type { BillingPeriod } from "@/lib/payments";
 import type { CollectionDTO, HouseDTO } from "@/lib/types";
 import { apiClient, createTestEnv } from "./helpers/db";
+import { paymentPlans } from "@/server/schema";
 
 const date = "2025-03-07";
 let admin: ReturnType<typeof apiClient>;
@@ -12,13 +13,17 @@ type NightDetail = { houses: HouseDTO[]; collections: CollectionDTO[]; paymentPe
 type HistoryNight = { date: string; filled: number; empty: number; total: number; checked: number; unchecked: number; expected: number };
 
 beforeAll(async () => {
-  const { env } = await createTestEnv();
+  const { db, env } = await createTestEnv();
   admin = apiClient(env);
   await admin.post("/api/auth/setup", { communityName: "Natura", defaultAmount: 500, name: "Admin", pin: "1234", pinConfirm: "1234" });
   await admin.post("/api/admin/rumah", { block: "A", numbers: "1-4" });
   const houses = (await admin.get("/api/admin/rumah")).data.houses as HouseDTO[];
   monthly = houses[1];
   for (const [house, cadence] of [[monthly, "monthly"], [houses[2], "weekly"]] as const) {
+    if (cadence === "weekly") {
+      await db.insert(paymentPlans).values({ houseId: house.id, effectiveFrom: "2025-03-01", cadence, ratePerNight: 500, dueTiming: "end" });
+      continue;
+    }
     expect((await admin.put(`/api/admin/pembayaran/kesepakatan/${house.id}`, {
       effectiveFrom: "2025-03-01", cadence, ratePerNight: 500,
     })).status).toBe(200);

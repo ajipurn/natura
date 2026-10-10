@@ -260,6 +260,7 @@ describe("rekap bulanan yang dikelompokkan", () => {
     const label = [...container.querySelectorAll("[id]")].find((l) => l.textContent === "Cara bayar")!;
     const combo = [...container.querySelectorAll<HTMLButtonElement>('[role="combobox"]')].find((b) => b.getAttribute("aria-labelledby")?.split(" ").includes(label.id))!;
     await click(combo);
+    expect([...document.querySelectorAll('[role="option"]')].some((o) => o.textContent?.includes("Mingguan"))).toBe(false);
     const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((o) => o.textContent?.replace(/\s/g, "") === "Bulanan1")!;
     await click(option);
     expect(container.querySelector('[data-recap]')?.textContent).not.toContain("Warga harian");
@@ -268,6 +269,23 @@ describe("rekap bulanan yang dikelompokkan", () => {
     expect(container.querySelector('[data-recap] tfoot')?.textContent).toContain("Rp 500");
     await click(button("Reset filter"));
     expect(container.querySelector('[data-recap]')?.textContent).toContain("Warga harian");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("filter Mingguan tetap tersedia untuk membaca riwayat bulan yang memilikinya", async () => {
+    await act(async () => {
+      client.setQueryData(["rekap", month], (previous: Record<string, unknown>) => ({ ...previous, paymentCadences: { 1: ["daily"], 2: ["weekly"] }, paymentPeriods: [{ ...bill, cadence: "weekly" }] }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await click(button("Filter"));
+    const label = [...container.querySelectorAll("[id]")].find((l) => l.textContent === "Cara bayar")!;
+    const combo = [...container.querySelectorAll<HTMLButtonElement>('[role="combobox"]')].find((b) => b.getAttribute("aria-labelledby")?.split(" ").includes(label.id))!;
+    await click(combo);
+    const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((o) => o.textContent?.includes("Mingguan"))!;
+    expect(option).toBeDefined();
+    await click(option);
+    expect(container.querySelector('[data-recap]')?.textContent).toContain("Warga bulanan");
+    expect(container.querySelector('[data-recap]')?.textContent).not.toContain("Warga harian");
     expect(fetch).not.toHaveBeenCalled();
   });
 

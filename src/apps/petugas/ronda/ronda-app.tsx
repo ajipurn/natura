@@ -324,7 +324,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                 </p>
                 {paymentPeriods.length > 0 && (
                   <p className="mt-1 text-xs text-muted">
-                    Mingguan/bulanan otomatis; tidak perlu discan.
+                    Pembayaran periode otomatis; tidak perlu discan.
                   </p>
                 )}
               </>

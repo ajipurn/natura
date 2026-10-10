@@ -72,7 +72,7 @@ export function TonightMap() {
                 <Stat value={formatRupiah(summary.total)} label="Terkumpul" />
               </div>
               {summary.collectors.length > 0 && <p className="text-sm text-muted">Petugas: {summary.collectors.join(", ")}</p>}
-              {!!paymentPeriods?.length && <p className="text-xs text-muted">Mingguan/bulanan otomatis; tidak perlu discan.</p>}
+              {!!paymentPeriods?.length && <p className="text-xs text-muted">Pembayaran periode otomatis; tidak perlu discan.</p>}
             </Card>
 
             <MapWithPanel

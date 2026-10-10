@@ -44,6 +44,7 @@ function PaymentForm({ month, payment, onDone }: { month: string; payment?: Admi
   const count = daysBetween(periodStart, periodEnd) + 1;
   const validRange = count > 0 && count <= 366;
   const periods = validRange ? billingPeriods(data.data?.plans ?? [], {}, {}, today, periodStart, periodEnd) : [];
+  // Kesepakatan pada periode pilihan tetap dapat dibayar meski cara bayar sekarang sudah berubah.
   const eligibleHouseIds = new Set(cadence === "daily"
     ? (rapel.data?.dates ?? []).filter((d) => d.date <= receivedDate).map((d) => d.houseId)
     : periods.filter((p) => p.cadence === cadence).map((p) => p.houseId));
@@ -129,9 +130,10 @@ function PaymentForm({ month, payment, onDone }: { month: string; payment?: Admi
   const disabled = save.isPending || !cadence || !houseId || houseError ||
     (cadence === "daily" ? !rapelAmount || !validRapelRange || rapel.isPending || rapel.isError : !amount || !validRange) ||
     data.isPending || data.isError || (receivedBy === "collector" && !collectorId);
+  const cadenceOptions: PaymentCadence[] = payment?.cadence === "weekly" ? ["monthly", "daily", "weekly"] : ["monthly", "daily"];
   return (
     <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (!disabled) save.mutate(); }}>
-      <Select label="Jenis pembayaran" value={cadence} onValueChange={(mode) => { if (mode) chooseCadence(mode); }} placeholder="Pilih jenis pembayaran" required options={["monthly", "weekly", "daily"].map((value) => ({ value: value as PaymentCadence, label: PAYMENT_LABEL[value as PaymentCadence] }))} />
+      <Select label="Jenis pembayaran" value={cadence} onValueChange={(mode) => { if (mode) chooseCadence(mode); }} placeholder="Pilih jenis pembayaran" required options={cadenceOptions.map((value) => ({ value, label: PAYMENT_LABEL[value] }))} />
       <div>
         <Select label="Rumah" value={houseId} onValueChange={chooseHouse} placeholder={!cadence ? "Pilih jenis pembayaran dulu" : loadingHouses ? "Memuat rumah…" : "Pilih rumah"} searchPlaceholder="Cari rumah atau nama…" required disabled={!cadence || loadingHouses || houseError || !houseOptions.length} options={houseOptions} />
         {cadence && !loadingHouses && !houseError && !(payment?.cadence === cadence && houseId) && <p role="status" className="mt-1.5 text-xs text-muted">{cadence === "daily"

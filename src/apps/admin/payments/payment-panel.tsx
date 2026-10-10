@@ -38,7 +38,7 @@ export function PaymentPanel({ month }: { month: string }) {
       <div className="flex flex-col gap-4 @xl:flex-row @xl:items-center @xl:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><ReceiptText className="size-5" aria-hidden /></div>
-          <div className="min-w-0"><h2 className="font-semibold">Pembayaran</h2><p className="mt-0.5 text-pretty text-sm text-muted">Catat rapel, mingguan, dan bulanan warga.</p></div>
+          <div className="min-w-0"><h2 className="font-semibold">Pembayaran</h2><p className="mt-0.5 text-pretty text-sm text-muted">Catat pembayaran bulanan dan rapel warga.</p></div>
         </div>
         <Button size="sm" className="h-11 w-full shrink-0 transition-[background-color,color,box-shadow,scale] active:scale-[0.96] motion-reduce:active:scale-100 @xl:h-9 @xl:w-auto" onClick={() => record()}><Plus className="size-4" aria-hidden /> Catat pembayaran</Button>
       </div>
@@ -58,7 +58,7 @@ export function PaymentPanel({ month }: { month: string }) {
               <div>
                 <h3 className="text-sm font-semibold">Status per rumah</h3>
                 {bills.some((b) => b.end < month + "-01") && <p className="mt-1 text-xs text-muted">Termasuk periode sebelumnya yang belum lunas.</p>}
-                {bills.length === 0 ? <p className="mt-3 rounded-xl bg-idle-soft/30 px-4 py-5 text-pretty text-sm text-muted">Belum ada kesepakatan mingguan atau bulanan. Atur cara bayar di <Link to={adminPath("/rumah")} className="font-semibold text-primary underline underline-offset-2">Rumah & QR</Link>.</p> : (
+                {bills.length === 0 ? <p className="mt-3 rounded-xl bg-idle-soft/30 px-4 py-5 text-pretty text-sm text-muted">Belum ada kesepakatan bulanan. Atur cara bayar di <Link to={adminPath("/rumah")} className="font-semibold text-primary underline underline-offset-2">Rumah & QR</Link>.</p> : (
                   <div className="mt-3">
                     <div aria-hidden className={cx("hidden items-center gap-4 rounded-lg bg-idle-soft/40 px-3 py-2 text-xs font-medium text-muted @2xl:grid", billColumns)}>
                       <span>Rumah</span><span>Periode</span><span className="text-right">Terbayar / Total</span><span className="text-right">Status</span>

@@ -76,7 +76,10 @@ it.each(["petugas", "warga"])("PIN akun %s dari profil warga tetap tampil setela
     await expect.poll(() => client.getQueryData<{ residents: Resident[] }>(["admin", "warga"])?.residents[0].userId).toBe(52);
     await expect.poll(() => client.isMutating()).toBe(0);
   });
-  expect(dialog.textContent).toContain("Ipung ditambahkan. PIN-nya:");
+  await expect.poll(async () => {
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    return dialog.textContent;
+  }).toContain("Ipung ditambahkan. PIN-nya:");
   expect(dialog.textContent).toContain("1234");
   expect(dialog.textContent).not.toContain("Warga ini sudah memiliki akun");
   expect(fetch).toHaveBeenCalledWith("/api/admin/petugas", expect.objectContaining({

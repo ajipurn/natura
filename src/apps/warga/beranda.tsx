@@ -427,7 +427,7 @@ function MonthRecap({
                 />
                 <p className="mt-3 border-t border-line pt-3 text-xs text-muted">
                   Grafik dan rata-rata: hasil ronda. Total bulan juga
-                  mencakup pembayaran mingguan dan bulanan.
+                  mencakup pembayaran periode dan rapel.
                 </p>
               </>
             )

@@ -92,6 +92,13 @@
       "when": 1791620299215,
       "tag": "0012_resident_ronda",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791645918893,
+      "tag": "0013_retire_weekly_payments",
+      "breakpoints": true
     }
   ]
 }

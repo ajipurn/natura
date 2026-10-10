@@ -1,7 +1,10 @@
 import { addDays, daysBetween, daysInMonth, shiftMonth } from "./dates";
 import { scheduleDay } from "./schedule";
 
+/** Mingguan hanya dipertahankan untuk membaca dan mengoreksi riwayat lama. */
 export type PaymentCadence = "daily" | "weekly" | "monthly";
+export const PAYMENT_PLAN_CADENCES = ["daily", "monthly"] as const;
+export type CurrentPaymentCadence = typeof PAYMENT_PLAN_CADENCES[number];
 export type PaymentPlanDTO = {
   id: number;
   houseId: number;

@@ -8,7 +8,7 @@ import { RupiahInput } from "@/components/rupiah-input";
 import { Alert, Button, Field } from "@/components/ui";
 import { addDays, formatDateShort, localDate } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
-import { CADENCE_LABEL, planAt, type PaymentCadence, type PaymentPlanDTO } from "@/lib/payments";
+import { CADENCE_LABEL, PAYMENT_PLAN_CADENCES, planAt, type CurrentPaymentCadence, type PaymentPlanDTO } from "@/lib/payments";
 import { PAYMENT_REFRESH, settingsQuery } from "../queries";
 
 export function PaymentPlanSection({ houseId }: { houseId: number }) {
@@ -50,20 +50,18 @@ export function PaymentPlanSection({ houseId }: { houseId: number }) {
 
 function PlanForm({ houseId, today, current, defaultAmount, onDone }: { houseId: number; today: string; current?: PaymentPlanDTO; defaultAmount: number; onDone: () => void }) {
   const [effectiveFrom, setEffectiveFrom] = useState(today);
-  const [cadence, setCadence] = useState<PaymentCadence>(current?.cadence ?? "monthly");
+  const [cadence, setCadence] = useState<CurrentPaymentCadence>(current?.cadence === "weekly" ? "daily" : current?.cadence ?? "monthly");
   const [ratePerNight, setRate] = useState<number | null>(current?.ratePerNight ?? defaultAmount);
-  const [weekStart, setWeekStart] = useState(String(current?.weekStart ?? 1));
   const save = useMutation({
-    mutationFn: () => call(api.admin.pembayaran.kesepakatan[":id"].$put({ param: { id: String(houseId) }, json: { effectiveFrom, cadence, ratePerNight: ratePerNight ?? 0, weekStart: Number(weekStart), dueTiming: "end", graceDays: 0 } })),
+    mutationFn: () => call(api.admin.pembayaran.kesepakatan[":id"].$put({ param: { id: String(houseId) }, json: { effectiveFrom, cadence, ratePerNight: ratePerNight ?? 0, weekStart: 1, dueTiming: "end", graceDays: 0 } })),
     onSuccess: async () => { await invalidate(...PAYMENT_REFRESH); onDone(); },
   });
   return (
     <form className="space-y-3 rounded-xl bg-idle-soft/50 p-3" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
-      <Select label="Cara pembayaran" value={cadence} onValueChange={setCadence} options={Object.entries(CADENCE_LABEL).map(([value, label]) => ({ value: value as PaymentCadence, label }))} />
-      <Field label="Nominal per hari (Rp)" hint="Mingguan = jumlah hari × nominal ini. Bulanan mengikuti jumlah hari dalam bulan."><RupiahInput value={ratePerNight} onValueChange={setRate} required /></Field>
+      <Select label="Cara pembayaran" value={cadence} onValueChange={setCadence} options={PAYMENT_PLAN_CADENCES.map((value) => ({ value, label: CADENCE_LABEL[value] }))} />
+      <Field label="Nominal per hari (Rp)" hint="Bulanan mengikuti jumlah hari dalam bulan."><RupiahInput value={ratePerNight} onValueChange={setRate} required /></Field>
       <DatePicker label="Mulai berlaku" value={effectiveFrom} onValueChange={setEffectiveFrom} today={today} max={addDays(today, 366)} />
-      <p className="text-xs text-muted">Harian dicatat saat ronda. Mingguan dan bulanan mengikuti status pembayaran periode secara otomatis.</p>
-      {cadence === "weekly" && <Select label="Awal minggu" value={weekStart} onValueChange={setWeekStart} options={["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"].map((label, i) => ({ value: String(i), label }))} />}
+      <p className="text-xs text-muted">Harian dicatat saat ronda. Bulanan mengikuti status pembayaran periode secara otomatis.</p>
       {save.isError && <Alert>{save.error.message}</Alert>}
       <div className="flex justify-end gap-2"><Button variant="ghost" onClick={onDone}>Batal</Button><Button type="submit" disabled={save.isPending || !ratePerNight}>{save.isPending ? "Menyimpan…" : "Simpan kesepakatan"}</Button></div>
     </form>
