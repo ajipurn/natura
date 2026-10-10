@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildRecapCsv, buildSheetsCsv } from "@/lib/recap-csv";
+import { buildRecapSheets } from "@/lib/recap-xlsx";
+import { monthHouseNights } from "@/lib/month-summary";
 import type { MonthRecap } from "@/lib/types";
 
 const recap: MonthRecap = {
@@ -52,7 +54,7 @@ describe("rekap bulanan sebagai CSV", () => {
     expect(lines[3]).toBe("AF,7,Mudik,0,0,0,0,,,0,0,0");
   });
 
-  it.each(["unpaid", "paid"] as const)("seluruh blok bulanan %s mengikuti pelunasan periode tanpa menghilangkan nominal ronda asli", (status) => {
+  it.each(["unpaid", "paid"] as const)("catatan isi tetap terlihat saat periode bulanan %s", (status) => {
     const data: MonthRecap = {
       ...recap, houses: [recap.houses[0]],
       cells: { "1:2026-10-05": { status: "filled", amount: 500 }, "1:2026-10-06": { status: "empty", amount: 0 } },
@@ -62,9 +64,35 @@ describe("rekap bulanan sebagai CSV", () => {
     };
     const lines = buildSheetsCsv(data, "2026-10", "Natura").split("\r\n");
     const label = status === "paid" ? "Lunas" : "Belum";
-    expect(lines[2].split(",").slice(7)).toEqual([label, label, status === "paid" ? "500" : "0", "0", "500"]);
+    expect(lines[2].split(",").slice(7)).toEqual(["500", label, status === "paid" ? "500" : "0", "0", "500"]);
     expect(lines[2].split(",").slice(3, 5)).toEqual([status === "paid" ? "1000" : "500", "1"]);
     expect(lines.at(-1)!.split(",").slice(7, 9)).toEqual(["500", "0"]);
+  });
+
+  it("AF-13: tujuh catatan isi selama transisi Bulanan ke Harian konsisten dengan dashboard dan Excel", () => {
+    const house = { ...recap.houses[0], block: "AF", number: "13" };
+    const dates = Array.from({ length: 9 }, (_, i) => `2026-10-0${i + 1}`);
+    const data: MonthRecap = {
+      houses: [house], dates,
+      cells: Object.fromEntries(dates.map((date, i) => [`1:${date}`, { status: [3, 5].includes(i) ? "empty" : "filled", amount: [3, 5].includes(i) ? 0 : 500 }])),
+      paymentCadences: { 1: ["monthly", "daily"] },
+      paymentPeriods: [{ houseId: 1, planId: 1, cadence: "monthly", start: dates[0], end: dates[7], expected: 4000, paid: 3000, remaining: 1000, status: "unpaid" }],
+    };
+    const nights = monthHouseNights(data, house);
+    const expected = ["500", "500", "500", "Belum", "500", "Belum", "500", "500", "500"];
+    const lines = buildSheetsCsv(data, "2026-10", "Natura").split("\r\n");
+    const row = lines[2].split(",");
+    expect(row.slice(7, 16)).toEqual(expected);
+    expect(row.slice(2, 7)).toEqual(["Bulanan → Harian", "3500", "7", "2", "0"]);
+    expect(row.slice(-3)).toEqual(["0", "0", "3500"]);
+    expect(row.slice(7, 16).filter((cell) => cell === "500")).toHaveLength(nights.filter((night) => night.status === "filled").length);
+    expect(lines.at(-1)!.split(",").slice(7, 16)).toEqual(["500", "500", "500", "0", "500", "0", "500", "500", "500"]);
+
+    const [excel] = buildRecapSheets(data, "Natura");
+    const cells = excel.data[3].slice(4, 13);
+    expect(cells.map((cell) => String(cell?.value))).toEqual(expected);
+    for (const cell of cells) expect(cell?.backgroundColor).toBe(cell?.value === 500 ? "#dcfce7" : "#fef9c3");
+    expect(excel.data[3].slice(-4).map((cell) => cell?.value)).toEqual([3500, 0, 0, 3500]);
   });
 
   it("unduhan: dengan nama KK, nama tidak jadi rumus", () => {

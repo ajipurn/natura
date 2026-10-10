@@ -59,9 +59,11 @@ export function buildSheetsCsv(recap: MonthRecap, month: string, communityName: 
       filledCount,
       empty,
       unchecked,
+      // Catatan isi didahulukan seperti di dashboard, termasuk selama periode belum lunas.
       // Penanda periode dipakai aturan warna di Sheets; bukan penerimaan harian baru.
-      ...nights.map(({ cell, period }) => period?.cadence === "monthly" ? period.status === "paid" ? "Lunas" : "Belum"
-        : cell?.status === "filled" ? cell.amount : cell?.status === "empty" ? "kosong" : ""),
+      ...nights.map(({ cell, period }) => cell?.status === "filled" ? cell.amount
+        : period?.cadence === "monthly" ? period.status === "paid" ? "Lunas" : "Belum"
+          : cell?.status === "empty" ? "kosong" : ""),
       monthlyTotal,
       weeklyTotal,
       collectedTotal,

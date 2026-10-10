@@ -56,10 +56,10 @@ export function buildRecapSheets(recap: MonthRecap, communityName: string): Xlsx
       text(house.ownerName ?? ""),
       text(monthHouseStatusLabel(recap, house)),
       ...nights.map(({ cell, period }) =>
-        period?.cadence === "monthly"
-          ? text(period.status === "paid" ? "Lunas" : "Belum", { align: "center", ...(period.status === "paid" ? FILLED : UNPAID) })
-          : cell?.status === "filled"
-            ? num(cell.amount, { format: RUPIAH, ...FILLED })
+        cell?.status === "filled"
+          ? num(cell.amount, { format: RUPIAH, ...FILLED })
+          : period?.cadence === "monthly"
+            ? text(period.status === "paid" ? "Lunas" : "Belum", { align: "center", ...(period.status === "paid" ? FILLED : UNPAID) })
             : cell?.status === "empty"
               ? text("kosong", { align: "center", ...EMPTY })
               : null,
