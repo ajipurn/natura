@@ -1,7 +1,7 @@
 import { ShieldAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router";
-import { errorMessage } from "@/client/api";
+import { errorMessage, errorTitle } from "@/client/api";
 import { useAuth } from "@/client/auth";
 import type { SessionUser } from "@/server/auth";
 import { ErrorCard, LoadingCards } from "@/components/query-state";
@@ -26,7 +26,7 @@ export function RequireAuth({
   const location = useLocation();
 
   if (!auth.data) {
-    if (auth.isError) return <Centered><ErrorCard message={errorMessage(auth.error)} onRetry={() => void auth.refetch()} /></Centered>;
+    if (auth.isError) return <Centered><ErrorCard title={errorTitle(auth.error)} message={errorMessage(auth.error)} onRetry={() => void auth.refetch()} /></Centered>;
     return <Centered><LoadingCards count={2} /></Centered>;
   }
   if (auth.data.setupNeeded) {

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router";
-import { api, call, errorMessage } from "@/client/api";
+import { api, call, errorMessage, errorTitle } from "@/client/api";
 import { loginNext, useAuth } from "@/client/auth";
 import { clearCache, queryClient } from "@/client/query";
 import { ErrorCard } from "@/components/query-state";
@@ -92,7 +92,7 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
         <p className="mt-2 text-pretty text-sm leading-relaxed text-muted">Cari nama atau rumah, lalu masukkan PIN untuk melanjutkan.</p>
         {users.isError ? (
           <div className="mt-7">
-            <ErrorCard message={errorMessage(users.error)} onRetry={() => void users.refetch()} />
+            <ErrorCard title={errorTitle(users.error)} message={errorMessage(users.error)} onRetry={() => void users.refetch()} />
           </div>
         ) : (
           <form className="mt-7 space-y-5" onSubmit={submit} aria-busy={pending}>

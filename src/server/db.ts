@@ -11,7 +11,7 @@ export type Executor = Db | Tx;
 /** Query yang belum dijalankan (query builder Drizzle baru jalan saat di-await). */
 export type Statement = PromiseLike<unknown>;
 
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 /**
  * Drizzle di atas Postgres sungguhan, mis. Supabase lewat "Transaction pooler" (port 6543).

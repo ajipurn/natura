@@ -8,6 +8,7 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly title?: string,
   ) {
     super(message);
   }
@@ -23,11 +24,15 @@ export async function call<R extends ClientResponse<unknown, number, string>>(re
   } catch {
     throw new ApiError(0, "Tidak ada koneksi internet. Coba lagi.");
   }
-  const data = (await res.json().catch(() => null)) as { error?: string } | null;
-  if (!res.ok) throw new ApiError(res.status, data?.error ?? `Terjadi kesalahan (${res.status}). Coba lagi.`);
+  const data = (await res.json().catch(() => null)) as { error?: string; title?: string } | null;
+  if (!res.ok) throw new ApiError(res.status, data?.error ?? `Terjadi kesalahan (${res.status}). Coba lagi.`, typeof data?.title === "string" ? data.title : undefined);
   return data as OkBody<R>;
 }
 
 export function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : "Terjadi kesalahan. Coba lagi.";
+}
+
+export function errorTitle(err: unknown): string | undefined {
+  return err instanceof ApiError ? err.title : undefined;
 }

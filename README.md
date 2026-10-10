@@ -113,7 +113,36 @@ bun run dev
 
 Buka http://localhost:5173/admin/, buat admin pertama, lalu jalankan `bun run seed` di terminal lain. Database lokalnya [PGlite](https://pglite.dev) (Postgres di dalam proses) di folder `.data/`, dimigrasi otomatis, jadi tidak perlu memasang apa pun. PGlite hanya boleh dibuka satu proses, jadi selama `bun run dev` jalan, seed dititipkan ke server dev itu; kalau server dev mati, seed membuka databasenya sendiri.
 
-Mau memakai Postgres lokal (mis. supaya bisa dibuka di DBeaver sambil `bun run dev` jalan)? Isi `DATABASE_URL` di `.env.local`, mis. `postgres://postgres:postgres@localhost:5432/natura`, lalu jalankan `bun run db:migrate` sekali.
+Mau memakai Postgres lokal (mis. supaya bisa dibuka di DBeaver sambil `bun run dev` jalan)? Isi `DATABASE_URL` di `.env.local`, mis. `postgres://postgres:postgres@localhost:5432/natura`, lalu jalankan `bun run db:migrate` sekali. Server dev dan perintah database lokal menolak alamat remote; gunakan `REMOTE_DATABASE_URL` dan perintah `--remote` untuk Supabase.
+
+### Menyalin database remote untuk development
+
+Pasang PostgreSQL beserta `pg_dump`, `pg_restore`, `initdb`, dan `pg_ctl` (versi tool harus minimal sama dengan server remote). Di macOS:
+
+```bash
+brew install postgresql@18
+```
+
+Jika binary belum ada di `PATH`, isi `PG_BIN` di `.env.local` dengan hasil `brew --prefix postgresql@18` ditambah `/bin`. Isi `REMOTE_DATABASE_URL` dengan **Session pooler** Supabase (port 5432). Hentikan `bun run dev`, lalu:
+
+```bash
+make db-sync
+bun run dev
+```
+
+`db-sync` menyimpan dump remote, menjalankan PostgreSQL khusus proyek di `127.0.0.1:5433`, mencadangkan data lokal sebelumnya, lalu memulihkan schema `public` dan `drizzle` dalam satu transaksi. Setelah restore, migrasi yang belum diterapkan dijalankan **hanya di lokal**. `.env.local` otomatis memakai `postgresql://natura@127.0.0.1:5433/natura`, dan `APP_URL` dikosongkan supaya link saat dev mengikuti localhost. Remote hanya dibaca; akun dan PIN hasil salinan tetap bisa dipakai untuk login lokal.
+
+Command terpisah:
+
+```bash
+make db-dump                         # hanya dump remote
+make db-restore                      # restore dump terakhir ke lokal
+make db-restore DB_DUMP=.data/dumps/local-before-restore-TIMESTAMP.dump
+make db-start                        # jalankan server lokal lagi setelah komputer restart
+make db-stop                         # hentikan PostgreSQL khusus proyek
+```
+
+Data server ada di `.data/postgres`, dump dan cadangan di `.data/dumps`; keduanya tidak masuk Git. Dump berisi data warga dan akun, sehingga file ditulis dengan izin `0600`. Restore mengganti data lokal: hentikan server dev sebelum menjalankannya. `LOCAL_DATABASE_URL` dapat diisi untuk memakai PostgreSQL localhost yang sudah berjalan; jika kosong, command mengelola instance khusus proyek pada port 5433. DBeaver memakai host `127.0.0.1`, port `5433`, database/user `natura`, tanpa password (instance ini hanya mendengarkan loopback).
 
 Untuk mencoba scan dari HP di jaringan yang sama, kamera butuh HTTPS. Pakai tunnel, misalnya `bunx cloudflared tunnel --url http://localhost:5173`.
 

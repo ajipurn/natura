@@ -1,7 +1,7 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import { CloudOff, RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
-import { errorMessage } from "@/client/api";
+import { errorMessage, errorTitle } from "@/client/api";
 import { Button, Card } from "./ui";
 
 /**
@@ -18,16 +18,16 @@ export function QueryState<T>({
   loading?: ReactNode;
 }) {
   if (query.data !== undefined) return <>{children(query.data)}</>;
-  if (query.isError) return <ErrorCard message={errorMessage(query.error)} onRetry={() => void query.refetch()} />;
+  if (query.isError) return <ErrorCard title={errorTitle(query.error)} message={errorMessage(query.error)} onRetry={() => void query.refetch()} />;
   return <>{loading ?? <LoadingCards />}</>;
 }
 
-export function ErrorCard({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorCard({ title = "Gagal memuat", message, onRetry }: { title?: string; message: string; onRetry?: () => void }) {
   return (
-    <Card className="text-center">
+    <Card className="text-center" role="alert">
       <CloudOff className="mx-auto size-10 text-muted" />
-      <p className="mt-2 font-semibold">Gagal memuat</p>
-      <p className="mt-1 text-sm text-muted">{message}</p>
+      <p className="mt-2 font-semibold">{title}</p>
+      <p className="mt-1 text-pretty text-sm leading-relaxed text-muted">{message}</p>
       {onRetry && (
         <Button onClick={onRetry} variant="secondary" className="mt-4">
           <RefreshCw className="size-5" /> Coba lagi

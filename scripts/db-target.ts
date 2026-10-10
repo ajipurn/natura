@@ -1,4 +1,5 @@
 import { openLocalDb, type LocalDb } from "../src/server/db-local";
+import { localDatabaseUrl } from "../src/server/local-database";
 
 /**
  * Database tujuan skrip (migrasi, seed):
@@ -6,7 +7,7 @@ import { openLocalDb, type LocalDb } from "../src/server/db-local";
  *   --remote       → REMOTE_DATABASE_URL di .env/.env.local (Supabase, "Session pooler" port 5432)
  */
 export async function openTarget(remote: boolean): Promise<LocalDb> {
-  if (!remote) return openLocalDb();
+  if (!remote) return openLocalDb(localDatabaseUrl(process.env.DATABASE_URL) ?? "");
   const url = process.env.REMOTE_DATABASE_URL;
   if (!url) {
     console.error("✗ REMOTE_DATABASE_URL belum diisi di .env atau .env.local (lihat .env.example).");
