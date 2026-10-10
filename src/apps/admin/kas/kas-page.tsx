@@ -65,8 +65,8 @@ export function KasPage() {
             {cashPublic !== undefined && (
               <p className="text-xs text-muted">
                 {cashPublic
-                  ? "Saldo, jumlah bulan ini, dan rincian pemasukan/pengeluaran tampil di halaman warga (tanpa nama pencatat)."
-                  : "Kas tidak ditampilkan di halaman warga."}{" "}
+                  ? "Saldo, jumlah bulan ini, dan rincian pemasukan/pengeluaran tampil di Beranda (tanpa nama pencatat)."
+                  : "Kas tidak ditampilkan di Beranda."}{" "}
                 <Link to={adminPath("/pengaturan")} className="font-semibold text-primary">
                   Ubah di Pengaturan
                 </Link>

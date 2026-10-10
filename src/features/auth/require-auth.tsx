@@ -57,7 +57,7 @@ export function RequireAuth({
           <p className="mt-2 font-semibold">Khusus pengurus</p>
           <p className="mt-1 text-sm text-muted">Akun {user.name} adalah petugas ronda.</p>
           <a href={petugasPath("/")} className={cx(buttonClass("primary"), "mt-4")}>
-            Buka app petugas
+            Buka app
           </a>
         </Card>
       </Centered>

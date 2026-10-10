@@ -30,8 +30,7 @@ beforeAll(async () => {
     { date: "2026-10-06", houseId: home.id, status: "filled", amount: 500 },
     { date: "2026-10-07", houseId: home.id, status: "filled", amount: 500 },
   ] });
-  const { data } = await admin.post("/api/admin/pengaturan/kode-warga", { enabled: true });
-  expect((await warga.post("/api/warga/masuk", { code: data.wargaCode })).status).toBe(200);
+  expect((await warga.post("/api/auth/login", { userId: 1, pin: "1234" })).status).toBe(200);
 });
 afterAll(() => vi.useRealTimers());
 

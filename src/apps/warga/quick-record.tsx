@@ -59,9 +59,9 @@ export function QuickRecord({
       )}
       {record.isError && <Alert>{record.error.message}</Alert>}
       <p className="text-center text-xs text-muted">
-        Nominal lain atau scan banyak rumah lebih cepat lewat{" "}
-        <a href={petugasPath("/")} className="font-semibold underline">
-          app petugas
+        Untuk nominal lain atau scan banyak rumah, buka menu{" "}
+        <a href={petugasPath("/ronda")} className="font-semibold underline">
+          Ronda
         </a>{" "}
         → Scan QR.
       </p>

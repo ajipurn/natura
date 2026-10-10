@@ -5,7 +5,7 @@ export const APP_DOMAINS = {
   admin: `app.${COMMUNITY_DOMAIN}`,
   warga: COMMUNITY_DOMAIN,
 } as const;
-export const APP_BASE_PATHS = { petugas: "", admin: "/dashboard", warga: "/info" };
+export const APP_BASE_PATHS = { petugas: "/app", admin: "/dashboard", warga: "/info" };
 export const LEGACY_APP_DOMAINS = { admin: `dashboard.${COMMUNITY_DOMAIN}`, warga: `info.${COMMUNITY_DOMAIN}` };
 
 export type AppSurface = keyof typeof APP_DOMAINS;
@@ -23,13 +23,15 @@ export function appSurface(hostname: string, pathname = "/"): AppSurface | "land
   return null;
 }
 
-const LEGACY_BASE = { petugas: "/petugas", admin: "/admin", warga: "" };
+const LEGACY_BASE = { petugas: "/app", admin: "/admin", warga: "" };
 const currentHost = () => typeof location === "undefined" ? "" : location.hostname;
 
 /** Alamat pada host yang sama relatif; dev/preview tetap memakai path lama. */
 export function appPath(app: AppSurface, path = "", hostname = currentHost()): string {
-  if (!appSurface(hostname)) return `${LEGACY_BASE[app]}${path}` || "/";
   const suffix = path === "/" ? "" : path && !/^[/?#]/.test(path) ? `/${path}` : path;
+  // Info warga menjadi halaman awal app; QR rumah tetap memakai alamat publiknya.
+  if (app === "warga" && !/^\/r(?:\/|$)/.test(suffix)) return appPath("petugas", suffix, hostname);
+  if (!appSurface(hostname)) return `${LEGACY_BASE[app]}${suffix}` || "/";
   const joined = `${APP_BASE_PATHS[app]}${suffix}`;
   const target = joined.startsWith("/") ? joined : `/${joined}`;
   return normalizedHost(hostname) === APP_DOMAINS[app] ? target : `https://${APP_DOMAINS[app]}${target}`;
@@ -48,7 +50,7 @@ export function sameAppPath(path: string, homePath: string, hostname = currentHo
   return path === base || ["/", "?", "#"].some((separator) => path.startsWith(base + separator));
 }
 
-/** QR rumah dan link kode warga selalu membuka Info warga, walau dibuat dari dashboard. */
+/** QR rumah tetap memakai alamat publiknya, walau Info warga sudah menjadi menu app. */
 export function wargaOrigin(origin: string): string {
   return appSurface(new URL(origin).hostname) ? `https://${APP_DOMAINS.warga}${APP_BASE_PATHS.warga}` : origin.replace(/\/+$/, "");
 }

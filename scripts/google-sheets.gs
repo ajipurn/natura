@@ -5,7 +5,8 @@
  * Pilih fungsinya di sebelah tombol Jalankan, lalu tekan Jalankan. Pertama kali, Google meminta izin.
  *
  * - `rapikanRekap`: warna dan format untuk lembar yang sedang dibuka. Cukup sekali per lembar: format
- *   sel tetap ada saat IMPORTDATA memperbarui isinya.
+ *   sel tetap ada saat IMPORTDATA memperbarui isinya. Setelah mengganti skrip dengan versi baru,
+ *   jalankan lagi di setiap lembar: tanggal bulanan berwarna kuning (Belum) atau hijau (Lunas).
  * - `arsipkanBulan`: tab per bulan. Jalankan sekali dari editor, lalu buat pemicunya di menu Pemicu
  *   (ikon jam): fungsi `arsipkanBulan`, berbasis waktu, timer harian, jam 07.00–08.00. Lembar bulan
  *   berjalan selalu bernama bulannya (mis. "Oktober 2026"). Saat bulan berganti, lembar itu disalin
@@ -57,6 +58,8 @@ function rapikanRekap() {
   // Mengganti semua aturan format bersyarat di lembar ini. Warnanya sama dengan file Excel dari Natura.
   sheet.setConditionalFormatRules([
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("kosong").setFontColor("#be123c").setBackground("#ffe4e6").setRanges([night]).build(),
+    SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("Belum").setFontColor("#854d0e").setBackground("#fef9c3").setRanges([night]).build(),
+    SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("Lunas").setFontColor("#15803d").setBackground("#dcfce7").setRanges([night]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=AND(ISNUMBER(H$2),H4>0)').setFontColor("#15803d").setBackground("#dcfce7").setRanges([night]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=OR(H$2="Bulanan (Rp)",H$2="Mingguan (Rp)")').setFontColor("#1d4ed8").setBackground("#dbeafe").setRanges([night]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=$C4="Mudik"').setFontColor("#94a3b8").setRanges([house]).build(),

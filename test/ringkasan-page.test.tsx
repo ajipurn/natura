@@ -17,7 +17,7 @@ const fixture: Dashboard = {
   monthSummary: { nights: 7, total: 49500, average: 7071 },
   paymentOverview: { unpaidHouses: 5, unpaidAmount: 77000, receivedToday: 0, receivedMonth: 0 },
   trend: [], oftenEmpty: [], cash: { balance: 49500, undeposited: 0 },
-  todo: { noHouses: false, planMissing: 0, noSchedule: false, noWargaCode: false, onlyOneUser: false, pendingRequests: 0, offDuty: 0, undeposited: 0, unpaidPayments: 5 },
+  todo: { noHouses: false, planMissing: 0, noSchedule: false, onlyOneUser: false, pendingRequests: 0, offDuty: 0, undeposited: 0, unpaidPayments: 5 },
 };
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);

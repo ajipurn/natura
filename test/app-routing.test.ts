@@ -5,26 +5,31 @@ import { DOMAIN_MANIFESTS, domainRedirect, pageShell, vercelRoutes } from "../sc
 
 describe("alamat setiap bagian Natura", () => {
   it("memakai /dashboard dan /info, dengan URL relatif saat host-nya sama", () => {
-    expect(petugasPath("", "app.clusternatura.com")).toBe("/");
-    expect(petugasPath("/jadwal", "app.clusternatura.com")).toBe("/jadwal");
+    expect(petugasPath("", "app.clusternatura.com")).toBe("/app");
+    expect(petugasPath("/", "app.clusternatura.com")).toBe("/app");
+    expect(petugasPath("?cari=Aji", "app.clusternatura.com")).toBe("/app?cari=Aji");
+    expect(petugasPath("/jadwal", "app.clusternatura.com")).toBe("/app/jadwal");
     expect(adminPath("/rekap?bulan=2026-10", "app.clusternatura.com")).toBe("/dashboard/rekap?bulan=2026-10");
     expect(adminPath("/rumah", "app.clusternatura.com")).toBe("/dashboard/rumah");
     expect(adminPath("", "app.clusternatura.com")).toBe("/dashboard");
     expect(adminPath("/petugas?cari=Aji", "app.clusternatura.com")).toBe("/dashboard/petugas?cari=Aji");
     expect(adminPath("/rumah", "clusternatura.com")).toBe("https://app.clusternatura.com/dashboard/rumah");
-    expect(petugasPath("/", "dashboard.clusternatura.com")).toBe("https://app.clusternatura.com/");
+    expect(petugasPath("/", "dashboard.clusternatura.com")).toBe("https://app.clusternatura.com/app");
+    expect(wargaPath("", "app.clusternatura.com")).toBe("/app");
+    expect(wargaPath("?kode=ABCD", "app.clusternatura.com")).toBe("/app?kode=ABCD");
     expect(wargaPath("/r/TOKEN", "app.clusternatura.com")).toBe("https://clusternatura.com/info/r/TOKEN");
-    expect(wargaPath("", "clusternatura.com")).toBe("/info");
+    expect(wargaPath("", "clusternatura.com")).toBe("https://app.clusternatura.com/app");
     expect(wargaPath("/r/TOKEN", "clusternatura.com")).toBe("/info/r/TOKEN");
-    expect(wargaPath("?kode=ABCD", "clusternatura.com")).toBe("/info?kode=ABCD");
+    expect(wargaPath("?kode=ABCD", "clusternatura.com")).toBe("https://app.clusternatura.com/app?kode=ABCD");
   });
 
   it("mempertahankan path development dan preview, termasuk host yang mirip Natura", () => {
     for (const hostname of ["localhost", "192.168.1.1", "jimpitan-natura.vercel.app", "app.clusternatura.com.example.org"]) {
       expect(appSurface(hostname)).toBeNull();
-      expect(petugasPath("/jadwal", hostname)).toBe("/petugas/jadwal");
+      expect(petugasPath("/jadwal", hostname)).toBe("/app/jadwal");
+      expect(petugasPath("", hostname)).toBe("/app");
       expect(adminPath("", hostname)).toBe("/admin");
-      expect(wargaPath("", hostname)).toBe("/");
+      expect(wargaPath("", hostname)).toBe("/app");
     }
     expect(appSurface("APP.CLUSTERNATURA.COM.")).toBe("petugas");
     expect(appSurface("app.clusternatura.com", "/dashboard/rekap")).toBe("admin");
@@ -33,7 +38,7 @@ describe("alamat setiap bagian Natura", () => {
     expect(appSurface("clusternatura.com", "/informasi")).toBe("landing");
   });
 
-  it("QR dan kode warga memakai Info warga walaupun APP_URL diisi domain utama/dashboard", () => {
+  it("QR rumah mempertahankan URL publik walaupun APP_URL diisi domain utama/dashboard", () => {
     for (const origin of ["https://clusternatura.com/", "https://app.clusternatura.com/dashboard", "https://dashboard.clusternatura.com", "https://info.clusternatura.com", "https://clusternatura.com/info/"]) {
       expect(wargaOrigin(origin)).toBe("https://clusternatura.com/info");
     }
@@ -44,8 +49,10 @@ describe("alamat setiap bagian Natura", () => {
     const host = "app.clusternatura.com";
     expect(loginNext("/r/TOKEN", "/", host)).toBe("https://clusternatura.com/info/r/TOKEN");
     expect(loginNext("/info/r/TOKEN", "/", host)).toBe("https://clusternatura.com/info/r/TOKEN");
-    expect(loginNext("/petugas/riwayat?bulan=2026-10", "/", host)).toBe("/riwayat?bulan=2026-10");
-    expect(loginNext("/petugas?cari=Aji", "/", host)).toBe("/?cari=Aji");
+    expect(loginNext("/petugas/riwayat?bulan=2026-10", "/", host)).toBe("/app/riwayat?bulan=2026-10");
+    expect(loginNext("/petugas?cari=Aji", "/app", host)).toBe("/app?cari=Aji");
+    expect(loginNext(null, "/app", host)).toBe("/app");
+    expect(loginNext("/info?kode=ABCD", "/app", host)).toBe("/app?kode=ABCD");
     expect(loginNext("/admin/rekap", "/", host)).toBe("/dashboard/rekap");
     expect(loginNext("/dashboard/rekap?bulan=2026-10", "/", host)).toBe("/dashboard/rekap?bulan=2026-10");
     expect(loginNext("/riwayat", "/", host)).toBe("/riwayat");
@@ -59,7 +66,7 @@ describe("alamat setiap bagian Natura", () => {
 
   it("manifest dashboard memakai cakupan /dashboard/, terpisah dari halaman awal petugas", () => {
     expect(DOMAIN_MANIFESTS.find((m) => m.target === "admin-domain.webmanifest")?.basePath).toBe("/dashboard/");
-    expect(DOMAIN_MANIFESTS.find((m) => m.target === "petugas-domain.webmanifest")?.basePath).toBe("/");
+    expect(DOMAIN_MANIFESTS.find((m) => m.target === "petugas-domain.webmanifest")?.basePath).toBe("/app/");
   });
 
   it("login memuat halaman baru saat berpindah antara petugas, dashboard, dan QR", () => {
@@ -92,19 +99,18 @@ describe("routing HTML Vite dan Vercel", () => {
   it.each([
     ["clusternatura.com", "/", "/landing/index.html"],
     ["www.clusternatura.com", "/", "/landing/index.html"],
-    ["app.clusternatura.com", "/", "/petugas/index.html"],
-    ["app.clusternatura.com", "/riwayat/2026-10-09", "/petugas/index.html"],
+    ["app.clusternatura.com", "/app", "/petugas/index.html"],
+    ["app.clusternatura.com", "/app/riwayat/2026-10-09", "/petugas/index.html"],
+    ["app.clusternatura.com", "/app/ronda", "/petugas/index.html"],
     ["app.clusternatura.com", "/dashboard", "/admin/index.html"],
     ["app.clusternatura.com", "/dashboard/", "/admin/index.html"],
     ["app.clusternatura.com", "/dashboard/rekap", "/admin/index.html"],
     ["app.clusternatura.com", "/dashboard/petugas", "/admin/index.html"],
     ["app.clusternatura.com", "/dashboard/info", "/admin/index.html"],
-    ["clusternatura.com", "/info", "/index.html"],
-    ["clusternatura.com", "/info/", "/index.html"],
     ["clusternatura.com", "/info/r/TOKEN", "/index.html"],
     ["www.clusternatura.com", "/info/r/TOKEN", "/index.html"],
     ["localhost", "/admin/rekap", "/admin/index.html"],
-    ["preview.vercel.app", "/petugas/jadwal", "/petugas/index.html"],
+    ["preview.vercel.app", "/app/jadwal", "/petugas/index.html"],
     ["localhost", "/landing/", "/landing/index.html"],
     ["localhost", "/", "/index.html"],
   ])("%s%s memilih %s", (hostname, pathname, shell) => {
@@ -123,15 +129,24 @@ describe("routing HTML Vite dan Vercel", () => {
   });
 
   it.each([
-    ["https://app.clusternatura.com/petugas/masuk?next=%2Fpetugas", "https://app.clusternatura.com/masuk?next=%2Fpetugas"],
+    ["https://app.clusternatura.com/petugas", "https://app.clusternatura.com/app"],
+    ["https://clusternatura.com/petugas/?cari=Aji", "https://app.clusternatura.com/app?cari=Aji"],
+    ["https://app.clusternatura.com/petugas/masuk?next=%2Fpetugas", "https://app.clusternatura.com/app/masuk?next=%2Fpetugas"],
     ["https://clusternatura.com/admin/rekap?bulan=2026-10", "https://app.clusternatura.com/dashboard/rekap?bulan=2026-10"],
     ["https://app.clusternatura.com/admin", "https://app.clusternatura.com/dashboard"],
     ["https://clusternatura.com/dashboard", "https://app.clusternatura.com/dashboard"],
-    ["https://app.clusternatura.com/info?kode=ABCD", "https://clusternatura.com/info?kode=ABCD"],
+    ["https://app.clusternatura.com/info?kode=ABCD", "https://app.clusternatura.com/app?kode=ABCD"],
+    ["https://clusternatura.com/info/?kode=ABCD", "https://app.clusternatura.com/app?kode=ABCD"],
+    ["https://app.clusternatura.com/", "https://app.clusternatura.com/app"],
+    ["https://app.clusternatura.com/ronda", "https://app.clusternatura.com/app/ronda"],
+    ["https://clusternatura.com/app", "https://app.clusternatura.com/app"],
+    ["http://localhost:5173/petugas/", "/app"],
+    ["http://localhost:5173/petugas/jadwal?hari=1", "/app/jadwal?hari=1"],
+    ["https://preview.vercel.app/petugas", "/app"],
     ["https://clusternatura.com/r/TOKEN", "https://clusternatura.com/info/r/TOKEN"],
     ["https://app.clusternatura.com/r/TOKEN", "https://clusternatura.com/info/r/TOKEN"],
     ["https://info.clusternatura.com/r/TOKEN", "https://clusternatura.com/info/r/TOKEN"],
-    ["https://info.clusternatura.com/?kode=ABCD", "https://clusternatura.com/info?kode=ABCD"],
+    ["https://info.clusternatura.com/?kode=ABCD", "https://app.clusternatura.com/app?kode=ABCD"],
     ["https://dashboard.clusternatura.com/", "https://app.clusternatura.com/dashboard"],
     ["https://dashboard.clusternatura.com/rekap?bulan=2026-10", "https://app.clusternatura.com/dashboard/rekap?bulan=2026-10"],
     ["https://dashboard.clusternatura.com/petugas?cari=Aji", "https://app.clusternatura.com/dashboard/petugas?cari=Aji"],
@@ -144,11 +159,11 @@ describe("routing HTML Vite dan Vercel", () => {
     if (!rule || !("headers" in rule) || !rule.headers || !("Location" in rule.headers)) throw new Error("Missing redirect Location");
     const match = source.pathname.match(new RegExp(rule!.src!))!;
     expect(rule.headers.Location!.replace(/\$(\d+)/g, (_, group) => match[Number(group)] ?? "") + source.search).toBe(to);
-    expect(domainRedirect(new URL(to))).toBeNull();
+    expect(domainRedirect(new URL(to, source.origin))).toBeNull();
   });
 
   it("alamat baru dan localhost tidak diarahkan ulang", () => {
-    for (const url of ["https://clusternatura.com/info/r/TOKEN", "https://app.clusternatura.com/dashboard/petugas", "https://app.clusternatura.com/dashboard/info", "https://app.clusternatura.com/jadwal"]) {
+    for (const url of ["https://clusternatura.com/info/r/TOKEN", "https://app.clusternatura.com/dashboard/petugas", "https://app.clusternatura.com/dashboard/info", "https://app.clusternatura.com/app/jadwal"]) {
       expect(domainRedirect(new URL(url))).toBeNull();
     }
     expect(domainRedirect(new URL("http://localhost:5173/admin/rekap"))).toBeNull();

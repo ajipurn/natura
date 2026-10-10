@@ -14,7 +14,7 @@ export function LogoSettings({ logoUrl }: { logoUrl: string | null }) {
   const save = useMutation({
     mutationFn: async (file: File | null) =>
       call(api.admin.pengaturan.logo.$put({ json: { logo: file ? await resizeLogo(file) : null } })),
-    // Logo tampil di dashboard, stiker QR, halaman warga, halaman rumah, dan sebagai favicon.
+    // Logo tampil di dashboard, stiker QR, Beranda app, halaman rumah, dan sebagai favicon.
     onSuccess: () => {
       refreshFavicon();
       return invalidate(["admin"], ["warga"], ["rumah"]);
@@ -31,7 +31,7 @@ export function LogoSettings({ logoUrl }: { logoUrl: string | null }) {
         <div>
           <p className="text-sm font-medium">Logo</p>
           <p className="text-xs text-muted">
-            Tampil di stiker QR, halaman warga, dashboard, dan ikon tab. PNG, JPG, WebP, atau SVG;
+            Tampil di stiker QR, Beranda app, dashboard, dan ikon tab. PNG, JPG, WebP, atau SVG;
             diperkecil otomatis dan langsung tersimpan.
           </p>
         </div>

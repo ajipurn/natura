@@ -10,7 +10,7 @@ import { Select } from "@/components/select";
 import { ThemeButton } from "@/components/theme-toggle";
 import { Alert, Button, cx, Field, Input, PageTitle } from "@/components/ui";
 import { DEFAULT_LOGO_URL } from "@/lib/branding";
-import { sameAppPath } from "@/lib/app-paths";
+import { petugasPath, sameAppPath } from "@/lib/app-paths";
 
 const LAST_USER_KEY = "jimpitan:last-user";
 
@@ -22,7 +22,7 @@ function lastUser(): string {
   }
 }
 
-/** Layar masuk dengan nama + PIN (dipakai app petugas dan admin). */
+/** Layar masuk dengan nama + PIN untuk app warga/petugas dan dashboard. */
 export function LoginPage({ title, homePath, setupPath }: { title: string; homePath: string; setupPath: string }) {
   const [params] = useSearchParams();
   const next = loginNext(params.get("next"), homePath);
@@ -81,7 +81,7 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
           <img src={DEFAULT_LOGO_URL} alt="" className="h-11 w-14 shrink-0 object-contain" />
           <div>
             <p className="font-semibold tracking-tight">Cluster Natura</p>
-            <p className="text-xs text-muted">Jimpitan & ronda</p>
+            <p className="text-xs text-muted">{homePath === petugasPath() ? "Info warga & ronda" : "Dashboard pengurus"}</p>
           </div>
         </div>
         <ThemeButton className="size-11 rounded-xl transition-[background-color,color,box-shadow,scale] active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100" />
@@ -89,7 +89,7 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
 
       <div className="rounded-[2rem] bg-card p-5 shadow-sm ring-1 ring-line sm:p-8">
         <h1 className="text-balance text-3xl font-semibold tracking-tight">{title}</h1>
-        <p className="mt-2 text-pretty text-sm leading-relaxed text-muted">Pilih nama dan masukkan PIN untuk melanjutkan.</p>
+        <p className="mt-2 text-pretty text-sm leading-relaxed text-muted">Cari nama atau rumah, lalu masukkan PIN untuk melanjutkan.</p>
         {users.isError ? (
           <div className="mt-7">
             <ErrorCard message={errorMessage(users.error)} onRetry={() => void users.refetch()} />
@@ -97,15 +97,15 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
         ) : (
           <form className="mt-7 space-y-5" onSubmit={submit} aria-busy={pending}>
             <Select
-              label="Nama"
+              label="Nama atau rumah"
+              searchInField
               name="userId"
               required
               value={list.some((u) => String(u.id) === userId) ? userId : ""}
               onValueChange={setUserId}
               // Blok/nomor rumah tampil di samping nama, jadi nama kembar tetap bisa dibedakan.
               options={list.map((u) => ({ value: String(u.id), label: u.name, hint: u.house ?? undefined }))}
-              placeholder={users.isPending ? "Memuat nama…" : "Pilih nama kamu"}
-              searchPlaceholder="Cari nama atau rumah…"
+              placeholder={users.isPending ? "Memuat nama…" : "Cari nama atau rumah…"}
               disabled={users.isPending || pending}
               className="h-12 bg-bg/50"
             />

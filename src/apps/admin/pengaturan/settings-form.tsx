@@ -43,7 +43,7 @@ export function SettingsForm({
       <SwitchField
         name="cashPublic"
         defaultChecked={cashPublic}
-        label="Tampilkan kas di halaman warga"
+        label="Tampilkan kas di Beranda"
         description="Saldo, setoran, dan rincian pemasukan/pengeluaran bulan ini, tanpa nama pencatat."
       />
       {state?.error && <Alert>{state.error}</Alert>}

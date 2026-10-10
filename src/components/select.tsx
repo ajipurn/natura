@@ -1,6 +1,6 @@
 import { Combobox } from "@base-ui/react/combobox";
 import { Check, ChevronsUpDown, Search } from "lucide-react";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { cx, inputClass } from "./ui";
 
 /**
@@ -25,7 +25,8 @@ function matches(option: SelectOption<string>, query: string) {
 }
 
 /**
- * Pilihan dari daftar yang bisa dicari (Base UI Combobox, kolom cari di dalam popup). Isi `options`,
+ * Pilihan dari daftar yang bisa dicari (Base UI Combobox). `searchInField` memindahkan kolom cari
+ * dari popup ke kolom utama supaya bisa langsung diketik. Isi `options`,
  * atau `groups` untuk daftar berkelompok. Beri `label` (tampil di atas) atau `aria-label`. Dengan
  * `name`, nilainya ikut terkirim bersama form. Label dan tombolnya dibungkus satu `<div>`, jadi aman
  * di dalam `space-y-*`; `className` untuk tombolnya.
@@ -38,6 +39,7 @@ export function Select<T extends string>({
   label,
   placeholder,
   searchPlaceholder = "Cari…",
+  searchInField = false,
   name,
   required,
   disabled,
@@ -51,12 +53,14 @@ export function Select<T extends string>({
   label?: ReactNode;
   placeholder?: string;
   searchPlaceholder?: string;
+  searchInField?: boolean;
   name?: string;
   required?: boolean;
   disabled?: boolean;
   className?: string;
   "aria-label"?: string;
 }) {
+  const inputId = useId();
   const all = [...(options ?? []), ...(groups ?? []).flatMap((g) => g.options)];
   // Nilai yang tidak ada di daftar (mis. "" sebelum memilih) = belum memilih: tampilkan placeholder.
   const selected = all.find((o) => o.value === value) ?? null;
@@ -70,7 +74,11 @@ export function Select<T extends string>({
       <Combobox.Root
         items={grouped ?? all}
         value={selected}
-        onValueChange={(next: SelectOption<T> | null) => next && onValueChange(next.value)}
+        onValueChange={(next: SelectOption<T> | null) => {
+          if (next) onValueChange(next.value);
+          else if (searchInField) onValueChange("" as T);
+        }}
+        itemToStringLabel={searchInField ? (option: SelectOption<T>) => option.hint ? `${option.label} · ${option.hint}` : option.label : undefined}
         isItemEqualToValue={(a: SelectOption<T>, b: SelectOption<T>) => a.value === b.value}
         filter={(item: SelectOption<T>, query: string) => matches(item, query)}
         autoHighlight
@@ -78,8 +86,25 @@ export function Select<T extends string>({
         required={required}
         disabled={disabled}
       >
-        {label && <Combobox.Label className="mb-1 block text-sm font-medium">{label}</Combobox.Label>}
-        <Combobox.Trigger
+        {label && (searchInField
+          ? <label htmlFor={inputId} className="mb-1 block text-sm font-medium">{label}</label>
+          : <Combobox.Label className="mb-1 block text-sm font-medium">{label}</Combobox.Label>)}
+        {searchInField ? (
+          <Combobox.InputGroup
+            className={cx(inputClass, "flex items-center gap-2 pe-0 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30 data-disabled:opacity-50", className)}
+          >
+            <Search className="size-4 shrink-0 text-muted" aria-hidden />
+            <Combobox.Input
+              id={inputId}
+              aria-label={ariaLabel}
+              placeholder={placeholder}
+              className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted/70"
+            />
+            <Combobox.Trigger aria-label="Tampilkan pilihan" className="flex size-11 shrink-0 items-center justify-center rounded-xl text-muted">
+              <ChevronsUpDown className="size-4" aria-hidden />
+            </Combobox.Trigger>
+          </Combobox.InputGroup>
+        ) : <Combobox.Trigger
           aria-label={ariaLabel}
           className={cx(
             inputClass,
@@ -95,14 +120,14 @@ export function Select<T extends string>({
           <Combobox.Icon className="shrink-0 text-muted">
             <ChevronsUpDown className="size-4" />
           </Combobox.Icon>
-        </Combobox.Trigger>
+        </Combobox.Trigger>}
         <Combobox.Portal>
           <Combobox.Positioner className="z-50 outline-none" align="start" sideOffset={4}>
             <Combobox.Popup
               aria-label={typeof label === "string" ? label : ariaLabel}
               className="flex max-h-[min(24rem,var(--available-height))] w-[var(--anchor-width)] min-w-60 max-w-[var(--available-width)] origin-[var(--transform-origin)] flex-col overflow-hidden rounded-xl border border-line bg-card text-fg shadow-lg outline-none transition-[opacity,scale] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 motion-reduce:transition-none"
             >
-              <div className="relative border-b border-line p-2">
+              {!searchInField && <div className="relative border-b border-line p-2">
                 <Search className="pointer-events-none absolute left-4.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
                 <Combobox.Input
                   placeholder={searchPlaceholder}
@@ -110,7 +135,7 @@ export function Select<T extends string>({
                   // 16px di HP supaya iOS tidak memperbesar halaman saat kolom ini difokus.
                   className="h-9 w-full rounded-lg border border-line bg-bg pl-8 pr-2 text-base text-fg placeholder:text-muted/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 sm:text-sm"
                 />
-              </div>
+              </div>}
               <Combobox.Empty>
                 <p className="px-3 py-4 text-center text-sm text-muted">Tidak ada yang cocok.</p>
               </Combobox.Empty>

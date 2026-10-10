@@ -27,6 +27,7 @@ export type XlsxSheet = {
 const RUPIAH = "#,##0";
 const FILLED = { textColor: "#15803d", backgroundColor: "#dcfce7" };
 const EMPTY = { textColor: "#be123c", backgroundColor: "#ffe4e6" };
+const UNPAID = { textColor: "#854d0e", backgroundColor: "#fef9c3" };
 const HEADER = { fontWeight: "bold", backgroundColor: "#e2e8f0" } as const;
 
 const text = (value: string, style: Omit<NonNullable<XlsxCell>, "value" | "type"> = {}): XlsxCell => ({ value, type: String, ...style });
@@ -46,7 +47,7 @@ export function buildRecapSheets(recap: MonthRecap, communityName: string): Xlsx
 
   let emptyTotal = 0;
   let uncheckedTotal = 0;
-  const houseRows = rows.map(({ house, cells, filledCount, empty, unchecked, total, collectedTotal, monthlyTotal, weeklyTotal }) => {
+  const houseRows = rows.map(({ house, nights, filledCount, empty, unchecked, total, collectedTotal, monthlyTotal, weeklyTotal }) => {
     emptyTotal += empty;
     uncheckedTotal += unchecked;
     return [
@@ -54,12 +55,14 @@ export function buildRecapSheets(recap: MonthRecap, communityName: string): Xlsx
       text(house.number),
       text(house.ownerName ?? ""),
       text(monthHouseStatusLabel(recap, house)),
-      ...cells.map((c) =>
-        c?.status === "filled"
-          ? num(c.amount, { format: RUPIAH, ...FILLED })
-          : c?.status === "empty"
-            ? text("kosong", { align: "center", ...EMPTY })
-            : null,
+      ...nights.map(({ cell, period }) =>
+        period?.cadence === "monthly"
+          ? text(period.status === "paid" ? "Lunas" : "Belum", { align: "center", ...(period.status === "paid" ? FILLED : UNPAID) })
+          : cell?.status === "filled"
+            ? num(cell.amount, { format: RUPIAH, ...FILLED })
+            : cell?.status === "empty"
+              ? text("kosong", { align: "center", ...EMPTY })
+              : null,
       ),
       num(filledCount),
       num(empty),
@@ -75,7 +78,7 @@ export function buildRecapSheets(recap: MonthRecap, communityName: string): Xlsx
     sheet: "Per rumah",
     data: [
       [text(title, { fontWeight: "bold", fontSize: 14, columnSpan: lead + dateCount + tail })],
-      [text("Tanggal dan Harian = hasil ronda. Mingguan dan Bulanan = pembayaran sesuai periode. Total = Harian + Mingguan + Bulanan.", { columnSpan: lead + dateCount + tail })],
+      [text("Tanggal = hasil ronda atau status bulanan (kuning: belum lunas, hijau: lunas). Total = Harian + Mingguan + Bulanan.", { columnSpan: lead + dateCount + tail })],
       [
         ...["Blok", "No", "Nama KK", "Status"].map((h) => text(h, HEADER)),
         ...recap.dates.map((d) => text(String(Number(d.slice(8))), { ...HEADER, align: "center" })),

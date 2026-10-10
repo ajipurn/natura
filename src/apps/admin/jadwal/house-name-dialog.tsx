@@ -26,7 +26,7 @@ export function HouseNameDialog({
       open={house !== null}
       onClose={onClose}
       title={house ? `Nama KK ${houseLabelLong(house)}` : ""}
-      description="Disimpan di data rumah, jadi ikut tampil di Rumah & QR dan halaman warga."
+      description="Disimpan di data rumah, jadi ikut tampil di Rumah & QR dan Beranda app."
     >
       {house && <NameForm key={house.id} house={house} onCancel={onClose} onSaved={onSaved} />}
     </Dialog>

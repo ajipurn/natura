@@ -4,7 +4,6 @@ import {
   ArrowUp,
   Copy,
   ExternalLink,
-  KeyRound,
   Lock,
   Megaphone,
   MessageCircle,
@@ -12,7 +11,6 @@ import {
   Phone,
   Pin,
   Plus,
-  RefreshCw,
   Share2,
   Trash2,
   TriangleAlert,
@@ -27,21 +25,21 @@ import { CheckboxField } from "@/components/choice";
 import { Dialog } from "@/components/dialog";
 import { QrSvg } from "@/components/qr-svg";
 import { QueryState } from "@/components/query-state";
-import { Alert, Button, Card, Field, Input, PageHeader, Textarea, buttonClass, cx } from "@/components/ui";
+import { Alert, Button, Card, Field, Input, PageHeader, Textarea, buttonClass } from "@/components/ui";
 import { formatDateShort, localDate } from "@/lib/dates";
 import { phoneDigits, whatsappNumber } from "@/lib/format";
 import { infoQuery, settingsQuery } from "./queries";
 
-/** Isi halaman warga: akses (kode warga), pengumuman, dan kontak pengurus. */
+/** Isi menu Info warga: link app, pengumuman, dan kontak pengurus. */
 export function InfoPage() {
   return (
     <>
       <PageHeader
         title="Info warga"
-        subtitle="Pengumuman, kontak pengurus, dan akses halaman warga"
+        subtitle="Pengumuman, kontak pengurus, dan akses Beranda app"
         action={
           <a href={wargaPath()} target="_blank" rel="noopener" className={buttonClass("secondary", "sm")}>
-            <ExternalLink className="size-4" /> <span className="max-sm:hidden">Lihat halaman warga</span>
+            <ExternalLink className="size-4" /> <span className="max-sm:hidden">Lihat Beranda</span>
             <span className="sm:hidden">Lihat</span>
           </a>
         }
@@ -121,173 +119,66 @@ function ConfirmDialog({
   );
 }
 
-/* ---------- Akses halaman warga (kode warga) ---------- */
+/* ---------- Akses menu Info warga ---------- */
 
 function WargaAccess() {
   const query = useQuery(settingsQuery);
   const [copied, setCopied] = useState(false);
-  const [confirming, setConfirming] = useState<"baru" | "tutup" | null>(null);
-  const change = useMutation({
-    mutationFn: (enabled: boolean) => call(api.admin.pengaturan["kode-warga"].$post({ json: { enabled } })),
-    onSuccess: async () => {
-      await invalidate(["admin"]);
-      setConfirming(null);
-    },
-  });
-
   return (
     <section aria-labelledby="akses-warga">
       <QueryState query={query}>
-        {({ wargaCode, origin, fromEnv, communityName }) => {
-          const link = wargaCode ? `${origin}/?kode=${wargaCode}` : null;
-          // Alamat lokal tidak bisa dibuka HP warga (lihat juga halaman cetak QR).
+        {({ origin, communityName }) => {
+          const base = new URL(origin);
+          const link = new URL(wargaPath("", base.hostname), base.origin).href;
           const isLocal = /\/\/(localhost|127\.|192\.168\.|10\.|\[::1\])/.test(origin);
-          const message = link
-            ? `Halaman warga ${communityName}: pengumuman, jadwal ronda, dan rekap jimpitan.\nBuka: ${link}\nKode warga: ${wargaCode}`
-            : "";
-
-          if (!link) {
-            return (
-              <Card className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-idle-soft text-muted">
-                  <Lock className="size-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h2 id="akses-warga" className="flex flex-wrap items-center gap-2 font-semibold">
-                    Halaman warga <StatusPill open={false} />
-                  </h2>
-                  <p className="mt-1 text-sm text-muted">
-                    Warga belum bisa melihat pengumuman, jadwal ronda, dan kontak. Buka dengan membuat kode warga, lalu bagikan link-nya ke
-                    grup warga.
-                  </p>
-                </div>
-                <Button disabled={change.isPending} onClick={() => change.mutate(true)} className="shrink-0">
-                  <KeyRound className="size-5" /> {change.isPending ? "Membuka…" : "Buka halaman warga"}
-                </Button>
-                {change.isError && <Alert>{change.error.message}</Alert>}
-              </Card>
-            );
-          }
-
+          const message = `Info warga ${communityName}: pengumuman, jadwal ronda, dan rekap jimpitan.\nBuka: ${link}\nMasuk dengan nama dan PIN, lalu buka menu Beranda.`;
           return (
             <Card className="overflow-hidden p-0">
               <div className="flex flex-col gap-5 p-4 sm:flex-row sm:p-5">
                 <div className="min-w-0 flex-1 space-y-3">
                   <div>
                     <h2 id="akses-warga" className="flex flex-wrap items-center gap-2 font-semibold">
-                      Halaman warga <StatusPill open />
+                      Akses Beranda
+                      <span className="inline-flex items-center gap-1 rounded-full bg-idle-soft px-2 py-0.5 text-xs font-medium text-muted">
+                        <Lock className="size-3" aria-hidden /> Perlu login
+                      </span>
                     </h2>
                     <p className="mt-1 text-sm text-muted">
-                      Bagikan link ini ke grup warga. Cukup dibuka sekali di HP; yang tidak punya kodenya tidak bisa melihat nama,
-                      jadwal, dan kontak.
+                      Informasi warga tersedia di menu Beranda. Warga masuk dengan nama dan PIN akun yang sudah dibuat pengurus.
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-baseline gap-x-3">
-                    <span className="text-xs font-medium uppercase tracking-wide text-muted">Kode warga</span>
-                    <span className="font-mono text-2xl font-bold tracking-[0.25em]">{wargaCode}</span>
-                  </div>
                   <div className="flex items-center gap-1 rounded-xl border border-line bg-idle-soft/50 py-1 pl-3 pr-1">
-                    <span className="min-w-0 flex-1 truncate font-mono text-sm" title={link}>
-                      {link}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="shrink-0"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(link);
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 2000);
-                        } catch {
-                          window.prompt("Salin link:", link);
-                        }
-                      }}
-                    >
+                    <span className="min-w-0 flex-1 truncate font-mono text-sm" title={link}>{link}</span>
+                    <Button variant="ghost" size="sm" className="shrink-0" onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(link);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      } catch { window.prompt("Salin link:", link); }
+                    }}>
                       <Copy className="size-4" /> {copied ? "Tersalin" : "Salin"}
                     </Button>
                   </div>
-                  {(isLocal || !fromEnv) && (
+                  {isLocal && (
                     <p className="flex gap-2 rounded-xl bg-warn-soft px-3 py-2 text-sm text-warn">
                       <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-                      <span>
-                        {isLocal
-                          ? "Ini alamat lokal: HP warga tidak bisa membukanya. Bagikan dari alamat aplikasi yang sudah online, atau isi APP_URL."
-                          : "Link memakai alamat yang sedang kamu buka. Isi APP_URL supaya link selalu memakai alamat tetap aplikasi."}
-                      </span>
+                      Ini alamat lokal. Bagikan link dari alamat aplikasi yang sudah online.
                     </p>
                   )}
-                  <a
-                    href={`https://wa.me/?text=${encodeURIComponent(message)}`}
-                    target="_blank"
-                    rel="noopener"
-                    className={buttonClass("primary", "sm")}
-                  >
+                  <a href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener" className={buttonClass("primary", "sm")}>
                     <Share2 className="size-4" /> Kirim ke grup WhatsApp
                   </a>
                 </div>
                 <figure className="flex shrink-0 flex-col items-center gap-2 self-center sm:w-40">
-                  <div className="rounded-xl border border-line bg-white p-2.5">
-                    <QrSvg text={link} className="w-32 sm:w-34" />
-                  </div>
-                  <figcaption className="text-center text-xs text-muted">Scan dengan kamera HP, mis. saat rapat warga</figcaption>
+                  <div className="rounded-xl border border-line bg-white p-2.5"><QrSvg text={link} className="w-32 sm:w-34" /></div>
+                  <figcaption className="text-center text-xs text-muted">Scan untuk membuka app, lalu masuk dengan nama dan PIN</figcaption>
                 </figure>
               </div>
-              <footer className="flex flex-col gap-2 border-t border-line bg-idle-soft/40 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                <p className="text-muted">Kode tersebar ke luar grup? Buat kode baru; akses dengan kode lama berhenti.</p>
-                <div className="flex shrink-0 gap-2">
-                  <Button variant="secondary" size="sm" onClick={() => setConfirming("baru")}>
-                    <RefreshCw className="size-4" /> Kode baru
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-empty hover:text-empty" onClick={() => setConfirming("tutup")}>
-                    <Lock className="size-4" /> Tutup halaman
-                  </Button>
-                </div>
-              </footer>
-
-              <ConfirmDialog
-                open={confirming === "baru"}
-                onClose={() => setConfirming(null)}
-                title="Buat kode warga baru?"
-                confirmLabel="Buat kode baru"
-                pending={change.isPending}
-                onConfirm={() => change.mutate(true)}
-              >
-                <p>Kode {wargaCode} tidak berlaku lagi. Warga yang sudah masuk perlu membuka link baru atau memasukkan kode baru.</p>
-                <p>Setelah ini, kirim link barunya ke grup warga.</p>
-                {change.isError && <Alert>{change.error.message}</Alert>}
-              </ConfirmDialog>
-              <ConfirmDialog
-                open={confirming === "tutup"}
-                onClose={() => setConfirming(null)}
-                title="Tutup halaman warga?"
-                confirmLabel="Tutup halaman"
-                danger
-                pending={change.isPending}
-                onConfirm={() => change.mutate(false)}
-              >
-                <p>Semua warga tidak bisa membuka halaman warga sampai kamu membukanya lagi dengan kode baru.</p>
-                {change.isError && <Alert>{change.error.message}</Alert>}
-              </ConfirmDialog>
             </Card>
           );
         }}
       </QueryState>
     </section>
-  );
-}
-
-function StatusPill({ open }: { open: boolean }) {
-  return (
-    <span
-      className={cx(
-        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
-        open ? "bg-filled-soft text-filled" : "bg-idle-soft text-muted",
-      )}
-    >
-      <span className={cx("size-1.5 rounded-full", open ? "bg-filled" : "bg-muted")} aria-hidden />
-      {open ? "Terbuka" : "Tertutup"}
-    </span>
   );
 }
 
@@ -358,7 +249,7 @@ function Announcements() {
                   <div className="px-4 py-10 text-center">
                     <Megaphone className="mx-auto size-9 text-muted" />
                     <p className="mt-2 font-semibold">Belum ada pengumuman</p>
-                    <p className="mt-1 text-sm text-muted">Pengumuman tampil paling atas di halaman warga, mis. jadwal kerja bakti.</p>
+                    <p className="mt-1 text-sm text-muted">Pengumuman tampil paling atas di Beranda, mis. jadwal kerja bakti.</p>
                   </div>
                 )
               ) : (
@@ -481,7 +372,7 @@ function AnnouncementItem({ announcement: a, onSaved }: { announcement: Announce
           pending={remove.isPending}
           onConfirm={() => remove.mutate()}
         >
-          <p>"{a.title}" tidak tampil lagi di halaman warga.</p>
+          <p>"{a.title}" tidak tampil lagi di Beranda.</p>
           {remove.isError && <Alert>{remove.error.message}</Alert>}
         </ConfirmDialog>
       </li>
@@ -559,7 +450,7 @@ function Contacts() {
                     <div className="px-4 py-10 text-center">
                       <UsersRound className="mx-auto size-9 text-muted" />
                       <p className="mt-2 font-semibold">Belum ada kontak</p>
-                      <p className="mt-1 text-sm text-muted">Warga bisa langsung menelepon atau WhatsApp pengurus dari halaman warga.</p>
+                      <p className="mt-1 text-sm text-muted">Warga bisa langsung menelepon atau WhatsApp pengurus dari Beranda.</p>
                       <Button size="sm" className="mt-4" onClick={() => setEditing(true)}>
                         <Plus className="size-4" /> Tambah kontak
                       </Button>

@@ -58,9 +58,9 @@ json(path.join(OUT, "config.json"), {
   routes: vercelRoutes,
 });
 
-for (const { source, target, name, shortName, basePath } of DOMAIN_MANIFESTS) {
+for (const { source, target, name, shortName, id, basePath } of DOMAIN_MANIFESTS) {
   const manifest = JSON.parse(readFileSync(path.join(ROOT, "dist", source), "utf8"));
-  const value = { ...manifest, name, short_name: shortName, id: basePath, start_url: basePath, scope: basePath };
+  const value = { ...manifest, name, short_name: shortName, id, start_url: basePath, scope: basePath };
   // Vite preview memakai dist, deployment memakai static.
   for (const dir of [path.join(ROOT, "dist"), path.join(OUT, "static")]) json(path.join(dir, target), value);
 }

@@ -489,18 +489,17 @@ describe("satu sumber: nama warga di akun petugas", () => {
 });
 
 describe("halaman warga", () => {
-  it("tertutup sampai admin membuat kode, lalu terbuka dengan kode itu", async () => {
+  it("memerlukan login akun, lalu Info warga bisa dibaca petugas biasa", async () => {
     const warga = apiClient(env);
-    expect((await warga.get("/api/warga/akses")).data).toMatchObject({ enabled: false, access: false });
-    expect((await warga.post("/api/warga/masuk", { code: "APAPUN" })).status).toBe(403);
-
-    const { data } = await admin.post("/api/admin/pengaturan/kode-warga", { enabled: true });
-    const code = data.wargaCode as string;
-    expect(code).toMatch(/^[2-9A-Z]{8}$/);
-
-    expect((await warga.get("/api/warga")).status).toBe(401);
-    expect((await warga.post("/api/warga/masuk", { code: "SALAH123" })).status).toBe(400);
-    expect((await warga.post("/api/warga/masuk", { code: code.toLowerCase() })).data).toEqual({ ok: true });
+    expect((await warga.get("/api/warga/akses")).data).toMatchObject({ access: false });
+    for (const path of ["/api/warga", "/api/warga/rekap", "/api/warga/rumah/1"]) expect((await warga.get(path)).status).toBe(401);
+    expect((await warga.post("/api/warga/masuk", { code: "APAPUN" })).status).toBe(410);
+    expect((await admin.post("/api/admin/pengaturan/kode-warga", { enabled: true })).status).toBe(410);
+    const users = (await warga.get("/api/auth/users")).data.users as { id: number; name: string }[];
+    const userId = users.find((u) => u.name === "Budi")!.id;
+    expect((await warga.post("/api/auth/login", { userId, pin: "2222" })).status).toBe(200);
+    expect((await warga.get("/api/warga/akses")).data).toMatchObject({ access: true });
+    expect((await warga.get("/api/admin/rumah")).status).toBe(403);
 
     await admin.post("/api/admin/pengumuman", { title: "Kerja bakti", body: "Minggu pagi jam 7.", pinned: true });
     await admin.put("/api/admin/kontak", { contacts: [{ name: "Pak RT", role: "Ketua RT", phone: "0812-3456-7890" }] });
@@ -536,8 +535,8 @@ describe("halaman warga", () => {
     expect(JSON.stringify(history.data)).not.toMatch(/ownerName|token/);
     expect((await warga.get("/api/warga/rumah/99999")).status).toBe(404);
 
-    // Kode diganti: akses lama tidak berlaku.
-    await admin.post("/api/admin/pengaturan/kode-warga", { enabled: true });
+    // Keluar dari akun menutup semua data Info warga.
+    await warga.post("/api/auth/logout", {});
     expect((await warga.get("/api/warga")).status).toBe(401);
     expect((await warga.get(`/api/warga/rumah/${checked.id}`)).status).toBe(401);
   });

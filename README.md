@@ -4,16 +4,16 @@ Sistem informasi dan layanan warga Cluster Natura. Saat ini mencakup pendataan w
 
 Untuk jimpitan, setiap rumah punya stiker QR di dekat wadahnya. Petugas ronda scan QR-nya, tekan **Ada** atau **Kosong**, dan rekapnya langsung tersusun.
 
-Satu project dan database, empat pintu masuk:
+Satu project dan database, dengan pintu masuk bersama untuk warga dan petugas:
 
 | Alamat production | Alamat dev/preview | Untuk | Isi |
 | --- | --- | --- | --- |
-| `app.clusternatura.com` | `/petugas/` | Petugas ronda (HP) | Scan QR, catat manual, denah 2D/3D, jaga malam ini, riwayat, jadwal. Tetap jalan tanpa sinyal. |
-| `app.clusternatura.com/dashboard` | `/admin/` | Pengurus (laptop/HP) | Ringkasan, peta ronda, riwayat & koreksi (dengan log catatan), rekap bulanan, kas & iuran, warga & keluarga, jadwal, akun & akses, data rumah & cetak QR, info warga, pengaturan. |
-| `clusternatura.com/info` | `/` | Warga | Pengumuman, jaga malam ini & jadwal seminggu, rekap jimpitan per bulan, status per rumah, kas, kontak pengurus. Dibuka dengan **kode warga**. |
-| `clusternatura.com` | `/landing/` | Pengunjung | Halaman sementara **Under maintenance** dengan tautan ke layanan yang tersedia. |
+| `app.clusternatura.com/app` | `/app` | Warga dan petugas | Beranda menjadi halaman awal: pengumuman, jadwal, rekap jimpitan, status per rumah, kas, dan kontak. Wajib login nama dan PIN. |
+| `app.clusternatura.com/app/ronda` | `/app/ronda` | Petugas ronda (HP) | Scan QR, catat manual, denah 2D/3D, jaga malam ini, riwayat, jadwal. Tetap jalan tanpa sinyal. |
+| `app.clusternatura.com/dashboard` | `/admin/` | Admin / pengurus (laptop/HP) | Kelola warga, keluarga, rumah, akun, akses pengurus, jadwal, kas, iuran, dan informasi. |
+| `clusternatura.com/info/r/<token>` | `/r/<token>` | Penghuni rumah | Riwayat jimpitan satu rumah dari stiker QR, tetap bisa dibuka tanpa login. |
 
-App petugas dimulai di `/`, dashboard di `/dashboard`, dan info warga di `/info`: misalnya `app.clusternatura.com/dashboard/rekap` dan `app.clusternatura.com/jadwal`. Sesi login berlaku di domain Natura yang sama; API tetap di `/api/*` pada masing-masing host dan memeriksa peran akun. Dev/preview dan domain Vercel memakai alamat lama agar tetap bisa dicoba tanpa DNS khusus. Subdomain lama `dashboard.clusternatura.com` dan `info.clusternatura.com` diarahkan ke alamat baru, termasuk filter dan kode warga pada query string.
+Urutan menu app: **Beranda, Ronda, Riwayat, Jadwal, Akun**. Login di `/app/masuk` memakai akun yang sama untuk semua menu. Root `app.clusternatura.com/`, `/petugas`, dan alamat Info warga lama mengarah ke `/app`; subhalaman `/petugas/*` menjadi `/app/*`, dengan query string tetap dibawa. `clusternatura.com/app` juga mengarah ke app. Kode warga bersama dan cookie lamanya tidak lagi membuka Info warga. Sesi akun berlaku di domain Natura yang sama; API tetap di `/api/*` dan memeriksa peran akun. Dashboard tetap di `/dashboard`; `/dashboard/petugas` tetap mengelola akun. Subdomain lama diarahkan ke alamat baru.
 
 Stiker QR berisi alamat `https://clusternatura.com/info/r/<kode>`: dibuka pakai kamera HP biasa, warga melihat riwayat jimpitan rumah itu, dan petugas yang sudah masuk bisa langsung mencatat. QR lama di `/r/<kode>` pada domain Natura diarahkan ke alamat baru. QR yang memakai domain Vercel tetap bisa dibuka; login di domain berbeda tidak ikut berpindah.
 
@@ -24,7 +24,7 @@ Stiker QR berisi alamat `https://clusternatura.com/info/r/<kode>`: dibuka pakai 
 - **Warga dan akun terhubung:** buat akun petugas untuk warga yang sudah didata tanpa membuat orang baru. Warga boleh tidak memiliki akun. Profil yang terhubung akun membaca nama dan rumah langsung dari akun; perubahan di Warga atau Akun petugas langsung konsisten. Nomor telepon tidak ditampilkan di info warga atau QR.
 - **Keluarga dan hunian:** menu **Warga** memiliki tab **Daftar warga** dan **Keluarga**. Kelompok keluarga memilih kepala, pasangan, anak, orang tua, atau anggota lainnya dari orang yang sama; satu rumah dapat menampung beberapa keluarga. Status hunian dicatat per orang (pemilik, penyewa, anggota keluarga, lainnya), beserta tanggal mulai tinggal dan riwayat perpindahan. Memindahkan keluarga memperbarui rumah seluruh anggota, termasuk akun petugas dan jadwalnya. Kepala keluarga dipindahkan bersama anggota; anggota yang pindah sendiri dilepas dari keluarga lama.
 - **Iuran lingkungan:** tentukan jenis dan nominal per rumah, periode bulanan atau sekali bayar, serta tanggal jatuh tempo. Pengurus menekan **Terbitkan tagihan** untuk bulan yang dipilih, untuk semua rumah terdaftar (termasuk kosong) atau rumah pilihan. Penerbitan ulang tidak menggandakan tagihan; perubahan tarif berlaku untuk tagihan baru. Pembayaran sebagian/lunas, tunai/transfer, tanggal penerimaan, catatan, dan bukti gambar didukung. Pembayaran masuk kas sekali pada tanggal diterima. Tagihan dan penerimaan dibatalkan tanpa menghapus riwayat; bukti hanya bisa dibaca pengelola keuangan.
-- **Akun & akses:** Admin dan Ketua mengelola semua fitur serta akses akun; Sekretaris mengelola warga, keluarga, rumah, jadwal, dan informasi; Bendahara mengelola kas/iuran serta membaca rumah dan riwayat ronda; Petugas menggunakan app ronda. Izin diperiksa di API setiap permintaan, dan perubahan peran/status mencabut sesi lama. Peran atau status akun sendiri tidak dapat diturunkan. Akun yang sudah ada mempertahankan perannya.
+- **Akun & akses:** Admin dan Ketua mengelola semua fitur serta akses akun; Sekretaris mengelola warga, keluarga, rumah, jadwal, dan informasi; Bendahara mengelola kas/iuran serta membaca rumah dan riwayat ronda; Akun Petugas membuka Beranda dan menu Ronda; pencatatan mengikuti jadwal jaga. Izin diperiksa di API setiap permintaan, dan perubahan peran/status mencabut sesi lama. Peran atau status akun sendiri tidak dapat diturunkan. Akun yang sudah ada mempertahankan perannya.
 - **Dashboard pengurus:** menu Lingkungan (Warga, Rumah & QR, Info warga), Ronda & jimpitan, Keuangan (Kas, Iuran), dan Akun & akses menyesuaikan izin pengguna.
 - **Scan QR per rumah** dari app petugas. Ada tombol senter untuk HP Android dan mendukung iPhone.
 - **Ada / Kosong + nominal.** Nominal awal bisa diatur dan diubah saat mencatat.
@@ -62,9 +62,9 @@ Semua waktu memakai WIB. Ronda yang lewat tengah malam tetap dihitung malam sebe
    - **Warga:** daftarkan tiap orang dan pilih rumahnya bila sudah diketahui. Anggota keluarga dapat memakai rumah yang sama.
    - **Akun petugas:** pilih warga yang sudah didata untuk membuat akun, atau pilih Warga baru.
    - **Jadwal ronda:** impor tabel jadwal (judul hari seperti "AHAD (MALAM SENIN)", isi "NAMA (BLOK-NO)"), lalu rapikan langsung di halaman Jadwal.
-   - **Info warga:** buat kode warga, lalu kirim link-nya ke grup WA. Tambahkan pengumuman dan kontak pengurus.
+   - **Info warga:** bagikan link app; warga masuk dengan nama dan PIN akun yang dibuat pengurus. Tambahkan pengumuman dan kontak pengurus.
 3. **Rumah & QR → Cetak QR**, cetak di kertas stiker (sebaiknya vinyl atau dilaminasi), lalu tempel dekat wadah jimpitan.
-4. Petugas membuka `/petugas/` sekali saat ada sinyal (supaya tersimpan untuk offline), lalu tekan **Scan QR** saat keliling.
+4. Petugas membuka `/app/ronda` sekali saat ada sinyal (supaya tersimpan untuk offline), lalu tekan **Scan QR** saat keliling.
 5. Selesai ronda, tekan **Bagikan rekap** dan kirim ke grup WA, lalu setor uangnya ke bendahara. Bendahara mencatatnya di **Kas** (catat juga saldo awal kas sebagai pemasukan lain).
 
 Untuk warga yang membayar mingguan/bulanan, pengurus mencatat **uang yang benar-benar diterima** di Rekap bulanan. Pilih **Langsung bendahara** untuk langsung menambah kas, atau **Petugas, belum disetor** untuk memasukkannya ke pencocokan setoran tanggal penerimaan. Pembayaran yang sudah tercatat tidak dicatat lagi sebagai pemasukan lain atau uang hasil ronda. Petugas tetap mencatat hasil pemeriksaan wadah dan hanya memasukkan uang tambahan yang benar-benar diambil. Koreksi dan pembatalan pembayaran menyimpan log sebelum/sesudah.
@@ -129,7 +129,7 @@ Keempat bagian (hasil build Vite) dilayani sebagai file statis, API di `/api/*` 
 3. **Vercel:** import repo ini (Framework Preset: Other; sisanya diatur `vercel.json`). Di **Settings → Environment Variables** isi:
    - `DATABASE_URL`: Transaction pooler dari Supabase,
    - `AUTH_SECRET`: kunci acak minimal 32 karakter (`openssl rand -base64 32`),
-   - `APP_URL`: `https://clusternatura.com/info`, untuk QR rumah dan link kode warga. Link ekspor tetap memakai `/api/ekspor/...` di root domain. Saat domain Natura dipakai, link publik otomatis menuju Info warga walaupun dibuka dari dashboard.
+   - `APP_URL`: `https://clusternatura.com`, untuk QR rumah dan link ekspor. QR rumah otomatis memakai `/info/r/<token>` pada domain Natura, sedangkan ekspor tetap memakai `/api/ekspor/...` di root domain. Nilai lama yang berakhiran `/info` tetap didukung. Link Beranda memakai `/app` dan memerlukan login akun.
 4. Deploy (push ke `main`, atau `bunx vercel --prod`). Function otomatis berjalan di region Vercel yang terdekat dengan database, dibaca dari alamat pooler di `DATABASE_URL` (mis. `ap-south-1` → `bom1` Mumbai; kalau tidak terbaca: `sin1`). Bisa dipaksa lewat environment variable `FUNCTION_REGION`.
 5. Buka `/admin/setup` di alamat production untuk membuat admin, lalu isi data awal dari komputer: `bun run seed:remote`.
 6. Pastikan alamat production sudah final (isi `APP_URL` kalau pakai domain sendiri, lalu deploy ulang), baru cetak stiker QR.
@@ -138,9 +138,9 @@ Paket gratis Vercel (Hobby) dan Supabase cukup untuk satu perumahan. Project Sup
 
 ### Domain Cluster Natura di Cloudflare
 
-1. Tambahkan `clusternatura.com` dan `app.clusternatura.com` di **Vercel → project natura → Settings → Domains**, keduanya ke environment Production project yang sama. Domain utama memakai landing di `/` dan Info warga di `/info`; subdomain app memakai petugas di `/` dan dashboard di `/dashboard`. Pertahankan domain lama `dashboard.clusternatura.com` dan `info.clusternatura.com` pada project yang sama supaya redirect dan stiker lama tetap bekerja. Jika menambahkan `www.clusternatura.com`, arahkan ke domain utama.
+1. Tambahkan `clusternatura.com` dan `app.clusternatura.com` di **Vercel → project natura → Settings → Domains**, keduanya ke environment Production project yang sama. Domain utama memakai landing di `/` dan QR rumah di `/info/r/<token>`; alamat Info warga `/info` mengarah ke app. Subdomain app memakai `/app` untuk Beranda setelah login, `/app/ronda` untuk pencatatan, dan `/dashboard` untuk pengurus. Root subdomain app serta `/petugas` diarahkan ke `/app`. Pertahankan domain lama `dashboard.clusternatura.com` dan `info.clusternatura.com` pada project yang sama supaya redirect dan stiker lama tetap bekerja. Jika menambahkan `www.clusternatura.com`, arahkan ke domain utama.
 2. Di **Cloudflare → clusternatura.com → DNS → Records**, gunakan nilai yang ditampilkan Vercel untuk project ini. Untuk Cloudflare, Vercel meminta record **CNAME** dengan nama `@`, `app`, `dashboard`, dan `info`, dengan **Proxy disabled / DNS only**; Cloudflare melakukan flattening untuk CNAME di domain utama. Nama dan target harus sama dengan petunjuk Vercel. Record email memakai nilainya sendiri.
-3. Setelah Vercel menunjukkan konfigurasi valid dan sertifikat siap, deploy hasil build baru. Periksa halaman utama, masuk petugas, dashboard, Info warga, QR rumah, dan pemasangan PWA. App petugas perlu dibuka sekali saat online di alamat baru agar bisa dipakai offline.
+3. Setelah Vercel menunjukkan konfigurasi valid dan sertifikat siap, deploy hasil build baru. Periksa halaman utama, masuk petugas, dashboard, Beranda, QR rumah, dan pemasangan PWA. App petugas perlu dibuka sekali saat online di alamat baru agar bisa dipakai offline.
 4. Sebelum pindah dari domain Vercel, kirim semua antrean catatan offline dari alamat lama. Penyimpanan HP dan pemasangan PWA terikat ke origin; salinannya tidak otomatis pindah ke subdomain baru. Akun, PIN, jadwal, dan riwayat di database tetap sama. Petugas cukup masuk lagi dan memasang app dari alamat baru.
 
 Rujukan konfigurasi DNS: [Vercel — Adding & Configuring a Custom Domain](https://vercel.com/docs/domains/working-with-domains/add-a-domain).
@@ -168,8 +168,8 @@ Semua tabel memakai Row Level Security tanpa policy: aplikasi konek sebagai pemi
 ```
 index.html, petugas/index.html, admin/index.html   Halaman awal tiap app
 src/
-  apps/warga/       Halaman warga (/) dan halaman rumah (/r/:kode)
-  apps/petugas/     App petugas: Ronda (scanner, antrean offline), riwayat, jadwal, akun
+  apps/warga/       Komponen Beranda untuk app, serta halaman QR rumah publik (/info/r/:kode; dev /r/:kode)
+  apps/petugas/     App warga/petugas: Beranda, Ronda (scanner, antrean offline), riwayat, jadwal, akun
   apps/admin/       Dashboard admin
   features/         Bagian yang dipakai beberapa app: masuk, riwayat, jadwal
   components/       Komponen UI, pemindai QR, denah 2D & 3D

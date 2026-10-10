@@ -133,11 +133,6 @@ function appOrigin(c: { env: AppEnv["Bindings"]; req: { url: string } }) {
   return { origin: wargaOrigin(appSurface(request.hostname) ? request.origin : fromEnv || request.origin), fromEnv: Boolean(fromEnv) };
 }
 
-/** Kode warga: huruf/angka yang mudah dibaca, tanpa 0/O dan 1/I/L. */
-function newWargaCode() {
-  return newToken().slice(0, 8);
-}
-
 /** Token link CSV untuk Google Sheets: 128 bit acak (hex), karena link itu bisa dibuka tanpa login. */
 function newExportToken() {
   return Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
@@ -421,15 +416,8 @@ export const adminRoutes = new Hono<AppEnv>()
     return c.json({ logoUrl: row ? logoUrl({ logoVersion: row.logoVersion, hasLogo: logo !== null }) : null });
   })
 
-  /** Buat kode warga baru (kode lama tidak berlaku lagi) atau tutup halaman warga. */
-  .post("/pengaturan/kode-warga", body(z.object({ enabled: z.boolean() })), async (c) => {
-    const code = c.req.valid("json").enabled ? newWargaCode() : null;
-    await c.var.db
-      .update(settings)
-      .set({ wargaCode: code, wargaCodeVersion: sql`${settings.wargaCodeVersion} + 1`, updatedAt: new Date() })
-      .where(eq(settings.id, 1));
-    return c.json({ wargaCode: code });
-  })
+  /** Kode bersama sudah digantikan login akun. Bookmark API lama tidak membuat akses baru. */
+  .post("/pengaturan/kode-warga", (c) => c.json({ error: "Info warga sekarang memakai login nama dan PIN." }, 410))
 
   /** Buat token baru untuk link Google Sheets (link lama berhenti) atau matikan link-nya. */
   .post("/pengaturan/link-ekspor", body(z.object({ enabled: z.boolean() })), async (c) => {

@@ -5,9 +5,9 @@ import { z } from "zod";
 import { daysInMonth, rondaDate } from "@/lib/dates";
 import { monthStats } from "@/lib/month-stats";
 import { scheduleDay } from "@/lib/schedule";
-import { endWargaAccess, hasWargaAccess, requireWarga, startWargaAccess } from "../auth";
+import { endWargaAccess, hasWargaAccess, requireUser } from "../auth";
 import type { AppEnv } from "../env";
-import { body, idParam } from "../http";
+import { idParam } from "../http";
 import { getCashPublic } from "../kas";
 import { getHouseHistory, getMonthRecap, getSettings, logoColumns, logoUrl } from "../queries";
 import { listSchedule } from "../schedule";
@@ -18,29 +18,18 @@ import { getHousePaymentInfo } from "../payments";
 /** Banyaknya malam ronda terakhir di riwayat per rumah (± 3 bulan). */
 const HISTORY_NIGHTS = 100;
 
-/** Halaman informasi untuk warga, dibuka dengan kode bersama dari pengurus. */
+/** Informasi warga di dalam app, dibuka dengan login nama dan PIN. */
 export const wargaRoutes = new Hono<AppEnv>()
   .get("/akses", async (c) => {
     const db = c.var.db;
     const [[row], access] = await Promise.all([
-      db.select({ communityName: settings.communityName, code: settings.wargaCode, ...logoColumns }).from(settings).where(eq(settings.id, 1)).limit(1),
+      db.select({ communityName: settings.communityName, ...logoColumns }).from(settings).where(eq(settings.id, 1)).limit(1),
       hasWargaAccess(c),
     ]);
-    return c.json({ communityName: row?.communityName ?? null, logoUrl: logoUrl(row), enabled: Boolean(row?.code), access });
+    return c.json({ communityName: row?.communityName ?? null, logoUrl: logoUrl(row), access });
   })
 
-  .post("/masuk", body(z.object({ code: z.string().trim().max(32) })), async (c) => {
-    const code = c.req.valid("json").code.toUpperCase().replace(/[^0-9A-Z]/g, "");
-    const [row] = await c.var.db
-      .select({ code: settings.wargaCode, version: settings.wargaCodeVersion })
-      .from(settings)
-      .where(eq(settings.id, 1))
-      .limit(1);
-    if (!row?.code) return c.json({ error: "Halaman warga belum dibuka oleh pengurus." }, 403);
-    if (code !== row.code) return c.json({ error: "Kode salah. Tanyakan kode terbaru ke pengurus." }, 400);
-    await startWargaAccess(c, row.version);
-    return c.json({ ok: true });
-  })
+  .post("/masuk", (c) => c.json({ error: "Info warga sekarang ada di app. Masuk dengan nama dan PIN." }, 410))
 
   .post("/keluar", (c) => {
     endWargaAccess(c);
@@ -48,7 +37,7 @@ export const wargaRoutes = new Hono<AppEnv>()
   })
 
   /** Info umum: jadwal ronda, pengumuman, kontak, dan ringkasan kas (kalau ditampilkan pengurus). */
-  .get("/", requireWarga, async (c) => {
+  .get("/", requireUser, async (c) => {
     const db = c.var.db;
     const date = rondaDate(new Date());
     const [settingsRow, schedule, announcementRows, contactRows, cash] = await Promise.all([
@@ -84,7 +73,7 @@ export const wargaRoutes = new Hono<AppEnv>()
    * rumah itu terdaftar, termasuk catatan yang diisi untuk tanggal sebelumnya.
    * `status` null = malam itu rumahnya tidak dicek petugas.
    */
-  .get("/rumah/:id", requireWarga, idParam(), validator("query", (value, c) => {
+  .get("/rumah/:id", requireUser, idParam(), validator("query", (value, c) => {
     const parsed = z.object({ bulan: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional() }).safeParse(value);
     return parsed.success ? parsed.data : c.json({ error: "Bulan tidak valid." }, 400);
   }), async (c) => {
@@ -102,7 +91,7 @@ export const wargaRoutes = new Hono<AppEnv>()
   })
 
   /** Rekap bulanan tanpa nama: total per malam dan per rumah. */
-  .get("/rekap", requireWarga, monthQuery, async (c) => {
+  .get("/rekap", requireUser, monthQuery, async (c) => {
     const month = c.req.valid("query").bulan;
     const recap = await getMonthRecap(c.var.db, month);
     const today = rondaDate(new Date());

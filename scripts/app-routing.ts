@@ -8,7 +8,7 @@ export function pageShell(pathname: string, hostname: string): string | null {
   if (!new RegExp(PAGE_PATTERN).test(pathname)) return null;
   const surface = appSurface(hostname, pathname);
   if (surface) return SHELLS[surface];
-  if (/^\/petugas(?:\/|$)/.test(pathname)) return SHELLS.petugas;
+  if (/^\/(?:app|petugas)(?:\/|$)/.test(pathname)) return SHELLS.petugas;
   if (/^\/admin(?:\/|$)/.test(pathname)) return SHELLS.admin;
   if (/^\/landing(?:\/|$)/.test(pathname)) return SHELLS.landing;
   return SHELLS.warga;
@@ -28,17 +28,32 @@ const DOMAIN_REDIRECTS = NATURA_HOSTS.flatMap((hostname) => {
   const redirects = [
     ...movePrefix("/admin", "admin"),
     ...(oldDashboard ? [] : movePrefix("/petugas", "petugas")),
+    ...(hostname === APP_DOMAINS.petugas || oldDashboard ? [] : movePrefix("/app", "petugas")),
     ...(hostname === APP_DOMAINS.admin ? [] : movePrefix("/dashboard", "admin")),
-    ...(oldDashboard || hostname === COMMUNITY_DOMAIN || hostname === `www.${COMMUNITY_DOMAIN}` ? [] : movePrefix("/info", "warga")),
+    ...(oldDashboard ? [] : [
+      { src: "^/info/?$", destination: `https://${APP_DOMAINS.petugas}${APP_BASE_PATHS.petugas}` },
+      ...(hostname === COMMUNITY_DOMAIN || hostname === `www.${COMMUNITY_DOMAIN}` ? [] : [{ src: "^/info/(?!.*\\.[a-zA-Z0-9]+$)(.+)$", destination: `https://${APP_DOMAINS.warga}${APP_BASE_PATHS.warga}/$1` }]),
+    ]),
+    ...(hostname === APP_DOMAINS.petugas ? [
+      { src: "^/$", destination: `https://${APP_DOMAINS.petugas}${APP_BASE_PATHS.petugas}` },
+      { src: "^/(masuk|ronda|riwayat|jadwal|akun)(/[^.]*)?$", destination: `https://${APP_DOMAINS.petugas}${APP_BASE_PATHS.petugas}/$1$2` },
+      { src: "^/app/info/?$", destination: `https://${APP_DOMAINS.petugas}${APP_BASE_PATHS.petugas}` },
+    ] : []),
     { src: "^/r/(.*)$", destination: `https://${APP_DOMAINS.warga}${APP_BASE_PATHS.warga}/r/$1` },
   ];
   if (oldDashboard || hostname === LEGACY_APP_DOMAINS.warga) {
     const app = oldDashboard ? "admin" : "warga";
     const base = `https://${APP_DOMAINS[app]}${APP_BASE_PATHS[app]}`;
-    redirects.push({ src: "^/$", destination: base }, { src: PAGE_PATTERN, destination: `${base}/$1` });
+    redirects.push({ src: "^/$", destination: oldDashboard ? base : `https://${APP_DOMAINS.petugas}${APP_BASE_PATHS.petugas}` }, { src: PAGE_PATTERN, destination: `${base}/$1` });
   }
   return redirects.map((rule) => ({ ...rule, hostname }));
 });
+
+const LOCAL_REDIRECTS = [
+  { src: "^/petugas/?$", destination: "/app" },
+  { src: "^/petugas/(?!.*\\.[a-zA-Z0-9]+$)(.+)$", destination: "/app/$1" },
+  { src: "^/info/?$", destination: "/app" },
+];
 
 /** Tautan lama membuka alamat canonical; query (filter/login) ikut dibawa. */
 export function domainRedirect(url: URL): string | null {
@@ -47,6 +62,12 @@ export function domainRedirect(url: URL): string | null {
     if (rule.hostname !== hostname) continue;
     const match = url.pathname.match(new RegExp(rule.src));
     if (match) return rule.destination.replace(/\$(\d+)/g, (_, group) => match[Number(group)] ?? "") + url.search;
+  }
+  if (!NATURA_HOSTS.includes(hostname)) {
+    for (const rule of LOCAL_REDIRECTS) {
+      const match = url.pathname.match(new RegExp(rule.src));
+      if (match) return rule.destination.replace(/\$(\d+)/g, (_, group) => match[Number(group)] ?? "") + url.search;
+    }
   }
   return null;
 }
@@ -69,7 +90,9 @@ export const vercelRoutes = [
     has: [{ type: "host", value: hostname }],
     dest: SHELLS[appSurface(hostname)!],
   })),
+  ...LOCAL_REDIRECTS.map(({ src, destination }) => ({ src, status: 308, headers: { Location: destination } })),
   { handle: "filesystem" },
+  { src: "^/app(?:/.*)?$", dest: SHELLS.petugas },
   { src: "^/petugas(?:/.*)?$", dest: SHELLS.petugas },
   { src: "^/admin(?:/.*)?$", dest: SHELLS.admin },
   { src: "^/landing(?:/.*)?$", dest: SHELLS.landing },
@@ -78,6 +101,6 @@ export const vercelRoutes = [
 
 /** Manifest production memakai alamat awal dan cakupan masing-masing bagian. */
 export const DOMAIN_MANIFESTS = [
-  { source: "petugas.webmanifest", target: "petugas-domain.webmanifest", name: "Cluster Natura · Petugas", shortName: "Natura", basePath: "/" },
-  { source: "admin.webmanifest", target: "admin-domain.webmanifest", name: "Cluster Natura · Dashboard", shortName: "Natura Admin", basePath: "/dashboard/" },
+  { source: "petugas.webmanifest", target: "petugas-domain.webmanifest", name: "Cluster Natura", shortName: "Natura", id: "/", basePath: "/app/" },
+  { source: "admin.webmanifest", target: "admin-domain.webmanifest", name: "Cluster Natura · Dashboard", shortName: "Natura Admin", id: "/dashboard/", basePath: "/dashboard/" },
 ];

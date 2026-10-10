@@ -47,7 +47,7 @@ export function buildSheetsCsv(recap: MonthRecap, month: string, communityName: 
   let filledTotal = 0;
   let emptyTotal = 0;
   let uncheckedTotal = 0;
-  const houseLines = rows.map(({ house, cells, filledCount, empty, unchecked, total, collectedTotal, monthlyTotal, weeklyTotal }) => {
+  const houseLines = rows.map(({ house, nights, filledCount, empty, unchecked, total, collectedTotal, monthlyTotal, weeklyTotal }) => {
     filledTotal += filledCount;
     emptyTotal += empty;
     uncheckedTotal += unchecked;
@@ -59,7 +59,9 @@ export function buildSheetsCsv(recap: MonthRecap, month: string, communityName: 
       filledCount,
       empty,
       unchecked,
-      ...cells.map((c) => (c?.status === "filled" ? c.amount : c?.status === "empty" ? "kosong" : "")),
+      // Penanda periode dipakai aturan warna di Sheets; bukan penerimaan harian baru.
+      ...nights.map(({ cell, period }) => period?.cadence === "monthly" ? period.status === "paid" ? "Lunas" : "Belum"
+        : cell?.status === "filled" ? cell.amount : cell?.status === "empty" ? "kosong" : ""),
       monthlyTotal,
       weeklyTotal,
       collectedTotal,

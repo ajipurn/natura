@@ -131,9 +131,8 @@ describe("kas di ringkasan dan halaman warga", () => {
   });
 
   it("tampil di halaman warga tanpa nama pencatat, dan bisa dimatikan di Pengaturan", async () => {
-    const code = (await admin.post("/api/admin/pengaturan/kode-warga", { enabled: true })).data.wargaCode as string;
     const warga = apiClient(env);
-    await warga.post("/api/warga/masuk", { code });
+    expect((await warga.post("/api/auth/login", { userId: 1, pin: "1234" })).status).toBe(200);
     await admin.post("/api/admin/kas/transaksi", { date: localDate(new Date()), direction: "out", amount: 2500, description: "Fotokopi jadwal" });
 
     const cash = (await warga.get("/api/warga")).data.cash as Kas & { entries: Record<string, unknown>[] };

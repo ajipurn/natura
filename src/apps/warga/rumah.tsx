@@ -105,8 +105,8 @@ export function HousePage() {
 
               <div className="mt-8 flex flex-col items-center gap-2 text-center">
                 {user ? (
-                  <a href={petugasPath("/")} className={buttonClass("secondary")}>
-                    Ke app petugas
+                  <a href={petugasPath("/ronda")} className={buttonClass("secondary")}>
+                    Buka Ronda
                   </a>
                 ) : (
                   <a href={petugasPath(`/masuk?next=${encodeURIComponent(`/r/${house.token}`)}`)} className={cx(buttonClass("ghost", "sm"))}>
@@ -114,7 +114,7 @@ export function HousePage() {
                   </a>
                 )}
                 <a href={wargaPath()} className="text-sm font-semibold text-primary">
-                  Info warga
+                  Beranda app
                 </a>
               </div>
             </>

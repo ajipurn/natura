@@ -4,7 +4,6 @@ import {
   CalendarClock,
   CalendarDays,
   ChevronRight,
-  KeyRound,
   Map as MapIcon,
   ShieldAlert,
   ShieldCheck,
@@ -166,7 +165,6 @@ function todoItems(
     undeposited: number;
     planMissing: number;
     noSchedule: boolean;
-    noWargaCode: boolean;
     onlyOneUser: boolean;
     unpaidPayments: number;
   },
@@ -191,7 +189,6 @@ function todoItems(
   }
   if (todo.onlyOneUser) items.push({ to: adminPath("/petugas"), icon: Users, text: "Tambahkan petugas ronda" });
   if (todo.noSchedule) items.push({ to: adminPath("/jadwal"), icon: CalendarDays, text: "Impor jadwal ronda" });
-  if (todo.noWargaCode) items.push({ to: adminPath("/info"), icon: KeyRound, text: "Buka halaman warga (buat kode warga)" });
   return items;
 }
 

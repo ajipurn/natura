@@ -154,7 +154,7 @@ function Picker({
           <UserPlus className="size-5 shrink-0 text-muted" />
           <span>
             Tambah “<strong>{query.trim()}</strong>” tanpa akun
-            <span className="block text-xs text-muted">Hanya nama di jadwal; tidak bisa masuk ke app petugas.</span>
+            <span className="block text-xs text-muted">Hanya nama di jadwal; tidak bisa masuk ke app.</span>
           </span>
         </Button>
       )}

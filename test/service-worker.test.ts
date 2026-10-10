@@ -30,35 +30,36 @@ function worker(hostname: string, shell: string, assets: Record<string, string> 
 }
 
 describe("app petugas bisa dibuka offline setelah pindah subdomain", () => {
-  it("root, jadwal, dan riwayat di subdomain memakai shell yang disimpan di /", async () => {
-    const sw = worker("app.clusternatura.com", "/");
-    for (const path of ["/", "/jadwal", "/riwayat/2026-10-09", "/masuk"]) {
+  it("Info warga, ronda, jadwal, dan riwayat memakai shell /app/", async () => {
+    const sw = worker("app.clusternatura.com", "/app/");
+    for (const path of ["/", "/app", "/app/", "/app/ronda", "/app/jadwal", "/app/riwayat/2026-10-09", "/app/masuk", "/petugas", "/info"]) {
       const response = await sw.navigate(path);
       expect(response?.status).toBe(200);
       expect(await response?.text()).toContain("App petugas tersimpan");
     }
   });
 
-  it("alamat Vercel lama masih memakai shell /petugas/", async () => {
-    const sw = worker("jimpitan-natura.vercel.app", "/petugas/");
+  it("bookmark Vercel lama dan alamat baru memakai shell /app/", async () => {
+    const sw = worker("jimpitan-natura.vercel.app", "/app/");
     expect(await (await sw.navigate("/petugas/jadwal"))?.text()).toContain("App petugas tersimpan");
+    expect(await (await sw.navigate("/app/jadwal"))?.text()).toContain("App petugas tersimpan");
     expect((await sw.navigate("/admin/rekap"))?.status).toBe(503);
   });
 
-  it("QR, dashboard, info, dan API tidak menerima salinan halaman ronda sebagai respons", async () => {
-    const sw = worker("app.clusternatura.com", "/");
+  it("QR rumah, dashboard, dan API tidak menerima salinan halaman ronda sebagai respons", async () => {
+    const sw = worker("app.clusternatura.com", "/app/");
     const qr = await sw.navigate("/r/TOKEN");
     expect(qr?.status).toBe(503);
-    expect(await qr?.text()).toContain("href='/'");
+    expect(await qr?.text()).toContain("href='/app/'");
     expect((await sw.navigate("/api/auth"))?.status).toBe(503);
-    for (const path of ["/dashboard", "/dashboard/rekap", "/dashboard/petugas", "/info", "/info/r/TOKEN"]) {
+    for (const path of ["/dashboard", "/dashboard/rekap", "/dashboard/petugas", "/info/r/TOKEN"]) {
       expect((await sw.navigate(path))?.status).toBe(503);
     }
   });
 
   it("logo bawaan yang sudah disimpan tetap tampil saat offline", async () => {
     const logo = '<svg xmlns="http://www.w3.org/2000/svg"><title>Cluster Natura</title></svg>';
-    const sw = worker("app.clusternatura.com", "/", { "/natura-logo.svg": logo });
+    const sw = worker("app.clusternatura.com", "/app/", { "/natura-logo.svg": logo });
     const response = await sw.navigate("/natura-logo.svg");
     expect(response?.status).toBe(200);
     expect(await response?.text()).toBe(logo);

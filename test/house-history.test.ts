@@ -24,8 +24,7 @@ beforeAll(async () => {
   await admin.post("/api/admin/rumah", { block: "A", numbers: "1" });
   house = ((await admin.get("/api/admin/rumah")).data.houses as { id: number; token: string; block: string }[]).find((h) => h.block === "A")!;
   await db.update(houses).set({ createdAt: new Date("2025-03-05T12:00:00+07:00") }).where(eq(houses.id, house.id));
-  const { data } = await admin.post("/api/admin/pengaturan/kode-warga", { enabled: true });
-  expect((await warga.post("/api/warga/masuk", { code: data.wargaCode })).status).toBe(200);
+  expect((await warga.post("/api/auth/login", { userId: 1, pin: "1234" })).status).toBe(200);
   const saved = await admin.put("/api/admin/riwayat", {
     entries: dates.map((date) => ({ date, houseId: house.id, status: "filled", amount: 500 })),
   });

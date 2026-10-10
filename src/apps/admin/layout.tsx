@@ -8,7 +8,7 @@ import {
   Map as MapIcon,
   Megaphone,
   Menu,
-  ScanLine,
+  Smartphone,
   Settings,
   Table2,
   Users,
@@ -223,7 +223,7 @@ function Sidebar({ user }: { user: SessionUser }) {
           href={petugasPath("/")}
           className="flex items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium hover:bg-idle-soft"
         >
-          <ScanLine className="size-5 text-primary" /> Buka app petugas
+          <Smartphone className="size-5 text-primary" aria-hidden /> Buka app
         </a>
         <Button
           variant="plain"

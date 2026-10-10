@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { localDate, rondaDate } from "@/lib/dates";
 import { houseWatch } from "@/lib/house-watch";
 import { monthStats } from "@/lib/month-stats";
@@ -13,13 +13,13 @@ import { getCashOverview } from "./kas";
 import { getPaymentOverview } from "./payments";
 import { countPendingRequests } from "./requests";
 import { listSchedule } from "./schedule";
-import { settings, users } from "./schema";
+import { users } from "./schema";
 
 /** Data halaman Ringkasan admin. */
 export async function getDashboard(db: Db, now: Date) {
   const date = rondaDate(now);
   const month = date.slice(0, 7);
-  const [settingsRow, houseRows, tonightRows, recap, recent, schedule, [userCounts], [codeRow], pendingRequests, offDuty, cash, paymentOverview] =
+  const [settingsRow, houseRows, tonightRows, recap, recent, schedule, [userCounts], pendingRequests, offDuty, cash, paymentOverview] =
     await Promise.all([
       getSettings(db),
       listHouses(db),
@@ -32,7 +32,6 @@ export async function getDashboard(db: Db, now: Date) {
           active: sql<number>`count(*) filter (where ${users.active})`.mapWith(Number),
         })
         .from(users),
-      db.select({ wargaCode: settings.wargaCode }).from(settings).where(eq(settings.id, 1)).limit(1),
       countPendingRequests(db),
       countOffDuty(db, date),
       getCashOverview(db, date),
@@ -83,7 +82,6 @@ export async function getDashboard(db: Db, now: Date) {
       noHouses: houseRows.length === 0,
       planMissing: plan.missing.length,
       noSchedule: schedule.length === 0,
-      noWargaCode: !codeRow?.wargaCode,
       onlyOneUser: (userCounts?.active ?? 0) <= 1,
       /** Permintaan ubah jadwal yang menunggu keputusan admin. */
       pendingRequests,

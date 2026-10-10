@@ -1,23 +1,24 @@
-import { CalendarDays, History, ScanLine, UserRound, type LucideIcon } from "lucide-react";
+import { CalendarDays, History, Home, ScanLine, UserRound, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { NavLink } from "react-router";
 import { cx } from "@/components/ui";
 import { petugasPath } from "@/lib/app-paths";
 
 const ITEMS: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
-  { to: petugasPath(), label: "Ronda", icon: ScanLine, end: true },
+  { to: petugasPath(), label: "Beranda", icon: Home, end: true },
+  { to: petugasPath("/ronda"), label: "Ronda", icon: ScanLine },
   { to: petugasPath("/riwayat"), label: "Riwayat", icon: History },
   { to: petugasPath("/jadwal"), label: "Jadwal", icon: CalendarDays },
   { to: petugasPath("/akun"), label: "Akun", icon: UserRound },
 ];
 
-/** Kerangka app petugas: tampilan satu kolom dan navigasi bawah pada semua ukuran layar. */
+/** Kerangka app warga/petugas: tampilan satu kolom dan navigasi bawah pada semua ukuran layar. */
 export function PetugasLayout({ children }: { children: ReactNode }) {
   return (
     <>
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 pb-28 pt-5">{children}</div>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-        <ul className="mx-auto grid max-w-3xl grid-cols-4">
+        <ul className="mx-auto grid max-w-3xl grid-cols-5">
           {ITEMS.map(({ to, label, icon: Icon, end }) => (
             <li key={to}>
               <NavLink

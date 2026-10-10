@@ -62,7 +62,7 @@ function timeline(patrols: Patrol[], today: string) {
   return [...months];
 }
 
-/** Daftar malam ronda per bulan. `basePath` = alamat halaman ini di app (mis. /petugas/riwayat). */
+/** Daftar malam ronda per bulan. `basePath` = alamat halaman ini di app (mis. /app/riwayat). */
 export function PatrolList({ basePath }: { basePath: string }) {
   const query = useQuery(patrolsQuery);
   // Rekap bulanan dan pengisian catatan hanya ada di dashboard admin.

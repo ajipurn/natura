@@ -7,12 +7,11 @@ import type { Role } from "@/lib/types";
 import { can, type Resource } from "@/lib/permissions";
 import { COMMUNITY_DOMAIN, appSurface } from "@/lib/app-paths";
 import type { AppEnv } from "./env";
-import { settings, users } from "./schema";
+import { users } from "./schema";
 
 const SESSION_COOKIE = "jimpitan_session";
 const WARGA_COOKIE = "jimpitan_warga";
 const SESSION_DAYS = 90;
-const WARGA_DAYS = 365;
 /** Sesi diperpanjang otomatis kalau umurnya sudah lewat sekian hari. */
 const REFRESH_AFTER_DAYS = 7;
 const DAY_SECONDS = 24 * 60 * 60;
@@ -156,32 +155,13 @@ export const requireDashboardResource = createMiddleware<AppEnv>(async (c, next)
   return requireResource(resource)(c, next);
 });
 
-/* ---------- Akses halaman warga (pakai kode bersama) ---------- */
-
-export async function startWargaAccess(c: Ctx, codeVersion: number) {
-  const token = await sign(c, { scope: "warga", v: codeVersion }, "warga", WARGA_DAYS);
-  setCookie(c, WARGA_COOKIE, token, cookieOptions(c, WARGA_DAYS));
-}
+/* ---------- Kompatibilitas akses warga lama ---------- */
 
 export function endWargaAccess(c: Ctx) {
   endCookie(c, WARGA_COOKIE);
 }
 
-/** Warga dengan kode yang masih berlaku, atau petugas/admin yang sedang login. */
+/** Info warga memakai sesi akun; cookie kode bersama lama tidak memberikan akses. */
 export async function hasWargaAccess(c: Ctx): Promise<boolean> {
-  const payload = await verify(c, getCookie(c, WARGA_COOKIE));
-  if (payload?.scope === "warga") {
-    const [row] = await c.var.db
-      .select({ code: settings.wargaCode, version: settings.wargaCodeVersion })
-      .from(settings)
-      .where(eq(settings.id, 1))
-      .limit(1);
-    if (row?.code && row.version === payload.v) return true;
-  }
   return (await getSessionUser(c)) !== null;
 }
-
-export const requireWarga = createMiddleware<AppEnv>(async (c, next) => {
-  if (!(await hasWargaAccess(c))) return c.json({ error: "Masukkan kode warga dulu." }, 401);
-  await next();
-});

@@ -19,7 +19,7 @@ export const ROLE_HINT: Record<Role, string> = {
   ketua: "Semua fitur dan pengaturan akses",
   sekretaris: "Warga, keluarga, rumah, jadwal, dan informasi",
   bendahara: "Kas, iuran, dan membaca data rumah",
-  petugas: "Ronda dan pencatatan jimpitan",
+  petugas: "Info warga, ronda, dan pencatatan jimpitan",
 };
 export type Resource =
   | "overview"

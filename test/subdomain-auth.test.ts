@@ -1,3 +1,6 @@
+import { eq } from "drizzle-orm";
+import { SignJWT } from "jose";
+import { settings } from "@/server/schema";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { app } from "@/server/app";
 import type { Bindings } from "@/server/env";
@@ -46,22 +49,32 @@ describe("sesi antar-subdomain Natura", () => {
     }
   });
 
-  it("kode warga memakai cookie bersama tetapi tidak membuka API petugas atau admin", async () => {
-    const created = await request(dashboard, "/api/admin/pengaturan/kode-warga", "POST", { enabled: true }, cookiePair(session));
-    const { wargaCode } = await created.json();
-    const entered = await request("clusternatura.com", "/api/warga/masuk", "POST", { code: wargaCode });
-    expect(entered.status).toBe(200);
-    const cookie = entered.headers.getSetCookie().find((value) => value.startsWith("jimpitan_warga="))!;
-    expect(cookie).toContain("Domain=clusternatura.com");
-    const access = await request("app.clusternatura.com", "/api/warga/akses", "GET", undefined, cookiePair(cookie));
-    expect(await access.json()).toMatchObject({ access: true });
-    expect((await request("app.clusternatura.com", "/api/ronda", "GET", undefined, cookiePair(cookie))).status).toBe(401);
-    expect((await request(dashboard, "/api/admin/rumah", "GET", undefined, cookiePair(cookie))).status).toBe(401);
-    const logout = await request("clusternatura.com", "/api/warga/keluar", "POST", {}, cookiePair(cookie));
+  it("cookie kode warga lama tidak lagi membuka data warga maupun pencatatan", async () => {
+    // Sesi kode lama yang masih valid saat upgrade tidak boleh melewati login akun.
+    await env.db.update(settings).set({ wargaCode: "OLD23456", wargaCodeVersion: 1 }).where(eq(settings.id, 1));
+    const token = await new SignJWT({ scope: "warga", v: 1 }).setProtectedHeader({ alg: "HS256" }).setSubject("warga")
+      .setIssuedAt().setExpirationTime("365d").sign(new TextEncoder().encode(env.AUTH_SECRET));
+    const cookie = `jimpitan_warga=${token}`;
+    const entered = await request("clusternatura.com", "/api/warga/masuk", "POST", { code: "OLD23456" });
+    expect(entered.status).toBe(410);
+    expect(entered.headers.getSetCookie()).toHaveLength(0);
+    const access = await request(dashboard, "/api/warga/akses", "GET", undefined, cookie);
+    expect(await access.json()).toMatchObject({ access: false });
+    for (const path of ["/api/warga", "/api/warga/rekap", "/api/warga/rumah/1", "/api/ronda", "/api/admin/rumah"]) {
+      expect((await request(dashboard, path, "GET", undefined, cookie)).status).toBe(401);
+    }
+    const logout = await request("clusternatura.com", "/api/warga/keluar", "POST", {}, cookie);
     expect(logout.headers.getSetCookie()).toEqual(expect.arrayContaining([
       expect.stringMatching(/jimpitan_warga=;.*Domain=clusternatura\.com/),
       expect.stringMatching(/jimpitan_warga=;.*Path=\//),
     ]));
+  });
+
+  it("sesi akun yang sama membuka Info warga tanpa kode bersama", async () => {
+    for (const host of [dashboard, "clusternatura.com"]) {
+      expect(await (await request(host, "/api/warga/akses", "GET", undefined, cookiePair(session))).json()).toMatchObject({ access: true });
+      expect((await request(host, "/api/warga", "GET", undefined, cookiePair(session))).status).toBe(200);
+    }
   });
 
   it("logout menghapus cookie bersama dan cookie host-only lama", async () => {

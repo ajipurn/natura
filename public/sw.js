@@ -1,12 +1,12 @@
-// Service worker Jimpitan: app petugas tetap bisa dibuka walau sinyal hilang.
+// Service worker Cluster Natura: app tetap bisa dibuka walau sinyal hilang.
 // Data catatan disimpan di HP (localStorage) oleh layar Ronda dan dikirim saat online.
 
-const CACHE = "jimpitan-v7";
+const CACHE = "jimpitan-v9";
 // Logo ikut disimpan untuk offline; naikkan versi CACHE saat aset bawaan diganti.
 const BRAND_ASSETS = ["/natura-logo.svg", "/icon.svg", "/apple-icon.png"];
 const APP_DOMAIN = self.location.hostname === "app.clusternatura.com";
-/** Kerangka app petugas: / di subdomain, /petugas/ di alamat dev/preview lama. */
-const SHELL = APP_DOMAIN ? "/" : "/petugas/";
+/** Satu kerangka app untuk Info warga dan pencatatan ronda. */
+const SHELL = "/app/";
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener("install", (event) => {
@@ -38,8 +38,8 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     const inPetugas = APP_DOMAIN
-      ? !/^\/(?:r|admin|dashboard|info|api)(?:\/|$)/.test(url.pathname) && !/\.[a-z0-9]+$/i.test(url.pathname)
-      : url.pathname === "/petugas" || url.pathname.startsWith("/petugas/");
+      ? !/^\/(?:r|admin|dashboard|api)(?:\/|$)/.test(url.pathname) && !/^\/info\/.+/.test(url.pathname) && !/\.[a-z0-9]+$/i.test(url.pathname)
+      : /^\/(?:app|petugas)(?:\/|$)/.test(url.pathname);
     event.respondWith(inPetugas ? networkFirstShell(request) : fetch(request).catch(() => offlineResponse()));
   }
 });
@@ -97,8 +97,8 @@ function offlineResponse() {
   return new Response(
     "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'><title>Offline</title>" +
       "<body style='font-family:system-ui;padding:24px;line-height:1.5'><h1>Sedang offline</h1>" +
-      "<p>Halaman ini butuh internet. App petugas tetap bisa dipakai offline kalau sudah pernah dibuka saat ada sinyal.</p>" +
-      `<p><a href='${SHELL}'>Buka app petugas</a></p></body>`,
+      "<p>Halaman ini butuh internet. App Cluster Natura bisa dibuka offline kalau sudah pernah dibuka saat ada sinyal.</p>" +
+      `<p><a href='${SHELL}'>Buka app</a></p></body>`,
     { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } },
   );
 }

@@ -118,7 +118,7 @@ function CreateAccountForm({ residents, initialResidentId, onDone }: { residents
           placeholder="Pak Andi"
         />
       </Field>
-      <Field label="PIN (4–6 angka)" hint="Sudah dibuatkan PIN acak. PIN bisa diganti di menu Akun pada app petugas.">
+      <Field label="PIN (4–6 angka)" hint="Sudah dibuatkan PIN acak. PIN bisa diganti di menu Akun pada app Cluster Natura.">
         <div className="flex gap-2">
           <Input
             value={pin}
@@ -158,7 +158,7 @@ function CreateAccountForm({ residents, initialResidentId, onDone }: { residents
 function SharePin({ name, role, pin, onDone }: { name: string; role: Role; pin: string; onDone: () => void }) {
   const [copied, setCopied] = useState(false);
   const url = new URL(isManager(role) ? adminPath("/") : petugasPath("/"), location.origin).href;
-  const message = `Halo ${name}, akun ${ROLE_LABEL[role]} sudah dibuat.\nBuka ${url} lalu pilih nama "${name}" dan masukkan PIN: ${pin}\nPIN bisa diganti sendiri di menu Akun pada app petugas.`;
+  const message = `Halo ${name}, akun ${ROLE_LABEL[role]} sudah dibuat.\nBuka ${url} lalu pilih nama "${name}" dan masukkan PIN: ${pin}\nPIN bisa diganti sendiri di menu Akun pada app Cluster Natura.`;
   return (
     <div className="space-y-4 text-center">
       <KeyRound className="mx-auto size-10 text-primary" />

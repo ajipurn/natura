@@ -28,7 +28,8 @@ describe("rekap bulanan sebagai xlsx", () => {
     const sheets = buildRecapSheets(data, "Natura");
     const label = cadence === "monthly" ? "Bulanan" : "Mingguan";
     expect(sheets[0].data[3][3]?.value).toBe(label);
-    expect(sheets[0].data[3].slice(4).map((c) => c?.value ?? null)).toEqual([null, null, 0, 0, 0, 0, 0, 0, 0]);
+    const nightLabel = cadence === "monthly" ? "Belum" : null;
+    expect(sheets[0].data[3].slice(4).map((c) => c?.value ?? null)).toEqual([nightLabel, nightLabel, 0, 0, 0, 0, 0, 0, 0]);
     expect(sheets[1].data.slice(3, 5).map((row) => row[3]?.value)).toEqual([0, 0]);
     const files = unzipSync(new Uint8Array(await writeXlsxFile(sheets).toBuffer()));
     expect(strFromU8(files["xl/sharedStrings.xml"])).toContain(`<t>${label}</t>`);
@@ -42,8 +43,28 @@ describe("rekap bulanan sebagai xlsx", () => {
     };
     const [perHouse, perNight] = buildRecapSheets(data, "Natura");
     expect(perHouse.data[3][3]?.value).toBe("Harian → Bulanan");
+    expect(perHouse.data[3][4]).toBeNull();
+    expect(perHouse.data[3][5]).toMatchObject({ value: "Belum", backgroundColor: "#fef9c3" });
     expect(perHouse.data[3][8]?.value).toBe(1);
     expect(perNight.data.slice(3, 5).map((row) => row[3]?.value)).toEqual([1, 0]);
+  });
+
+  it.each([0, 500, 1000])("blok bulanan berubah dari kuning ke hijau hanya setelah lunas (dibayar %i)", async (paid) => {
+    const settled = paid === 1000;
+    const data: MonthRecap = {
+      ...recap, houses: [recap.houses[0]], cells: { "1:2026-10-05": { status: "empty", amount: 0 } },
+      paymentCadences: { 1: ["monthly"] },
+      paymentPeriods: [{ houseId: 1, planId: 1, cadence: "monthly", start: recap.dates[0], end: recap.dates[1], expected: 1000, paid, remaining: 1000 - paid, status: settled ? "paid" : "unpaid" }],
+      paymentCells: Object.fromEntries(recap.dates.map((date) => [`1:${date}`, { amount: paid / 2, monthlyAmount: paid / 2, weeklyAmount: 0, paid: settled }])),
+    };
+    const sheets = buildRecapSheets(data, "Natura");
+    const expected = { value: settled ? "Lunas" : "Belum", backgroundColor: settled ? "#dcfce7" : "#fef9c3", textColor: settled ? "#15803d" : "#854d0e" };
+    for (const cell of sheets[0].data[3].slice(4, 6)) expect(cell).toMatchObject(expected);
+    expect(sheets[0].data[3].slice(-4).map((cell) => cell?.value)).toEqual([0, 0, paid, paid]);
+    expect(sheets[1].data.slice(3, 5).map((row) => row[4]?.value)).toEqual([0, 0]);
+    const files = unzipSync(new Uint8Array(await writeXlsxFile(sheets).toBuffer()));
+    expect(strFromU8(files["xl/sharedStrings.xml"])).toContain(`<t>${expected.value}</t>`);
+    expect(strFromU8(files["xl/styles.xml"])).toContain(expected.backgroundColor.slice(1).toUpperCase());
   });
 
   it("lembar per rumah: nominal tiap malam, jumlah, dan total", () => {
