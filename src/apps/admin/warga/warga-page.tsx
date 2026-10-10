@@ -22,6 +22,7 @@ import { residentsQuery } from "../queries";
 import { WargaDialog, type Resident } from "./warga-dialog";
 
 export function WargaPage() {
+  const canEdit = usePermission("residents", true);
   const query = useQuery(residentsQuery);
   const [params, setParams] = useSearchParams();
   const familyView = params.get("tab") === "keluarga";
@@ -64,7 +65,7 @@ export function WargaPage() {
               title="Warga"
               subtitle="Pendataan warga, keluarga, dan tempat tinggal."
               action={
-                !familyView && (
+                canEdit && !familyView && (
                   <Button size="sm" onClick={() => setEditing("baru")}>
                     <UserPlus className="size-4" /> Tambah warga
                   </Button>
@@ -162,9 +163,9 @@ export function WargaPage() {
                     <p className="mt-1 text-sm text-muted">
                       {residents.length
                         ? "Ubah pencarian atau filter blok."
-                        : "Tambahkan warga. Rumahnya bisa ditentukan nanti."}
+                        : canEdit ? "Tambahkan warga. Rumahnya bisa ditentukan nanti." : "Data warga belum dicatat pengurus."}
                     </p>
-                    {!residents.length && (
+                    {canEdit && !residents.length && (
                       <Button
                         className="mt-4"
                         size="sm"
@@ -175,11 +176,11 @@ export function WargaPage() {
                     )}
                   </Card>
                 )}
-                <WargaDialog
+                {canEdit && <WargaDialog
                   open={editing === "baru" || Boolean(selected)}
                   resident={selected}
                   onClose={() => setEditing(null)}
-                />
+                />}
               </>
             )}
           </>
@@ -205,6 +206,7 @@ function ResidentList({
   residents: Resident[];
   onEdit: (id: number) => void;
 }) {
+  const canEdit = usePermission("residents", true);
   const manageAccounts = usePermission("accounts", true);
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-card">
@@ -224,13 +226,13 @@ function ResidentList({
             className="grid grid-cols-[minmax(0,1fr)_2.5rem] items-center gap-x-3 gap-y-2 px-4 py-4 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)_2.5rem] sm:gap-4 sm:px-5"
           >
             <div className="min-w-0">
-              <Button
+              {canEdit ? <Button
                 variant="plain"
                 className="min-h-6 max-w-full break-words text-left text-sm font-semibold hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary"
                 onClick={() => onEdit(resident.id)}
               >
                 {resident.name}
-              </Button>
+              </Button> : <p className="break-words text-sm font-semibold">{resident.name}</p>}
               {resident.phone && (
                 <a
                   href={`tel:${resident.phone.replace(/[^+\d]/g, "")}`}
@@ -285,7 +287,7 @@ function ResidentList({
                 <span className="text-muted">Tanpa akun</span>
               )}
             </div>
-            <Button
+            {canEdit && <Button
               size="icon"
               variant="ghost"
               aria-label={`Edit ${resident.name}`}
@@ -293,7 +295,7 @@ function ResidentList({
               className="col-start-2 row-span-3 row-start-1 sm:col-auto sm:row-span-1 sm:row-auto"
             >
               <Pencil className="size-4" aria-hidden />
-            </Button>
+            </Button>}
           </li>
         ))}
       </ul>

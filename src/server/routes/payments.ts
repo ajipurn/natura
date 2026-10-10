@@ -4,8 +4,9 @@ import { z } from "zod";
 import { daysBetween, daysInMonth, isIsoDate, localDate } from "@/lib/dates";
 import { requireResource } from "../auth";
 import type { AppEnv } from "../env";
+import type { Executor } from "../db";
 import { body, idParam } from "../http";
-import { getPaymentMonth, getPaymentPlansForHouse, paymentLogsFor } from "../payments";
+import { getPaymentMonth, getPaymentPlansForHouse, getRapelDates, paymentLogsFor } from "../payments";
 import { houses, paymentLogs, paymentPlans, payments, users } from "../schema";
 import { monthQuery } from "./ronda";
 
@@ -16,7 +17,9 @@ const paymentSchema = z.object({
   receivedDate: date,
   periodStart: date,
   periodEnd: date,
-  cadence: z.enum(["weekly", "monthly"], "Pilih mingguan atau bulanan. Pembayaran harian dicatat melalui ronda."),
+  cadence,
+  allocations: z.array(z.tuple([date, z.number().int().positive()])).max(366).nullish()
+    .transform((value) => value ? [...value].sort(([a], [b]) => a.localeCompare(b)) : null),
   amount: z.number().int().positive("Isi nominal pembayaran.").max(100_000_000),
   receivedBy: z.enum(["treasurer", "collector"]),
   collectorId: z.number().int().positive().nullable().default(null),
@@ -26,7 +29,28 @@ const paymentSchema = z.object({
     ctx.addIssue({ code: "custom", message: "Pilih periode berurutan, maksimal 366 hari." });
   if (p.receivedDate > localDate(new Date())) ctx.addIssue({ code: "custom", message: "Tanggal penerimaan belum tiba." });
   if (p.receivedBy === "collector" && !p.collectorId) ctx.addIssue({ code: "custom", message: "Pilih petugas penerima uang." });
+  if (p.cadence === "daily") {
+    if (!p.allocations?.length) ctx.addIssue({ code: "custom", message: "Pilih hari kosong untuk rapel." });
+    else {
+      const dates = p.allocations.map(([day]) => day);
+      if (new Set(dates).size !== dates.length || dates[0] !== p.periodStart || dates.at(-1) !== p.periodEnd)
+        ctx.addIssue({ code: "custom", message: "Tanggal rapel harus unik dan sesuai hari yang dipilih." });
+      if (dates.some((day) => day > p.receivedDate)) ctx.addIssue({ code: "custom", message: "Pilih hari rapel sebelum atau pada tanggal penerimaan." });
+      if (p.allocations.reduce((sum, [, amount]) => sum + amount, 0) !== p.amount)
+        ctx.addIssue({ code: "custom", message: "Nominal rapel harus sesuai hari yang dipilih." });
+    }
+  } else if (p.allocations) ctx.addIssue({ code: "custom", message: "Tanggal pilihan hanya digunakan untuk rapel." });
 });
+
+async function validateRapel(db: Executor, values: z.infer<typeof paymentSchema>, previous?: typeof payments.$inferSelect) {
+  if (values.cadence !== "daily") return null;
+  const dates = new Map((await getRapelDates(db, values.houseId, values.receivedDate, previous?.id)).map((d) => [d.date, d.amount]));
+  // Tanggal yang dipertahankan memakai nominal lunas semula, termasuk saat hanya mengoreksi penerima/catatan.
+  if (previous?.houseId === values.houseId && previous.cadence === "daily")
+    for (const [date, amount] of previous.allocations ?? []) dates.set(date, amount);
+  return values.allocations?.every(([date, amount]) => dates.get(date) === amount) ? null
+    : "Hari rapel sudah dibayar, bukan catatan kosong harian, atau nominal berubah. Muat ulang dan pilih lagi.";
+}
 
 const planSchema = z.object({
   effectiveFrom: date, cadence,
@@ -46,6 +70,7 @@ export const paymentRoutes = new Hono<AppEnv>().use(requireResource("finance"))
     const history = await c.var.db.select({
       id: payments.id, houseId: payments.houseId, clientId: payments.clientId, cadence: payments.cadence,
       receivedDate: payments.receivedDate, periodStart: payments.periodStart, periodEnd: payments.periodEnd,
+      allocations: payments.allocations,
       amount: payments.amount, receivedBy: payments.receivedBy, collectorId: payments.collectorId,
       collectorName: users.name, note: payments.note, cancelledAt: payments.cancelledAt,
     }).from(payments).leftJoin(users, eq(users.id, payments.collectorId))
@@ -58,6 +83,7 @@ export const paymentRoutes = new Hono<AppEnv>().use(requireResource("finance"))
         .map((p) => ({ ...p, updatedAt: p.updatedAt.toISOString() })),
     });
   })
+  .get("/rapel/:id", idParam(), async (c) => c.json({ dates: await getRapelDates(c.var.db, c.req.valid("param").id, localDate(new Date())) }))
   .get("/kesepakatan/:id", idParam(), async (c) => c.json({ plans: await getPaymentPlansForHouse(c.var.db, c.req.valid("param").id) }))
   .put("/kesepakatan/:id", idParam(), body(planSchema), async (c) => {
     const houseId = c.req.valid("param").id;
@@ -89,13 +115,16 @@ export const paymentRoutes = new Hono<AppEnv>().use(requireResource("finance"))
       if (!house) return { error: "Rumah tidak ditemukan." };
       const [previous] = await tx.select().from(payments).where(eq(payments.clientId, values.clientId));
       if (previous) {
-        const same = !previous.cancelledAt && Object.entries(values).every(([key, value]) => previous[key as keyof typeof previous] === value);
+        const same = !previous.cancelledAt && Object.entries(values).every(([key, value]) =>
+          key === "allocations" ? JSON.stringify(previous.allocations) === JSON.stringify(value) : previous[key as keyof typeof previous] === value);
         return same ? { success: "Pembayaran sudah tersimpan." } : { error: "Catatan pembayaran ini sudah dipakai. Muat ulang lalu coba lagi." };
       }
       if (values.receivedBy === "collector") {
         const [collector] = await tx.select({ id: users.id }).from(users).where(and(eq(users.id, values.collectorId!), eq(users.active, true)));
         if (!collector) return { error: "Petugas penerima tidak aktif atau tidak ditemukan." };
       }
+      const error = await validateRapel(tx, values);
+      if (error) return { error };
       const [saved] = await tx.insert(payments).values({ ...values, recordedBy: c.var.user.id })
         .onConflictDoNothing({ target: payments.clientId }).returning();
       if (!saved) return { error: "Catatan pembayaran ini sudah dipakai. Muat ulang lalu coba lagi." };
@@ -110,12 +139,14 @@ export const paymentRoutes = new Hono<AppEnv>().use(requireResource("finance"))
     const error = await c.var.db.transaction(async (tx) => {
       const [previous] = await tx.select().from(payments).where(eq(payments.id, c.req.valid("param").id)).for("update");
       if (!previous || previous.cancelledAt) return "Pembayaran tidak ditemukan atau sudah dibatalkan.";
-      const [house] = await tx.select({ id: houses.id }).from(houses).where(eq(houses.id, values.houseId));
+      const [house] = await tx.select({ id: houses.id }).from(houses).where(eq(houses.id, values.houseId)).for("update");
       if (!house) return "Rumah tidak ditemukan.";
       if (values.receivedBy === "collector") {
         const [collector] = await tx.select({ id: users.id }).from(users).where(and(eq(users.id, values.collectorId!), eq(users.active, true)));
         if (!collector) return "Petugas penerima tidak aktif atau tidak ditemukan.";
       }
+      const error = await validateRapel(tx, values, previous);
+      if (error) return error;
       const [saved] = await tx.update(payments).set({ ...values, collectorId: values.receivedBy === "collector" ? values.collectorId : null, updatedAt: new Date() }).where(eq(payments.id, previous.id)).returning();
       await tx.insert(paymentLogs).values({ paymentId: saved.id, userId: c.var.user.id, action: "update", payload: { before: previous, after: saved } });
       return null;

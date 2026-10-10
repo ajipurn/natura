@@ -19,6 +19,7 @@ import {
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useBlocker } from "react-router";
 import { api, call } from "@/client/api";
+import { usePermission } from "@/client/permissions";
 import { invalidate } from "@/client/query";
 import { Dialog } from "@/components/dialog";
 import { guardColorClass } from "@/components/guard-color-class";
@@ -28,6 +29,7 @@ import { QueryState } from "@/components/query-state";
 import { Alert, Button, Card, PageHeader, cx } from "@/components/ui";
 import { ScheduleImportForm } from "@/features/jadwal/import-form";
 import { scheduleQuery } from "@/features/jadwal/queries";
+import { ScheduleList } from "@/features/jadwal/schedule-page";
 import { rondaDate } from "@/lib/dates";
 import { GUARD_COLOR_LABEL, GUARD_COLOR_MEANING, GUARD_COLORS, type GuardColor } from "@/lib/guard-color";
 import { DAY_NAMES, dayLabel, scheduleDay, slotHouseLabel } from "@/lib/schedule";
@@ -50,10 +52,11 @@ const COLOR_CHOICES: [GuardColor | null, string][] = [
 const colorMeaning = (color: GuardColor | null) => GUARD_COLOR_MEANING[color ?? "white"];
 
 export function JadwalPage() {
+  const canEdit = usePermission("schedule", true);
   const queryClient = useQueryClient();
   const schedule = useQuery(scheduleQuery);
-  const users = useQuery(usersQuery);
-  const houses = useQuery(housesQuery);
+  const users = useQuery({ ...usersQuery, enabled: canEdit });
+  const houses = useQuery({ ...housesQuery, enabled: canEdit });
   const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   // Dinaikkan setelah impor supaya editor mulai lagi dari jadwal baru.
@@ -92,9 +95,9 @@ export function JadwalPage() {
             >
               <ImageDown className="size-4" /> {exporting.isPending ? "Menyiapkan…" : "Ekspor gambar"}
             </Button>
-            <Button onClick={() => setImportOpen(true)} variant="secondary" size="sm" className="h-11 sm:h-9">
+            {canEdit && <Button onClick={() => setImportOpen(true)} variant="secondary" size="sm" className="h-11 sm:h-9">
               <FileSpreadsheet className="size-4" /> Impor
-            </Button>
+            </Button>}
           </div>
         }
       />
@@ -104,7 +107,7 @@ export function JadwalPage() {
         </div>
       )}
       <QueryState query={schedule}>
-        {(data) => (
+        {(data) => canEdit ? (
           <ScheduleEditor
             key={version}
             schedule={data.schedule}
@@ -114,9 +117,20 @@ export function JadwalPage() {
             onImport={() => setImportOpen(true)}
             onEditingChange={setEditing}
           />
+        ) : data.schedule.length ? (
+          <>
+            <GuardColorLegend />
+            <ScheduleList schedule={data.schedule} tonight={tonight} />
+          </>
+        ) : (
+          <Card className="text-center">
+            <CalendarDays className="mx-auto size-10 text-muted" />
+            <p className="mt-2 font-semibold">Belum ada jadwal ronda</p>
+            <p className="mt-1 text-sm text-muted">Jadwal belum dicatat pengurus.</p>
+          </Card>
         )}
       </QueryState>
-      <Dialog
+      {canEdit && <Dialog
         open={importOpen}
         onClose={() => setImportOpen(false)}
         title="Impor jadwal dari spreadsheet"
@@ -128,7 +142,7 @@ export function JadwalPage() {
           hasSchedule={(schedule.data?.schedule.length ?? 0) > 0}
           onChanged={() => setVersion((v) => v + 1)}
         />
-      </Dialog>
+      </Dialog>}
     </>
   );
 }

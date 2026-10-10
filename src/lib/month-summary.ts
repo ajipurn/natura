@@ -12,14 +12,16 @@ export function monthHouseStatusLabel(recap: Pick<MonthRecap, "paymentCadences">
 }
 
 /** Status tampilan per malam; catatan dan nominal asli tetap disimpan terpisah. */
-export function monthHouseNights(recap: Pick<MonthRecap, "dates" | "cells" | "paymentPeriods">, house: Pick<HouseDTO, "id" | "status">) {
+export function monthHouseNights(recap: Pick<MonthRecap, "dates" | "cells" | "paymentPeriods" | "paymentCells">, house: Pick<HouseDTO, "id" | "status">) {
   return recap.dates.map((date) => {
     const cell = recap.cells[`${house.id}:${date}`];
     const period = house.status === "active"
       ? recap.paymentPeriods?.find((p) => p.houseId === house.id && p.start <= date && p.end >= date)
       : undefined;
-    const status = house.status === "active" ? rondaHouseState(house, cell, period) : cell?.status ?? "unchecked";
-    return { date, cell, period, status };
+    const payment = recap.paymentCells?.[`${house.id}:${date}`];
+    const rapel = (payment?.rapelAmount ?? 0) > 0 && payment?.paid ? payment : undefined;
+    const status = rapel ? "filled" : house.status === "active" ? rondaHouseState(house, cell, period) : cell?.status ?? "unchecked";
+    return { date, cell, period, rapel, status };
   });
 }
 
@@ -30,15 +32,16 @@ export function summarizeMonth(recap: MonthRecap) {
     let filledCount = 0;
     let total = 0;
     const nights = monthHouseNights(recap, house);
-    const cells = nights.map(({ cell }, i) => {
+    const cells = nights.map(({ cell, rapel }, i) => {
       if (cell?.status === "filled") {
         filledCount++;
         total += cell.amount;
         dateTotals[i] += cell.amount;
       }
+      else if (rapel) filledCount++;
       return cell;
     });
-    const empty = cells.filter((cell) => cell?.status === "empty").length;
+    const empty = nights.filter((night) => night.cell?.status === "empty" && !night.rapel).length;
     // Periode mingguan/bulanan tidak memerlukan pemeriksaan harian, termasuk sebelum lunas.
     const unchecked = house.status === "active"
       ? nights.filter((night) => !night.cell && !night.period).length
@@ -46,8 +49,9 @@ export function summarizeMonth(recap: MonthRecap) {
     const allocations = Object.entries(recap.paymentCells ?? {}).filter(([key]) => key.startsWith(house.id + ":")).map(([, c]) => c);
     const monthlyTotal = allocations.reduce((sum, c) => sum + c.monthlyAmount, 0);
     const weeklyTotal = allocations.reduce((sum, c) => sum + c.weeklyAmount, 0);
+    const rapelTotal = allocations.reduce((sum, c) => sum + (c.rapelAmount ?? 0), 0);
     const periodTotal = allocations.reduce((sum, c) => sum + c.amount, 0);
-    return { house, cells, nights, filledCount, empty, unchecked, total: total + periodTotal, collectedTotal: total, monthlyTotal, weeklyTotal, periodTotal };
+    return { house, cells, nights, filledCount, empty, unchecked, total: total + periodTotal, collectedTotal: total, monthlyTotal, weeklyTotal, rapelTotal, periodTotal };
   });
   const grandTotal = rows.reduce((sum, row) => sum + row.total, 0);
   return { rows, dateTotals, grandTotal };

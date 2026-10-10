@@ -20,8 +20,9 @@ export type PeriodPayment = {
   periodEnd: string;
   cadence: PaymentCadence;
   amount: number;
+  allocations?: [string, number][] | null;
 };
-export type PaymentCell = { amount: number; monthlyAmount: number; weeklyAmount: number; paid: boolean };
+export type PaymentCell = { amount: number; monthlyAmount: number; weeklyAmount: number; rapelAmount?: number; paid: boolean };
 export type BillingStatus = "paid" | "unpaid";
 export type BillingPeriod = {
   houseId: number;
@@ -36,6 +37,7 @@ export type BillingPeriod = {
 };
 
 export const CADENCE_LABEL: Record<PaymentCadence, string> = { daily: "Harian", weekly: "Mingguan", monthly: "Bulanan" };
+export const PAYMENT_LABEL = { ...CADENCE_LABEL, daily: "Rapel" };
 export const BILLING_LABEL: Record<BillingStatus, string> = {
   paid: "Sudah bayar", unpaid: "Belum bayar",
 };
@@ -58,6 +60,7 @@ export function planAt(plans: PaymentPlanDTO[], houseId: number, date: string) {
 
 /** Pembagian rupiah deterministik, termasuk sisa pembulatan, sehingga jumlahnya selalu sama dengan penerimaan. */
 export function allocatePayment(payment: PeriodPayment): [string, number][] {
+  if (payment.cadence === "daily" && payment.allocations) return payment.allocations;
   const count = daysBetween(payment.periodStart, payment.periodEnd) + 1;
   const base = Math.floor(payment.amount / count);
   const remainder = payment.amount % count;
@@ -73,7 +76,9 @@ export function paymentCells(payments: PeriodPayment[], plans: PaymentPlanDTO[],
     cell.amount += amount;
     if (p.cadence === "monthly") cell.monthlyAmount += amount;
     if (p.cadence === "weekly") cell.weeklyAmount += amount;
-    cell.paid = cell.amount >= (planAt(plans, p.houseId, date)?.ratePerNight ?? fallbackRate);
+    if (p.cadence === "daily") cell.rapelAmount = (cell.rapelAmount ?? 0) + amount;
+    // Rapel melunasi tanggal pilihan saat dicatat; perubahan tarif berikutnya tidak membuka pembayaran itu lagi.
+    cell.paid = (cell.rapelAmount ?? 0) > 0 || cell.amount >= (planAt(plans, p.houseId, date)?.ratePerNight ?? fallbackRate);
   }
   return cells;
 }

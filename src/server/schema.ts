@@ -23,7 +23,7 @@ import {
  */
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 
-export const roleEnum = pgEnum("role", ["admin", "petugas", "ketua", "sekretaris", "bendahara"]);
+export const roleEnum = pgEnum("role", ["admin", "petugas", "ketua", "sekretaris", "bendahara", "humas"]);
 /** `vacant` = rumah kosong / penghuni mudik, tidak dihitung sebagai bolong. */
 export const houseStatusEnum = pgEnum("house_status", ["active", "vacant"]);
 /** `filled` = wadah jimpitan ada isinya, `empty` = kosong. */
@@ -324,6 +324,8 @@ export const payments = pgTable("jimpitan_payments", {
   periodStart: date("period_start", { mode: "string" }).notNull(),
   periodEnd: date("period_end", { mode: "string" }).notNull(),
   cadence: text("cadence").$type<"daily" | "weekly" | "monthly">().notNull(),
+  /** Rapel harian: tanggal pilihan dan nominalnya, tanpa mengubah catatan pemeriksaan. */
+  allocations: jsonb("allocations").$type<[string, number][]>(),
   amount: integer("amount").notNull(),
   receivedBy: text("received_by").$type<"treasurer" | "collector">().notNull(),
   collectorId: integer("collector_id").references(() => users.id, { onDelete: "set null" }),
@@ -337,6 +339,7 @@ export const payments = pgTable("jimpitan_payments", {
   index("jimpitan_payments_house_period_idx").on(t.houseId, t.periodStart, t.periodEnd),
   index("jimpitan_payments_received_idx").on(t.receivedDate),
   check("jimpitan_payments_values", sql`${t.amount} > 0 and ${t.periodEnd} >= ${t.periodStart} and ${t.cadence} in ('daily', 'weekly', 'monthly') and ${t.receivedBy} in ('treasurer', 'collector')`),
+  check("jimpitan_payments_allocations", sql`${t.allocations} is null or (${t.cadence} = 'daily' and jsonb_typeof(${t.allocations}) = 'array' and jsonb_array_length(${t.allocations}) > 0)`),
 ]).enableRLS();
 
 /** Koreksi dan pembatalan tetap meninggalkan catatan sebelumnya, pelaku, dan waktu perubahan. */

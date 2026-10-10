@@ -25,8 +25,6 @@ export function SchedulePage({
 }) {
   const query = useQuery(scheduleQuery);
   const tonight = scheduleDay(rondaDate(new Date()));
-  // Mulai dari malam ini, lalu malam-malam berikutnya.
-  const days = DAY_NAMES.map((_, i) => (tonight + i) % 7);
 
   return (
     <>
@@ -45,21 +43,23 @@ export function SchedulePage({
                 <p className="mt-1 text-sm text-muted">{emptyHint}</p>
               </Card>
             ) : (
-              <div className="grid gap-3 lg:grid-cols-2">
-                {days.map((day) => (
-                  <DayCard
-                    key={day}
-                    day={day}
-                    tonight={day === tonight}
-                    entries={schedule.filter((e) => e.day === day)}
-                    currentUserId={currentUserId}
-                  />
-                ))}
-              </div>
+              <ScheduleList schedule={schedule} tonight={tonight} currentUserId={currentUserId} />
             );
         }}
       </QueryState>
     </>
+  );
+}
+
+/** Daftar mingguan tanpa kontrol ubah, juga dipakai pengurus dengan akses baca. */
+export function ScheduleList({ schedule, tonight, currentUserId }: { schedule: ScheduleDTO[]; tonight: number; currentUserId?: number }) {
+  const days = DAY_NAMES.map((_, i) => (tonight + i) % 7);
+  return (
+    <div className="grid gap-3 lg:grid-cols-2">
+      {days.map((day) => (
+        <DayCard key={day} day={day} tonight={day === tonight} entries={schedule.filter((entry) => entry.day === day)} currentUserId={currentUserId} />
+      ))}
+    </div>
   );
 }
 

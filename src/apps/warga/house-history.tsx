@@ -6,7 +6,7 @@ import { HouseMonthCalendar, HouseCalendarLegend, type HouseCalendarNight } from
 import { QueryState } from "@/components/query-state";
 import { Button, cx } from "@/components/ui";
 import { PaymentNotice } from "@/components/payment-notice";
-import { CADENCE_LABEL } from "@/lib/payments";
+import { PAYMENT_LABEL } from "@/lib/payments";
 import { daysInMonth, formatDateShort } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 
@@ -68,13 +68,13 @@ function HistoryBody({ houseId, selectedMonth }: { houseId: number; selectedMont
           <div className="space-y-5">
             {house.status === "active" && <PaymentNotice period={paymentInfo.periods.find((b) => b.start <= through && b.end >= through)} cell={through === today ? paymentInfo.tonight : null} />}
             {paymentInfo.periods.some((p) => p.status === "unpaid" && p.end < today) && house.status === "active" && <p className="text-sm text-muted">Periode sebelumnya belum dibayar: {paymentInfo.periods.filter((p) => p.status === "unpaid" && p.end < today).map((p) => formatDateShort(p.start) + " – " + formatDateShort(p.end)).join("; ")}.</p>}
-            {paymentInfo.receipts.length > 0 && <section><h3 className="font-semibold">Pembayaran periode</h3><ul className="mt-2 space-y-2">{paymentInfo.receipts.map((p, i) => <li key={i} className="rounded-xl bg-primary/5 px-3 py-2 text-sm"><div className="flex flex-wrap justify-between gap-2"><span>{CADENCE_LABEL[p.cadence]}</span><strong>{formatRupiah(p.amount)}</strong></div><p className="text-xs text-muted">Untuk {formatDateShort(p.periodStart)} – {formatDateShort(p.periodEnd)} {p.periodEnd.slice(0, 4)} · diterima {formatDateShort(p.receivedDate)}.</p></li>)}</ul><p className="mt-2 text-xs text-muted">Terpisah dari hasil pemeriksaan wadah di kalender ronda.</p></section>}
+            {paymentInfo.receipts.length > 0 && <section><h3 className="font-semibold">Pembayaran jimpitan</h3><ul className="mt-2 space-y-2">{paymentInfo.receipts.map((p, i) => <li key={i} className="rounded-xl bg-primary/5 px-3 py-2 text-sm"><div className="flex flex-wrap justify-between gap-2"><span>{PAYMENT_LABEL[p.cadence]}</span><strong>{formatRupiah(p.amount)}</strong></div><p className="text-xs text-muted">Untuk {p.allocations ? p.allocations.map(([date]) => `${formatDateShort(date)} ${date.slice(0, 4)}`).join(", ") : `${formatDateShort(p.periodStart)} – ${formatDateShort(p.periodEnd)} ${p.periodEnd.slice(0, 4)}`} · diterima {formatDateShort(p.receivedDate)}.</p></li>)}</ul><p className="mt-2 text-xs text-muted">Dicatat terpisah dari uang yang diambil saat ronda.</p></section>}
             {house.status === "vacant" && (
               <p className="rounded-xl bg-warn-soft px-3 py-2 text-sm text-warn">
                 Ditandai rumah kosong/mudik: tidak dihitung bolong walau wadahnya kosong.
               </p>
             )}
-            {months.map((month) => <HouseMonthCalendar key={month} month={month} byDate={byDate} today={today} house={house} periods={paymentInfo.periods} />)}
+            {months.map((month) => <HouseMonthCalendar key={month} month={month} byDate={byDate} today={today} house={house} periods={paymentInfo.periods} paymentCells={paymentInfo.cells} />)}
             <HouseCalendarLegend />
           </div>
         );

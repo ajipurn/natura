@@ -10,7 +10,7 @@ import { houseLabelLong } from "@/lib/houses";
 import { dayLabel, scheduleDay } from "@/lib/schedule";
 import { QuickRecord } from "./quick-record";
 import { PaymentNotice } from "@/components/payment-notice";
-import { CADENCE_LABEL } from "@/lib/payments";
+import { PAYMENT_LABEL } from "@/lib/payments";
 import { petugasPath, wargaPath } from "@/lib/app-paths";
 import { DEFAULT_LOGO_URL } from "@/lib/branding";
 
@@ -69,6 +69,7 @@ export function HousePage() {
 
               <Card className="mt-5">
                 <p className="text-sm text-muted">{formatMonth(month)}</p>
+                <p className="text-xs text-muted">Dari ronda</p>
                 <div className="mt-1 flex items-baseline justify-between">
                   <p>
                     <strong className="text-2xl">{monthFilled.length}</strong>
@@ -78,28 +79,33 @@ export function HousePage() {
                 </div>
               </Card>
 
-              {paymentInfo.receipts.length > 0 && <Card className="mt-5"><h2 className="font-semibold">Pembayaran periode</h2><ul className="mt-3 space-y-3">{paymentInfo.receipts.map((p, i) => <li key={i} className="text-sm"><p className="flex flex-wrap justify-between gap-2"><span>{CADENCE_LABEL[p.cadence]}</span><strong>{formatRupiah(p.amount)}</strong></p><p className="text-xs text-muted">Untuk {formatDateShort(p.periodStart)} – {formatDateShort(p.periodEnd)} {p.periodEnd.slice(0, 4)} · diterima {formatDateShort(p.receivedDate)}.</p></li>)}</ul></Card>}
+              {paymentInfo.receipts.length > 0 && <Card className="mt-5"><h2 className="font-semibold">Pembayaran jimpitan</h2><ul className="mt-3 space-y-3">{paymentInfo.receipts.map((p, i) => <li key={i} className="text-sm"><p className="flex flex-wrap justify-between gap-2"><span>{PAYMENT_LABEL[p.cadence]}</span><strong>{formatRupiah(p.amount)}</strong></p><p className="text-xs text-muted">Untuk {p.allocations ? p.allocations.map(([date]) => `${formatDateShort(date)} ${date.slice(0, 4)}`).join(", ") : `${formatDateShort(p.periodStart)} – ${formatDateShort(p.periodEnd)} ${p.periodEnd.slice(0, 4)}`} · diterima {formatDateShort(p.receivedDate)}.</p></li>)}</ul></Card>}
 
               <h2 className="mb-2 mt-6 text-sm font-semibold uppercase tracking-wide text-muted">30 malam terakhir</h2>
               {history.length === 0 ? (
                 <Card className="text-center text-muted">Belum ada catatan ronda.</Card>
               ) : (
                 <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
-                  {history.map((h) => (
+                  {history.map((h) => {
+                    const payment = paymentInfo.cells?.[h.date];
+                    const rapel = (payment?.rapelAmount ?? 0) > 0 && payment?.paid;
+                    return (
                     <li key={h.date} className="flex items-center justify-between px-4 py-2.5">
                       <span>{formatDateShort(h.date)}</span>
                       <span
+                        title={rapel ? "Dibayar rapel; catatan ronda asli tetap " + (h.status === "filled" ? "terisi" : "kosong") + "." : undefined}
                         className={cx(
                           "rounded-full px-2.5 py-1 text-xs font-semibold",
-                          h.status === "filled" && "bg-filled-soft text-filled",
-                          h.status === "empty" && "bg-empty-soft text-empty",
-                          !h.status && "bg-idle-soft text-muted",
+                          (h.status === "filled" || rapel) && "bg-filled-soft text-filled",
+                          h.status === "empty" && !rapel && "bg-empty-soft text-empty",
+                          !h.status && !rapel && "bg-idle-soft text-muted",
                         )}
                       >
-                        {h.status === "filled" ? formatRupiah(h.amount ?? 0) : h.status === "empty" ? "Kosong" : "Tidak dicek"}
+                        {rapel ? `Rapel · ${formatRupiah(payment?.rapelAmount ?? 0)}` : h.status === "filled" ? formatRupiah(h.amount ?? 0) : h.status === "empty" ? "Kosong" : "Tidak dicek"}
                       </span>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               )}
 

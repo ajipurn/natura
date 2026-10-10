@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Pencil, Plus, Users } from "lucide-react";
 import { useState } from "react";
 import { api, call } from "@/client/api";
+import { usePermission } from "@/client/permissions";
 import { invalidate } from "@/client/query";
 import { DatePicker } from "@/components/date-picker";
 import { Dialog } from "@/components/dialog";
@@ -36,6 +37,7 @@ type Member = { id: number; relation: "spouse" | "child" | "parent" | "other" };
 
 /** Dikelola sebagai tab di Warga, memakai orang yang sama dengan daftar warga. */
 export function KeluargaPanel() {
+  const canEdit = usePermission("residents", true);
   const query = useQuery(familiesQuery);
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<number | "new" | null>(null);
@@ -61,14 +63,14 @@ export function KeluargaPanel() {
                 value={search}
                 onValueChange={setSearch}
               />
-              <Button
+              {canEdit && <Button
                 size="sm"
                 className="shrink-0"
                 onClick={() => setEditing("new")}
               >
                 <Plus className="size-4" />
                 Tambah keluarga
-              </Button>
+              </Button>}
             </div>
             <p className="mb-3 text-xs text-muted" role="status">
               {shown.length} keluarga ·{" "}
@@ -87,8 +89,7 @@ export function KeluargaPanel() {
                     : "Belum ada keluarga"}
                 </p>
                 <p className="mt-1 text-sm text-muted">
-                  Pilih kepala dan anggota dari daftar warga yang sudah
-                  terdaftar.
+                  {families.length ? "Ubah pencarian untuk melihat keluarga lain." : canEdit ? "Pilih kepala dan anggota dari daftar warga yang sudah terdaftar." : "Data keluarga belum dicatat pengurus."}
                 </p>
               </Card>
             ) : (
@@ -107,14 +108,14 @@ export function KeluargaPanel() {
                           · {HOUSING_LABEL[family.housingStatus]}
                         </p>
                       </div>
-                      <Button
+                      {canEdit && <Button
                         variant="ghost"
                         size="icon"
                         aria-label={`Edit keluarga ${family.headName}`}
                         onClick={() => setEditing(family.id)}
                       >
                         <Pencil className="size-4" />
-                      </Button>
+                      </Button>}
                     </div>
                     <ul className="mt-4 divide-y divide-line">
                       {family.members.map((member) => (
@@ -142,7 +143,7 @@ export function KeluargaPanel() {
                 ))}
               </div>
             )}
-            <Dialog
+            {canEdit && <Dialog
               open={editing !== null}
               onClose={() => setEditing(null)}
               title={selected ? "Edit keluarga" : "Tambah keluarga"}
@@ -153,7 +154,7 @@ export function KeluargaPanel() {
                 family={selected}
                 onDone={() => setEditing(null)}
               />
-            </Dialog>
+            </Dialog>}
           </>
         );
       }}

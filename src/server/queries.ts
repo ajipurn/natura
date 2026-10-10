@@ -306,7 +306,7 @@ export async function getMonthRecap(db: Db, month: string): Promise<MonthRecap> 
     paymentCells: Object.fromEntries(Object.entries(paymentData.cells).filter(([key]) => key.split(":")[1].startsWith(month))),
     paymentPeriods: paymentData.bills,
     periodPayments: paymentData.receipts.filter((p) => p.periodStart <= days[days.length - 1] && p.periodEnd >= days[0])
-      .map(({ id, houseId, receivedDate, periodStart, periodEnd, cadence, amount }) => ({ id, houseId, receivedDate, periodStart, periodEnd, cadence, amount })),
+      .map(({ id, houseId, receivedDate, periodStart, periodEnd, cadence, amount, allocations }) => ({ id, houseId, receivedDate, periodStart, periodEnd, cadence, amount, allocations })),
   };
 }
 

@@ -25,7 +25,7 @@
 /** @OnlyCurrentDoc */
 
 const FIRST_NIGHT = 8; // kolom H
-const COLUMNS = FIRST_NIGHT - 1 + 31 + 3; // Bulanan, Mingguan, dan Harian di belakang tanggal
+const COLUMNS = FIRST_NIGHT - 1 + 31 + 4; // Bulanan, Mingguan, Harian, dan Rapel di belakang tanggal
 const TIME_ZONE = "Asia/Jakarta";
 const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 /** Rumus di A1: link Natura, dengan `?bulan=YYYY-MM` untuk tab arsip. */
@@ -55,7 +55,7 @@ function rapikanRekap() {
   sheet.setColumnWidths(FIRST_NIGHT, nights, 52);
 
   const body = sheet.getRange(3, 1, rows - 2, COLUMNS);
-  const night = sheet.getRange(3, FIRST_NIGHT, rows - 2, nights + 3);
+  const night = sheet.getRange(3, FIRST_NIGHT, rows - 2, nights + 4);
   const house = sheet.getRange(3, 1, rows - 2, FIRST_NIGHT - 1);
   const status = sheet.getRange(3, 3, rows - 2, 1);
   // Mengganti semua aturan format bersyarat di lembar ini. Warnanya sama dengan file Excel dari Natura.
@@ -65,6 +65,7 @@ function rapikanRekap() {
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("kosong").setFontColor("#be123c").setBackground("#ffe4e6").setRanges([night]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("Belum").setFontColor("#854d0e").setBackground("#fef9c3").setRanges([night]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("Lunas").setFontColor("#15803d").setBackground("#dcfce7").setRanges([night]).build(),
+    SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("Rapel").setFontColor("#15803d").setBackground("#dcfce7").setRanges([night]).build(),
     // Rumus satu perbandingan tidak bergantung pemisah argumen sesuai lokal spreadsheet.
     SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=H$2="Bulanan (Rp)"').setFontColor("#1d4ed8").setBackground("#dbeafe").setRanges([night]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=H$2="Mingguan (Rp)"').setFontColor("#1d4ed8").setBackground("#dbeafe").setRanges([night]).build(),

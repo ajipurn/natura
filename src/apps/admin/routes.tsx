@@ -37,6 +37,11 @@ function AdminPatrolDetail() {
   return <PatrolDetail basePath={adminPath("/riwayat")} canCorrect={canCorrect} log={NIGHT_LOG} />;
 }
 
+function DashboardHome() {
+  const canOverview = usePermission("overview");
+  return canOverview ? <RingkasanPage /> : <Navigate to={adminPath("/info")} replace />;
+}
+
 export const router = createBrowserRouter([
   { path: adminPath("/masuk"), element: <LoginPage title="Masuk dashboard" homePath={adminPath()} setupPath={adminPath("/setup")} /> },
   { path: adminPath("/setup"), element: <SetupPage /> },
@@ -52,18 +57,18 @@ export const router = createBrowserRouter([
       </RequireAuth>
     ),
     children: [
-      { index: true, element: <RingkasanPage /> },
-      { path: "riwayat", element: <PatrolList basePath={adminPath("/riwayat")} /> },
-      { path: "riwayat/:tanggal", element: <AdminPatrolDetail /> },
+      { index: true, element: <DashboardHome /> },
+      { path: "riwayat", element: <Access resource="patrols"><PatrolList basePath={adminPath("/riwayat")} /></Access> },
+      { path: "riwayat/:tanggal", element: <Access resource="patrols"><AdminPatrolDetail /></Access> },
       // Audit catatan sekarang tab "Log catatan" di detail malam Riwayat.
-      { path: "audit", element: <AuditRedirect /> },
-      { path: "rekap", element: <RekapPage /> },
+      { path: "audit", element: <Access resource="patrols"><AuditRedirect /></Access> },
+      { path: "rekap", element: <Access resource="patrols"><RekapPage /></Access> },
       { path: "kas", element: <Access resource="finance"><KasPage /></Access> },
       { path: "iuran", element: <Access resource="finance"><IuranPage /></Access> },
       { path: "jadwal", element: <Access resource="schedule"><JadwalPage /></Access> },
-      { path: "rumah", element: <RumahPage /> },
-      { path: "rumah/cetak", element: <CetakPage /> },
-      { path: "denah", element: <DenahPage /> },
+      { path: "rumah", element: <Access resource="houses"><RumahPage /></Access> },
+      { path: "rumah/cetak", element: <Access resource="houses"><CetakPage /></Access> },
+      { path: "denah", element: <Access resource="patrols"><DenahPage /></Access> },
       { path: "petugas", element: <Access resource="accounts" write><PetugasPage /></Access> },
       { path: "warga", element: <Access resource="residents"><WargaPage /></Access> },
       { path: "keluarga", element: <Navigate to={adminPath("/warga?tab=keluarga")} replace /> },

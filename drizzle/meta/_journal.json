@@ -64,6 +64,20 @@
       "when": 1791526373562,
       "tag": "0008_community_management",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791608305051,
+      "tag": "0009_rapel_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791608747088,
+      "tag": "0010_humas_role",
+      "breakpoints": true
     }
   ]
 }

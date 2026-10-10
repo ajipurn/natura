@@ -5,6 +5,7 @@ export const ROLES = [
   "ketua",
   "sekretaris",
   "bendahara",
+  "humas",
   "petugas",
 ] as const;
 export const ROLE_LABEL: Record<Role, string> = {
@@ -12,6 +13,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   ketua: "Ketua",
   sekretaris: "Sekretaris",
   bendahara: "Bendahara",
+  humas: "Humas",
   petugas: "Petugas",
 };
 export const ROLE_HINT: Record<Role, string> = {
@@ -19,6 +21,7 @@ export const ROLE_HINT: Record<Role, string> = {
   ketua: "Semua fitur dan pengaturan akses",
   sekretaris: "Warga, keluarga, rumah, jadwal, dan informasi",
   bendahara: "Kas, iuran, dan membaca data rumah",
+  humas: "Pengumuman dan kontak; membaca warga, rumah, dan jadwal",
   petugas: "Info warga, ronda, dan pencatatan jimpitan",
 };
 export type Resource =
@@ -52,10 +55,17 @@ const ACCESS: Record<Role, Partial<Record<Resource, "read" | "write">>> = {
     accounts: "read",
     settings: "read",
   },
+  humas: {
+    residents: "read",
+    houses: "read",
+    schedule: "read",
+    info: "write",
+    settings: "read",
+  },
   petugas: {},
 };
 export const isManager = (role: Role) =>
-  ["admin", "ketua", "sekretaris", "bendahara"].includes(role);
+  ["admin", "ketua", "sekretaris", "bendahara", "humas"].includes(role);
 export function can(role: Role, resource: Resource, write = false): boolean {
   if (role === "admin" || role === "ketua") return true;
   const access = ACCESS[role]?.[resource];

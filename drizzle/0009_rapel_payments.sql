@@ -1,0 +1,2 @@
+ALTER TABLE "jimpitan_payments" ADD COLUMN "allocations" jsonb;--> statement-breakpoint
+ALTER TABLE "jimpitan_payments" ADD CONSTRAINT "jimpitan_payments_allocations" CHECK ("jimpitan_payments"."allocations" is null or ("jimpitan_payments"."cadence" = 'daily' and jsonb_typeof("jimpitan_payments"."allocations") = 'array' and jsonb_array_length("jimpitan_payments"."allocations") > 0));

@@ -72,8 +72,8 @@ type CadenceFilter = "all" | PaymentCadence;
 type RecapView = "houses" | "payments";
 type DateView = "recorded" | "month";
 type AmountColumn = {
-  key: "daily" | "weekly" | "monthly";
-  field: "collectedTotal" | "weeklyTotal" | "monthlyTotal";
+  key: "daily" | "weekly" | "monthly" | "rapel";
+  field: "collectedTotal" | "weeklyTotal" | "monthlyTotal" | "rapelTotal";
   label: string;
   hint: string;
 };
@@ -331,6 +331,7 @@ function RecapBody({
   const { rows, dateTotals, grandTotal } = summarizeMonth({ ...data, dates });
   const monthlyTotal = rows.reduce((sum, r) => sum + r.monthlyTotal, 0);
   const weeklyTotal = rows.reduce((sum, r) => sum + r.weeklyTotal, 0);
+  const rapelTotal = rows.reduce((sum, r) => sum + r.rapelTotal, 0);
   const nights = data.dates.length;
   const maxNight = Math.max(...dateTotals, 1);
   const tableDates =
@@ -345,6 +346,7 @@ function RecapBody({
       label: "Harian",
       hint: "Uang yang diambil saat ronda",
     },
+    ...(rapelTotal > 0 ? [{ key: "rapel", field: "rapelTotal", label: "Rapel", hint: "Pembayaran untuk hari kosong sebelumnya" } as const] : []),
     ...(weeklyTotal > 0 ||
     Object.values(data.paymentCadences ?? {}).some((c) => c.includes("weekly"))
       ? [
@@ -379,16 +381,7 @@ function RecapBody({
     ];
     const statusAt = (i: number) => {
       if (dates[i] > tonight) return undefined;
-      const period =
-        r.house.status === "active"
-          ? periodAt(r.house.id, dates[i])
-          : undefined;
-      if (r.cells[i]?.status === "filled") return "filled";
-      return period
-        ? period.status === "paid"
-          ? "filled"
-          : "empty"
-        : r.cells[i]?.status;
+      return r.nights[i].status;
     };
     return {
       ...r,
@@ -472,6 +465,7 @@ function RecapBody({
     );
   const shownTotals = {
     daily: visible.reduce((sum, r) => sum + r.collectedTotal, 0),
+    rapel: visible.reduce((sum, r) => sum + r.rapelTotal, 0),
     weekly: visible.reduce((sum, r) => sum + r.weeklyTotal, 0),
     monthly: visible.reduce((sum, r) => sum + r.monthlyTotal, 0),
     total: visible.reduce((sum, r) => sum + r.total, 0),
@@ -1162,7 +1156,10 @@ function RecapBody({
                               const period = vacant
                                 ? undefined
                                 : periodAt(r.house.id, date);
-                              const content = future ? null : !editing && period &&
+                              const rapel = r.nights[i].rapel;
+                              const content = future ? null : !editing && rapel && cell?.status !== "filled" ? (
+                                <span role="img" aria-label={`${formatDateShort(date)}: Rapel lunas, catatan ronda ${cellText(cell, vacant)}`} title={`${formatDateShort(date)}: Rapel lunas · ${formatRupiah(rapel.rapelAmount ?? 0)}; catatan ronda ${cellText(cell, vacant)}`} className={cx(cellBox, "bg-filled-soft text-xs font-bold text-filled ring-1 ring-inset ring-filled/15")}>R</span>
+                              ) : !editing && period &&
                                 cell?.status !== "filled" ? (
                                 <PeriodCell period={period} date={date} />
                               ) : (

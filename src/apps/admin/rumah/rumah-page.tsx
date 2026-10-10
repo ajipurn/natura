@@ -40,8 +40,9 @@ const VIEWS = [
 
 export function RumahPage() {
   const canEdit = usePermission("houses", true);
+  const canReadAccounts = usePermission("accounts");
   const query = useQuery(housesQuery);
-  const users = useQuery(usersQuery).data?.users ?? [];
+  const users = useQuery({ ...usersQuery, enabled: canReadAccounts }).data?.users ?? [];
   const [params, setParams] = useSearchParams();
   const view: View = params.get("tampilan") === "denah" ? "denah" : "daftar";
   // `?tampilan=denah&lokasi=1`: atur titik acuan GPS di denah (untuk "Lokasi saya" di app petugas).
@@ -57,7 +58,14 @@ export function RumahPage() {
       {({ houses, origin }) => {
         // Akun petugas per rumah: nama warga rumah itu diambil dari akunnya.
         const accounts = new Map<number, string[]>();
-        for (const u of users) if (u.houseId) accounts.set(u.houseId, [...(accounts.get(u.houseId) ?? []), u.name]);
+        if (canReadAccounts) {
+          for (const u of users) if (u.houseId) accounts.set(u.houseId, [...(accounts.get(u.houseId) ?? []), u.name]);
+        } else {
+          for (const house of houses) {
+            const names = house.residents?.filter((resident) => resident.userId !== null).map((resident) => resident.name) ?? [];
+            if (names.length) accounts.set(house.id, names);
+          }
+        }
         const counts = Object.fromEntries(
           FILTERS.map((f) => [f.value, houses.filter((h) => f.match(h, accounts.has(h.id))).length]),
         ) as Record<Filter, number>;

@@ -80,7 +80,7 @@ describe("akses pengurus dari peran di database", () => {
     });
 
   it("akses tulis dibatasi meski mengirim peran palsu di payload", async () => {
-    for (const role of ["sekretaris", "bendahara", "petugas"] as const) {
+    for (const role of ["sekretaris", "bendahara", "humas", "petugas"] as const) {
       const client = clients.get(role)!;
       expect(
         (
@@ -132,6 +132,46 @@ describe("akses pengurus dari peran di database", () => {
     ).toBe(403);
   });
 
+  it("humas menerbitkan, menyunting, menyematkan, dan menghapus pengumuman serta mengelola kontak", async () => {
+    const humas = clients.get("humas")!;
+    expect((await humas.post("/api/admin/pengumuman", {
+      title: "Kerja bakti", body: "Berkumpul di taman.", pinned: false,
+    })).status).toBe(200);
+    const info = (await humas.get("/api/admin/info")).data;
+    const [announcement] = info.announcements as { id: number; title: string }[];
+    expect(announcement.title).toBe("Kerja bakti");
+    expect((await humas.patch(`/api/admin/pengumuman/${announcement.id}`, {
+      title: "Kerja bakti hari Minggu", body: "Pukul 07.00 di taman.", pinned: true,
+    })).status).toBe(200);
+    expect((await humas.put("/api/admin/kontak", {
+      contacts: [{ name: "Pengurus Humas", role: "Humas", phone: "081234567890" }],
+    })).status).toBe(200);
+    expect((await humas.get("/api/admin/info")).data).toMatchObject({
+      announcements: [{ id: announcement.id, title: "Kerja bakti hari Minggu", pinned: true }],
+      contacts: [{ name: "Pengurus Humas", role: "Humas", phone: "081234567890" }],
+    });
+    expect((await humas.delete(`/api/admin/pengumuman/${announcement.id}`)).status).toBe(200);
+    expect((await humas.put("/api/admin/kontak", { contacts: [] })).status).toBe(200);
+    expect((await humas.get("/api/admin/info")).data).toMatchObject({ announcements: [], contacts: [] });
+  });
+
+  it("humas membaca data lingkungan tetapi tidak mengubahnya atau mengakses keuangan dan akun", async () => {
+    const humas = clients.get("humas")!;
+    for (const path of ["/api/admin/warga", "/api/admin/keluarga", "/api/admin/rumah", "/api/jadwal"])
+      expect((await humas.get(path)).status, path).toBe(200);
+    for (const path of ["/api/admin/ringkasan", "/api/admin/petugas", "/api/admin/kas", "/api/admin/iuran", "/api/admin/pembayaran", "/api/admin/audit?tanggal=2024-02-01"])
+      expect((await humas.get(path)).status, path).toBe(403);
+    for (const path of ["/api/admin/warga", "/api/admin/keluarga", "/api/admin/rumah", "/api/admin/petugas", "/api/admin/kas"])
+      expect((await humas.post(path, {})).status, path).toBe(403);
+    for (const path of [`/api/admin/warga/${residentId}`, "/api/admin/keluarga/1", "/api/admin/rumah/1", "/api/admin/riwayat/2024-02-01/1"])
+      expect((await humas.patch(path, {})).status, path).toBe(403);
+    for (const path of [`/api/admin/warga/${residentId}`, "/api/admin/keluarga/1", "/api/admin/rumah/1"])
+      expect((await humas.delete(path)).status, path).toBe(403);
+    expect((await humas.put("/api/admin/jadwal/slot", { slots: [] })).status).toBe(403);
+    expect((await humas.put("/api/admin/jadwal", {})).status).toBe(403);
+    expect((await humas.put("/api/admin/pengaturan", {})).status).toBe(403);
+  });
+
   it("sekretaris mengelola warga dan rumah, bendahara mengelola iuran", async () => {
     expect(
       (
@@ -169,7 +209,7 @@ describe("akses pengurus dari peran di database", () => {
       "/api/admin/iuran/pembayaran/1/bukti",
     ])
       expect((await guest.get(path)).status).toBe(401);
-    for (const role of ["sekretaris", "petugas"] as const)
+    for (const role of ["sekretaris", "humas", "petugas"] as const)
       expect(
         (await clients.get(role)!.get("/api/admin/iuran/pembayaran/1/bukti"))
           .status,
@@ -185,6 +225,9 @@ describe("akses pengurus dari peran di database", () => {
     ).toMatchObject({ exportToken: null, wargaCode: null });
     expect(
       (await clients.get("sekretaris")!.get("/api/admin/pengaturan")).data,
+    ).toMatchObject({ exportToken: null, wargaCode: "kode-rahasia" });
+    expect(
+      (await clients.get("humas")!.get("/api/admin/pengaturan")).data,
     ).toMatchObject({ exportToken: null, wargaCode: "kode-rahasia" });
     expect(
       (await clients.get("ketua")!.get("/api/admin/pengaturan")).data,
@@ -252,6 +295,14 @@ describe("akses pengurus dari peran di database", () => {
     await client.post("/api/auth/login", { userId: user.id, pin: "1234" });
     expect((await client.get("/api/admin/iuran")).status).toBe(403);
     expect((await client.get("/api/admin/warga")).status).toBe(200);
+    expect((await admin.patch(`/api/admin/petugas/${user.id}`, {
+      name: user.name, role: "humas", active: true,
+    })).status).toBe(200);
+    expect((await client.get("/api/admin/warga")).status).toBe(401);
+    expect((await client.post("/api/auth/login", { userId: user.id, pin: "1234" })).data).toMatchObject({ user: { role: "humas" } });
+    expect((await client.get("/api/admin/warga")).status).toBe(200);
+    expect((await client.patch(`/api/admin/warga/${residentId}`, { name: "Dilarang" })).status).toBe(403);
+    expect((await client.get("/api/admin/info")).status).toBe(200);
   });
 
   it("perubahan akses bersamaan tetap menyisakan pengurus yang dapat mengelola akun", async () => {

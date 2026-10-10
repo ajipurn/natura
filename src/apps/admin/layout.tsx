@@ -38,7 +38,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: "Utama",
     items: [
-      { to: adminPath(), label: "Ringkasan", icon: LayoutDashboard, end: true },
+      { to: adminPath(), label: "Ringkasan", icon: LayoutDashboard, end: true, resource: "overview" },
     ],
   },
   {
@@ -52,10 +52,10 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: "Ronda & jimpitan",
     items: [
-      { to: adminPath("/denah"), label: "Peta ronda", icon: MapIcon },
+      { to: adminPath("/denah"), label: "Peta ronda", icon: MapIcon, resource: "patrols" },
       { to: adminPath("/jadwal"), label: "Jadwal ronda", icon: CalendarDays, resource: "schedule" },
-      { to: adminPath("/riwayat"), label: "Riwayat", icon: History },
-      { to: adminPath("/rekap"), label: "Rekap bulanan", icon: Table2 },
+      { to: adminPath("/riwayat"), label: "Riwayat", icon: History, resource: "patrols" },
+      { to: adminPath("/rekap"), label: "Rekap bulanan", icon: Table2, resource: "patrols" },
     ],
   },
   {

@@ -17,21 +17,23 @@ const toCsv = (lines: (string | number)[][]) => lines.map((row) => row.map(csvCe
  */
 export function buildRecapCsv(recap: MonthRecap): string {
   const { rows, dateTotals, grandTotal } = summarizeMonth(recap);
+  const hasRapel = rows.some((r) => r.rapelTotal > 0);
   return toCsv([
-    ["Blok", "No", "Nama KK", ...recap.dates, "Jumlah Ada", "Harian (Rp)", "Mingguan (Rp)", "Bulanan (Rp)", "Total (Rp)"],
-    ...rows.map(({ house, cells, filledCount, total, collectedTotal, monthlyTotal, weeklyTotal }) => [
+    ["Blok", "No", "Nama KK", ...recap.dates, "Jumlah Ada", "Harian (Rp)", "Mingguan (Rp)", "Bulanan (Rp)", ...(hasRapel ? ["Rapel (Rp)"] : []), "Total (Rp)"],
+    ...rows.map(({ house, nights, filledCount, total, collectedTotal, monthlyTotal, weeklyTotal, rapelTotal }) => [
       house.block,
       house.number,
       house.ownerName ?? "",
       // Angka = nominal, K = kosong, kosong = belum dicek.
-      ...cells.map((c) => (c?.status === "filled" ? c.amount : c?.status === "empty" ? "K" : "")),
+      ...nights.map(({ cell: c, rapel }) => (c?.status === "filled" ? c.amount : rapel ? "Rapel" : c?.status === "empty" ? "K" : "")),
       filledCount,
       collectedTotal,
       weeklyTotal,
       monthlyTotal,
+      ...(hasRapel ? [rapelTotal] : []),
       total,
     ]),
-    ["", "", "Total", ...dateTotals, "", rows.reduce((sum, r) => sum + r.collectedTotal, 0), rows.reduce((sum, r) => sum + r.weeklyTotal, 0), rows.reduce((sum, r) => sum + r.monthlyTotal, 0), grandTotal],
+    ["", "", "Total", ...dateTotals, "", rows.reduce((sum, r) => sum + r.collectedTotal, 0), rows.reduce((sum, r) => sum + r.weeklyTotal, 0), rows.reduce((sum, r) => sum + r.monthlyTotal, 0), ...(hasRapel ? [rows.reduce((sum, r) => sum + r.rapelTotal, 0)] : []), grandTotal],
   ]);
 }
 
@@ -44,10 +46,11 @@ export function buildRecapCsv(recap: MonthRecap): string {
  */
 export function buildSheetsCsv(recap: MonthRecap, month: string, communityName: string): string {
   const { rows, dateTotals, grandTotal } = summarizeMonth(recap);
+  const hasRapel = rows.some((r) => r.rapelTotal > 0);
   let filledTotal = 0;
   let emptyTotal = 0;
   let uncheckedTotal = 0;
-  const houseLines = rows.map(({ house, nights, filledCount, empty, unchecked, total, collectedTotal, monthlyTotal, weeklyTotal }) => {
+  const houseLines = rows.map(({ house, nights, filledCount, empty, unchecked, total, collectedTotal, monthlyTotal, weeklyTotal, rapelTotal }) => {
     filledTotal += filledCount;
     emptyTotal += empty;
     uncheckedTotal += unchecked;
@@ -61,18 +64,19 @@ export function buildSheetsCsv(recap: MonthRecap, month: string, communityName: 
       unchecked,
       // Catatan isi didahulukan seperti di dashboard, termasuk selama periode belum lunas.
       // Penanda periode dipakai aturan warna di Sheets; bukan penerimaan harian baru.
-      ...nights.map(({ cell, period }) => cell?.status === "filled" ? cell.amount
-        : period?.cadence === "monthly" ? period.status === "paid" ? "Lunas" : "Belum"
+      ...nights.map(({ cell, period, rapel }) => cell?.status === "filled" ? cell.amount
+        : rapel ? "Rapel" : period?.cadence === "monthly" ? period.status === "paid" ? "Lunas" : "Belum"
           : cell?.status === "empty" ? "kosong" : ""),
       monthlyTotal,
       weeklyTotal,
       collectedTotal,
+      ...(hasRapel ? [rapelTotal] : []),
     ];
   });
   return toCsv([
     [`Rekap jimpitan ${communityName} · ${formatMonth(month)}`],
-    ["Blok", "No", "Status", "Total (Rp)", "Ada", "Kosong", "Tidak dicek", ...recap.dates.map((d) => Number(d.slice(8))), "Bulanan (Rp)", "Mingguan (Rp)", "Harian (Rp)"],
+    ["Blok", "No", "Status", "Total (Rp)", "Ada", "Kosong", "Tidak dicek", ...recap.dates.map((d) => Number(d.slice(8))), "Bulanan (Rp)", "Mingguan (Rp)", "Harian (Rp)", ...(hasRapel ? ["Rapel (Rp)"] : [])],
     ...houseLines,
-    ["Total", "", "", grandTotal, filledTotal, emptyTotal, uncheckedTotal, ...dateTotals, rows.reduce((sum, r) => sum + r.monthlyTotal, 0), rows.reduce((sum, r) => sum + r.weeklyTotal, 0), rows.reduce((sum, r) => sum + r.collectedTotal, 0)],
+    ["Total", "", "", grandTotal, filledTotal, emptyTotal, uncheckedTotal, ...dateTotals, rows.reduce((sum, r) => sum + r.monthlyTotal, 0), rows.reduce((sum, r) => sum + r.weeklyTotal, 0), rows.reduce((sum, r) => sum + r.collectedTotal, 0), ...(hasRapel ? [rows.reduce((sum, r) => sum + r.rapelTotal, 0)] : [])],
   ]);
 }

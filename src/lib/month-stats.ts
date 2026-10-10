@@ -42,7 +42,7 @@ export function monthStats({ houses, dates, cells, paymentCells = {}, paymentPer
       total: 0,
       periodTotal: 0,
     };
-    monthHouseNights({ dates, cells, paymentPeriods }, h).forEach(({ cell, status }, i) => {
+    monthHouseNights({ dates, cells, paymentPeriods, paymentCells }, h).forEach(({ cell, status }, i) => {
       // Status otomatis tidak membuat transaksi uang baru.
       if (cell?.status === "filled") {
         stats.total += cell.amount;

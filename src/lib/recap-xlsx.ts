@@ -1,7 +1,7 @@
 import { formatDateLong, formatMonth } from "./dates";
 import { monthHouseStatusLabel, summarizeMonth } from "./month-summary";
 import type { MonthRecap } from "./types";
-import { CADENCE_LABEL } from "./payments";
+import { PAYMENT_LABEL } from "./payments";
 
 /** Isi sel xlsx (sama dengan bentuk sel `write-excel-file`, tanpa perlu memuat pustakanya). */
 type XlsxCell = {
@@ -43,11 +43,12 @@ export function buildRecapSheets(recap: MonthRecap, communityName: string): Xlsx
   const title = `Rekap jimpitan ${communityName}${month ? ` · ${formatMonth(month)}` : ""}`;
   const dateCount = recap.dates.length;
   const lead = 4; // Blok, No, Nama KK, Status
-  const tail = 7; // Ada, Kosong, Tidak dicek, Harian, Mingguan, Bulanan, Total
+  const hasRapel = rows.some((r) => r.rapelTotal > 0);
+  const tail = hasRapel ? 8 : 7;
 
   let emptyTotal = 0;
   let uncheckedTotal = 0;
-  const houseRows = rows.map(({ house, nights, filledCount, empty, unchecked, total, collectedTotal, monthlyTotal, weeklyTotal }) => {
+  const houseRows = rows.map(({ house, nights, filledCount, empty, unchecked, total, collectedTotal, monthlyTotal, weeklyTotal, rapelTotal }) => {
     emptyTotal += empty;
     uncheckedTotal += unchecked;
     return [
@@ -55,10 +56,10 @@ export function buildRecapSheets(recap: MonthRecap, communityName: string): Xlsx
       text(house.number),
       text(house.ownerName ?? ""),
       text(monthHouseStatusLabel(recap, house)),
-      ...nights.map(({ cell, period }) =>
+      ...nights.map(({ cell, period, rapel }) =>
         cell?.status === "filled"
           ? num(cell.amount, { format: RUPIAH, ...FILLED })
-          : period?.cadence === "monthly"
+          : rapel ? text("Rapel", { align: "center", ...FILLED }) : period?.cadence === "monthly"
             ? text(period.status === "paid" ? "Lunas" : "Belum", { align: "center", ...(period.status === "paid" ? FILLED : UNPAID) })
             : cell?.status === "empty"
               ? text("kosong", { align: "center", ...EMPTY })
@@ -70,6 +71,7 @@ export function buildRecapSheets(recap: MonthRecap, communityName: string): Xlsx
       num(collectedTotal, { format: RUPIAH }),
       num(weeklyTotal, { format: RUPIAH }),
       num(monthlyTotal, { format: RUPIAH, textColor: "#1d4ed8", backgroundColor: "#dbeafe" }),
+      ...(hasRapel ? [num(rapelTotal, { format: RUPIAH, ...FILLED })] : []),
       num(total, { format: RUPIAH, fontWeight: "bold" }),
     ];
   });
@@ -78,11 +80,11 @@ export function buildRecapSheets(recap: MonthRecap, communityName: string): Xlsx
     sheet: "Per rumah",
     data: [
       [text(title, { fontWeight: "bold", fontSize: 14, columnSpan: lead + dateCount + tail })],
-      [text("Tanggal = hasil ronda atau status bulanan (kuning: belum lunas, hijau: lunas). Total = Harian + Mingguan + Bulanan.", { columnSpan: lead + dateCount + tail })],
+      [text("Tanggal = hasil ronda atau status pembayaran (kuning: belum lunas, hijau: lunas). Rapel tetap menyimpan catatan ronda asli. Total = Harian + Mingguan + Bulanan + Rapel.", { columnSpan: lead + dateCount + tail })],
       [
         ...["Blok", "No", "Nama KK", "Status"].map((h) => text(h, HEADER)),
         ...recap.dates.map((d) => text(String(Number(d.slice(8))), { ...HEADER, align: "center" })),
-        ...["Ada", "Kosong", "Tidak dicek", "Harian (Rp)", "Mingguan (Rp)", "Bulanan (Rp)", "Total (Rp)"].map((h) => text(h, { ...HEADER, align: "right" })),
+        ...["Ada", "Kosong", "Tidak dicek", "Harian (Rp)", "Mingguan (Rp)", "Bulanan (Rp)", ...(hasRapel ? ["Rapel (Rp)"] : []), "Total (Rp)"].map((h) => text(h, { ...HEADER, align: "right" })),
       ],
       ...houseRows,
       [
@@ -97,10 +99,11 @@ export function buildRecapSheets(recap: MonthRecap, communityName: string): Xlsx
         num(rows.reduce((sum, r) => sum + r.collectedTotal, 0), { format: RUPIAH, fontWeight: "bold" }),
         num(rows.reduce((sum, r) => sum + r.weeklyTotal, 0), { format: RUPIAH, fontWeight: "bold" }),
         num(rows.reduce((sum, r) => sum + r.monthlyTotal, 0), { format: RUPIAH, fontWeight: "bold" }),
+        ...(hasRapel ? [num(rows.reduce((sum, r) => sum + r.rapelTotal, 0), { format: RUPIAH, fontWeight: "bold" })] : []),
         num(grandTotal, { format: RUPIAH, fontWeight: "bold" }),
       ],
     ],
-    columns: [{ width: 6 }, { width: 6 }, { width: 24 }, { width: 24 }, ...recap.dates.map(() => ({ width: 7 })), { width: 6 }, { width: 8 }, { width: 11 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 13 }],
+    columns: [{ width: 6 }, { width: 6 }, { width: 24 }, { width: 24 }, ...recap.dates.map(() => ({ width: 7 })), { width: 6 }, { width: 8 }, { width: 11 }, { width: 13 }, { width: 13 }, { width: 13 }, ...(hasRapel ? [{ width: 13 }] : []), { width: 13 }],
     stickyRowsCount: 3,
     stickyColumnsCount: 3,
   };
@@ -127,15 +130,15 @@ export function buildRecapSheets(recap: MonthRecap, communityName: string): Xlsx
   const periodPayments: XlsxSheet = {
     sheet: "Pembayaran periode",
     data: [
-      [text(title, { fontWeight: "bold", fontSize: 14, columnSpan: 7 })],
-      [text("Nominal adalah uang diterima sekali; periode yang dibayar bisa berbeda dari bulan penerimaan.", { columnSpan: 7 })],
-      ["Rumah", "Nama KK", "Jenis", "Tanggal diterima", "Periode dari", "Periode sampai", "Nominal (Rp)"].map((h) => text(h, HEADER)),
+      [text(title, { fontWeight: "bold", fontSize: 14, columnSpan: hasRapel ? 8 : 7 })],
+      [text("Nominal adalah uang diterima sekali; periode yang dibayar bisa berbeda dari bulan penerimaan.", { columnSpan: hasRapel ? 8 : 7 })],
+      ["Rumah", "Nama KK", "Jenis", "Tanggal diterima", "Periode dari", "Periode sampai", "Nominal (Rp)", ...(hasRapel ? ["Hari rapel"] : [])].map((h) => text(h, HEADER)),
       ...(recap.periodPayments ?? []).map((p) => {
         const house = recap.houses.find((h) => h.id === p.houseId);
-        return [text(house ? house.block + "-" + house.number : "#" + p.houseId), text(house?.ownerName ?? ""), text(CADENCE_LABEL[p.cadence]), text(p.receivedDate), text(p.periodStart), text(p.periodEnd), num(p.amount, { format: RUPIAH })];
+        return [text(house ? house.block + "-" + house.number : "#" + p.houseId), text(house?.ownerName ?? ""), text(PAYMENT_LABEL[p.cadence]), text(p.receivedDate), text(p.periodStart), text(p.periodEnd), num(p.amount, { format: RUPIAH }), ...(hasRapel ? [text(p.allocations?.map(([date]) => date).join(", ") ?? "")] : [])];
       }),
     ],
-    columns: [{ width: 10 }, { width: 24 }, { width: 12 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 15 }],
+    columns: [{ width: 10 }, { width: 24 }, { width: 12 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 15 }, ...(hasRapel ? [{ width: 32 }] : [])],
     stickyRowsCount: 3,
   };
   return [perHouse, perNight, periodPayments];

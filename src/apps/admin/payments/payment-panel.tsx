@@ -11,7 +11,7 @@ import { Alert, Button, Card, cx } from "@/components/ui";
 import { formatDateShort, formatTime, localDate } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { houseLabel } from "@/lib/houses";
-import { BILLING_LABEL, CADENCE_LABEL } from "@/lib/payments";
+import { BILLING_LABEL, PAYMENT_LABEL } from "@/lib/payments";
 import { housesQuery, paymentsQuery, PAYMENT_REFRESH } from "../queries";
 import { PaymentDialog, type AdminPayment } from "./payment-dialog";
 import { adminPath } from "@/lib/app-paths";
@@ -38,7 +38,7 @@ export function PaymentPanel({ month }: { month: string }) {
       <div className="flex flex-col gap-4 @xl:flex-row @xl:items-center @xl:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><ReceiptText className="size-5" aria-hidden /></div>
-          <div className="min-w-0"><h2 className="font-semibold">Pembayaran periode</h2><p className="mt-0.5 text-pretty text-sm text-muted">Kelola pembayaran mingguan dan bulanan warga.</p></div>
+          <div className="min-w-0"><h2 className="font-semibold">Pembayaran</h2><p className="mt-0.5 text-pretty text-sm text-muted">Catat rapel, mingguan, dan bulanan warga.</p></div>
         </div>
         <Button size="sm" className="h-11 w-full shrink-0 transition-[background-color,color,box-shadow,scale] active:scale-[0.96] motion-reduce:active:scale-100 @xl:h-9 @xl:w-auto" onClick={() => record()}><Plus className="size-4" aria-hidden /> Catat pembayaran</Button>
       </div>
@@ -88,9 +88,10 @@ export function PaymentPanel({ month }: { month: string }) {
                 {expanded && <div id={historyId} className="mt-3 space-y-3">
                   <p className="text-xs text-muted">Uang diterima atau pembayaran yang mencakup bulan ini.</p>
                   {data.history.length === 0 ? <p className="text-sm text-muted">Belum ada pembayaran tercatat. Gunakan Catat pembayaran saat menerima uang dari warga.</p> : <ul className="divide-y divide-line">{data.history.map((p) => <li key={p.id} className="space-y-2 py-3">
-                    <div className="flex flex-wrap justify-between gap-2"><p className="font-semibold">{label(p.houseId)} <span className="text-xs font-normal text-muted">{CADENCE_LABEL[p.cadence]}{p.cancelledAt && " · Dibatalkan"}</span></p><p className={cx("font-semibold tabular-nums", !!p.cancelledAt && "text-muted line-through")}>{formatRupiah(p.amount)}</p></div>
+                    <div className="flex flex-wrap justify-between gap-2"><p className="font-semibold">{label(p.houseId)} <span className="text-xs font-normal text-muted">{PAYMENT_LABEL[p.cadence]}{p.cancelledAt && " · Dibatalkan"}</span></p><p className={cx("font-semibold tabular-nums", !!p.cancelledAt && "text-muted line-through")}>{formatRupiah(p.amount)}</p></div>
                     <p className="break-words text-xs text-muted">{byId.get(p.houseId)?.ownerName || "Belum ada nama"}</p>
                     <p className="text-xs text-muted">Periode {formatDateShort(p.periodStart)} – {formatDateShort(p.periodEnd)} {p.periodEnd.slice(0, 4)} · diterima {formatDateShort(p.receivedDate)} oleh {p.receivedBy === "treasurer" ? "bendahara" : p.collectorName ?? "petugas"}.</p>
+                    {p.allocations && <p className="text-xs text-muted">Hari rapel: {p.allocations.map(([date]) => formatDateShort(date)).join(", ")}.</p>}
                     {p.note && <p className="break-words text-xs text-muted">{p.note}</p>}
                     <div className="flex flex-wrap gap-2">{!p.cancelledAt && <Button variant="secondary" size="sm" onClick={() => record(p)}><Pencil className="size-3.5" /> Ubah</Button>}<Button variant="ghost" size="sm" onClick={() => setLogId(p.id)}>Log perubahan</Button>{!p.cancelledAt && <Button variant="ghost" size="sm" disabled={cancel.isPending} onClick={() => window.confirm("Batalkan pembayaran " + label(p.houseId) + " sebesar " + formatRupiah(p.amount) + "? Kas dan rekap akan diperbarui.") && cancel.mutate(p.id)}>Batalkan pembayaran</Button>}</div>
                   </li>)}</ul>}
@@ -113,6 +114,7 @@ function PaymentLogDialog({ id, onClose }: { id: number | null; onClose: () => v
   return <Dialog open={id !== null} onClose={onClose} title="Log perubahan pembayaran" description="Catatan sebelum dan sesudah koreksi tetap disimpan."><QueryState query={query}>{(data) => <ul className="space-y-3">{data.logs.map((log) => {
     const payload = log.payload as { before?: AdminPayment; after?: AdminPayment };
     const action = { create: "Dicatat", update: "Diubah", cancel: "Dibatalkan" }[log.action];
-    return <li key={log.id} className="rounded-xl bg-idle-soft p-3 text-sm"><p className="font-semibold">{action} oleh {log.name ?? "akun yang dihapus"}</p><p className="text-xs text-muted">{formatDateShort(localDate(new Date(log.createdAt)))} · {formatTime(log.createdAt)}</p>{payload.before && <p className="mt-2">Sebelumnya: {formatRupiah(payload.before.amount)}, {payload.before.periodStart} – {payload.before.periodEnd}, diterima {payload.before.receivedDate}.</p>}{payload.after && <p className="mt-1">{log.action === "create" ? "Pembayaran" : "Sesudahnya"}: {formatRupiah(payload.after.amount)}, {payload.after.periodStart} – {payload.after.periodEnd}, diterima {payload.after.receivedDate}.</p>}</li>;
+    const coverage = (p: AdminPayment) => p.allocations ? "hari rapel " + p.allocations.map(([date, amount]) => `${date} (${formatRupiah(amount)})`).join(", ") : `${p.periodStart} – ${p.periodEnd}`;
+    return <li key={log.id} className="rounded-xl bg-idle-soft p-3 text-sm"><p className="font-semibold">{action} oleh {log.name ?? "akun yang dihapus"}</p><p className="text-xs text-muted">{formatDateShort(localDate(new Date(log.createdAt)))} · {formatTime(log.createdAt)}</p>{payload.before && <p className="mt-2">Sebelumnya: {formatRupiah(payload.before.amount)}, {coverage(payload.before)}, diterima {payload.before.receivedDate}.</p>}{payload.after && <p className="mt-1">{log.action === "create" ? "Pembayaran" : "Sesudahnya"}: {formatRupiah(payload.after.amount)}, {coverage(payload.after)}, diterima {payload.after.receivedDate}.</p>}</li>;
   })}</ul>}</QueryState></Dialog>;
 }

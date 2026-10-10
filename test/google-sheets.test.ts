@@ -22,7 +22,7 @@ function recapRules() {
     setHorizontalAlignment() { return this; },
   };
   const sheet = {
-    getMaxColumns: () => 41, getMaxRows: () => 1000,
+    getMaxColumns: () => 42, getMaxRows: () => 1000,
     getRange: (...coordinates: number[]) => ({ ...range, coordinates }),
     setFrozenRows(value: number) { frozenRows = value; },
     setFrozenColumns() {}, setColumnWidth() {}, setColumnWidths() {},
@@ -62,13 +62,14 @@ describe("format rekap Google Sheets", () => {
       expect(blue).toBeLessThan(green);
     }
     expect(rules.some((rule) => rule.formula?.includes("AND(") || rule.formula?.includes("OR("))).toBe(false);
-    expect(rules[green].ranges).toMatchObject([{ coordinates: [3, 8, 998, 34] }]);
+    expect(rules[green].ranges).toMatchObject([{ coordinates: [3, 8, 998, 35] }]);
   });
 
   it("status bulanan dan hasil kosong tetap punya warna masing-masing", () => {
     const { rules } = recapRules();
     expect(rules.find((rule) => rule.text === "Belum")).toMatchObject({ background: "#fef9c3" });
     expect(rules.find((rule) => rule.text === "Lunas")).toMatchObject({ background: "#dcfce7" });
+    expect(rules.find((rule) => rule.text === "Rapel")).toMatchObject({ color: "#15803d", background: "#dcfce7" });
     expect(rules.find((rule) => rule.text === "kosong")).toMatchObject({ background: "#ffe4e6" });
   });
 
@@ -83,7 +84,7 @@ describe("format rekap Google Sheets", () => {
 
   it("total di bawah dikenali dinamis dan lebih dahulu dari warna sel", () => {
     const { rules, frozenRows } = recapRules();
-    expect(rules[0]).toMatchObject({ formula: '=$A3="Total"', bold: true, background: "#f1f5f9", ranges: [{ coordinates: [3, 1, 998, 41] }] });
+    expect(rules[0]).toMatchObject({ formula: '=$A3="Total"', bold: true, background: "#f1f5f9", ranges: [{ coordinates: [3, 1, 998, 42] }] });
     expect(frozenRows).toBe(2);
   });
 });

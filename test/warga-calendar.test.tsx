@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HouseHistoryDialog } from "@/apps/warga/house-history";
-import type { BillingPeriod } from "@/lib/payments";
+import type { BillingPeriod, PaymentCell } from "@/lib/payments";
 
 let root: Root;
 let container: HTMLDivElement;
@@ -23,8 +23,8 @@ afterEach(async () => {
   container.remove();
   vi.unstubAllGlobals();
 });
-async function render(history: unknown[], periods: BillingPeriod[] = [], status = "active", month?: string) {
-  client.setQueryData(month ? ["warga", "rumah", 1, month] : ["warga", "rumah", 1], { house: { id: 1, block: "AA", number: "9", status }, today: "2026-10-07", history, paymentInfo: { periods, receipts: [], tonight: null } });
+async function render(history: unknown[], periods: BillingPeriod[] = [], status = "active", month?: string, paymentInfo: { cells?: Record<string, PaymentCell>; receipts?: unknown[] } = {}) {
+  client.setQueryData(month ? ["warga", "rumah", 1, month] : ["warga", "rumah", 1], { house: { id: 1, block: "AA", number: "9", status }, today: "2026-10-07", history, paymentInfo: { periods, receipts: [], tonight: null, ...paymentInfo } });
   await act(async () => root.render(<QueryClientProvider client={client}><HouseHistoryDialog houseId={1} label="AA-9" month={month} myHouse={null} onMyHouse={() => {}} onClose={() => {}} /></QueryClientProvider>));
 }
 describe("kalender rumah dari awal bulan", () => {
@@ -70,5 +70,26 @@ describe("kalender rumah dari awal bulan", () => {
     expect(month.textContent).toContain("30 malam berjalan");
     expect(month.querySelectorAll('[role="listitem"][aria-label*="belum dicatat"]')).toHaveLength(30);
     expect(month.querySelector('[role="listitem"][aria-label*="belum tiba"]')).toBeNull();
+  });
+  it("rapel memberi penanda R hanya pada hari yang dipilih dan menjaga nominal ronda asli", async () => {
+    const cell = { amount: 500, monthlyAmount: 0, weeklyAmount: 0, rapelAmount: 500, paid: true };
+    await render([
+      { date: "2026-10-01", status: "empty", amount: 0 },
+      { date: "2026-10-02", status: "filled", amount: 500 },
+      { date: "2026-10-03", status: "empty", amount: 0 },
+      { date: "2026-10-05", status: "empty", amount: 0 },
+    ], [], "active", undefined, {
+      cells: { "2026-10-01": cell, "2026-10-03": cell },
+      receipts: [{ cadence: "daily", receivedDate: "2026-10-07", periodStart: "2026-10-01", periodEnd: "2026-10-03", amount: 1000, allocations: [["2026-10-01", 500], ["2026-10-03", 500]] }],
+    });
+    const month = document.querySelector('section[aria-label="Oktober 2026"]')!;
+    const paid = [...month.querySelectorAll('[role="listitem"][aria-label*="Rapel lunas"]')];
+    expect(paid).toHaveLength(2);
+    expect(paid.every((el) => el.classList.contains("bg-filled-soft") && el.textContent?.includes("R") && el.getAttribute("aria-label")?.includes("catatan ronda kosong"))).toBe(true);
+    expect(month.querySelectorAll('[role="listitem"][aria-label$=": kosong"]')).toHaveLength(1);
+    expect(month.textContent).toContain("Dari ronda Rp 500");
+    expect(document.querySelector("h3")?.textContent).toBe("Pembayaran jimpitan");
+    expect(document.body.textContent).toContain("Rapel");
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

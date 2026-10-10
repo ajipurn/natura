@@ -1,16 +1,17 @@
-import { asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, lte } from "drizzle-orm";
 import { addDays, daysInMonth, localDate } from "@/lib/dates";
-import { billingPeriods, paymentCells, type PaymentPlanDTO } from "@/lib/payments";
-import type { Db } from "./db";
+import { billingPeriods, paymentCells, planAt, type PaymentPlanDTO } from "@/lib/payments";
+import type { Db, Executor } from "./db";
 import { collections, houses, paymentLogs, paymentPlans, payments, patrols, settings, users } from "./schema";
 
-export async function getPaymentData(db: Db) {
+export async function getPaymentData(db: Executor) {
   const [plans, receipts, daily, [config]] = await Promise.all([
     db.select().from(paymentPlans).orderBy(asc(paymentPlans.effectiveFrom)),
     db.select({
       id: payments.id, houseId: payments.houseId, clientId: payments.clientId,
       receivedDate: payments.receivedDate, periodStart: payments.periodStart, periodEnd: payments.periodEnd,
       cadence: payments.cadence, amount: payments.amount, receivedBy: payments.receivedBy,
+      allocations: payments.allocations,
       collectorId: payments.collectorId, collectorName: users.name, note: payments.note,
       updatedAt: payments.updatedAt,
     }).from(payments).leftJoin(users, eq(users.id, payments.collectorId))
@@ -21,7 +22,29 @@ export async function getPaymentData(db: Db) {
   ]);
   const cells = paymentCells(receipts, plans, config?.defaultAmount ?? 500);
   const dailyCells = Object.fromEntries(daily.map((c) => [c.houseId + ":" + c.date, c]));
-  return { plans, receipts, cells, dailyCells };
+  return { plans, receipts, cells, dailyCells, defaultAmount: config?.defaultAmount ?? 500 };
+}
+
+/** Hari kosong yang dapat dibayar rapel. Tidak membuat tagihan untuk rumah harian. */
+export async function getRapelDates(db: Executor, houseId: number, before: string, excludePaymentId?: number) {
+  const [data, empty] = await Promise.all([
+    getPaymentData(db),
+    db.select({ date: patrols.date }).from(collections)
+      .innerJoin(patrols, eq(patrols.id, collections.patrolId))
+      .innerJoin(houses, eq(houses.id, collections.houseId))
+      .where(and(eq(collections.houseId, houseId), eq(collections.status, "empty"), eq(houses.status, "active"), lte(patrols.date, before)))
+      .orderBy(asc(patrols.date)),
+  ]);
+  const cells = excludePaymentId === undefined ? data.cells
+    : paymentCells(data.receipts.filter((p) => p.id !== excludePaymentId), data.plans, data.defaultAmount);
+  return empty.flatMap(({ date }) => {
+    const plan = planAt(data.plans, houseId, date);
+    if (plan && plan.cadence !== "daily") return [];
+    const cell = cells[houseId + ":" + date];
+    if ((cell?.rapelAmount ?? 0) > 0) return [];
+    const remaining = Math.max(0, (plan?.ratePerNight ?? data.defaultAmount) - (cell?.amount ?? 0));
+    return remaining > 0 ? [{ date, amount: remaining }] : [];
+  });
 }
 
 export async function getPaymentMonth(db: Db, month: string, today = localDate(new Date())) {
@@ -54,9 +77,10 @@ export async function getHousePaymentInfo(db: Db, houseId: number, today: string
     ({ id, houseId, effectiveFrom, cadence, ratePerNight, dueTiming, graceDays, weekStart }));
   const first = plans.reduce((date, p) => p.effectiveFrom < date ? p.effectiveFrom : date, today);
   const periods = billingPeriods(plans, data.cells, data.dailyCells, today, first, today);
-  const receipts = data.receipts.filter((p) => p.houseId === houseId).map(({ receivedDate, periodStart, periodEnd, cadence, amount }) =>
-    ({ receivedDate, periodStart, periodEnd, cadence, amount }));
-  return { plans, periods, receipts, tonight: data.cells[houseId + ":" + today] ?? null };
+  const receipts = data.receipts.filter((p) => p.houseId === houseId).map(({ receivedDate, periodStart, periodEnd, cadence, amount, allocations }) =>
+    ({ receivedDate, periodStart, periodEnd, cadence, amount, ...(allocations ? { allocations } : {}) }));
+  const cells = Object.fromEntries(Object.entries(data.cells).filter(([key]) => key.startsWith(houseId + ":")).map(([key, cell]) => [key.split(":")[1], cell]));
+  return { plans, periods, receipts, cells, tonight: data.cells[houseId + ":" + today] ?? null };
 }
 
 export async function getPaymentPlansForHouse(db: Db, houseId: number) {

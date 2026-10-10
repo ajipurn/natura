@@ -73,6 +73,29 @@ async function addVacantHouse() {
 }
 
 describe("rekap bulanan yang dikelompokkan", () => {
+  it("rapel tampil hijau dengan tanda R dan total terpisah, koreksi tetap menampilkan kosong asli", async () => {
+    await act(async () => {
+      client.setQueryData(["rekap", month], (previous: Record<string, unknown>) => ({
+        ...previous, paymentCells: { "1:2026-10-07": { amount: 500, monthlyAmount: 0, weeklyAmount: 0, rapelAmount: 500, paid: true } },
+      }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const marker = container.querySelector('span[title*="Rapel lunas"]')!;
+    expect(marker.textContent).toBe("R");
+    expect(marker.className).toContain("bg-filled-soft");
+    expect(marker.getAttribute("aria-label")).toContain("catatan ronda kosong");
+    expect(headers()).toContain("Rapel");
+    const row = [...container.querySelectorAll('[data-recap] tr')].find((r) => r.querySelector('th[scope="row"]')?.textContent?.includes("Warga harian"))!;
+    expect(row.textContent).toContain("2/2");
+    expect(row.textContent).toContain("Rp 1.000");
+    await click(button("Ubah catatan"));
+    const original = container.querySelector<HTMLButtonElement>('button[data-cell="1:2026-10-07"]')!;
+    expect(original.getAttribute("aria-label")).toContain("kosong");
+    expect(original.querySelector("span")?.className).toContain("bg-empty-soft");
+    await click(button("Selesai"));
+    expect(container.querySelector('span[title*="Rapel lunas"]')?.textContent).toBe("R");
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it("toggle mudik/kosong menyaring rumah tanpa menghilangkan catatan kosong rumah aktif atau uang dari ringkasan bulan", async () => {
     await addVacantHouse();
     const toggle = container.querySelector<HTMLElement>('[role="switch"]')!;

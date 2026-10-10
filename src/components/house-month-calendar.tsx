@@ -1,6 +1,6 @@
 import { Check } from "lucide-react";
 import { cx } from "./ui";
-import { BILLING_LABEL, CADENCE_LABEL, type BillingPeriod } from "@/lib/payments";
+import { BILLING_LABEL, CADENCE_LABEL, type BillingPeriod, type PaymentCell } from "@/lib/payments";
 import { monthHouseNights } from "@/lib/month-summary";
 import type { HouseStatus, MonthCell } from "@/lib/types";
 import { daysInMonth, formatDateShort, formatMonth } from "@/lib/dates";
@@ -10,12 +10,13 @@ import { scheduleDay } from "@/lib/schedule";
 const WEEKDAYS = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
 export type HouseCalendarNight = { date: string; status: "filled" | "empty" | null; amount: number | null };
 
-export function HouseMonthCalendar({ month, byDate, today, house, periods }: {
+export function HouseMonthCalendar({ month, byDate, today, house, periods, paymentCells }: {
   month: string;
   byDate: Map<string, HouseCalendarNight>;
   today: string;
   house: { id: number; status: HouseStatus };
   periods: BillingPeriod[];
+  paymentCells?: Record<string, PaymentCell>;
 }) {
   const days = daysInMonth(month);
   const dates = days.filter((date) => date <= today);
@@ -24,7 +25,8 @@ export function HouseMonthCalendar({ month, byDate, today, house, periods }: {
     const night = byDate.get(date);
     if (night?.status) cells[`${house.id}:${date}`] = { status: night.status, amount: night.amount ?? 0 };
   }
-  const nights = monthHouseNights({ dates, cells, paymentPeriods: periods }, house);
+  const allocations = Object.fromEntries(Object.entries(paymentCells ?? {}).map(([date, cell]) => [house.id + ":" + date, cell]));
+  const nights = monthHouseNights({ dates, cells, paymentPeriods: periods, paymentCells: allocations }, house);
   const states = new Map(nights.map((n) => [n.date, n]));
   const filled = nights.filter((n) => n.status === "filled").length;
   const empty = nights.filter((n) => n.status === "empty").length;
@@ -69,7 +71,9 @@ export function HouseMonthCalendar({ month, byDate, today, house, periods }: {
           const night = states.get(date);
           const state = date > today ? "future" : house.status === "vacant" && !night?.cell ? "vacant" : night?.status ?? "unchecked";
           const automatic = night?.period && !(night.cell?.status === "filled" && night.period.status === "unpaid") ? night.period : undefined;
-          const text = automatic
+          const text = night?.rapel
+            ? `Rapel lunas ${formatRupiah(night.rapel.rapelAmount ?? 0)} · catatan ronda ${night.cell?.status === "filled" ? "terisi" : "kosong"}`
+            : automatic
             ? `${CADENCE_LABEL[automatic.cadence]} · ${BILLING_LABEL[automatic.status]}`
             :
             state === "filled"
@@ -96,7 +100,7 @@ export function HouseMonthCalendar({ month, byDate, today, house, periods }: {
               )}
             >
               {Number(date.slice(8))}
-              {automatic && state === "filled" ? <Check className="size-3" aria-hidden /> : state === "filled" && <span className="text-[10px] font-medium">{formatAmountShort(night?.cell?.amount ?? 0)}</span>}
+              {night?.rapel ? <span className="text-[10px] font-semibold">R</span> : automatic && state === "filled" ? <Check className="size-3" aria-hidden /> : state === "filled" && <span className="text-[10px] font-medium">{formatAmountShort(night?.cell?.amount ?? 0)}</span>}
               {state === "empty" && <span className="text-[10px] font-medium">{automatic ? "belum" : "kosong"}</span>}
             </span>
           );
@@ -120,7 +124,7 @@ export function HouseCalendarLegend() {
           {text}
         </span>
       ))}
-      <p className="w-full pt-1">Tanggal redup belum tiba. Tanda ✓ mengikuti pembayaran mingguan/bulanan.</p>
+      <p className="w-full pt-1">Tanggal redup belum tiba. ✓ = pembayaran mingguan/bulanan, R = rapel. Catatan ronda asli tetap tersimpan.</p>
     </div>
   );
 }
