@@ -1,12 +1,12 @@
 // Service worker Cluster Natura: app tetap bisa dibuka walau sinyal hilang.
 // Data catatan disimpan di HP (localStorage) oleh layar Ronda dan dikirim saat online.
 
-const CACHE = "jimpitan-v9";
+const CACHE = "jimpitan-v10";
 // Logo ikut disimpan untuk offline; naikkan versi CACHE saat aset bawaan diganti.
 const BRAND_ASSETS = ["/natura-logo.svg", "/icon.svg", "/apple-icon.png"];
 const APP_DOMAIN = self.location.hostname === "app.clusternatura.com";
 /** Satu kerangka app untuk Info warga dan pencatatan ronda. */
-const SHELL = "/app/";
+const SHELL = APP_DOMAIN ? "/" : "/app/";
 const NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener("install", (event) => {

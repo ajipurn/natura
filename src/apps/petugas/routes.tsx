@@ -12,14 +12,17 @@ import { BerandaPage } from "../warga/beranda";
 import { adminPath, petugasPath } from "@/lib/app-paths";
 
 function LegacyAppRedirect() {
-  const { pathname, search } = useLocation();
-  const suffix = pathname.replace(/^\/petugas(?=\/|$)/, "");
+  const { pathname, search, hash } = useLocation();
+  const suffix = pathname.replace(/^\/(?:app|petugas)(?=\/|$)/, "");
   const target = suffix === "/info" || suffix === "/info/" ? "" : suffix;
-  return <Navigate to={petugasPath(target) + search} replace />;
+  return <Navigate to={petugasPath(target) + search + hash} replace />;
 }
 
+const atAppRoot = petugasPath() === "/";
+const legacyPaths = ["/petugas/*", "/info", ...(atAppRoot ? ["/app/*"] : ["/", "/masuk", "/ronda", "/riwayat/*", "/jadwal", "/akun"])];
+
 export const router = createBrowserRouter([
-  ...["/", "/petugas/*", "/info", "/masuk", "/ronda", "/riwayat/*", "/jadwal", "/akun"].map((path) => ({ path, element: <LegacyAppRedirect /> })),
+  ...legacyPaths.map((path) => ({ path, element: <LegacyAppRedirect /> })),
   { path: petugasPath("/masuk"), element: <LoginPage title="Masuk" homePath={petugasPath()} setupPath={adminPath("/setup")} /> },
   {
     element: (
@@ -34,7 +37,7 @@ export const router = createBrowserRouter([
     children: [
       { path: petugasPath(), element: <BerandaPage /> },
       { path: petugasPath("/ronda"), element: <RondaPage /> },
-      { path: petugasPath("/info"), element: <Navigate to={petugasPath()} replace /> },
+      ...(atAppRoot ? [] : [{ path: petugasPath("/info"), element: <Navigate to={petugasPath()} replace /> }]),
       { path: petugasPath("/riwayat"), element: <PatrolList basePath={petugasPath("/riwayat")} /> },
       { path: petugasPath("/riwayat/:tanggal"), element: <PatrolDetail basePath={petugasPath("/riwayat")} canCorrect={false} /> },
       { path: petugasPath("/jadwal"), element: <JadwalPetugas /> },

@@ -25,26 +25,23 @@ function movePrefix(prefix: string, app: AppSurface) {
 // Satu daftar redirect untuk Vite dan Vercel; halaman pengelolaan akun di dashboard lama tetap /dashboard/petugas.
 const DOMAIN_REDIRECTS = NATURA_HOSTS.flatMap((hostname) => {
   const oldDashboard = hostname === LEGACY_APP_DOMAINS.admin;
+  const appHome = `https://${APP_DOMAINS.petugas}/`;
   const redirects = [
     ...movePrefix("/admin", "admin"),
+    ...(oldDashboard ? [] : [{ src: "^/(?:app|petugas)/info/?$", destination: appHome }]),
     ...(oldDashboard ? [] : movePrefix("/petugas", "petugas")),
-    ...(hostname === APP_DOMAINS.petugas || oldDashboard ? [] : movePrefix("/app", "petugas")),
+    ...(oldDashboard ? [] : movePrefix("/app", "petugas")),
     ...(hostname === APP_DOMAINS.admin ? [] : movePrefix("/dashboard", "admin")),
     ...(oldDashboard ? [] : [
-      { src: "^/info/?$", destination: `https://${APP_DOMAINS.petugas}${APP_BASE_PATHS.petugas}` },
+      { src: "^/info/?$", destination: appHome },
       ...(hostname === COMMUNITY_DOMAIN || hostname === `www.${COMMUNITY_DOMAIN}` ? [] : [{ src: "^/info/(?!.*\\.[a-zA-Z0-9]+$)(.+)$", destination: `https://${APP_DOMAINS.warga}${APP_BASE_PATHS.warga}/$1` }]),
     ]),
-    ...(hostname === APP_DOMAINS.petugas ? [
-      { src: "^/$", destination: `https://${APP_DOMAINS.petugas}${APP_BASE_PATHS.petugas}` },
-      { src: "^/(masuk|ronda|riwayat|jadwal|akun)(/[^.]*)?$", destination: `https://${APP_DOMAINS.petugas}${APP_BASE_PATHS.petugas}/$1$2` },
-      { src: "^/app/info/?$", destination: `https://${APP_DOMAINS.petugas}${APP_BASE_PATHS.petugas}` },
-    ] : []),
     { src: "^/r/(.*)$", destination: `https://${APP_DOMAINS.warga}${APP_BASE_PATHS.warga}/r/$1` },
   ];
   if (oldDashboard || hostname === LEGACY_APP_DOMAINS.warga) {
     const app = oldDashboard ? "admin" : "warga";
     const base = `https://${APP_DOMAINS[app]}${APP_BASE_PATHS[app]}`;
-    redirects.push({ src: "^/$", destination: oldDashboard ? base : `https://${APP_DOMAINS.petugas}${APP_BASE_PATHS.petugas}` }, { src: PAGE_PATTERN, destination: `${base}/$1` });
+    redirects.push({ src: "^/$", destination: oldDashboard ? base : appHome }, { src: PAGE_PATTERN, destination: `${base}/$1` });
   }
   return redirects.map((rule) => ({ ...rule, hostname }));
 });
@@ -55,18 +52,18 @@ const LOCAL_REDIRECTS = [
   { src: "^/info/?$", destination: "/app" },
 ];
 
-/** Tautan lama membuka alamat canonical; query (filter/login) ikut dibawa. */
+/** Tautan lama membuka alamat canonical; query (filter/login) dan fragmen ikut dibawa. */
 export function domainRedirect(url: URL): string | null {
   const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
   for (const rule of DOMAIN_REDIRECTS) {
     if (rule.hostname !== hostname) continue;
     const match = url.pathname.match(new RegExp(rule.src));
-    if (match) return rule.destination.replace(/\$(\d+)/g, (_, group) => match[Number(group)] ?? "") + url.search;
+    if (match) return rule.destination.replace(/\$(\d+)/g, (_, group) => match[Number(group)] ?? "") + url.search + url.hash;
   }
   if (!NATURA_HOSTS.includes(hostname)) {
     for (const rule of LOCAL_REDIRECTS) {
       const match = url.pathname.match(new RegExp(rule.src));
-      if (match) return rule.destination.replace(/\$(\d+)/g, (_, group) => match[Number(group)] ?? "") + url.search;
+      if (match) return rule.destination.replace(/\$(\d+)/g, (_, group) => match[Number(group)] ?? "") + url.search + url.hash;
     }
   }
   return null;
@@ -101,6 +98,6 @@ export const vercelRoutes = [
 
 /** Manifest production memakai alamat awal dan cakupan masing-masing bagian. */
 export const DOMAIN_MANIFESTS = [
-  { source: "petugas.webmanifest", target: "petugas-domain.webmanifest", name: "Cluster Natura", shortName: "Natura", id: "/", basePath: "/app/" },
+  { source: "petugas.webmanifest", target: "petugas-domain.webmanifest", name: "Cluster Natura", shortName: "Natura", id: "/", basePath: "/" },
   { source: "admin.webmanifest", target: "admin-domain.webmanifest", name: "Cluster Natura · Dashboard", shortName: "Natura Admin", id: "/dashboard/", basePath: "/dashboard/" },
 ];

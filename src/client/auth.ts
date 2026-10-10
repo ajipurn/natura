@@ -50,7 +50,12 @@ export function safeNext(value: string | null | undefined, fallback: string): st
 /** Tautan login lama tetap bisa dipakai; hanya bagian milik Natura yang boleh dituju antarhost. */
 export function loginNext(value: string | null | undefined, fallback: string, hostname = typeof location === "undefined" ? "" : location.hostname): string {
   const next = safeNext(value, fallback);
+  // Prefix lama yang dilepas tidak boleh mengubah next menjadi URL antarhost.
+  const appPrefix = next.match(/^\/(?:app|petugas|info)(?=\/|[?#]|$)/);
+  if (appPrefix && /^\/[/\\]/.test(next.slice(appPrefix[0].length))) return fallback;
   if (next.startsWith("/r/")) return wargaPath(next, hostname);
+  const oldApp = next.match(/^\/app(?=\/|[?#]|$)/);
+  if (oldApp) return appPath("petugas", next.slice(oldApp[0].length), hostname);
   const current = next.match(/^\/(dashboard|info)(?=\/|[?#]|$)/);
   if (current) return appPath(current[1] === "dashboard" ? "admin" : "warga", next.slice(current[0].length), hostname);
   const legacy = next.match(/^\/(petugas|admin)(?=\/|[?#]|$)/);

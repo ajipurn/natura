@@ -46,7 +46,7 @@ export function RequireAuth({
   }
   const user = auth.data.user;
   if (!user) {
-    const next = location.pathname + location.search;
+    const next = location.pathname + location.search + location.hash;
     return <Navigate to={`${loginPath}?next=${encodeURIComponent(next)}`} replace />;
   }
   if (adminOnly && !isManager(user.role)) {

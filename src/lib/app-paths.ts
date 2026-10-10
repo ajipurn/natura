@@ -5,7 +5,7 @@ export const APP_DOMAINS = {
   admin: `app.${COMMUNITY_DOMAIN}`,
   warga: COMMUNITY_DOMAIN,
 } as const;
-export const APP_BASE_PATHS = { petugas: "/app", admin: "/dashboard", warga: "/info" };
+export const APP_BASE_PATHS = { petugas: "", admin: "/dashboard", warga: "/info" };
 export const LEGACY_APP_DOMAINS = { admin: `dashboard.${COMMUNITY_DOMAIN}`, warga: `info.${COMMUNITY_DOMAIN}` };
 
 export type AppSurface = keyof typeof APP_DOMAINS;
