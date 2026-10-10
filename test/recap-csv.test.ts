@@ -17,6 +17,40 @@ const recap: MonthRecap = {
 };
 
 describe("rekap bulanan sebagai CSV", () => {
+  it.each([
+    ["monthly", "Bulanan", "unpaid"],
+    ["monthly", "Bulanan", "paid"],
+    ["weekly", "Mingguan", "unpaid"],
+    ["weekly", "Mingguan", "paid"],
+  ] as const)("Sheets memberi keterangan %s (%s, %s) tanpa membuat uang harian atau hitungan tidak dicek", (cadence, label, status) => {
+    const paid = status === "paid";
+    const data: MonthRecap = {
+      ...recap, houses: [recap.houses[0]], cells: {},
+      paymentCadences: { 1: [cadence] },
+      paymentPeriods: [{ houseId: 1, planId: 1, cadence, start: recap.dates[0], end: recap.dates[1], expected: 1000, paid: paid ? 1000 : 0, remaining: paid ? 0 : 1000, status }],
+      paymentCells: paid ? Object.fromEntries(recap.dates.map((date) => [`1:${date}`, { amount: 500, monthlyAmount: cadence === "monthly" ? 500 : 0, weeklyAmount: cadence === "weekly" ? 500 : 0, paid: true }])) : {},
+    };
+    const lines = buildSheetsCsv(data, "2026-10", "Natura").split("\r\n");
+    expect(lines[3].split(",")).toEqual([
+      "AD", "3", label, paid ? "1000" : "0", "0", "0", "0", "", "",
+      paid && cadence === "monthly" ? "1000" : "0", paid && cadence === "weekly" ? "1000" : "0", "0",
+    ]);
+    expect(lines[2].split(",").slice(4, 9)).toEqual(["0", "0", "0", "0", "0"]);
+    expect(lines[1].split(",")[7]).toBe("5"); // Tanggal tetap mulai kolom H.
+    expect(lines.join("\n")).not.toContain("Yusuf");
+  });
+
+  it("Sheets mengikuti pergantian cara bayar dan tetap memberi status Mudik pada rumah kosong", () => {
+    const data: MonthRecap = {
+      ...recap, houses: [recap.houses[0], recap.houses[2]], cells: {},
+      paymentCadences: { 1: ["daily", "monthly"], 3: ["monthly"] },
+      paymentPeriods: [1, 3].map((houseId) => ({ houseId, planId: houseId, cadence: "monthly", start: recap.dates[1], end: "2026-10-31", expected: 13000, paid: 0, remaining: 13000, status: "unpaid" })),
+    };
+    const lines = buildSheetsCsv(data, "2026-10", "Natura").split("\r\n");
+    expect(lines[3]).toBe("AD,3,Harian → Bulanan,0,0,0,1,,,0,0,0");
+    expect(lines[4]).toBe("AF,7,Mudik,0,0,0,0,,,0,0,0");
+  });
+
   it("unduhan: dengan nama KK, nama tidak jadi rumus", () => {
     expect(buildRecapCsv(recap).split("\r\n")).toEqual([
       "Blok,No,Nama KK,2026-10-05,2026-10-06,Jumlah Ada,Harian (Rp),Mingguan (Rp),Bulanan (Rp),Total (Rp)",

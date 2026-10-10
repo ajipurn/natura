@@ -19,6 +19,33 @@ const recap: MonthRecap = {
 };
 
 describe("rekap bulanan sebagai xlsx", () => {
+  it.each(["monthly", "weekly"] as const)("Excel memberi label %s dan mengecualikan periode dari rumah yang belum dicek", async (cadence) => {
+    const data: MonthRecap = {
+      ...recap, houses: [recap.houses[0]], cells: {},
+      paymentCadences: { 1: [cadence] },
+      paymentPeriods: [{ houseId: 1, planId: 1, cadence, start: recap.dates[0], end: recap.dates[1], expected: 1000, paid: 0, remaining: 1000, status: "unpaid" }],
+    };
+    const sheets = buildRecapSheets(data, "Natura");
+    const label = cadence === "monthly" ? "Bulanan" : "Mingguan";
+    expect(sheets[0].data[3][3]?.value).toBe(label);
+    expect(sheets[0].data[3].slice(4).map((c) => c?.value ?? null)).toEqual([null, null, 0, 0, 0, 0, 0, 0, 0]);
+    expect(sheets[1].data.slice(3, 5).map((row) => row[3]?.value)).toEqual([0, 0]);
+    const files = unzipSync(new Uint8Array(await writeXlsxFile(sheets).toBuffer()));
+    expect(strFromU8(files["xl/sharedStrings.xml"])).toContain(`<t>${label}</t>`);
+  });
+
+  it("Excel hanya mengecualikan malam selama periode berlaku dari hitungan tidak dicek", () => {
+    const data: MonthRecap = {
+      ...recap, houses: [recap.houses[0]], cells: {},
+      paymentCadences: { 1: ["daily", "monthly"] },
+      paymentPeriods: [{ houseId: 1, planId: 1, cadence: "monthly", start: recap.dates[1], end: "2026-10-31", expected: 13000, paid: 0, remaining: 13000, status: "unpaid" }],
+    };
+    const [perHouse, perNight] = buildRecapSheets(data, "Natura");
+    expect(perHouse.data[3][3]?.value).toBe("Harian → Bulanan");
+    expect(perHouse.data[3][8]?.value).toBe(1);
+    expect(perNight.data.slice(3, 5).map((row) => row[3]?.value)).toEqual([1, 0]);
+  });
+
   it("lembar per rumah: nominal tiap malam, jumlah, dan total", () => {
     const [perHouse, perNight] = buildRecapSheets(recap, "Natura");
     expect(perHouse.sheet).toBe("Per rumah");

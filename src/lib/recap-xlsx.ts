@@ -1,5 +1,5 @@
 import { formatDateLong, formatMonth } from "./dates";
-import { summarizeMonth } from "./month-summary";
+import { monthHouseStatusLabel, summarizeMonth } from "./month-summary";
 import type { MonthRecap } from "./types";
 import { CADENCE_LABEL } from "./payments";
 
@@ -46,16 +46,14 @@ export function buildRecapSheets(recap: MonthRecap, communityName: string): Xlsx
 
   let emptyTotal = 0;
   let uncheckedTotal = 0;
-  const houseRows = rows.map(({ house, cells, filledCount, total, collectedTotal, monthlyTotal, weeklyTotal }) => {
-    const empty = cells.filter((c) => c?.status === "empty").length;
-    const unchecked = house.status === "active" ? cells.filter((c) => !c).length : 0;
+  const houseRows = rows.map(({ house, cells, filledCount, empty, unchecked, total, collectedTotal, monthlyTotal, weeklyTotal }) => {
     emptyTotal += empty;
     uncheckedTotal += unchecked;
     return [
       text(house.block),
       text(house.number),
       text(house.ownerName ?? ""),
-      text(house.status === "vacant" ? "Mudik" : "Dihuni"),
+      text(monthHouseStatusLabel(recap, house)),
       ...cells.map((c) =>
         c?.status === "filled"
           ? num(c.amount, { format: RUPIAH, ...FILLED })
@@ -99,7 +97,7 @@ export function buildRecapSheets(recap: MonthRecap, communityName: string): Xlsx
         num(grandTotal, { format: RUPIAH, fontWeight: "bold" }),
       ],
     ],
-    columns: [{ width: 6 }, { width: 6 }, { width: 24 }, { width: 9 }, ...recap.dates.map(() => ({ width: 7 })), { width: 6 }, { width: 8 }, { width: 11 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 13 }],
+    columns: [{ width: 6 }, { width: 6 }, { width: 24 }, { width: 24 }, ...recap.dates.map(() => ({ width: 7 })), { width: 6 }, { width: 8 }, { width: 11 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 13 }],
     stickyRowsCount: 3,
     stickyColumnsCount: 3,
   };
@@ -114,7 +112,7 @@ export function buildRecapSheets(recap: MonthRecap, communityName: string): Xlsx
         const active = rows.filter((r) => r.house.status === "active");
         const filled = rows.filter((r) => r.cells[i]?.status === "filled").length;
         const empty = active.filter((r) => r.cells[i]?.status === "empty").length;
-        const unchecked = active.filter((r) => !r.cells[i]).length;
+        const unchecked = active.filter((r) => !r.nights[i].cell && !r.nights[i].period).length;
         return [text(formatDateLong(date)), num(filled), num(empty), num(unchecked), num(dateTotals[i], { format: RUPIAH })];
       }),
       [text("Total hasil ronda", { fontWeight: "bold" }), null, null, null, num(dateTotals.reduce((sum, n) => sum + n, 0), { format: RUPIAH, fontWeight: "bold" })],

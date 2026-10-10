@@ -61,5 +61,17 @@ describe("cara pembayaran di Data rumah", () => {
     expect(november.status).toBe(200);
     const novemberCadences = november.data.paymentCadences as Record<number, string[]>;
     expect(rows.map((h) => novemberCadences[h.id])).toEqual([["daily"], ["monthly"], ["weekly"], ["monthly"]]);
+
+    const token = (await admin.post("/api/admin/pengaturan/link-ekspor", { enabled: true })).data.exportToken as string;
+    const sheets = await Promise.all(["2026-10", "2026-11"].map(async (month) => {
+      const exported = await admin.get(`/api/ekspor/${token}/rekap.csv?bulan=${month}`);
+      expect(exported.status).toBe(200);
+      const lines = (exported.data as unknown as string).split("\r\n");
+      return rows.map((_, i) => lines.find((line) => line.startsWith(`Y,${i + 1},`))?.split(",")[2]);
+    }));
+    expect(sheets).toEqual([
+      ["Bulanan", "Harian → Mingguan → Bulanan", "Dihuni", "Bulanan → Harian → Bulanan"],
+      ["Dihuni", "Bulanan", "Mingguan", "Bulanan"],
+    ]);
   });
 });

@@ -1,5 +1,5 @@
 import { formatMonth } from "./dates";
-import { summarizeMonth } from "./month-summary";
+import { monthHouseStatusLabel, summarizeMonth } from "./month-summary";
 import type { MonthRecap } from "./types";
 
 function csvCell(value: string | number): string {
@@ -47,17 +47,14 @@ export function buildSheetsCsv(recap: MonthRecap, month: string, communityName: 
   let filledTotal = 0;
   let emptyTotal = 0;
   let uncheckedTotal = 0;
-  const houseLines = rows.map(({ house, cells, filledCount, total, collectedTotal, monthlyTotal, weeklyTotal }) => {
-    const empty = cells.filter((c) => c?.status === "empty").length;
-    // Rumah mudik tidak dihitung "tidak dicek".
-    const unchecked = house.status === "active" ? cells.filter((c) => !c).length : 0;
+  const houseLines = rows.map(({ house, cells, filledCount, empty, unchecked, total, collectedTotal, monthlyTotal, weeklyTotal }) => {
     filledTotal += filledCount;
     emptyTotal += empty;
     uncheckedTotal += unchecked;
     return [
       house.block,
       house.number,
-      house.status === "vacant" ? "Mudik" : "Dihuni",
+      monthHouseStatusLabel(recap, house),
       total,
       filledCount,
       empty,

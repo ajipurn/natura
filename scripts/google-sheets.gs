@@ -49,7 +49,7 @@ function rapikanRekap() {
   // judul di A1 terpotong di batas kolom yang dibekukan.
   sheet.setFrozenRows(3);
   sheet.setFrozenColumns(FIRST_NIGHT - 1);
-  [48, 48, 64, 84, 48, 60, 84].forEach((width, i) => sheet.setColumnWidth(i + 1, width));
+  [48, 48, 160, 84, 48, 60, 84].forEach((width, i) => sheet.setColumnWidth(i + 1, width));
   sheet.setColumnWidths(FIRST_NIGHT, nights, 52);
 
   const night = sheet.getRange(4, FIRST_NIGHT, rows - 3, nights + 3);
