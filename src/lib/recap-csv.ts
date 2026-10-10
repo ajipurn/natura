@@ -38,7 +38,7 @@ export function buildRecapCsv(recap: MonthRecap): string {
 /**
  * Rekap bulanan untuk link Google Sheets (`=IMPORTDATA(...)`), tanpa nama warga. Posisinya tetap
  * supaya format yang dipasang sekali di Sheet tidak bergeser (lihat scripts/google-sheets.gs):
- * baris 1 judul, baris 2 kepala kolom, baris 3 total, rumah mulai baris 4; kolom A–G rumah dan
+ * baris 1 judul, baris 2 kepala kolom, rumah mulai baris 3, total di paling bawah; kolom A–G rumah dan
  * ringkasan, kolom H dan seterusnya satu kolom per malam ronda (kepalanya angka tanggal; tanggal
  * lengkap akan diubah Sheets menjadi nomor seri).
  */
@@ -70,7 +70,7 @@ export function buildSheetsCsv(recap: MonthRecap, month: string, communityName: 
   return toCsv([
     [`Rekap jimpitan ${communityName} · ${formatMonth(month)}`],
     ["Blok", "No", "Status", "Total (Rp)", "Ada", "Kosong", "Tidak dicek", ...recap.dates.map((d) => Number(d.slice(8))), "Bulanan (Rp)", "Mingguan (Rp)", "Harian (Rp)"],
-    ["Total", "", "", grandTotal, filledTotal, emptyTotal, uncheckedTotal, ...dateTotals, rows.reduce((sum, r) => sum + r.monthlyTotal, 0), rows.reduce((sum, r) => sum + r.weeklyTotal, 0), rows.reduce((sum, r) => sum + r.collectedTotal, 0)],
     ...houseLines,
+    ["Total", "", "", grandTotal, filledTotal, emptyTotal, uncheckedTotal, ...dateTotals, rows.reduce((sum, r) => sum + r.monthlyTotal, 0), rows.reduce((sum, r) => sum + r.weeklyTotal, 0), rows.reduce((sum, r) => sum + r.collectedTotal, 0)],
   ]);
 }

@@ -16,7 +16,7 @@
  *   Google.
  *
  * Tata letaknya mengikuti CSV dari Natura (`buildSheetsCsv` di src/lib/recap-csv.ts): baris 1 judul,
- * baris 2 kepala kolom, baris 3 total, rumah mulai baris 4; kolom A–G rumah dan ringkasan, kolom H
+ * baris 2 kepala kolom, rumah mulai baris 3, total di paling bawah; kolom A–G rumah dan ringkasan, kolom H
  * dan seterusnya satu kolom per malam ronda. Rumus IMPORTDATA ada di A1.
  *
  * `@OnlyCurrentDoc` membatasi izinnya ke spreadsheet ini saja, bukan semua spreadsheet di Drive.
@@ -41,28 +41,38 @@ function rapikanRekap() {
   const rows = sheet.getMaxRows();
 
   sheet.getRange(1, 1).setFontSize(14).setFontWeight("bold");
-  sheet.getRange(2, 1, 2, COLUMNS).setFontWeight("bold").setBackground("#e2e8f0");
-  sheet.getRange(3, 1, 1, COLUMNS).setBackground("#f1f5f9");
-  sheet.getRange(4, 4, rows - 3, 1).setFontWeight("bold"); // Total per rumah
+  // Hapus gaya total lama di baris 3; baris itu sekarang rumah pertama.
+  sheet.getRange(3, 1, rows - 2, COLUMNS).setFontWeight("normal").setFontColor(null).setBackground(null);
+  sheet.getRange(2, 1, 1, COLUMNS).setFontWeight("bold").setBackground("#e2e8f0");
+  sheet.getRange(3, 4, rows - 2, 1).setFontWeight("bold"); // Total per rumah
   sheet.getRange(2, 4, rows - 1, COLUMNS - 3).setNumberFormat("#,##0");
   sheet.getRange(2, FIRST_NIGHT, rows - 1, nights).setHorizontalAlignment("center");
   // Rumah dan ringkasannya tetap terlihat saat malam-malamnya digulir. Kolom A–G sekaligus, karena
   // judul di A1 terpotong di batas kolom yang dibekukan.
-  sheet.setFrozenRows(3);
+  sheet.setFrozenRows(2);
   sheet.setFrozenColumns(FIRST_NIGHT - 1);
   [48, 48, 160, 84, 48, 60, 84].forEach((width, i) => sheet.setColumnWidth(i + 1, width));
   sheet.setColumnWidths(FIRST_NIGHT, nights, 52);
 
-  const night = sheet.getRange(4, FIRST_NIGHT, rows - 3, nights + 3);
-  const house = sheet.getRange(4, 1, rows - 3, FIRST_NIGHT - 1);
+  const body = sheet.getRange(3, 1, rows - 2, COLUMNS);
+  const night = sheet.getRange(3, FIRST_NIGHT, rows - 2, nights + 3);
+  const house = sheet.getRange(3, 1, rows - 2, FIRST_NIGHT - 1);
+  const status = sheet.getRange(3, 3, rows - 2, 1);
   // Mengganti semua aturan format bersyarat di lembar ini. Warnanya sama dengan file Excel dari Natura.
   sheet.setConditionalFormatRules([
+    // Total dikenali dari labelnya, jadi gaya ikut pindah saat jumlah rumah berubah.
+    SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=$A3="Total"').setBold(true).setFontColor("#0f172a").setBackground("#f1f5f9").setRanges([body]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("kosong").setFontColor("#be123c").setBackground("#ffe4e6").setRanges([night]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("Belum").setFontColor("#854d0e").setBackground("#fef9c3").setRanges([night]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("Lunas").setFontColor("#15803d").setBackground("#dcfce7").setRanges([night]).build(),
-    SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=AND(ISNUMBER(H$2),H4>0)').setFontColor("#15803d").setBackground("#dcfce7").setRanges([night]).build(),
-    SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=OR(H$2="Bulanan (Rp)",H$2="Mingguan (Rp)")').setFontColor("#1d4ed8").setBackground("#dbeafe").setRanges([night]).build(),
-    SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=$C4="Mudik"').setFontColor("#94a3b8").setRanges([house]).build(),
+    // Rumus satu perbandingan tidak bergantung pemisah argumen sesuai lokal spreadsheet.
+    SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=H$2="Bulanan (Rp)"').setFontColor("#1d4ed8").setBackground("#dbeafe").setRanges([night]).build(),
+    SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=H$2="Mingguan (Rp)"').setFontColor("#1d4ed8").setBackground("#dbeafe").setRanges([night]).build(),
+    SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThan(0).setFontColor("#15803d").setBackground("#dcfce7").setRanges([night]).build(),
+    SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=$C3="Mudik"').setFontColor("#94a3b8").setRanges([house]).build(),
+    SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("Dihuni").setFontColor("#15803d").setRanges([status]).build(),
+    SpreadsheetApp.newConditionalFormatRule().whenTextContains("Bulanan").setFontColor("#7e22ce").setRanges([status]).build(),
+    SpreadsheetApp.newConditionalFormatRule().whenTextContains("Mingguan").setFontColor("#1d4ed8").setRanges([status]).build(),
   ]);
 }
 

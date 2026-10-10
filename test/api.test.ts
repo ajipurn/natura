@@ -558,7 +558,7 @@ describe("link Google Sheets", () => {
     const csv = march.data as unknown as string;
     const lines = csv.split("\r\n");
     expect(lines.slice(0, 2)).toEqual(["Rekap jimpitan Natura · Maret 2025", "Blok,No,Status,Total (Rp),Ada,Kosong,Tidak dicek,15,Bulanan (Rp),Mingguan (Rp),Harian (Rp)"]);
-    expect(lines[2]).toMatch(/^Total,,,2000,1,1,\d+,2000,0,0,2000$/);
+    expect(lines.at(-1)).toMatch(/^Total,,,2000,1,1,\d+,2000,0,0,2000$/);
     expect(lines).toContain("AB,3,Dihuni,0,0,0,1,,0,0,0");
     // Tanpa nama warga dan tanpa BOM (Google Sheets membacanya sebagai bagian sel A1).
     expect(csv).not.toMatch(/Nama KK|Nino|\uFEFF/);
