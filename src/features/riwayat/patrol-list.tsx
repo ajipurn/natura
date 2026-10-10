@@ -18,6 +18,7 @@ import {
 import { formatRupiah } from "@/lib/format";
 import { NightPicker } from "./night-picker";
 import { patrolsQuery } from "./queries";
+import { PatrolStamp } from "./patrol-stamp";
 import { adminPath } from "@/lib/app-paths";
 
 type Patrol = {
@@ -213,14 +214,14 @@ function NightRow({
     <li>
       <Link
         to={to}
-        aria-label={`${formatDateLong(p.date)}${tonight ? ", malam ini" : ""}: ${formatRupiah(p.total)}, ${p.filled} ada, ${p.empty} kosong${unchecked ? `, ${unchecked} belum dicek` : ""}`}
+        aria-label={`${formatDateLong(p.date)}${tonight ? ", malam ini" : ""}: ${formatRupiah(p.total)}, ${p.filled} ada, ${p.empty} kosong${unchecked ? `, ${unchecked} belum dicek` : ""}${expected > 0 && checked === expected ? ", jimpitan selesai" : ""}`}
         className="group flex items-center gap-3 px-3 py-3 hover:bg-idle-soft/50 active:bg-idle-soft sm:gap-4 sm:px-4"
       >
         <DateTile date={p.date} tonight={tonight} />
         <div className="min-w-0 flex-1">
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="flex min-w-0 items-baseline gap-2">
-              <span className="text-lg font-bold leading-tight tabular-nums">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+              <span className="whitespace-nowrap text-lg font-bold leading-tight tabular-nums">
                 {formatRupiah(p.total)}
               </span>
               {tonight && (
@@ -246,7 +247,7 @@ function NightRow({
               style={{ width: `${percent(p.empty, expected)}%` }}
             />
           </div>
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted">
             <Count color="bg-filled" value={p.filled} label="ada" />
             <Count color="bg-empty" value={p.empty} label="kosong" />
             {unchecked > 0 && (
@@ -258,6 +259,7 @@ function NightRow({
                 <span className="truncate">{p.collectors}</span>
               </span>
             )}
+            <PatrolStamp date={p.date} checked={checked} expected={expected} className={p.collectors ? "sm:ml-0" : undefined} />
           </div>
         </div>
         <ChevronRight className="size-5 shrink-0 text-muted transition-transform group-hover:translate-x-0.5" />

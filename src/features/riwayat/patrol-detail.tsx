@@ -46,6 +46,7 @@ import {
 } from "./correction-form";
 import { NightPicker } from "./night-picker";
 import { patrolQuery } from "./queries";
+import { PatrolStamp } from "./patrol-stamp";
 
 type Filter = "semua" | "ada" | "kosong" | "belum";
 type View = "daftar" | "denah";
@@ -297,7 +298,7 @@ function NightDetail({
             }}
           />
         </div>
-        <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+        <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted">
           <span>
             {summary.checked} dari {summary.expected} rumah dicek
             {summary.vacant.length > 0 && ` · ${summary.vacant.length} mudik`}
@@ -308,6 +309,7 @@ function NightDetail({
               {summary.collectors.join(", ")}
             </span>
           )}
+          <PatrolStamp date={date} checked={summary.checked} expected={summary.expected} />
         </p>
         {summary.checked > 0 ? (
           <ShareRecap

@@ -1,4 +1,5 @@
 import { usePermission } from "@/client/permissions";
+import { Field } from "@base-ui/react/field";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Check,
@@ -19,6 +20,7 @@ import {
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";
 import { BarChart } from "@/components/bar-chart";
+import { SwitchControl } from "@/components/choice";
 import { Menu } from "@/components/menu";
 import { QueryState } from "@/components/query-state";
 import { PaymentCadenceBadge } from "@/components/payment-cadence-badge";
@@ -269,6 +271,7 @@ function RecapBody({
   const [search, setSearch] = useState(params.get("cari") ?? "");
   const [filter, setFilter] = useState<Filter>("semua");
   const [cadence, setCadence] = useState<CadenceFilter>("all");
+  const [showVacant, setShowVacant] = useState(true);
   const [sort, setSort] = useState<Sort>("rumah");
   const canFinance = usePermission("finance");
   const canCorrect = usePermission("patrols", true);
@@ -456,6 +459,7 @@ function RecapBody({
     },
   ];
   const visible = stats
+    .filter((r) => showVacant || r.house.status !== "vacant")
     .filter((r) => !matched || matched.has(r.house.id))
     .filter((r) => cadence === "all" || r.cadences.includes(cadence))
     .filter(filters.find((f) => f.value === filter)!.match)
@@ -745,35 +749,48 @@ function RecapBody({
             </p>
           )}
 
-          <div className="flex items-center gap-2">
-            <label className="relative block min-w-0 flex-1 sm:max-w-sm">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
-              <Input
-                type="search"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-1">
+              <label className="relative block min-w-0 flex-1 sm:max-w-sm">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+                <Input
+                  type="search"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setSelected(new Set());
+                  }}
+                  placeholder="Cari rumah atau nama…"
+                  aria-label="Cari rumah"
+                  className="h-9 pl-9 sm:text-sm"
+                />
+              </label>
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-expanded={filtersOpen}
+                aria-controls={filtersOpen ? filtersId : undefined}
+                onClick={() => setFiltersOpen(!filtersOpen)}
+              >
+                <ListFilter className="size-4" /> Filter
+                {(filter !== "semua" || cadence !== "all") && (
+                  <span className="text-primary">
+                    {Number(filter !== "semua") + Number(cadence !== "all")}
+                  </span>
+                )}
+              </Button>
+            </div>
+            <Field.Root className="ml-auto flex min-h-9 items-center gap-3 text-sm">
+              <Field.Label className="cursor-pointer">Mudik/kosong</Field.Label>
+              <SwitchControl
+                checked={showVacant}
+                onCheckedChange={(show) => {
+                  setShowVacant(show);
                   setSelected(new Set());
+                  drag.current = null;
                 }}
-                placeholder="Cari rumah atau nama…"
-                aria-label="Cari rumah"
-                className="h-9 pl-9 sm:text-sm"
               />
-            </label>
-            <Button
-              variant="secondary"
-              size="sm"
-              aria-expanded={filtersOpen}
-              aria-controls={filtersOpen ? filtersId : undefined}
-              onClick={() => setFiltersOpen(!filtersOpen)}
-            >
-              <ListFilter className="size-4" /> Filter
-              {(filter !== "semua" || cadence !== "all") && (
-                <span className="text-primary">
-                  {Number(filter !== "semua") + Number(cadence !== "all")}
-                </span>
-              )}
-            </Button>
+            </Field.Root>
           </div>
           {filtersOpen && (
             <div
@@ -833,13 +850,14 @@ function RecapBody({
           )}
           <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <div className="flex flex-wrap items-center gap-x-3 text-xs text-muted">
-              {(filter !== "semua" || cadence !== "all" || search.trim()) && (
+              {(filter !== "semua" || cadence !== "all" || search.trim() || !showVacant) && (
                 <>
                   <span>
                     {[
                       filter !== "semua" &&
                         filters.find((f) => f.value === filter)?.label,
                       cadence !== "all" && CADENCE_LABEL[cadence],
+                      !showVacant && "Tanpa rumah mudik/kosong",
                     ]
                       .filter(Boolean)
                       .join(" · ") || "Hasil pencarian"}
@@ -852,6 +870,7 @@ function RecapBody({
                       setSearch("");
                       setFilter("semua");
                       setCadence("all");
+                      setShowVacant(true);
                       setSelected(new Set());
                     }}
                   >

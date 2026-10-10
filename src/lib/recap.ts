@@ -103,7 +103,7 @@ export function buildRecapText(input: {
     lines.push(`🏠 Rumah kosong/mudik: ${s.vacant.length} rumah`);
   }
   const automatic = input.houses.filter((h) => h.status === "active" && input.paymentPeriods?.some((p) => p.houseId === h.id)).length;
-  if (automatic) lines.push(`🔄 Mingguan/bulanan: ${automatic} rumah berstatus otomatis`);
+  if (automatic) lines.push(`🔄 Mingguan/bulanan: ${automatic} rumah`);
   lines.push(`💰 Total: ${formatRupiah(s.total)}`);
   if (s.collectors.length > 0) {
     lines.push(`👮 Petugas: ${s.collectors.join(", ")}`);

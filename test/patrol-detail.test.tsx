@@ -40,6 +40,16 @@ async function render(bill: BillingPeriod) {
   await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/admin/riwayat/2026-10-07"]}><Routes><Route path="/admin/riwayat/:tanggal" element={<PatrolDetail basePath="/admin/riwayat" canCorrect />} /></Routes></MemoryRouter></QueryClientProvider>));
 }
 
+const completedNight = {
+  date: "2026-10-07", filled: 1, empty: 1, total: 500,
+  checked: 2, unchecked: 0, expected: 2, collectors: "Aji",
+};
+
+async function renderHistory(patrols = [completedNight]) {
+  client.setQueryData(["riwayat"], { patrols, activeHouses: 2, today: "2026-10-10" });
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><PatrolList basePath="/admin/riwayat" /></MemoryRouter></QueryClientProvider>));
+}
+
 describe("detail riwayat mengikuti pembayaran periode", () => {
   it("rumah tanpa scan yang belum membayar tampil kosong otomatis dan tidak masuk isian massal", async () => {
     await render(period);
@@ -68,6 +78,57 @@ describe("detail riwayat mengikuti pembayaran periode", () => {
     expect(night.textContent).toContain("2/3 dicek");
     expect(night.textContent).toContain("1 belum dicek");
     expect(night.textContent).toContain("Rp 500");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("stempel selesai pada riwayat", () => {
+  it("hanya memberi stempel pada malam lengkap, termasuk rumah yang dicatat kosong", async () => {
+    await renderHistory([
+      { ...completedNight, date: "2026-10-09" },
+      { ...completedNight, date: "2026-10-08" },
+      { ...completedNight, checked: 1, unchecked: 1 },
+    ]);
+    const stamps = container.querySelectorAll('[data-stamp-side]');
+    expect(stamps).toHaveLength(2);
+    expect([...stamps].map((el) => el.getAttribute("data-stamp-side"))).toEqual(["right", "right"]);
+    expect(container.querySelector('a[href="/admin/riwayat/2026-10-09"]')?.getAttribute("aria-label")).toContain("jimpitan selesai");
+    expect(container.querySelector('a[href="/admin/riwayat/2026-10-07"] [data-stamp-side]')).toBeNull();
+    expect(container.querySelector('a[href="/admin/riwayat/2026-10-10"] [data-stamp-side]')).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("tidak memberi stempel 0/0 meskipun ada uang dari rumah yang sekarang mudik", async () => {
+    await renderHistory([{ ...completedNight, checked: 0, expected: 0, empty: 0 }]);
+    expect(container.textContent).toContain("Rp 500");
+    expect(container.querySelector('[data-stamp-side]')).toBeNull();
+  });
+
+  it("posisi dan kemiringan tetap sama setelah dimuat ulang dan ketika detail malam dibuka", async () => {
+    await renderHistory();
+    const stamp = container.querySelector<HTMLElement>('[data-stamp-side]')!;
+    const side = stamp.dataset.stampSide;
+    expect(side).toBe("right");
+    const transform = stamp.style.transform;
+    await act(async () => root.render(null));
+    await renderHistory();
+    const reloaded = container.querySelector<HTMLElement>('[data-stamp-side]')!;
+    expect(reloaded.dataset.stampSide).toBe(side);
+    expect(reloaded.style.transform).toBe(transform);
+    await act(async () => root.render(null));
+    await render(period);
+    const detail = container.querySelector<HTMLElement>('[data-stamp-side]')!;
+    expect(detail.dataset.stampSide).toBe(side);
+    expect(detail.style.transform).toBe(transform);
+  });
+
+  it("stempel hilang jika koreksi membuat satu rumah belum tercatat, dan kembali saat lengkap", async () => {
+    await renderHistory();
+    const transform = container.querySelector<HTMLElement>('[data-stamp-side]')!.style.transform;
+    await renderHistory([{ ...completedNight, checked: 1, unchecked: 1 }]);
+    expect(container.querySelector('[data-stamp-side]')).toBeNull();
+    await renderHistory();
+    expect(container.querySelector<HTMLElement>('[data-stamp-side]')?.style.transform).toBe(transform);
     expect(fetch).not.toHaveBeenCalled();
   });
 });

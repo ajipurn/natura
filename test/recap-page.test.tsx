@@ -61,7 +61,59 @@ function headers() {
   return [...container.querySelectorAll('[data-recap] table[role="presentation"] thead th')].map((th) => th.textContent?.trim());
 }
 
+async function addVacantHouse() {
+  await act(async () => {
+    client.setQueryData(["rekap", month], (previous: { houses: HouseDTO[]; cells: Record<string, unknown> }) => ({
+      ...previous,
+      houses: [...previous.houses, { id: 3, block: "B", number: "1", ownerName: "Warga mudik", token: "DEMO3", status: "vacant" }],
+      cells: { ...previous.cells, "3:2026-10-06": { status: "filled", amount: 500 } },
+    }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
 describe("rekap bulanan yang dikelompokkan", () => {
+  it("toggle mudik/kosong menyaring rumah tanpa menghilangkan catatan kosong rumah aktif atau uang dari ringkasan bulan", async () => {
+    await addVacantHouse();
+    const toggle = container.querySelector<HTMLElement>('[role="switch"]')!;
+    expect(document.getElementById(toggle.getAttribute("aria-labelledby")!)?.textContent).toBe("Mudik/kosong");
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    expect(container.querySelector('[data-recap]')?.textContent).toContain("Warga mudik");
+
+    await click(toggle);
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    expect(container.querySelector('[data-recap]')?.textContent).not.toContain("Warga mudik");
+    expect(container.querySelector('[data-recap]')?.textContent).toContain("Warga harian");
+    const activeRow = [...container.querySelectorAll('[data-recap] tr')].find((row) => row.querySelector('th[scope="row"]')?.textContent?.includes("Warga harian"));
+    expect(activeRow).toBeDefined();
+    expect(activeRow!.querySelector('span[title="Rab, 7 Okt: kosong"]')).not.toBeNull();
+    expect(container.textContent).toContain("2 dari 3 rumah");
+    expect(container.querySelector("dl")?.textContent).toContain("Rp 1.500");
+    expect(container.querySelector('[data-recap] tfoot')?.textContent).toContain("Rp 1.000");
+
+    await click(button("Reset filter"));
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    expect(container.querySelector('[data-recap]')?.textContent).toContain("Warga mudik");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("menghapus pilihan koreksi saat rumah mudik disembunyikan dan bisa menampilkannya kembali", async () => {
+    await addVacantHouse();
+    await click(button("Ubah catatan"));
+    await click(container.querySelector<HTMLButtonElement>('button[data-cell="3:2026-10-06"]')!);
+    expect(container.querySelector('[aria-label="Isi kotak terpilih"]')?.textContent).toContain("1 kotak dipilih");
+
+    const toggle = container.querySelector<HTMLElement>('[role="switch"]')!;
+    await click(toggle);
+    expect(container.querySelector('[aria-label="Isi kotak terpilih"]')).toBeNull();
+    expect(container.querySelector('button[data-cell="3:2026-10-06"]')).toBeNull();
+    expect(container.querySelector('button[data-cell="1:2026-10-07"]')?.getAttribute("aria-label")).toContain("kosong");
+
+    await click(toggle);
+    expect(container.querySelector('button[data-cell="3:2026-10-06"]')?.getAttribute("aria-pressed")).toBe("false");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("sekretaris membaca rekap tanpa kontrol koreksi, pembayaran, atau token ekspor", async () => {
     await act(async () => {
       client.setQueryData(["auth"], { setupNeeded: false, user: { id: 2, name: "Sekretaris", role: "sekretaris" } });
