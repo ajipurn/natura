@@ -29,8 +29,9 @@ export const houseRoutes = new Hono<AppEnv>()
     const [user, settings, history] = await Promise.all([getSessionUser(c), getSettings(db), getHouseHistory(db, house, 30)]);
     const tonight = rondaDate(new Date());
     const paymentInfo = await getHousePaymentInfo(db, house.id, tonight);
-    // Hanya yang dijadwalkan jaga malam ini yang bisa mencatat (admin juga; koreksi lewat dashboard).
-    const canRecord = user && canRonda(user.role) ? (await dutyDays(db, user.id)).has(scheduleDay(tonight)) : false;
+    const hasPaymentPeriod = paymentInfo.periods.some((p) => p.start <= tonight && p.end >= tonight);
+    // Rumah periode dikelola otomatis; harian hanya bisa dicatat petugas yang dijadwalkan malam ini.
+    const canRecord = !hasPaymentPeriod && user && canRonda(user.role) ? (await dutyDays(db, user.id)).has(scheduleDay(tonight)) : false;
     return c.json({
       communityName: settings.communityName,
       logoUrl: settings.logoUrl,

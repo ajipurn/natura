@@ -9,6 +9,7 @@ import { router as browserRouter } from "@/apps/petugas/routes";
 import { HousePage } from "@/apps/warga/rumah";
 import { queryClient } from "@/client/query";
 import { formatDateLong } from "@/lib/dates";
+import type { BillingPeriod } from "@/lib/payments";
 import type { SessionUser } from "@/server/auth";
 
 // happy-dom tidak menyediakan IndexedDB; cache memori dan alur autentikasi tetap diuji sungguhan.
@@ -180,7 +181,56 @@ describe("Beranda di dalam app dengan login", () => {
     await act(async () => root.render(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>));
     expect(container.querySelector("h1")?.textContent).toBe("Blok AF No. 4");
     expect(container.textContent?.includes("Catat malam ini")).toBe(recording);
+    expect([...container.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Kosong")).toBe(recording);
     expect(Boolean(container.querySelector('a[href="/ronda"]'))).toBe(recording);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { label: "Bulanan · Belum bayar", cadence: "monthly", paid: 0, expected: 15500, start: "2026-10-01", end: "2026-10-31", status: "unpaid" },
+    { label: "Bulanan · Belum bayar (sebagian)", cadence: "monthly", paid: 5000, expected: 15500, start: "2026-10-01", end: "2026-10-31", status: "unpaid" },
+    { label: "Bulanan · Sudah bayar", cadence: "monthly", paid: 15500, expected: 15500, start: "2026-10-01", end: "2026-10-31", status: "paid" },
+    { label: "Mingguan · Belum bayar", cadence: "weekly", paid: 0, expected: 3500, start: "2026-10-05", end: "2026-10-11", status: "unpaid" },
+    { label: "Mingguan · Sudah bayar", cadence: "weekly", paid: 3500, expected: 3500, start: "2026-10-05", end: "2026-10-11", status: "paid" },
+  ] as const)("QR kamera HP tidak menampilkan Ada/Kosong untuk $label meskipun petugas sedang bertugas", async ({ label, ...bill }) => {
+    const period: BillingPeriod = { houseId: 1, planId: 1, ...bill, remaining: bill.expected - bill.paid };
+    client.setQueryData(["rumah", "MONTHLYQR"], {
+      communityName: "Natura", logoUrl: null, defaultAmount: 500, tonight: "2026-10-10",
+      canRecord: true, user: petugas, house: { block: "A", number: "5", token: "MONTHLYQR", status: "active", ownerName: "Widodo" },
+      history: [], paymentInfo: {
+        periods: [period],
+        receipts: [], cells: {}, tonight: null,
+      },
+    });
+    router = createMemoryRouter([{ path: "/info/r/:token", element: <HousePage /> }], { initialEntries: ["/info/r/MONTHLYQR"] });
+    await act(async () => root.render(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>));
+    expect(container.textContent).toContain(label.replace(" (sebagian)", ""));
+    const recordButtons = [...container.querySelectorAll("button")].filter((button) => button.textContent?.trim().startsWith("Ada ·") || button.textContent?.trim() === "Kosong");
+    expect(recordButtons).toHaveLength(0);
+    expect(container.textContent).not.toContain("Catat malam ini");
+    expect(container.textContent).not.toContain("Bukan jadwal jagamu");
+    expect(container.querySelector('a[href="/ronda"]')).not.toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { label: "sudah berakhir", start: "2026-10-01", end: "2026-10-09" },
+    { label: "belum mulai", start: "2026-10-11", end: "2026-10-31" },
+  ])("QR kamera HP tetap menyediakan pencatatan harian ketika periode bulanan $label", async ({ start, end }) => {
+    client.setQueryData(["rumah", "DAILYQR"], {
+      communityName: "Natura", logoUrl: null, defaultAmount: 500, tonight: "2026-10-10",
+      canRecord: true, user: petugas, house: { block: "A", number: "5", token: "DAILYQR", status: "active", ownerName: "Widodo" },
+      history: [], paymentInfo: {
+        periods: [{ houseId: 1, planId: 1, cadence: "monthly", start, end, expected: 15500, paid: 0, remaining: 15500, status: "unpaid" }],
+        receipts: [], cells: {}, tonight: null,
+      },
+    });
+    router = createMemoryRouter([{ path: "/info/r/:token", element: <HousePage /> }], { initialEntries: ["/info/r/DAILYQR"] });
+    await act(async () => root.render(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>));
+    expect(container.textContent).toContain("Catat malam ini");
+    expect(container.textContent).not.toContain("Bulanan · Belum bayar");
+    const recordButtons = [...container.querySelectorAll("button")].filter((button) => button.textContent?.trim().startsWith("Ada ·") || button.textContent?.trim() === "Kosong");
+    expect(recordButtons).toHaveLength(2);
     expect(fetch).not.toHaveBeenCalled();
   });
 

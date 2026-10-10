@@ -33,6 +33,7 @@ export function HousePage() {
           const monthTotal = monthFilled.reduce((sum, h) => sum + (h.amount ?? 0), 0);
           const tonightRow = history.find((h) => h.date === tonight);
           const current = tonightRow?.status ? { status: tonightRow.status, amount: tonightRow.amount ?? 0 } : null;
+          const paymentPeriod = paymentInfo.periods.find((p) => p.start <= tonight && p.end >= tonight);
           return (
             <>
               <PageTitle title={houseLabelLong(house)} />
@@ -42,14 +43,14 @@ export function HousePage() {
               </p>
               <h1 className="mt-1 text-3xl font-bold tracking-tight">{houseLabelLong(house)}</h1>
               {house.ownerName && <p className="text-muted">{house.ownerName}</p>}
-              {house.status === "active" && <div className="mt-4"><PaymentNotice period={paymentInfo.periods.find((p) => p.start <= tonight && p.end >= tonight)} cell={paymentInfo.tonight} /></div>}
+              {house.status === "active" && <div className="mt-4"><PaymentNotice period={paymentPeriod} cell={paymentInfo.tonight} /></div>}
               {house.status === "vacant" && (
                 <p className="mt-2 inline-block rounded-full bg-warn-soft px-3 py-1 text-sm text-warn">
                   Ditandai rumah kosong/mudik
                 </p>
               )}
 
-              {user && canRonda(user.role) && (
+              {user && canRonda(user.role) && !paymentPeriod && (
                 <Card className="mt-5">
                   <p className="flex items-center gap-2 font-semibold">
                     <ScanLine className="size-5 text-primary" /> Catat malam ini

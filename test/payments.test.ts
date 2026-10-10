@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { addDays, daysInMonth, localDate, shiftMonth } from "@/lib/dates";
+import { addDays, daysInMonth, localDate, rondaDate, shiftMonth } from "@/lib/dates";
 import { allocatePayment, billingPeriods, paymentCells, paymentPeriod, rondaPaymentPeriods, type PaymentPlanDTO } from "@/lib/payments";
 import { summarize } from "@/lib/recap";
 import { summarizeMonth } from "@/lib/month-summary";
@@ -7,7 +7,10 @@ import { getMonthRecap } from "@/server/queries";
 import { getDashboard } from "@/server/dashboard";
 import { getPaymentMonth } from "@/server/payments";
 import type { Db } from "@/server/db";
+import { rondaSchedule } from "@/server/schema";
+import { scheduleDay } from "@/lib/schedule";
 import { apiClient, createTestEnv } from "./helpers/db";
+import { profileForUser } from "./helpers/residents";
 
 // Tanggal kalender dan malam ronda harus sama dalam fixture kas; sebelum 06.00 berbeda.
 vi.hoisted(() => {
@@ -202,5 +205,28 @@ describe("API pembayaran dan kas", () => {
   it("identitas kiriman yang sama tidak dapat digunakan untuk rumah lain", async () => {
     const current = (await admin.get("/api/admin/pembayaran?bulan=" + month)).data.payments as { clientId: string }[];
     expect((await admin.post("/api/admin/pembayaran", makePayment(houseIds[3], { clientId: current[0].clientId }))).status).toBe(400);
+  });
+
+  it("QR kamera HP hanya mengizinkan Ada/Kosong untuk harian, termasuk ketika petugas sedang bertugas", async () => {
+    await db.insert(rondaSchedule).values({ dayOfWeek: scheduleDay(rondaDate(new Date())), position: 0, residentId: await profileForUser(db, collectorId) });
+    expect((await admin.post("/api/admin/rumah", { block: "QR", numbers: "1-3" })).status).toBe(200);
+    const houses = ((await admin.get("/api/admin/rumah")).data.houses as { id: number; block: string; number: string; token: string }[]).filter((h) => h.block === "QR");
+    for (const [index, cadence] of (["daily", "monthly", "weekly"] as const).entries()) {
+      const house = houses.find((h) => h.number === String(index + 1))!;
+      if (cadence !== "daily") {
+        expect((await admin.put("/api/admin/pembayaran/kesepakatan/" + house.id, { effectiveFrom: days[0], cadence, ratePerNight: 500, dueTiming: "end" })).status).toBe(200);
+      }
+      const qr = await staff.get("/api/rumah/" + house.token);
+      expect(qr.status).toBe(200);
+      expect(qr.data.canRecord).toBe(cadence === "daily");
+      for (const status of ["filled", "empty"] as const) {
+        const recorded = await staff.post("/api/rumah/" + house.token + "/catat", { status, amount: status === "filled" ? 500 : 0 });
+        if (cadence === "daily") expect(recorded.status).toBe(200);
+        else {
+          expect(recorded.status).toBe(400);
+          expect(recorded.data.error).toContain("Tidak bisa mencatat Ada/Kosong lewat ronda.");
+        }
+      }
+    }
   });
 });

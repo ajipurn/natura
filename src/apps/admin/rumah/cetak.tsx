@@ -62,25 +62,27 @@ export function CetakPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 print:grid-cols-3 print:gap-0">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 print:grid-cols-4 print:gap-0">
               {houses.map((house) => (
                 <div
                   key={house.id}
-                  className="flex break-inside-avoid flex-col items-center rounded-2xl border border-line bg-white p-4 text-center text-black print:h-[68mm] print:justify-center print:rounded-none print:border-dashed print:border-gray-400 print:p-[4mm]"
+                  className="flex break-inside-avoid flex-col items-center rounded-2xl border border-line bg-white p-3 text-center text-black print:min-h-[54mm] print:justify-center print:rounded-none print:border-dashed print:border-gray-400 print:p-[1mm]"
                 >
-                  <div className="flex items-center justify-center gap-1.5">
-                    <img src={logoUrl ?? DEFAULT_LOGO_URL} alt="" className="h-7 w-auto max-w-16 object-contain print:h-[7mm] print:max-w-[18mm]" />
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-gray-600">Jimpitan {communityName}</p>
+                  <div className="flex w-full max-w-40 flex-col items-center print:w-[33mm] print:max-w-none">
+                    <div className="flex w-full items-center justify-between gap-1 print:gap-[1mm]">
+                      <img src={logoUrl ?? DEFAULT_LOGO_URL} alt="" className="h-6 w-auto max-w-12 shrink-0 object-contain print:h-[3.5mm] print:max-w-[12mm]" />
+                      <p className="min-w-0 break-words text-[9px] font-medium uppercase tracking-wide text-gray-600 print:text-[7px] print:leading-tight print:tracking-normal">Jimpitan {communityName}</p>
+                    </div>
+                    {/* Logo, nama lingkungan, dan QR memakai lebar yang sama; ruang putih QR tetap bebas dari teks. */}
+                    <QrSvg
+                      text={houseUrl(origin, house.token)}
+                      className="my-2 w-full shrink-0 print:my-[4mm]"
+                    />
                   </div>
-                  {/* QR 34 mm menyisakan ruang untuk logo dan alamat pada stiker 68 mm. */}
-                  <QrSvg
-                    text={houseUrl(origin, house.token)}
-                    className="my-2 w-full max-w-40 print:w-[34mm] print:max-w-none"
-                  />
-                  <p className="text-2xl font-black leading-tight">
+                  <p className="text-lg font-black leading-tight print:text-sm">
                     Blok {house.block} · No. {house.number}
                   </p>
-                  <p className="text-[10px] text-gray-500">Scan untuk lihat riwayat jimpitan</p>
+                  <p className="text-[9px] text-gray-500 print:text-[8px] print:leading-tight">Scan untuk lihat riwayat jimpitan</p>
                 </div>
               ))}
             </div>
