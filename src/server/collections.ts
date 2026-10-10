@@ -1,4 +1,4 @@
-import { can } from "@/lib/permissions";
+import { can, canRonda } from "@/lib/permissions";
 import { and, eq, inArray, lte, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { formatTime, rondaDate } from "@/lib/dates";
@@ -10,6 +10,7 @@ import type { SessionUser } from "./auth";
 import { runBatch, type Db, type Executor, type Statement } from "./db";
 import { getHouseIds } from "./queries";
 import { collectionLogs, collections, paymentPlans, patrols, rondaSchedule, users } from "./schema";
+import { scheduledAccount } from "./schedule";
 
 const MAX_CLOCK_SKEW_MS = 10 * 60 * 1000;
 /** Petugas hanya bisa menyinkronkan catatan sampai 3 hari ke belakang; selebihnya lewat admin. */
@@ -71,7 +72,7 @@ function logStatements(db: Executor, logs: LogWrite[]): Statement[] {
 
 /** Malam-malam jaga (0 = Ahad) seorang petugas menurut jadwal sekarang. */
 export async function dutyDays(db: Db, userId: number): Promise<Set<number>> {
-  const rows = await db.selectDistinct({ day: rondaSchedule.dayOfWeek }).from(rondaSchedule).where(eq(rondaSchedule.userId, userId));
+  const rows = await db.selectDistinct({ day: rondaSchedule.dayOfWeek }).from(rondaSchedule).where(scheduledAccount(userId));
   return new Set(rows.map((r) => r.day));
 }
 
@@ -209,6 +210,7 @@ export async function applyEntries(
   entries: EntryInput[],
   now = new Date(),
 ): Promise<EntryResult[]> {
+  if (!canRonda(user.role)) return entries.map(({ clientId }) => ({ clientId, ok: false, error: "Akun Warga tidak memiliki akses ronda." }));
   const [known, duty, plans] = await Promise.all([getHouseIds(db), dutyDays(db, user.id), db.select().from(paymentPlans)]);
   const results: EntryResult[] = [];
   const logs: LogWrite[] = [];

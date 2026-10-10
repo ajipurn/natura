@@ -2,7 +2,7 @@ import { asc, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { z } from "zod";
-import { daysInMonth, rondaDate } from "@/lib/dates";
+import { daysInMonth, isMonth, localDate, rondaDate, startedRondaDate } from "@/lib/dates";
 import { monthStats } from "@/lib/month-stats";
 import { scheduleDay } from "@/lib/schedule";
 import { endWargaAccess, hasWargaAccess, requireUser } from "../auth";
@@ -12,7 +12,6 @@ import { getCashPublic } from "../kas";
 import { getHouseHistory, getMonthRecap, getSettings, logoColumns, logoUrl } from "../queries";
 import { listSchedule } from "../schedule";
 import { announcements, contacts, houses, settings } from "../schema";
-import { monthQuery } from "./ronda";
 import { getHousePaymentInfo } from "../payments";
 
 /** Banyaknya malam ronda terakhir di riwayat per rumah (± 3 bulan). */
@@ -39,7 +38,8 @@ export const wargaRoutes = new Hono<AppEnv>()
   /** Info umum: jadwal ronda, pengumuman, kontak, dan ringkasan kas (kalau ditampilkan pengurus). */
   .get("/", requireUser, async (c) => {
     const db = c.var.db;
-    const date = rondaDate(new Date());
+    const now = new Date();
+    const date = rondaDate(now);
     const [settingsRow, schedule, announcementRows, contactRows, cash] = await Promise.all([
       getSettings(db),
       listSchedule(db),
@@ -54,12 +54,13 @@ export const wargaRoutes = new Hono<AppEnv>()
     return c.json({
       communityName: settingsRow.communityName,
       date,
+      today: localDate(now),
       tonight: scheduleDay(date),
       // Jadwal warga hanya memuat penjaga yang bisa ikut; roster admin tetap lengkap.
       schedule: schedule.flatMap((s) => {
         const name = s.name ?? s.ownerName;
         return name && s.color !== null && s.color !== "blue"
-          ? [{ id: s.id, day: s.day, position: s.position, houseId: s.houseId, block: s.block, number: s.number, name }]
+          ? [{ id: s.id, day: s.day, position: s.position, houseId: s.houseId, block: s.block, number: s.number, name, unassigned: s.residentId === null }]
           : [];
       }),
       announcements: announcementRows,
@@ -85,17 +86,23 @@ export const wargaRoutes = new Hono<AppEnv>()
       .limit(1);
     if (!house) return c.json({ error: "Rumah tidak ditemukan." }, 404);
     const history = await getHouseHistory(db, house, HISTORY_NIGHTS, c.req.valid("query").bulan);
-    const paymentInfo = await getHousePaymentInfo(db, house.id, rondaDate(new Date()));
+    const now = new Date();
+    const through = startedRondaDate(now);
+    const paymentInfo = await getHousePaymentInfo(db, house.id, through);
     const { createdAt: _createdAt, ...rest } = house;
-    return c.json({ house: rest, today: rondaDate(new Date()), history, paymentInfo });
+    return c.json({ house: rest, today: localDate(now), through, history, paymentInfo });
   })
 
   /** Rekap bulanan tanpa nama: total per malam dan per rumah. */
-  .get("/rekap", requireUser, monthQuery, async (c) => {
+  .get("/rekap", requireUser, validator("query", (value: Record<string, string | string[]>) => {
+    const bulan = typeof value.bulan === "string" ? value.bulan : "";
+    return { bulan: isMonth(bulan) ? bulan : localDate(new Date()).slice(0, 7) };
+  }), async (c) => {
     const month = c.req.valid("query").bulan;
     const recap = await getMonthRecap(c.var.db, month);
-    const today = rondaDate(new Date());
-    // Kalender warga menunjukkan seluruh malam yang sudah berjalan, termasuk yang belum dicatat.
-    const stats = monthStats({ ...recap, dates: daysInMonth(month).filter((date) => date <= today) });
-    return c.json({ month, today, ...stats, paymentPeriods: recap.paymentPeriods ?? [] });
+    const now = new Date();
+    const through = startedRondaDate(now);
+    // Malam hari ini baru ikut status mulai pukul 20.00 WIB, termasuk yang belum dicatat.
+    const stats = monthStats({ ...recap, dates: daysInMonth(month).filter((date) => date <= through) });
+    return c.json({ month, today: localDate(now), through, ...stats, paymentPeriods: recap.paymentPeriods ?? [] });
   });

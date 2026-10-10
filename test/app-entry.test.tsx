@@ -6,6 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { router as browserRouter } from "@/apps/petugas/routes";
+import { HousePage } from "@/apps/warga/rumah";
 import { queryClient } from "@/client/query";
 import { formatDateLong } from "@/lib/dates";
 import type { SessionUser } from "@/server/auth";
@@ -20,6 +21,7 @@ let container: HTMLDivElement;
 let client: QueryClient;
 let router: ReturnType<typeof createMemoryRouter>;
 const petugas: SessionUser = { id: 1, name: "Petugas contoh", role: "petugas" };
+const warga: SessionUser = { id: 2, name: "Warga contoh", role: "warga" };
 const history = { patrols: [{ date: "2026-10-09", filled: 1, empty: 0, checked: 1, unchecked: 0, expected: 1, total: 500, collectors: "Petugas contoh" }], today: "2026-10-10" };
 const schedule = { schedule: [{ id: 1, day: 6, position: 0, userId: 1, houseId: 1, block: "AF", number: "13", name: "Petugas contoh", ownerName: "Petugas contoh", color: "green" }] };
 const requests = { requests: [] };
@@ -43,8 +45,8 @@ beforeEach(() => {
   client.setDefaultOptions({ queries: { staleTime: Infinity, retry: false } });
   client.setQueryData(["warga", "akses"], { access: true, communityName: "Cluster Natura", logoUrl: null });
   client.setQueryData(["auth", "users"], { users: [{ ...petugas, house: "AF-13" }] });
-  client.setQueryData(["warga", "info"], { announcements: [{ id: 1, title: "Kerja bakti", body: "Minggu pagi", pinned: true, createdAt: "2026-10-10T12:00:00Z" }], schedule: [], tonight: 6, date: "2026-10-10", contacts: [], cash: null });
-  client.setQueryData(["warga", "rekap", "2026-10"], { month: "2026-10", today: "2026-10-10", nights: 0, total: 0, average: 0, perNight: [], perHouse: [], paymentPeriods: [] });
+  client.setQueryData(["warga", "info"], { announcements: [{ id: 1, title: "Kerja bakti", body: "Minggu pagi", pinned: true, createdAt: "2026-10-10T12:00:00Z" }], schedule: [], tonight: 6, date: "2026-10-10", today: "2026-10-10", contacts: [], cash: null });
+  client.setQueryData(["warga", "rekap", "2026-10"], { month: "2026-10", today: "2026-10-10", through: "2026-10-10", nights: 0, total: 0, average: 0, perNight: [], perHouse: [], paymentPeriods: [] });
   client.setQueryData(["riwayat"], history);
   client.setQueryData(["riwayat", "bulan", "2026-10"], history);
   for (const date of ["2026-10-08", "2026-10-09", "2026-10-10"]) client.setQueryData(["riwayat", date], { houses: [], collections: [], settings: { communityName: "Cluster Natura", defaultAmount: 500 }, paymentPeriods: [] });
@@ -104,6 +106,81 @@ describe("Beranda di dalam app dengan login", () => {
     expect(container.textContent).toContain("Kerja bakti");
     expect([...container.querySelectorAll("nav a")].map((a) => a.textContent)).toEqual(["Beranda", "Ronda", "Riwayat", "Jadwal", "Akun"]);
     expect(container.querySelector('nav a[aria-current="page"]')?.getAttribute("href")).toBe("/");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("Warga membuka Beranda dengan empat menu tanpa Ronda", async () => {
+    await render("/", warga);
+    expect(container.textContent).toContain("Kerja bakti");
+    expect([...container.querySelectorAll("nav a")].map((a) => a.textContent)).toEqual(["Beranda", "Riwayat", "Jadwal", "Akun"]);
+    expect(container.querySelector("nav ul")?.classList.contains("grid-cols-4")).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("tanggal 10 sebelum pukul 20.00 menampilkan sembilan malam yang sama di status dan grafik", async () => {
+    client.setQueryData(["warga", "rekap", "2026-10"], {
+      month: "2026-10", today: "2026-10-10", through: "2026-10-09", nights: 9, total: 4500, average: 500,
+      perNight: Array.from({ length: 9 }, (_, i) => ({ date: `2026-10-0${i + 1}`, filled: 1, empty: 0, total: 500 })),
+      perHouse: [{ id: 1, block: "AA", number: "9", status: "active", filled: 9, empty: 0, unchecked: 0, total: 4500, periodTotal: 0 }],
+      paymentPeriods: [],
+    });
+    await render("/", warga);
+    expect(container.textContent).toContain("9 malam berjalan · tanggal 1–9");
+    expect(container.querySelector('button[aria-label="AA-9: 9/9 terisi. Semua malam terisi. Lihat riwayat"]')?.classList.contains("bg-filled-soft")).toBe(true);
+    const bars = [...container.querySelectorAll("figure table tr")];
+    expect(bars).toHaveLength(9);
+    expect(bars.at(-1)?.textContent).toContain("9 Okt");
+    expect(container.textContent).toContain("20.00–00.00 WIB");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("bulan baru setelah tengah malam membuka bulan kalender walaupun jadwal masih malam sebelumnya", async () => {
+    client.setQueryData(["warga", "info"], { announcements: [], schedule: [], tonight: 6, date: "2026-10-31", today: "2026-11-01", contacts: [], cash: null });
+    client.setQueryData(["warga", "rekap", "2026-11"], {
+      month: "2026-11", today: "2026-11-01", through: "2026-10-31", nights: 0, total: 0, average: 0, perNight: [],
+      perHouse: [{ id: 1, block: "AA", number: "9", status: "active", filled: 0, empty: 0, unchecked: 0, total: 0, periodTotal: 0 }], paymentPeriods: [],
+    });
+    await render("/", warga);
+    expect([...container.querySelectorAll("h2")].map((h) => h.textContent)).toContain("November 2026");
+    expect(container.textContent).toContain("Belum ada malam berjalan");
+    expect(container.textContent).not.toContain("tanggal 1–31");
+    expect(container.querySelector('button[aria-label="AA-9: Belum berjalan. Belum ada malam berjalan. Lihat riwayat"]')).not.toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(["/ronda", "/app/ronda", "/petugas/ronda", "/masuk?next=%2Fronda"])("Warga tidak membuka Ronda melalui %s", async (path) => {
+    await render(path, warga);
+    expect(router.state.location.pathname).toBe("/");
+    expect(container.querySelector("h1")?.textContent).toBe("Beranda");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(["/jadwal", "/akun", "/riwayat", "/riwayat/2026-10-09"])("Warga tetap membaca %s tanpa kontrol tugas jaga", async (path) => {
+    client.removeQueries({ queryKey: ["jadwal", "permintaan"], exact: true });
+    await render(path, warga);
+    expect(router.state.location.pathname).toBe(path);
+    expect(container.textContent).not.toContain("Jadwal jagamu");
+    expect(container.textContent).not.toContain("Minta ubah jadwal");
+    expect(container.textContent).not.toContain("Tukar jadwal");
+    expect(container.querySelector('a[href="/dashboard"]')).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { label: "Warga", user: warga, recording: false },
+    { label: "Petugas", user: petugas, recording: true },
+    { label: "publik", user: null, recording: false },
+  ])("QR rumah untuk $label membatasi kontrol pencatatan sesuai peran", async ({ user, recording }) => {
+    client.setQueryData(["rumah", "WARGAAF4"], {
+      communityName: "Natura", logoUrl: null, defaultAmount: 500, tonight: "2026-10-10",
+      canRecord: true, user, house: { block: "AF", number: "4", token: "WARGAAF4", status: "active", ownerName: "Ipung" },
+      history: [], paymentInfo: { periods: [], receipts: [], cells: {}, tonight: null },
+    });
+    router = createMemoryRouter([{ path: "/r/:token", element: <HousePage /> }], { initialEntries: ["/r/WARGAAF4"] });
+    await act(async () => root.render(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>));
+    expect(container.querySelector("h1")?.textContent).toBe("Blok AF No. 4");
+    expect(container.textContent?.includes("Catat malam ini")).toBe(recording);
+    expect(Boolean(container.querySelector('a[href="/ronda"]'))).toBe(recording);
     expect(fetch).not.toHaveBeenCalled();
   });
 

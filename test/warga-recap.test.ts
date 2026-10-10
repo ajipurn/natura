@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { HouseMonthStats, MonthStats } from "@/lib/month-stats";
 import type { HouseDTO } from "@/lib/types";
 import { houses } from "@/server/schema";
@@ -11,7 +11,7 @@ let home: HouseDTO;
 
 beforeAll(async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
-  vi.setSystemTime(new Date("2026-10-07T12:00:00Z"));
+  vi.setSystemTime(new Date("2026-10-07T14:00:00Z"));
   const { env, db } = await createTestEnv();
   admin = apiClient(env);
   warga = apiClient(env);
@@ -33,6 +33,7 @@ beforeAll(async () => {
   expect((await warga.post("/api/auth/login", { userId: 1, pin: "1234" })).status).toBe(200);
 });
 afterAll(() => vi.useRealTimers());
+afterEach(() => vi.setSystemTime(new Date("2026-10-07T14:00:00Z")));
 
 describe("rekap kalender untuk warga", () => {
   it("menyembunyikan petugas biru dan putih hanya dari informasi warga", async () => {
@@ -63,5 +64,33 @@ describe("rekap kalender untuk warga", () => {
     const data = (await warga.get("/api/warga/rekap?bulan=2026-10")).data as MonthStats;
     expect(data.perHouse.find((h) => h.id === monthly.id) as HouseMonthStats).toMatchObject({ filled: 7, empty: 0, unchecked: 0, periodTotal: 15500, total: 15500 });
     expect(data.perNight.reduce((sum, n) => sum + n.total, 0)).toBe(1000);
+  });
+});
+
+describe("batas malam berjalan pukul 20.00 WIB", () => {
+  it.each([
+    ["2026-10-10T06:00:00+07:00", "2026-10-09", 9],
+    ["2026-10-10T19:59:59+07:00", "2026-10-09", 9],
+    ["2026-10-10T20:00:00+07:00", "2026-10-10", 10],
+    ["2026-10-10T23:59:59+07:00", "2026-10-10", 10],
+    ["2026-10-11T00:00:00+07:00", "2026-10-10", 10],
+    ["2026-10-11T06:00:00+07:00", "2026-10-10", 10],
+  ])("%s menghitung sampai %s (%i malam)", async (at, through, nights) => {
+    vi.setSystemTime(new Date(at));
+    const recap = await warga.get("/api/warga/rekap?bulan=2026-10");
+    expect(recap.status).toBe(200);
+    expect(recap.data).toMatchObject({ today: at.slice(0, 10), through, nights });
+    expect((recap.data.perNight as { date: string }[]).at(-1)?.date).toBe(through);
+    expect((recap.data.perHouse as HouseMonthStats[]).find((h) => h.id === home.id)).toMatchObject({ filled: 2, empty: 0, unchecked: nights - 2 });
+    const detail = await warga.get(`/api/warga/rumah/${home.id}?bulan=2026-10`);
+    expect(detail.data).toMatchObject({ today: at.slice(0, 10), through });
+  });
+
+  it("awal bulan tetap membuka bulan baru dengan nol malam sampai pukul 20.00", async () => {
+    vi.setSystemTime(new Date("2026-11-01T00:00:00+07:00"));
+    const recap = await warga.get("/api/warga/rekap");
+    expect(recap.data).toMatchObject({ month: "2026-11", today: "2026-11-01", through: "2026-10-31", nights: 0 });
+    expect((await warga.get("/api/warga/rekap?bulan=2026-10")).data.nights).toBe(31);
+    expect((await warga.get("/api/warga")).data.today).toBe("2026-11-01");
   });
 });

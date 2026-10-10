@@ -1,6 +1,6 @@
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { X } from "lucide-react";
-import { useRef, type ReactNode } from "react";
+import { useRef, type ComponentProps, type ReactNode } from "react";
 import { ScrollArea } from "./scroll-area";
 import { Button, cx } from "./ui";
 
@@ -17,6 +17,7 @@ export function Dialog({
   description,
   children,
   footer,
+  finalFocus,
   className,
 }: {
   open: boolean;
@@ -26,6 +27,8 @@ export function Dialog({
   children: ReactNode;
   /** Tombol-tombol di bawah, tetap terlihat walau isinya digulir. */
   footer?: ReactNode;
+  /** Tujuan fokus saat ditutup, misalnya tombol baris yang baru dipindahkan. */
+  finalFocus?: ComponentProps<typeof BaseDialog.Popup>["finalFocus"];
   className?: string;
 }) {
   const popupRef = useRef<HTMLDivElement>(null);
@@ -36,6 +39,7 @@ export function Dialog({
         <BaseDialog.Backdrop className="fixed inset-0 z-50 bg-black/45 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none" />
         <BaseDialog.Popup
           ref={popupRef}
+          finalFocus={finalFocus}
           initialFocus={(type) =>
             type === "touch" ? true : (popupRef.current?.querySelector<HTMLElement>("[data-autofocus]") ?? true)
           }

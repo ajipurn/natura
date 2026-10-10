@@ -136,6 +136,18 @@ describe("routing HTML Vite dan Vercel", () => {
   });
 
   it.each([
+    ["/petugas.webmanifest", "/petugas-domain.webmanifest", "/"],
+    ["/admin.webmanifest", "/admin-domain.webmanifest", "/dashboard/"],
+  ])("manifest awal %s langsung memakai cakupan production tanpa JavaScript", (source, target, basePath) => {
+    expect(route("app.clusternatura.com", source)).toMatchObject({ dest: target });
+    expect(DOMAIN_MANIFESTS.find((manifest) => `/${manifest.target}` === target)?.basePath).toBe(basePath);
+    for (const host of ["localhost", "preview.vercel.app", "clusternatura.com"]) {
+      expect(route(host, source)).toBeUndefined();
+    }
+    expect(route("app.clusternatura.com", `${source}.bak`)).toBeUndefined();
+  });
+
+  it.each([
     ["https://app.clusternatura.com/petugas", "https://app.clusternatura.com/"],
     ["https://clusternatura.com/petugas/?cari=Aji", "https://app.clusternatura.com/?cari=Aji"],
     ["https://app.clusternatura.com/petugas/masuk?next=%2Fpetugas", "https://app.clusternatura.com/masuk?next=%2Fpetugas"],

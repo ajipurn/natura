@@ -2,7 +2,7 @@ import type { GeoAnchor } from "./geo";
 import type { GuardColor } from "./guard-color";
 import type { BillingPeriod, PaymentCadence, PaymentCell, PaymentPlanDTO, PeriodPayment } from "./payments";
 
-export type Role = "admin" | "ketua" | "sekretaris" | "bendahara" | "humas" | "petugas";
+export type Role = "admin" | "ketua" | "sekretaris" | "bendahara" | "humas" | "petugas" | "warga";
 export type HouseStatus = "active" | "vacant";
 export type CollectionStatus = "filled" | "empty";
 export type CollectionMethod = "scan" | "manual";
@@ -26,14 +26,16 @@ export type CollectionDTO = {
   collectorName: string | null;
 };
 
-/** Satu baris jadwal ronda, dengan nama dan rumah dari akun petugas atau data rumah. */
+/** Satu penugasan warga; rumah/nama bebas merupakan jadwal lama yang belum dipilih petugasnya. */
 export type ScheduleDTO = {
   id: number;
   day: number;
   position: number;
-  /** Nama akun petugas, atau nama bebas untuk baris tanpa akun dan rumah. Null = baris rumah tanpa akun. */
+  /** Identitas orang yang ditugaskan; opsional hanya untuk cache aplikasi versi lama. */
+  residentId?: number | null;
+  /** Nama warga yang ditugaskan, atau nama bebas pada jadwal lama. */
   name: string | null;
-  /** Rumah petugas (dari akunnya) atau rumah di baris itu; "" = tanpa rumah. */
+  /** Alamat warga saat ini atau penanda rumah di jadwal lama; "" = tanpa rumah. */
   block: string;
   number: string;
   houseId: number | null;

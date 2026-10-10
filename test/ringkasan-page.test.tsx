@@ -39,6 +39,13 @@ async function render(tonight = fixture.tonight, oftenEmpty = fixture.oftenEmpty
   await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><RingkasanPage /></MemoryRouter></QueryClientProvider>));
 }
 describe("indikator ronda di ringkasan", () => {
+  it("pengingat uang belum disetor membuka tab setoran jimpitan", async () => {
+    client.setQueryData(["admin", "ringkasan"], { ...fixture, todo: { ...fixture.todo, undeposited: 2 } });
+    await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><RingkasanPage /></MemoryRouter></QueryClientProvider>));
+    const reminder = [...container.querySelectorAll("a")].find((a) => a.textContent?.includes("2 malam belum dicatat setorannya"));
+    expect(reminder?.getAttribute("href")).toBe("/admin/kas?view=deposits");
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it("tidak menampilkan bagian hijau saat Ada nol meskipun lima rumah sudah berstatus kosong", async () => {
     await render();
     const bar = container.querySelector('[role="progressbar"]')!;

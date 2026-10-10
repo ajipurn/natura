@@ -26,7 +26,7 @@ import {
   cx,
 } from "@/components/ui";
 import { adminPath, petugasPath } from "@/lib/app-paths";
-import { isManager, ROLE_LABEL } from "@/lib/permissions";
+import { canRonda, isManager, ROLE_LABEL } from "@/lib/permissions";
 
 export function AkunPage() {
   const user = useAuth().data?.user;
@@ -46,7 +46,7 @@ export function AkunPage() {
 
   return (
     <main>
-      <PageHeader title="Akun" subtitle="Pengaturan akun dan jadwal jagamu." />
+      <PageHeader title="Akun" subtitle={canRonda(user.role) ? "Pengaturan akun dan jadwal jagamu." : "Pengaturan akunmu."} />
 
       <Card className="flex items-center gap-4">
         <div
@@ -103,8 +103,10 @@ export function AkunPage() {
         )}
       </nav>
 
-      <SectionTitle>Jadwal jagamu</SectionTitle>
-      <MySchedule />
+      {canRonda(user.role) && <>
+        <SectionTitle>Jadwal jagamu</SectionTitle>
+        <MySchedule />
+      </>}
 
       <SectionTitle>Pengaturan</SectionTitle>
       <Card className="divide-y divide-line p-0">
@@ -163,7 +165,7 @@ export function AkunPage() {
           <div className="space-y-3 px-4 pb-4 pt-1 text-sm">
             <p className="text-muted">
               Pasang Cluster Natura agar app mudah dibuka dari layar utama HP.
-              Pencatatan ronda tetap bisa dipakai saat offline.
+              {canRonda(user.role) && " Pencatatan ronda tetap bisa dipakai saat offline."}
             </p>
             <dl className="space-y-2">
               <div>

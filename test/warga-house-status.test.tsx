@@ -16,7 +16,7 @@ beforeEach(() => {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  client.setQueryData(["warga", "rumah", 1, "2026-10"], { house: home, today: "2026-10-07", history: [{ date: "2026-10-06", status: "filled", amount: 500 }, { date: "2026-10-07", status: "filled", amount: 500 }], paymentInfo: { periods: [], receipts: [], tonight: null } });
+  client.setQueryData(["warga", "rumah", 1, "2026-10"], { house: home, today: "2026-10-07", through: "2026-10-07", history: [{ date: "2026-10-06", status: "filled", amount: 500 }, { date: "2026-10-07", status: "filled", amount: 500 }], paymentInfo: { periods: [], receipts: [], tonight: null } });
 });
 afterEach(async () => {
   await act(async () => root.unmount());

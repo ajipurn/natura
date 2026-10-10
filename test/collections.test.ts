@@ -1,3 +1,4 @@
+import { profileForUser } from "./helpers/residents";
 import { beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getAudit } from "@/server/audit";
@@ -36,7 +37,8 @@ beforeAll(async () => {
     .returning();
   petugas = { id: u.id, name: u.name, role: u.role };
   // Budi jaga setiap malam, supaya tes di bawah hanya soal cara menyimpan catatan.
-  await db.insert(rondaSchedule).values([0, 1, 2, 3, 4, 5, 6].map((day) => ({ dayOfWeek: day, position: 0, userId: u.id })));
+  const residentId = await profileForUser(db, u.id);
+  await db.insert(rondaSchedule).values([0, 1, 2, 3, 4, 5, 6].map((day) => ({ dayOfWeek: day, position: 0, residentId })));
   const rows = await db
     .insert(houses)
     .values([
@@ -161,7 +163,7 @@ describe("hanya petugas yang jaga malam itu yang bisa mencatat", () => {
       ])
       .returning();
     // Rina hanya jaga Sabtu (malam Minggu).
-    await db.insert(rondaSchedule).values({ dayOfWeek: 6, position: 1, userId: rina.id });
+    await db.insert(rondaSchedule).values({ dayOfWeek: 6, position: 1, residentId: await profileForUser(db, rina.id) });
     const asRina = { id: rina.id, name: rina.name, role: rina.role };
     const saturday = "2026-10-03T14:30:00Z"; // 21:30 WIB Sabtu 3 Oktober
     const results = await applyEntries(
@@ -178,7 +180,7 @@ describe("hanya petugas yang jaga malam itu yang bisa mencatat", () => {
     const asAdmin = { id: admin.id, name: admin.name, role: admin.role };
     expect((await applyEntries(db, asAdmin, [entry({ houseId: houseA2 })], NOW))[0].ok).toBe(false);
     // Begitu dijadwalkan malam itu, admin bisa mencatat.
-    await db.insert(rondaSchedule).values({ dayOfWeek: 0, position: 1, userId: admin.id });
+    await db.insert(rondaSchedule).values({ dayOfWeek: 0, position: 1, residentId: await profileForUser(db, admin.id) });
     expect((await applyEntries(db, asAdmin, [entry({ houseId: houseA2 })], NOW))[0].ok).toBe(true);
   });
 });
@@ -192,7 +194,7 @@ describe("dua petugas mencatat rumah yang sama", () => {
   beforeAll(async () => {
     const [u] = await db.insert(users).values({ name: "Sari", pinHash: "x", role: "petugas" }).returning();
     sari = { id: u.id, name: u.name, role: u.role };
-    await db.insert(rondaSchedule).values({ dayOfWeek: 0, position: 2, userId: u.id });
+    await db.insert(rondaSchedule).values({ dayOfWeek: 0, position: 2, residentId: await profileForUser(db, u.id) });
     [{ id: house }] = await db.insert(houses).values({ block: "C", number: "1", token: "TOKENC1AAA" }).returning();
   });
 

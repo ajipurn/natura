@@ -13,7 +13,7 @@ import { parseSchedule } from "@/lib/schedule";
 import { matchPlan } from "@/lib/site-plan";
 import { SITE_PLAN } from "@/site-plan";
 import { requireDashboardResource } from "../auth";
-import { ROLES, can } from "@/lib/permissions";
+import { ROLES, can, canRonda } from "@/lib/permissions";
 import { MAX_AMOUNT, writeCollections } from "../collections";
 import { runBatch, type Executor } from "../db";
 import type { AppEnv } from "../env";
@@ -22,13 +22,13 @@ import { hashPin } from "../pin";
 import { MAX_LOGO_DATA_URL, parseLogo } from "../logo";
 import { DEFAULT_SETTINGS, getHouseIds, getPlanAnchors, getSettings, listHouses, listHousesWithUsage, listUsers, logoColumns, logoUrl } from "../queries";
 import { countPendingRequests, decideRequest, listRequestsForAdmin } from "../requests";
-import { clearSchedule, houseSlots, replaceSlots, saveSchedule, userDaysStatements } from "../schedule";
-import { announcements, cashDeposits, cashEntries, collections, contacts, duesInvoices, houses, payments, residenceMoves, rondaSchedule, settings, users } from "../schema";
+import { clearSchedule, replaceSlots, residentDaysStatements, saveSchedule } from "../schedule";
+import { announcements, cashDeposits, cashEntries, collections, contacts, duesInvoices, houses, payments, residenceMoves, rondaSchedule, scheduleRequests, settings, users } from "../schema";
 import { getAudit } from "../audit";
 import { getDashboard } from "../dashboard";
 import { getCashMonth, MAX_CASH } from "../kas";
 import { monthQuery } from "./ronda";
-import { accountNameTaken as nameTaken, accountNameTakenError as nameTakenError, listResidents, setHouseResident } from "../residents";
+import { accountNameTaken as nameTaken, accountNameTakenError as nameTakenError, listResidents, selectHouseResident, setHouseResident } from "../residents";
 import { residents } from "../schema";
 import { moveResident } from "../residence";
 
@@ -39,28 +39,33 @@ const ownerName = z
   .trim()
   .transform((v) => v.slice(0, 80) || null)
   .nullable()
-  .optional()
-  .transform((v) => v ?? null);
+  .optional();
+
+const residentSelection = z.number().int().positive().nullable().optional();
 
 const addHousesSchema = z.object({
   block: z.string().transform(normalizeHouseField).pipe(z.string().regex(BLOCK_PATTERN, "Blok wajib diisi (huruf/angka, maks. 10 karakter).")),
   numbers: z.string().max(500),
   ownerName,
-});
+  residentId: residentSelection,
+}).refine((v) => v.residentId === undefined || !v.ownerName, "Pilih warga dari daftar, tanpa mengisi nama baru.");
 
 const updateHouseSchema = z.object({
   block: z.string().transform(normalizeHouseField).pipe(z.string().regex(BLOCK_PATTERN, "Blok/nomor tidak valid.")),
   number: z.string().transform(normalizeHouseField).pipe(z.string().regex(NUMBER_PATTERN, "Blok/nomor tidak valid.")),
   ownerName,
   status: z.enum(["active", "vacant"], "Status tidak valid."),
-});
+  residentId: residentSelection,
+  previousResidentId: residentSelection,
+}).refine((v) => v.residentId === undefined || v.previousResidentId !== undefined, "Penghuni sebelumnya wajib disertakan.")
+  .refine((v) => v.residentId === undefined || !v.ownerName, "Pilih warga dari daftar, tanpa mengisi nama baru.");
 
 const userName = trimmed(40, "Isi nama (maks. 40 karakter).").min(1, "Isi nama (maks. 40 karakter).");
 const role = z.enum(ROLES).default("petugas");
 const day = z.number().int().min(0).max(6);
 /**
- * Rumah dan malam jaga petugas. Malam jaga biasanya diatur di Jadwal ronda: tanpa `days`, malam
- * jaganya tetap, ditambah jadwal rumah yang baru ditempati.
+ * Tempat tinggal akun. `days` diterima untuk kompatibilitas editor lama; editor akun baru tidak
+ * mengirim penugasan. Malam jaga dikelola dengan memilih warga di Jadwal ronda.
  */
 const guardFields = {
   houseId: z.number().int().positive().nullable().default(null),
@@ -69,16 +74,17 @@ const guardFields = {
 
 const guardColor = z.enum(GUARD_COLORS).nullable();
 
-/** Satu baris jadwal: akun petugas, rumah tanpa akun, atau nama bebas (tepat salah satunya). */
+/** Rujukan warga; userId hanya untuk editor lama. Rumah/nama merupakan penanda yang belum terhubung. */
 const slotSchema = z
   .object({
     day,
     color: guardColor.default(null),
     userId: z.number().int().positive().nullable().default(null),
+    residentId: z.number().int().positive().nullable().default(null),
     houseId: z.number().int().positive().nullable().default(null),
     name: z.string().trim().max(60).nullable().default(null).transform((v) => v || null),
   })
-  .refine((s) => [s.userId, s.houseId, s.name].filter((v) => v !== null).length === 1, "Ada baris jadwal tanpa petugas atau rumah.");
+  .refine((s) => [s.residentId, s.userId, s.houseId, s.name].filter((v) => v !== null).length === 1, "Pilih satu warga untuk baris jadwal ini.");
 
 const settingsSchema = z.object({
   communityName: trimmed(80, "Isi nama lingkungan (maks. 80 karakter).").min(1, "Isi nama lingkungan (maks. 80 karakter)."),
@@ -153,13 +159,14 @@ export const adminRoutes = new Hono<AppEnv>()
 
   /** Tambah satu rumah atau banyak sekaligus ("1-20", "1, 3, 5"). */
   .post("/rumah", body(addHousesSchema), async (c) => {
-    const { block, numbers: raw } = c.req.valid("json");
+    const { block, numbers: raw, residentId } = c.req.valid("json");
     const numbers = parseNumberList(raw);
     if (!numbers || numbers.some((n) => !NUMBER_PATTERN.test(n))) {
       return c.json({ error: "Format nomor salah. Contoh: 12, atau 1-20, atau 1, 3, 5A." }, 400);
     }
+    if (residentId != null && numbers.length !== 1) return c.json({ error: "Pilih warga hanya saat menambah satu rumah." }, 400);
     const db = c.var.db;
-    // Nama KK hanya dipakai kalau menambah satu rumah.
+    // Nama hanya diterima dari klien lama; editor baru memilih profil warga yang sudah ada.
     const name = numbers.length === 1 ? c.req.valid("json").ownerName : null;
     const inserted = await db.transaction(async (tx) => {
       const added = await tx
@@ -167,7 +174,10 @@ export const adminRoutes = new Hono<AppEnv>()
         .values(numbers.map((number) => ({ block, number, token: newToken() })))
         .onConflictDoNothing({ target: [houses.block, houses.number] })
         .returning({ id: houses.id });
-      if (name && added.length === 1) await tx.insert(residents).values({ name, houseId: added[0].id });
+      if (added.length === 1) {
+        if (residentId != null) await selectHouseResident(tx, added[0].id, residentId, null, c.var.user.id);
+        else if (name) await tx.insert(residents).values({ name, houseId: added[0].id });
+      }
       return added.length;
     });
     if (inserted === 0) return c.json({ error: `Semua nomor di blok ${block} sudah terdaftar.` }, 409);
@@ -177,7 +187,7 @@ export const adminRoutes = new Hono<AppEnv>()
 
   .patch("/rumah/:id", idParam(), body(updateHouseSchema), async (c) => {
     const { id } = c.req.valid("param");
-    const { block, number, ownerName: name, status } = c.req.valid("json");
+    const { block, number, ownerName: name, status, residentId, previousResidentId } = c.req.valid("json");
     const db = c.var.db;
     const [duplicate] = await db
       .select({ id: houses.id })
@@ -185,6 +195,16 @@ export const adminRoutes = new Hono<AppEnv>()
       .where(and(eq(houses.block, block), eq(houses.number, number), ne(houses.id, id)))
       .limit(1);
     if (duplicate) return c.json({ error: `Rumah ${block}-${number} sudah ada.` }, 409);
+    if (residentId !== undefined || name === undefined) {
+      await db.transaction(async (tx) => {
+        const [house] = await tx.select({ id: houses.id }).from(houses).where(eq(houses.id, id));
+        if (!house) throw new HTTPException(404, { message: "Rumah tidak ditemukan." });
+        if (residentId !== undefined) await selectHouseResident(tx, id, residentId, previousResidentId!, c.var.user.id);
+        await tx.update(houses).set({ block, number, status }).where(eq(houses.id, id));
+      });
+      return c.json({ success: "Tersimpan." });
+    }
+    // Kompatibilitas editor lama yang masih mengirim ownerName.
     // Rumah yang dihuni petugas memakai nama akunnya: nama yang diubah di sini mengganti nama akun itu.
     const residents = await db.select({ id: users.id }).from(users).where(eq(users.houseId, id));
     if (residents.length === 1) {
@@ -289,27 +309,30 @@ export const adminRoutes = new Hono<AppEnv>()
   .post("/petugas", body(z.object({ name: userName, pin: pinField(), role, ...guardFields, residentId: z.number().int().positive().nullable().optional() })), async (c) => {
     const { name, pin, role: newRole, houseId, days, residentId } = c.req.valid("json");
     const db = c.var.db;
+    if (!canRonda(newRole) && days?.length) return c.json({ error: "Akun Warga tidak dapat dijadwalkan ronda." }, 400);
     if (await nameTaken(db, name, houseId)) return c.json({ error: nameTakenError(name) }, 409);
     if (!(await houseExists(db, houseId))) return c.json({ error: "Rumah tidak ditemukan." }, 404);
     const pinHash = await hashPin(pin);
     return db.transaction(async (tx) => {
-      // Pemanggil lama belum mengenal Warga: akun pertama menggantikan nama utama rumah.
-      const existingAccounts = houseId ? await tx.select({ id: users.id }).from(users).where(eq(users.houseId, houseId)) : [];
+      await tx.select({ id: settings.id }).from(settings).where(eq(settings.id, 1)).for("update");
+      // Hubungkan profil yang dipilih, atau nama/alamat yang persis cocok untuk pemanggil lama.
+      // Rumah yang sama saja tidak membuktikan orangnya sama.
       const matching = residentId === null ? [] : await tx.select().from(residents).where(residentId
         ? eq(residents.id, residentId)
         : and(isNull(residents.userId), houseId ? eq(residents.houseId, houseId) : isNull(residents.houseId),
-          houseId && !existingAccounts.length ? undefined : sql`lower(${residents.name}) = lower(${name})`))
+          sql`lower(${residents.name}) = lower(${name})`))
         .for("update");
       if (residentId && !matching.length) return c.json({ error: "Warga tidak ditemukan." }, 404);
       if (matching.some((r) => r.userId !== null)) return c.json({ error: "Warga ini sudah memiliki akun." }, 409);
       if (matching.length > 1) return c.json({ error: "Ada beberapa warga dengan nama yang sama. Pilih warga untuk akun ini." }, 409);
       if (matching[0]) await moveResident(tx, matching[0].id, houseId, c.var.user.id, localDate(new Date()));
       const [user] = await tx.insert(users).values({ name, pinHash, role: newRole, houseId }).returning({ id: users.id });
-      if (matching[0]) await tx.update(residents).set({ name: null, houseId: null, userId: user.id }).where(eq(residents.id, matching[0].id));
-      else await tx.insert(residents).values({ userId: user.id });
-      const slotsOfHouse = await houseSlots(tx, houseId);
-      const nights = days ?? slotsOfHouse.map((s) => s.day);
-      for (const statement of [...moveIntoHouse(tx, houseId), ...userDaysStatements(tx, user.id, nights, [], slotsOfHouse)]) await statement;
+      const profile = matching[0] ?? (await tx.insert(residents).values({ userId: user.id }).returning())[0];
+      if (matching[0]) await tx.update(residents).set({ name: null, houseId: null, userId: user.id }).where(eq(residents.id, profile.id));
+      const current = await tx.selectDistinct({ day: rondaSchedule.dayOfWeek }).from(rondaSchedule).where(eq(rondaSchedule.residentId, profile.id));
+      const currentDays = current.map((r) => r.day);
+      const nights = canRonda(newRole) ? days ?? currentDays : [];
+      for (const statement of [...moveIntoHouse(tx, houseId), ...residentDaysStatements(tx, profile.id, nights, currentDays)]) await statement;
       return c.json({ success: `${name} ditambahkan. Beri tahu PIN-nya secara langsung.`, id: user.id });
     });
   })
@@ -322,17 +345,12 @@ export const adminRoutes = new Hono<AppEnv>()
       const { id } = c.req.valid("param");
       const { name, role: newRole, active, houseId, days } = c.req.valid("json");
       const db = c.var.db;
+      if (!canRonda(newRole) && days?.length) return c.json({ error: "Akun Warga tidak dapat dijadwalkan ronda." }, 400);
       if (await nameTaken(db, name, houseId, id)) return c.json({ error: nameTakenError(name) }, 409);
       if (id === c.var.user.id && (!active || newRole !== c.var.user.role)) {
         return c.json({ error: "Tidak bisa menonaktifkan atau menurunkan peran akunmu sendiri." }, 400);
       }
       if (!(await houseExists(db, houseId))) return c.json({ error: "Rumah tidak ditemukan." }, 404);
-      const [current, slotsOfHouse] = await Promise.all([
-        db.selectDistinct({ day: rondaSchedule.dayOfWeek }).from(rondaSchedule).where(eq(rondaSchedule.userId, id)),
-        houseSlots(db, houseId),
-      ]);
-      const currentDays = current.map((r) => r.day);
-      const nights = days ?? [...currentDays, ...slotsOfHouse.map((s) => s.day)];
       await db.transaction(async (tx) => {
         // Serialkan perubahan akses agar dua pengurus tidak bisa saling menonaktifkan sekaligus.
         await tx.select({ id: settings.id }).from(settings).where(eq(settings.id, 1)).for("update");
@@ -342,12 +360,19 @@ export const adminRoutes = new Hono<AppEnv>()
           const remaining = await tx.select({ id: users.id }).from(users).where(and(eq(users.active, true), or(eq(users.role, "admin"), eq(users.role, "ketua")), ne(users.id, id)));
           if (!remaining.length) throw new HTTPException(409, { message: "Sisakan setidaknya satu Admin atau Ketua yang aktif untuk mengelola akses." });
         }
-        const [profile] = await tx.select({ id: residents.id }).from(residents).where(eq(residents.userId, id));
-        if (profile) await moveResident(tx, profile.id, houseId, c.var.user.id, localDate(new Date()), undefined, name);
-        await tx.update(users).set({ name, role: newRole, active, houseId,
+        const [profile] = await tx.select({ id: residents.id }).from(residents).where(eq(residents.userId, id)).for("update");
+        if (!profile) throw new HTTPException(409, { message: "Akun ini belum terhubung ke profil warga. Periksa data warga dahulu." });
+        const current = await tx.selectDistinct({ day: rondaSchedule.dayOfWeek }).from(rondaSchedule).where(eq(rondaSchedule.residentId, profile.id));
+        const currentDays = current.map((r) => r.day);
+        const nights = canRonda(newRole) ? days ?? currentDays : [];
+        await tx.update(users).set({ role: newRole, active,
           sessionVersion: sql`case when role <> ${newRole} or active <> ${active} then session_version + 1 else session_version end`,
         }).where(eq(users.id, id));
-        for (const statement of [...moveIntoHouse(tx, houseId), ...userDaysStatements(tx, id, nights, currentDays, slotsOfHouse)]) await statement;
+        if (profile) await moveResident(tx, profile.id, houseId, c.var.user.id, localDate(new Date()), undefined, name);
+        await tx.update(users).set({ name, houseId }).where(eq(users.id, id));
+        for (const statement of [...moveIntoHouse(tx, houseId), ...residentDaysStatements(tx, profile.id, nights, currentDays)]) await statement;
+        if (!canRonda(newRole)) await tx.update(scheduleRequests).set({ status: "cancelled", decidedAt: new Date() })
+          .where(and(eq(scheduleRequests.status, "pending"), or(eq(scheduleRequests.userId, id), eq(scheduleRequests.targetUserId, id))));
       });
       return c.json({ success: "Tersimpan." });
     },
@@ -453,9 +478,8 @@ export const adminRoutes = new Hono<AppEnv>()
       const withColors = colors?.length === entries.length ? entries.map((e, i) => ({ ...e, color: colors[i] })) : entries;
       const summary = await saveSchedule(c.var.db, withColors, { fillNames, overwriteNames });
       const parts = [`${summary.saved} baris jadwal tersimpan untuk ${summary.days} malam.`];
-      if (summary.linked) parts.push(`${summary.linked} terhubung ke akun petugas.`);
-      if (summary.housesLinked) parts.push(`${summary.housesLinked} petugas diisi rumahnya.`);
-      if (fillNames) parts.push(`${summary.namesFilled} nama KK diisi.`);
+      if (summary.linked) parts.push(`${summary.linked} terhubung ke warga.`);
+      if (fillNames) parts.push(`${summary.namesFilled} warga baru didata.`);
       if (summary.unknown.length) parts.push(`Belum ada di data rumah: ${summary.unknown.join(", ")}.`);
       if (summary.conflicting.length) parts.push(`Nama ganda, tidak diisi: ${summary.conflicting.join("; ")}.`);
       return c.json({ success: parts.join(" ") });

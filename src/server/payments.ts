@@ -25,26 +25,31 @@ export async function getPaymentData(db: Executor) {
   return { plans, receipts, cells, dailyCells, defaultAmount: config?.defaultAmount ?? 500 };
 }
 
-/** Hari kosong yang dapat dibayar rapel. Tidak membuat tagihan untuk rumah harian. */
-export async function getRapelDates(db: Executor, houseId: number, before: string, excludePaymentId?: number) {
+/** Pilihan rumah dan hari rapel berasal dari catatan kosong yang belum dilunasi. */
+export async function getRapelOptions(db: Executor, before: string, houseId?: number, excludePaymentId?: number) {
   const [data, empty] = await Promise.all([
     getPaymentData(db),
-    db.select({ date: patrols.date }).from(collections)
+    db.select({ houseId: collections.houseId, date: patrols.date }).from(collections)
       .innerJoin(patrols, eq(patrols.id, collections.patrolId))
       .innerJoin(houses, eq(houses.id, collections.houseId))
-      .where(and(eq(collections.houseId, houseId), eq(collections.status, "empty"), eq(houses.status, "active"), lte(patrols.date, before)))
+      .where(and(houseId === undefined ? undefined : eq(collections.houseId, houseId), eq(collections.status, "empty"), eq(houses.status, "active"), lte(patrols.date, before)))
       .orderBy(asc(patrols.date)),
   ]);
   const cells = excludePaymentId === undefined ? data.cells
     : paymentCells(data.receipts.filter((p) => p.id !== excludePaymentId), data.plans, data.defaultAmount);
-  return empty.flatMap(({ date }) => {
+  return empty.flatMap(({ houseId, date }) => {
     const plan = planAt(data.plans, houseId, date);
     if (plan && plan.cadence !== "daily") return [];
     const cell = cells[houseId + ":" + date];
     if ((cell?.rapelAmount ?? 0) > 0) return [];
     const remaining = Math.max(0, (plan?.ratePerNight ?? data.defaultAmount) - (cell?.amount ?? 0));
-    return remaining > 0 ? [{ date, amount: remaining }] : [];
+    return remaining > 0 ? [{ houseId, date, amount: remaining }] : [];
   });
+}
+
+/** Hari kosong yang dapat dibayar rapel. Tidak membuat tagihan untuk rumah harian. */
+export async function getRapelDates(db: Executor, houseId: number, before: string, excludePaymentId?: number) {
+  return (await getRapelOptions(db, before, houseId, excludePaymentId)).map(({ date, amount }) => ({ date, amount }));
 }
 
 export async function getPaymentMonth(db: Db, month: string, today = localDate(new Date())) {

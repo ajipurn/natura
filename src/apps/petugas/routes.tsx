@@ -10,6 +10,13 @@ import { JadwalPetugas } from "./jadwal";
 import { RondaPage } from "./ronda/ronda-page";
 import { BerandaPage } from "../warga/beranda";
 import { adminPath, petugasPath } from "@/lib/app-paths";
+import { useAuth } from "@/client/auth";
+import { canRonda } from "@/lib/permissions";
+
+function RondaAccess() {
+  const user = useAuth().data?.user;
+  return user && canRonda(user.role) ? <RondaPage /> : <Navigate to={petugasPath()} replace />;
+}
 
 function LegacyAppRedirect() {
   const { pathname, search, hash } = useLocation();
@@ -36,7 +43,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       { path: petugasPath(), element: <BerandaPage /> },
-      { path: petugasPath("/ronda"), element: <RondaPage /> },
+      { path: petugasPath("/ronda"), element: <RondaAccess /> },
       ...(atAppRoot ? [] : [{ path: petugasPath("/info"), element: <Navigate to={petugasPath()} replace /> }]),
       { path: petugasPath("/riwayat"), element: <PatrolList basePath={petugasPath("/riwayat")} /> },
       { path: petugasPath("/riwayat/:tanggal"), element: <PatrolDetail basePath={petugasPath("/riwayat")} canCorrect={false} /> },

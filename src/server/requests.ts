@@ -1,9 +1,10 @@
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { NEW_SLOT_COLOR } from "@/lib/guard-color";
-import { runBatch, type Db, type Executor } from "./db";
-import { guardDaysByUser } from "./schedule";
-import { houses, rondaSchedule, scheduleRequests, users } from "./schema";
+import { canRonda } from "@/lib/permissions";
+import type { Db, Executor } from "./db";
+import { guardDaysByUser, residentIdForUser, scheduledAccount } from "./schedule";
+import { houses, residents, rondaSchedule, scheduleRequests, users } from "./schema";
 
 const targetUser = alias(users, "target_user");
 const targetHouse = alias(houses, "target_house");
@@ -83,9 +84,10 @@ export async function createRequest(db: Db, userId: number, input: RequestInput)
   return db.transaction(async (tx) => {
     const involved = targetUserId === null ? [userId] : [userId, targetUserId];
     // Kunci akun dalam urutan yang tetap: dua permintaan bersamaan tidak boleh memakai petugas yang sama.
-    const accounts = await tx.select({ id: users.id, active: users.active }).from(users)
+    const accounts = await tx.select({ id: users.id, active: users.active, role: users.role }).from(users)
       .where(inArray(users.id, involved)).orderBy(asc(users.id)).for("update");
     if (accounts.length !== involved.length || accounts.some((u) => !u.active)) return "Petugas tidak ditemukan atau sudah nonaktif.";
+    if (accounts.some((u) => !canRonda(u.role))) return "Akun Warga tidak dapat dijadwalkan ronda.";
     const daysByUser = await guardDaysByUser(tx);
     const days = daysByUser.get(userId) ?? [];
     if (input.fromDay !== null && !days.includes(input.fromDay)) return "Kamu tidak dijadwalkan di malam itu.";
@@ -138,7 +140,7 @@ export async function decideRequest(
     .limit(1);
   if (!request) return "Permintaan tidak ditemukan.";
   if (request.status !== "pending") return "Permintaan ini sudah diproses atau dibatalkan.";
-  if (request.targetUserId !== null) return decideSwap(db, id, adminId, decision, response);
+  if (request.targetUserId !== null) return decideSwap(db, id, adminId, decision, response, [request.userId, request.targetUserId]);
 
   const mark = (tx: Executor) =>
     tx
@@ -150,32 +152,39 @@ export async function decideRequest(
     return null;
   }
 
-  const slots = await db
-    .select({ id: rondaSchedule.id, day: rondaSchedule.dayOfWeek })
-    .from(rondaSchedule)
-    .where(eq(rondaSchedule.userId, request.userId));
-  const from = request.fromDay === null ? undefined : slots.find((s) => s.day === request.fromDay);
-  const alreadyThere = slots.some((s) => s.day === request.toDay);
-  const lastPosition = sql`(select coalesce(max(${rondaSchedule.position}), -1) + 1 from ${rondaSchedule} where ${rondaSchedule.dayOfWeek} = ${request.toDay})`;
-
-  if (alreadyThere) {
-    // Sudah jaga di malam tujuan (mis. diatur admin lewat editor): cukup lepas malam lamanya.
-    await runBatch(db, (tx) => [mark(tx), ...(from ? [tx.delete(rondaSchedule).where(eq(rondaSchedule.id, from.id))] : [])]);
-  } else if (from) {
-    await runBatch(db, (tx) => [
-      mark(tx),
-      tx.update(rondaSchedule).set({ dayOfWeek: request.toDay, position: lastPosition }).where(eq(rondaSchedule.id, from.id)),
-    ]);
-  } else {
-    // Rumahnya ikut dari akun petugas.
-    await runBatch(db, (tx) => [mark(tx), tx.insert(rondaSchedule).values({ dayOfWeek: request.toDay, position: lastPosition, userId: request.userId, color: NEW_SLOT_COLOR })]);
-  }
-  return null;
+  return db.transaction(async (tx) => {
+    // Kunci akun sebelum permintaan, sama seperti perubahan peran di Akun & akses.
+    const [account] = await tx.select({ role: users.role }).from(users).where(eq(users.id, request.userId)).for("update");
+    if (!account || !canRonda(account.role)) return "Akun Warga tidak dapat dijadwalkan ronda.";
+    const [current] = await tx.select({ status: scheduleRequests.status }).from(scheduleRequests).where(eq(scheduleRequests.id, id)).for("update");
+    if (!current || current.status !== "pending") return "Permintaan ini sudah diproses atau dibatalkan.";
+    const slots = await tx
+      .select({ id: rondaSchedule.id, day: rondaSchedule.dayOfWeek })
+      .from(rondaSchedule)
+      .where(scheduledAccount(request.userId));
+    const from = request.fromDay === null ? undefined : slots.find((s) => s.day === request.fromDay);
+    const alreadyThere = slots.some((s) => s.day === request.toDay);
+    const lastPosition = sql`(select coalesce(max(${rondaSchedule.position}), -1) + 1 from ${rondaSchedule} where ${rondaSchedule.dayOfWeek} = ${request.toDay})`;
+    await mark(tx);
+    if (alreadyThere) {
+      if (from) await tx.delete(rondaSchedule).where(eq(rondaSchedule.id, from.id));
+    } else if (from) {
+      await tx.update(rondaSchedule).set({ dayOfWeek: request.toDay, position: lastPosition }).where(eq(rondaSchedule.id, from.id));
+    } else {
+      const residentId = await residentIdForUser(tx, request.userId);
+      if (!residentId) throw new Error("Akun belum terhubung ke profil warga.");
+      await tx.insert(rondaSchedule).values({ dayOfWeek: request.toDay, position: lastPosition, residentId, color: NEW_SLOT_COLOR });
+    }
+    return null;
+  });
 }
 
 /** Tukar dua baris beserta posisinya, tetap memakai rujukan akun dan warna masing-masing petugas. */
-async function decideSwap(db: Db, id: number, adminId: number, decision: "approved" | "rejected", response: string | null): Promise<string | null> {
+async function decideSwap(db: Db, id: number, adminId: number, decision: "approved" | "rejected", response: string | null, involved: number[]): Promise<string | null> {
   return db.transaction(async (tx) => {
+    // Perubahan peran juga mengunci akun sebelum membatalkan permintaan yang melibatkannya.
+    const accounts = decision === "approved" ? await tx.select({ id: users.id, active: users.active, role: users.role }).from(users)
+      .where(inArray(users.id, involved)).orderBy(asc(users.id)).for("update") : [];
     const [request] = await tx.select().from(scheduleRequests).where(eq(scheduleRequests.id, id)).for("update");
     if (!request || request.status !== "pending") return "Permintaan ini sudah diproses atau dibatalkan.";
     const mark = () => tx.update(scheduleRequests).set({ status: decision, response, decidedBy: adminId, decidedAt: new Date() })
@@ -184,13 +193,13 @@ async function decideSwap(db: Db, id: number, adminId: number, decision: "approv
       await mark();
       return null;
     }
-    const involved = [request.userId, request.targetUserId!];
-    const accounts = await tx.select({ id: users.id, active: users.active }).from(users)
-      .where(inArray(users.id, involved)).orderBy(asc(users.id)).for("update");
     if (accounts.length !== 2 || accounts.some((u) => !u.active)) return "Salah satu petugas sudah nonaktif. Tolak permintaan ini.";
-    const slots = await tx.select().from(rondaSchedule).where(inArray(rondaSchedule.userId, involved)).orderBy(asc(rondaSchedule.id)).for("update");
-    const own = slots.filter((s) => s.userId === request.userId);
-    const target = slots.filter((s) => s.userId === request.targetUserId);
+    if (accounts.some((u) => !canRonda(u.role))) return "Akun Warga tidak dapat dijadwalkan ronda.";
+    const profiles = await tx.select({ id: residents.id, userId: residents.userId }).from(residents).where(inArray(residents.userId, involved));
+    if (profiles.length !== 2) return "Salah satu akun belum terhubung ke profil warga.";
+    const slots = await tx.select().from(rondaSchedule).where(inArray(rondaSchedule.residentId, profiles.map((r) => r.id))).orderBy(asc(rondaSchedule.id)).for("update");
+    const own = slots.filter((s) => s.residentId === profiles.find((r) => r.userId === request.userId)!.id);
+    const target = slots.filter((s) => s.residentId === profiles.find((r) => r.userId === request.targetUserId)!.id);
     const from = own.filter((s) => s.dayOfWeek === request.fromDay);
     const to = target.filter((s) => s.dayOfWeek === request.toDay);
     if (from.length !== 1 || to.length !== 1 || own.some((s) => s.dayOfWeek === request.toDay) || target.some((s) => s.dayOfWeek === request.fromDay)) {

@@ -59,7 +59,7 @@ export function IuranPage() {
     ? params.get("bulan")!
     : thisMonth;
   const query = useQuery(duesQuery(month));
-  const [view, setView] = useState<"bills" | "types" | "receipts">("bills");
+  const [view, setView] = useState<"bills" | "types" | "receipts">(params.get("view") === "receipts" ? "receipts" : "bills");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [typeEditing, setTypeEditing] = useState<number | "new" | null>(null);

@@ -27,7 +27,8 @@ import { hashPin } from "../src/server/pin";
 import { houses, rondaSchedule, users } from "../src/server/schema";
 import { SITE_PLAN } from "../src/site-plan";
 import { houseName } from "../src/server/house-name";
-import { adoptLegacyResidents } from "../src/server/residents";
+import { adoptLegacyResidents, listResidents } from "../src/server/residents";
+import { canRonda } from "../src/lib/permissions";
 
 const MAX_NAME = 40;
 const COLOR_CODES: Record<string, GuardColor> = { H: "green", K: "yellow", O: "orange", B: "blue" };
@@ -97,12 +98,14 @@ export async function seed(db: Db, { root, label, remote, replaceSchedule, log }
   }
   await db.transaction(async (tx) => {
     if (newUsers.length) await tx.insert(users).values(newUsers);
+    await adoptLegacyResidents(tx);
     await tx
       .update(houses)
       .set({ ownerName: null })
       .where(sql`${houses.id} in (select ${users.houseId} from ${users} where ${users.houseId} is not null)`);
   });
-  const residents: GuardAccount[] = await db.select({ id: users.id, name: users.name, houseId: users.houseId }).from(users);
+  const people = await listResidents(db);
+  const guards = people.filter((r) => !r.role || (canRonda(r.role) && r.accountActive));
 
   // 3. Jadwal ronda dari file, kalau jadwal masih kosong (atau diminta diganti dengan --jadwal).
   //    Baris jadwal menunjuk akun petugas atau rumah, beserta warna selnya.
@@ -110,23 +113,23 @@ export async function seed(db: Db, { root, label, remote, replaceSchedule, log }
     .split("\n")
     .map((line) => line.split("\t"));
   const colorOf = (e: ScheduleEntry) => COLOR_CODES[colorGrid[e.cell?.row ?? -1]?.[e.cell?.col ?? -1]?.trim()] ?? null;
-  const resolved = entries.map((e) => ({ e, slot: resolveEntry(e, byKey, residents), color: colorOf(e) }));
+  const resolved = entries.map((e) => ({ e, slot: resolveEntry(e, byKey, guards), color: colorOf(e) }));
   const statements: ((tx: Executor) => Statement)[] = [];
   if (writeSchedule) {
     statements.push((tx) => tx.delete(rondaSchedule));
     if (resolved.length) {
       statements.push((tx) =>
         tx.insert(rondaSchedule).values(
-          resolved.map(({ e, slot, color }) => ({ dayOfWeek: e.day, position: e.position, userId: slot.userId, houseId: slot.houseId, name: slot.name, color })),
+          resolved.map(({ e, slot, color }) => ({ dayOfWeek: e.day, position: e.position, residentId: slot.residentId, houseId: slot.houseId, name: slot.name, color })),
         ),
       );
     }
   } else {
     // Jadwal sudah ada (mungkin sudah diatur di dashboard): hanya isi warna yang masih kosong.
     // Petugas/rumah yang muncul sekali dicocokkan tanpa malamnya, jadi tetap kena walau sudah dipindah malam.
-    const sourceKey = (slot: SlotSource) => (slot.userId ? `u${slot.userId}` : slot.houseId ? `h${slot.houseId}` : `n${slot.name}`);
+    const sourceKey = (slot: SlotSource) => (slot.residentId ? `r${slot.residentId}` : slot.houseId ? `h${slot.houseId}` : `n${slot.name}`);
     const source = (slot: SlotSource): SQL =>
-      slot.userId ? eq(rondaSchedule.userId, slot.userId) : slot.houseId ? eq(rondaSchedule.houseId, slot.houseId) : eq(rondaSchedule.name, slot.name ?? "");
+      slot.residentId ? eq(rondaSchedule.residentId, slot.residentId) : slot.houseId ? eq(rondaSchedule.houseId, slot.houseId) : eq(rondaSchedule.name, slot.name ?? "");
     const perSource = new Map<string, number>();
     for (const { slot } of resolved) perSource.set(sourceKey(slot), (perSource.get(sourceKey(slot)) ?? 0) + 1);
     for (const { e, slot, color } of resolved) {
@@ -138,7 +141,7 @@ export async function seed(db: Db, { root, label, remote, replaceSchedule, log }
 
   // 4. Nama KK dari jadwal untuk rumah tanpa akun yang nama KK-nya masih kosong.
   const { unknown, conflicting, uniqueNames } = analyzeSchedule(entries, new Set(byKey.keys()));
-  const withAccount = new Set(residents.map((u) => u.houseId));
+  const withAccount = new Set(people.map((u) => u.houseId));
   let namesFilled = 0;
   for (const [key, name] of uniqueNames) {
     const house = byKey.get(key);

@@ -8,9 +8,11 @@ import {
   ArrowRightLeft,
   ArrowUp,
   CalendarDays,
+  Check,
   FileSpreadsheet,
   GripVertical,
   ImageDown,
+  Palette,
   Plus,
   Trash2,
   UserRound,
@@ -36,8 +38,8 @@ import { DAY_NAMES, dayLabel, scheduleDay, slotHouseLabel } from "@/lib/schedule
 import { createScheduleImage } from "@/lib/schedule-image";
 import { houseKey } from "@/lib/site-plan";
 import type { HouseDTO, ScheduleDTO } from "@/lib/types";
-import type { Petugas } from "../petugas/petugas-dialog";
-import { housesQuery, settingsQuery, usersQuery } from "../queries";
+import type { Resident } from "../warga/warga-dialog";
+import { housesQuery, settingsQuery, residentsQuery } from "../queries";
 import { AddSlotDialog } from "./add-slot-dialog";
 import { HouseNameDialog } from "./house-name-dialog";
 import { RequestsPanel } from "./requests-panel";
@@ -55,7 +57,7 @@ export function JadwalPage() {
   const canEdit = usePermission("schedule", true);
   const queryClient = useQueryClient();
   const schedule = useQuery(scheduleQuery);
-  const users = useQuery({ ...usersQuery, enabled: canEdit });
+  const people = useQuery({ ...residentsQuery, enabled: canEdit });
   const houses = useQuery({ ...housesQuery, enabled: canEdit });
   const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -65,7 +67,7 @@ export function JadwalPage() {
   const exporting = useMutation({
     mutationFn: async () => {
       const settings = await queryClient.ensureQueryData(settingsQuery);
-      const blob = await createScheduleImage(schedule.data?.schedule ?? [], settings.communityName);
+      const blob = await createScheduleImage(schedule.data?.schedule ?? [], settings.communityName, settings.logoUrl);
       const url = URL.createObjectURL(blob);
       const link = Object.assign(document.createElement("a"), { href: url, download: `jadwal-ronda-${rondaDate(new Date())}.png` });
       document.body.append(link);
@@ -111,7 +113,7 @@ export function JadwalPage() {
           <ScheduleEditor
             key={version}
             schedule={data.schedule}
-            users={users.data?.users ?? []}
+            people={people.data?.residents ?? []}
             houses={houses.data?.houses ?? []}
             tonight={tonight}
             onImport={() => setImportOpen(true)}
@@ -134,7 +136,7 @@ export function JadwalPage() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         title="Impor jadwal dari spreadsheet"
-        description="Jadwal yang sekarang diganti seluruhnya. Nama yang sama dengan akun petugas otomatis terhubung."
+        description="Jadwal yang sekarang diganti seluruhnya. Nama dan alamat yang cocok terhubung ke warga. Tempat tinggal tidak berubah."
         className="sm:max-w-2xl"
       >
         <ScheduleImportForm
@@ -149,14 +151,14 @@ export function JadwalPage() {
 
 function ScheduleEditor({
   schedule,
-  users,
+  people,
   houses,
   tonight,
   onImport,
   onEditingChange,
 }: {
   schedule: ScheduleDTO[];
-  users: Petugas[];
+  people: Resident[];
   houses: HouseDTO[];
   tonight: number;
   onImport: () => void;
@@ -168,8 +170,10 @@ function ScheduleEditor({
   const [base, setBase] = useState(initial);
   const [draft, setDraft] = useState(initial);
   const [adding, setAdding] = useState<number | null>(null);
+  const [replacing, setReplacing] = useState<string | null>(null);
   const [naming, setNaming] = useState<HouseDTO | null>(null);
   const [swapping, setSwapping] = useState<string | null>(null);
+  const [choosing, setChoosing] = useState<{ key: string; kind: "day" | "color"; open: boolean } | null>(null);
   const beforeDrag = useRef(draft);
   const dirty = !sameSchedule(draft, base);
 
@@ -208,6 +212,8 @@ function ScheduleEditor({
   const days = DAY_NAMES.map((_, i) => (tonight + i) % 7);
   const houseById = useMemo(() => new Map(houses.map((h) => [h.id, h])), [houses]);
   const inactiveCount = draft.filter((s) => s.userActive === false).length;
+  const chosenSlot = draft.find((s) => s.key === choosing?.key);
+  const closeChoices = () => setChoosing((choice) => choice ? { ...choice, open: false } : null);
 
   if (draft.length === 0 && !dirty) {
     return (
@@ -228,7 +234,7 @@ function ScheduleEditor({
           <AddSlotDialog
             day={adding}
             onClose={() => setAdding(null)}
-            users={users}
+            people={people}
             houses={houses}
             slotsOfDay={[]}
             onAdd={(slot) => {
@@ -305,6 +311,11 @@ function ScheduleEditor({
                     index={i}
                     count={slots.length}
                     actions={[
+                      {
+                        label: slot.residentId || slot.userId ? "Ganti petugas" : "Pilih petugas",
+                        icon: <UserRound className="size-4" />,
+                        onSelect: () => { setReplacing(slot.key); setAdding(day); },
+                      },
                       ...(slot.houseId && !slot.name && !slot.ownerName
                         ? [
                             {
@@ -333,21 +344,16 @@ function ScheduleEditor({
                         disabled: save.isPending,
                         onSelect: () => setSwapping(slot.key),
                       },
-                      { heading: "Pindah ke" },
-                      ...days
-                        .filter((d) => d !== day)
-                        .map((target) => ({
-                          label: dayLabel(target),
-                          icon: <ArrowRightLeft className="size-4" />,
-                          onSelect: () => setDraft((d) => moveSlot(d, slot.key, target)),
-                        })),
-                      { heading: "Warna" },
-                      ...COLOR_CHOICES.map(([color, label]) => ({
-                        label: slot.color === color ? `${label} ✓` : label,
-                        hint: colorMeaning(color),
-                        icon: <span aria-hidden className={cx("size-4 rounded-full", guardColorClass(color))} />,
-                        onSelect: () => setDraft((d) => d.map((s) => (s.key === slot.key ? { ...s, color } : s))),
-                      })),
+                      {
+                        label: "Pindah malam",
+                        icon: <CalendarDays className="size-4" />,
+                        onSelect: () => setChoosing({ key: slot.key, kind: "day", open: true }),
+                      },
+                      {
+                        label: "Ubah warna",
+                        icon: <Palette className="size-4" />,
+                        onSelect: () => setChoosing({ key: slot.key, kind: "color", open: true }),
+                      },
                       {
                         label: "Hapus dari jadwal",
                         icon: <Trash2 className="size-4" />,
@@ -394,6 +400,49 @@ function ScheduleEditor({
         </div>
       )}
 
+      <Dialog
+        open={!!chosenSlot && choosing?.open === true}
+        onClose={closeChoices}
+        title={choosing?.kind === "day" ? "Pindah malam" : "Ubah warna"}
+        description={chosenSlot ? `${chosenSlot.name ?? chosenSlot.ownerName ?? slotHouseLabel(chosenSlot)} · ${dayLabel(chosenSlot.day)}` : undefined}
+        className="sm:max-w-sm"
+        finalFocus={() => document.querySelector<HTMLElement>(`[data-slot-key="${choosing?.key}"] button[aria-haspopup="menu"]`) ?? true}
+      >
+        {chosenSlot && <div className="space-y-2">
+          {choosing?.kind === "day" ? days.filter((day) => day !== chosenSlot.day).map((day) => (
+            <Button
+              key={day}
+              variant="secondary"
+              className="w-full justify-start text-sm"
+              onClick={() => {
+                setDraft((d) => moveSlot(d, chosenSlot.key, day));
+                closeChoices();
+              }}
+            >
+              <CalendarDays className="size-4 shrink-0 text-muted" aria-hidden />
+              {dayLabel(day)}
+            </Button>
+          )) : COLOR_CHOICES.map(([color, label]) => (
+            <Button
+              key={color ?? "white"}
+              variant="secondary"
+              aria-pressed={chosenSlot.color === color}
+              className={cx("h-auto min-h-14 w-full justify-start py-2 text-left text-sm", chosenSlot.color === color && "border-primary bg-primary/5")}
+              onClick={() => {
+                setDraft((d) => d.map((s) => s.key === chosenSlot.key ? { ...s, color } : s));
+                closeChoices();
+              }}
+            >
+              <span aria-hidden className={cx("size-5 shrink-0 rounded-full", guardColorClass(color))} />
+              <span className="min-w-0 flex-1">
+                <span className="block">{label}</span>
+                <span className="block text-xs font-normal text-muted">{colorMeaning(color)}</span>
+              </span>
+              {chosenSlot.color === color && <Check className="size-4 shrink-0 text-primary" aria-hidden />}
+            </Button>
+          ))}
+        </div>}
+      </Dialog>
       <SwapSlotDialog
         sourceKey={swapping}
         draft={draft}
@@ -408,7 +457,7 @@ function ScheduleEditor({
         onClose={() => setNaming(null)}
         onSaved={(houseId, ownerName) => {
           // Tampil juga di jadwal yang sedang diedit; nama KK tidak ikut disimpan bersama jadwal.
-          const withName = (d: DraftSlot[]) => d.map((s) => (s.houseId === houseId && !s.userId ? { ...s, ownerName } : s));
+          const withName = (d: DraftSlot[]) => d.map((s) => (s.houseId === houseId && !s.residentId && !s.userId ? { ...s, ownerName } : s));
           setDraft(withName);
           setBase(withName);
           setNaming(null);
@@ -416,11 +465,17 @@ function ScheduleEditor({
       />
       <AddSlotDialog
         day={adding}
-        onClose={() => setAdding(null)}
-        users={users}
+        onClose={() => { setAdding(null); setReplacing(null); }}
+        people={people}
         houses={houses}
-        slotsOfDay={adding === null ? [] : draft.filter((s) => s.day === adding)}
+        slotsOfDay={adding === null ? [] : draft.filter((s) => s.day === adding && s.key !== replacing)}
         onAdd={(slot) => {
+          if (replacing) {
+            setDraft((d) => d.map((s) => s.key === replacing ? { ...s, ...slot, color: s.color } : s));
+            setReplacing(null);
+            setAdding(null);
+            return;
+          }
           const key = newKey();
           // Ditaruh di urutan terakhir malam itu.
           setDraft((d) => moveSlot([...d, { ...slot, day: adding!, key }], key, adding!));
@@ -506,6 +561,7 @@ function SlotRow({ slot, index, count, actions }: { slot: DraftSlot; index: numb
   return (
     <li
       ref={ref}
+      data-slot-key={slot.key}
       aria-label={`${index + 1} dari ${count}: ${title}`}
       className={cx(
         "flex cursor-grab touch-manipulation items-center gap-2 bg-card px-2 py-1.5 active:cursor-grabbing",
@@ -533,7 +589,7 @@ function SlotRow({ slot, index, count, actions }: { slot: DraftSlot; index: numb
         {name && (
           <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
             {house || "tanpa rumah"}
-            {!slot.userId && <span title="Belum punya akun petugas">· tanpa akun</span>}
+            {slot.residentId ? !slot.userId && <span>· tanpa akun</span> : <span>· pilih petugas</span>}
             {slot.userActive === false && <span className="text-warn">· nonaktif</span>}
           </span>
         )}

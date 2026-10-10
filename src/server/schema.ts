@@ -23,7 +23,7 @@ import {
  */
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 
-export const roleEnum = pgEnum("role", ["admin", "petugas", "ketua", "sekretaris", "bendahara", "humas"]);
+export const roleEnum = pgEnum("role", ["admin", "petugas", "ketua", "sekretaris", "bendahara", "humas", "warga"]);
 /** `vacant` = rumah kosong / penghuni mudik, tidak dihitung sebagai bolong. */
 export const houseStatusEnum = pgEnum("house_status", ["active", "vacant"]);
 /** `filled` = wadah jimpitan ada isinya, `empty` = kosong. */
@@ -62,7 +62,7 @@ export const settings = pgTable("settings", {
 }).enableRLS();
 
 /**
- * Akun petugas/admin. Nama akun juga nama warga di rumahnya (`houseId`): rumah yang dihuni petugas
+ * Akun warga, petugas, dan pengurus. Nama akun juga nama warga di rumahnya (`houseId`): rumah yang dihuni akun
  * tidak menyimpan nama sendiri. Nama boleh kembar asal rumahnya beda.
  */
 export const users = pgTable("users", {
@@ -75,7 +75,7 @@ export const users = pgTable("users", {
   lockedUntil: timestamp("locked_until", { withTimezone: true }),
   /** Dinaikkan saat PIN diganti supaya sesi lama tidak berlaku lagi. */
   sessionVersion: integer("session_version").notNull().default(1),
-  /** Rumah tempat petugas tinggal; jadwal jaganya ikut memakai rumah ini. */
+  /** Rumah pemegang akun; jadwal jaga petugas ikut memakai rumah ini. */
   houseId: integer("house_id").references((): AnyPgColumn => houses.id, { onDelete: "set null" }),
   createdAt: createdAt(),
 }).enableRLS();
@@ -193,8 +193,8 @@ export const collectionLogs = pgTable(
 
 /**
  * Jadwal ronda mingguan. `dayOfWeek` = hari malamnya (0 = Ahad/malam Senin … 6 = Sabtu/malam Minggu).
- * Tiap baris menunjuk tepat satu: akun petugas (rumah dan namanya dari akun), rumah tanpa akun
- * (nama dari data rumah), atau nama bebas tanpa akun dan rumah. Tidak ada salinan nama atau blok/nomor.
+ * Tugas melekat pada profil warga, termasuk warga yang belum memiliki akun. Rumah/nama bebas
+ * hanya penanda jadwal lama yang petugasnya belum ditentukan. Tidak ada salinan identitas warga.
  */
 export const rondaSchedule = pgTable(
   "ronda_schedule",
@@ -202,14 +202,14 @@ export const rondaSchedule = pgTable(
     id: serial("id").primaryKey(),
     dayOfWeek: integer("day_of_week").notNull(),
     position: integer("position").notNull(),
-    userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+    residentId: integer("resident_id").references(() => residents.id, { onDelete: "restrict" }),
     houseId: integer("house_id").references(() => houses.id, { onDelete: "cascade" }),
     name: text("name"),
     color: guardColorEnum("color"),
   },
   (t) => [
     index("ronda_schedule_day_idx").on(t.dayOfWeek, t.position),
-    check("ronda_schedule_one_source", sql`num_nonnulls(user_id, house_id, name) = 1`),
+    check("ronda_schedule_one_source", sql`num_nonnulls(resident_id, house_id, name) = 1`),
   ],
 ).enableRLS();
 

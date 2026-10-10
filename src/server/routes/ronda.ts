@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { isIsoDate, isMonth, rondaDate } from "@/lib/dates";
-import { requireUser } from "../auth";
+import { requireRonda, requireUser } from "../auth";
 import { applyEntries, entriesSchema } from "../collections";
 import type { AppEnv } from "../env";
 import { body, idParam } from "../http";
@@ -30,13 +30,13 @@ const monthQuery = validator("query", (value: Record<string, string | string[]>)
  */
 export const rondaRoutes = new Hono<AppEnv>()
   /** Data malam ini untuk layar Ronda (disimpan di HP supaya bisa dipakai offline). */
-  .get("/ronda", requireUser, async (c) => {
+  .get("/ronda", requireUser, requireRonda, async (c) => {
     c.header("Cache-Control", "no-store");
     return c.json(await getRondaSnapshot(c.var.db, c.var.user));
   })
 
   /** Antrean catatan dari HP petugas. */
-  .post("/ronda/catatan", requireUser, body(entriesSchema), async (c) => {
+  .post("/ronda/catatan", requireUser, requireRonda, body(entriesSchema), async (c) => {
     const results = await applyEntries(c.var.db, c.var.user, c.req.valid("json").entries);
     return c.json({ results });
   })
@@ -44,11 +44,12 @@ export const rondaRoutes = new Hono<AppEnv>()
   .get("/jadwal", requireUser, async (c) => c.json({ schedule: await listSchedule(c.var.db) }))
 
   /** Permintaan ubah jadwal milik petugas yang sedang masuk. */
-  .get("/jadwal/permintaan", requireUser, async (c) => c.json({ requests: await listOwnRequests(c.var.db, c.var.user.id) }))
+  .get("/jadwal/permintaan", requireUser, requireRonda, async (c) => c.json({ requests: await listOwnRequests(c.var.db, c.var.user.id) }))
 
   .post(
     "/jadwal/permintaan",
     requireUser,
+    requireRonda,
     body(
       z.object({
         fromDay: z.number().int().min(0).max(6).nullable(),
@@ -68,7 +69,7 @@ export const rondaRoutes = new Hono<AppEnv>()
     },
   )
 
-  .post("/jadwal/permintaan/:id/batal", requireUser, idParam(), async (c) => {
+  .post("/jadwal/permintaan/:id/batal", requireUser, requireRonda, idParam(), async (c) => {
     if (!(await cancelRequest(c.var.db, c.var.user.id, c.req.valid("param").id))) {
       return c.json({ error: "Permintaan tidak bisa dibatalkan (mungkin sudah diproses)." }, 409);
     }

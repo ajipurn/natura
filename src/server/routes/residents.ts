@@ -9,7 +9,7 @@ import { accountNameTaken, accountNameTakenError, listResidents } from "../resid
 import { isIsoDate, localDate } from "@/lib/dates";
 import type { Tx } from "../db";
 import { moveResident, residenceHistory } from "../residence";
-import { families, houses, residents, residenceMoves, users } from "../schema";
+import { families, houses, residents, residenceMoves, rondaSchedule, users } from "../schema";
 
 const residentSchema = z.object({
   name: z.string().trim().min(1, "Isi nama warga.").max(100, "Nama maksimal 100 karakter."),
@@ -77,13 +77,15 @@ export const residentRoutes = new Hono<AppEnv>()
     const { id } = c.req.valid("param");
     const [head] = await c.var.db.select({ id: families.id }).from(families).where(eq(families.headResidentId, id));
     if (head) return c.json({ error: "Ganti kepala keluarga atau hapus kelompok keluarganya dahulu." }, 409);
+    const [scheduled] = await c.var.db.select({ id: rondaSchedule.id }).from(rondaSchedule).where(eq(rondaSchedule.residentId, id)).limit(1);
+    if (scheduled) return c.json({ error: "Warga ini masih ditugaskan ronda. Hapus tugasnya di Jadwal ronda dahulu." }, 409);
     const deleted = await c.var.db.delete(residents)
       .where(and(eq(residents.id, id), isNull(residents.userId)))
       .returning({ id: residents.id });
     if (deleted.length) return c.json({ success: "Warga dihapus." });
     const [resident] = await c.var.db.select({ id: residents.id }).from(residents).where(eq(residents.id, id));
     return resident
-      ? c.json({ error: "Warga ini memiliki akun petugas. Kelola aksesnya melalui Akun & akses." }, 409)
+      ? c.json({ error: "Warga ini memiliki akun. Kelola aksesnya melalui tab Akun di Warga." }, 409)
       : c.json({ error: "Warga tidak ditemukan." }, 404);
   })
   .get("/:id/riwayat", idParam(), async (c) => c.json({ moves: await residenceHistory(c.var.db, c.req.valid("param").id) }));

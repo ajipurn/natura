@@ -1,4 +1,5 @@
-import { and, asc, eq, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import { HTTPException } from "hono/http-exception";
 import type { Executor } from "./db";
 import { localDate } from "@/lib/dates";
 import { moveResident } from "./residence";
@@ -26,6 +27,34 @@ export async function listResidents(db: Executor) {
     .leftJoin(users, eq(users.id, residents.userId))
     .leftJoin(houses, eq(houses.id, residentHouse))
     .orderBy(asc(sql`coalesce(${residents.name}, ${users.name})`), asc(residents.id));
+}
+
+/** Pilihan penghuni tunggal di Rumah mengubah relasi, bukan nama. Panggil dalam transaksi. */
+export async function selectHouseResident(
+  db: Executor,
+  houseId: number,
+  residentId: number | null,
+  previousResidentId: number | null,
+  actorId: number,
+) {
+  const ids = [residentId, previousResidentId].filter((id): id is number => id !== null);
+  if (ids.length) await db.select({ id: residents.id }).from(residents)
+    .where(inArray(residents.id, ids)).orderBy(asc(residents.id)).for("update");
+  const people = await listResidents(db);
+  const current = people.filter((person) => person.houseId === houseId);
+  const selected = residentId === null ? null : people.find((person) => person.id === residentId);
+  if (residentId !== null && !selected) throw new HTTPException(404, { message: "Warga tidak ditemukan." });
+  if (current.length > 1 || (current[0]?.id ?? null) !== previousResidentId) {
+    throw new HTTPException(409, { message: "Penghuni rumah sudah berubah. Muat ulang sebelum memilih warga." });
+  }
+  if (residentId === previousResidentId) return;
+  if (current[0]?.familyId || selected?.familyId) {
+    throw new HTTPException(409, { message: "Kelola perpindahan penghuni yang terhubung keluarga melalui menu Warga." });
+  }
+  const date = localDate(new Date());
+  if (current[0]) await moveResident(db, current[0].id, null, actorId, date);
+  if (selected) await moveResident(db, selected.id, houseId, actorId, date);
+  await db.update(houses).set({ ownerName: null }).where(eq(houses.id, houseId));
 }
 
 /** Nama utama rumah tanpa akun. Nama-nama lain dikelola satu per satu melalui Warga. */

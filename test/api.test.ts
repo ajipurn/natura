@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { addDays, formatMonth, rondaDate } from "@/lib/dates";
 import { scheduleDay, slotHouseLabel } from "@/lib/schedule";
 import { houses } from "@/server/schema";
@@ -11,6 +11,7 @@ type Slot = {
   id: number;
   day: number;
   position: number;
+  residentId: number | null;
   name: string | null;
   block: string;
   number: string;
@@ -21,12 +22,13 @@ type Slot = {
 };
 
 /** Baris jadwal dari API → isi yang dikirim editor jadwal (akun, rumah, atau nama). */
-const toInput = (s: Pick<Slot, "day" | "name" | "houseId" | "userId" | "color">) => ({
+const toInput = (s: Pick<Slot, "day" | "name" | "houseId" | "userId" | "residentId" | "color">) => ({
   day: s.day,
   color: s.color,
-  userId: s.userId,
-  houseId: s.userId ? null : s.houseId,
-  name: s.userId || s.houseId ? null : s.name,
+  residentId: s.residentId,
+  userId: s.residentId ? null : s.userId,
+  houseId: s.residentId || s.userId ? null : s.houseId,
+  name: s.residentId || s.userId || s.houseId ? null : s.name,
 });
 
 let db: Db;
@@ -203,17 +205,17 @@ describe("jadwal", () => {
     const header = ["", ...days].join("\t");
     const rows = lots.map((lot, r) => [String(r + 1), ...days.map((_, d) => `WARGA ${r}${d} (${lot})`)].join("\t"));
     const res = await admin.put("/api/admin/jadwal", { text: [header, ...rows].join("\n"), fillNames: true, overwriteNames: false });
-    expect(res.data.success).toMatch(/^84 baris jadwal tersimpan untuk 7 malam\. 0 nama KK diisi\./);
+    expect(res.data.success).toMatch(/^84 baris jadwal tersimpan untuk 7 malam\. 0 warga baru didata\./);
     // Setiap rumah muncul 7 kali dengan nama berbeda → nama ganda, tidak diisi.
     expect(res.data.success).toMatch(/Nama ganda/);
 
     const single = await admin.put("/api/admin/jadwal", { text: "Senin: Nino (AB-3), Sahrul (AF-19)", fillNames: true, overwriteNames: false });
-    expect(single.data.success).toBe("2 baris jadwal tersimpan untuk 1 malam. 2 nama KK diisi.");
+    expect(single.data.success).toBe("2 baris jadwal tersimpan untuk 1 malam. 2 terhubung ke warga. 2 warga baru didata.");
     // Rumah tanpa akun: nama dari jadwal jadi nama KK, baris jadwalnya hanya menunjuk rumah.
     const list = await admin.get("/api/jadwal");
     expect(list.data.schedule).toMatchObject([
-      { block: "AB", number: "3", name: null, ownerName: "Nino" },
-      { block: "AF", number: "19", name: null, ownerName: "Sahrul" },
+      { block: "AB", number: "3", name: "Nino", ownerName: "Nino" },
+      { block: "AF", number: "19", name: "Sahrul", ownerName: "Sahrul" },
     ]);
   });
 });
@@ -230,21 +232,22 @@ describe("petugas & jadwal yang bisa diubah", () => {
   const schedule = async () => (await admin.get("/api/jadwal")).data.schedule as Slot[];
 
   it("impor jadwal menghubungkan nama ke akun petugas, termasuk nama kembar", async () => {
-    await admin.post("/api/admin/petugas", { name: "Nino", pin: "1357", role: "petugas" });
+    const ninoResident = ((await admin.get("/api/admin/warga")).data.residents as { id: number; name: string; houseId: number | null }[]).find((r) => r.name === "Nino")!;
+    await admin.post("/api/admin/petugas", { residentId: ninoResident.id, name: "Nino", pin: "1357", role: "petugas", houseId: ninoResident.houseId });
     await admin.post("/api/admin/petugas", { name: "Wawan", pin: "2468", role: "petugas", houseId: await houseId("AD-5") });
     const res = await admin.put("/api/admin/jadwal", {
       text: "Senin: Nino (AB-3), Sahrul (AF-19)\nSabtu: Wawan (AD-5), Wawan (AF-7)",
       fillNames: false,
       overwriteNames: false,
     });
-    expect(res.data.success).toMatch(/2 terhubung ke akun petugas\. 1 petugas diisi rumahnya\./);
+    expect(res.data.success).toMatch(/3 terhubung ke warga\./);
     const rows = await schedule();
-    // Wawan di AF-7 orang lain (rumahnya beda); Nino yang belum punya rumah diisi AB-3.
+    // Nama dan alamat yang cocok menunjuk warga; Wawan di AF-7 belum terhubung.
     expect(rows.map((r) => [r.day, r.name, `${r.block}-${r.number}`, r.userId !== null])).toEqual([
       [1, "Nino", "AB-3", true],
-      [1, null, "AF-19", false],
+      [1, "Sahrul", "AF-19", false],
       [6, "Wawan", "AD-5", true],
-      [6, null, "AF-7", false],
+      [6, "Wawan (AF-7)", "-", false],
     ]);
   });
 
@@ -271,7 +274,7 @@ describe("petugas & jadwal yang bisa diubah", () => {
     const created = await admin.post("/api/admin/petugas", { name: "Tehe", pin: "8642", role: "petugas", houseId: await houseId("AB-9"), days: [1] });
     expect(created.status).toBe(200);
     rows = await schedule();
-    expect(rows.filter((r) => r.day === 1).map((r) => r.name ?? slotHouseLabel(r))).toEqual(["AF-19", "Tehe"]);
+    expect(rows.filter((r) => r.day === 1).map((r) => r.name ?? slotHouseLabel(r))).toEqual(["Sahrul", "Tehe"]);
   });
 
   it("jadwal hasil edit disimpan sekaligus, urutan mengikuti daftar", async () => {
@@ -282,7 +285,7 @@ describe("petugas & jadwal yang bisa diubah", () => {
       ...rows.filter((r) => r.id !== tehe.id).map(toInput),
       { day: 0, houseId: await houseId("AA-8") },
       { day: 2, name: "Satpam" },
-      // Rumah yang dihuni petugas disimpan sebagai baris petugas itu.
+      // Rumah saja tetap penanda yang petugasnya belum dipilih.
       { day: 4, houseId: await houseId("AB-9") },
     ];
     const res = await admin.put("/api/admin/jadwal/slot", { slots });
@@ -293,7 +296,7 @@ describe("petugas & jadwal yang bisa diubah", () => {
       [1, null, "AA-8"],
     ]);
     expect(saved.find((r) => r.name === "Satpam")).toMatchObject({ day: 2, block: "", houseId: null, userId: null });
-    expect(saved.find((r) => r.day === 4)).toMatchObject({ name: "Tehe", userId: tehe.userId });
+    expect(saved.find((r) => r.day === 4)).toMatchObject({ name: null, residentId: null, userId: null });
 
     expect((await admin.put("/api/admin/jadwal/slot", { slots: [{ day: 0, userId: 99999 }] })).status).toBe(409);
     expect((await admin.put("/api/admin/jadwal/slot", { slots: [{ day: 0, houseId: 99999 }] })).status).toBe(409);
@@ -413,7 +416,7 @@ describe("satu sumber: nama warga di akun petugas", () => {
     ((await admin.get("/api/admin/petugas")).data.users as { id: number; name: string; house: string | null }[]).find((u) => u.id === id)!;
   let budi: number;
 
-  it("rumah tanpa akun yang dipilih untuk petugas: nama KK diganti nama akun, jadwal rumahnya jadi jadwal petugas", async () => {
+  it("akun terhubung ke warga yang dipilih; jadwal rumah lama tidak dianggap sebagai tugas orang itu", async () => {
     await admin.post("/api/admin/rumah", { block: "YY", numbers: "1-3" });
     const yy1 = (await house("YY-1")).id;
     await admin.patch(`/api/admin/rumah/${yy1}`, { block: "YY", number: "1", ownerName: "Pak Bambang", status: "active" });
@@ -425,14 +428,15 @@ describe("satu sumber: nama warga di akun petugas", () => {
       [5, "Pak Bambang"],
     ]);
 
-    // Petugas baru di YY-1 yang jaga Rabu saja: baris Rabu jadi miliknya, baris Jumat dihapus.
-    const res = await admin.post("/api/admin/petugas", { name: "Bambang", pin: "1593", role: "petugas", houseId: yy1, days: [3] });
+    // Pilih profil orangnya; tugas Rabu diberikan eksplisit. Penanda rumah tetap utuh.
+    const profile = ((await admin.get("/api/admin/warga")).data.residents as { id: number; houseId: number | null }[]).find((r) => r.houseId === yy1)!;
+    const res = await admin.post("/api/admin/petugas", { residentId: profile.id, name: "Bambang", pin: "1593", role: "petugas", houseId: yy1, days: [3] });
     expect(res.data).toMatchObject({ id: expect.any(Number) });
     budi = res.data.id as number;
     const rows = (await schedule()).filter((s) => s.houseId === yy1);
-    expect(rows.map((s) => [s.day, s.name, s.userId])).toEqual([[3, "Bambang", budi]]);
+    expect(rows.map((s) => [s.day, s.name, s.userId])).toEqual([[3, null, null], [3, "Bambang", budi], [5, null, null]]);
     expect((await house("YY-1")).ownerName).toBe("Bambang");
-    expect(await schedule()).toHaveLength(before.length + 1);
+    expect(await schedule()).toHaveLength(before.length + 3);
   });
 
   it("ganti nama di petugas atau di data rumah: semua layar ikut", async () => {
@@ -458,23 +462,23 @@ describe("satu sumber: nama warga di akun petugas", () => {
     expect(slotHouseLabel((await schedule()).find((s) => s.userId === budi)!)).toBe("YY-2");
   });
 
-  it("tanpa `days` (dialog petugas): malam jaga tetap, ditambah jadwal rumah yang ditempati", async () => {
+  it("tanpa `days`: malam jaga orangnya tetap; jadwal rumah tidak diwariskan", async () => {
     await admin.post("/api/admin/rumah", { block: "ZW", numbers: "1-2" });
     const [zw1, zw2] = [(await house("ZW-1")).id, (await house("ZW-2")).id];
-    // ZW-1 dijadwalkan Kamis sebelum punya akun: petugas baru di sana langsung jaga Kamis.
+    // ZW-1 dijadwalkan Kamis sebelum orangnya ditentukan; akun tidak otomatis mengambilnya.
     await admin.put("/api/admin/jadwal/slot", { slots: [...(await schedule()).map(toInput), { day: 4, houseId: zw1 }] });
     const wati = (await admin.post("/api/admin/petugas", { name: "Wati", pin: "7531", role: "petugas", houseId: zw1 })).data.id as number;
     const days = async () => (await schedule()).filter((s) => s.userId === wati).map((s) => s.day);
+    expect(await days()).toEqual([]);
+
+    await admin.patch(`/api/admin/petugas/${wati}`, { name: "Bu Wati", role: "petugas", active: true, houseId: zw1, days: [4] });
     expect(await days()).toEqual([4]);
 
-    await admin.patch(`/api/admin/petugas/${wati}`, { name: "Bu Wati", role: "petugas", active: true, houseId: zw1 });
-    expect(await days()).toEqual([4]);
-
-    // Pindah ke rumah yang dijadwalkan Senin: Kamis tetap, Senin ikut.
+    // Pindah ke rumah yang dijadwalkan Senin: tugas Kamis tetap, Senin belum ditugaskan.
     await admin.put("/api/admin/jadwal/slot", { slots: [...(await schedule()).map(toInput), { day: 1, houseId: zw2 }] });
     await admin.patch(`/api/admin/petugas/${wati}`, { name: "Bu Wati", role: "petugas", active: true, houseId: zw2 });
-    expect(await days()).toEqual([1, 4]);
-    expect((await schedule()).some((s) => s.houseId === zw2 && s.userId === null)).toBe(false);
+    expect(await days()).toEqual([4]);
+    expect((await schedule()).some((s) => s.houseId === zw2 && s.userId === null)).toBe(true);
   });
 
   it("nama kembar boleh asal rumahnya beda; halaman masuk menampilkan rumahnya", async () => {
@@ -489,6 +493,13 @@ describe("satu sumber: nama warga di akun petugas", () => {
 });
 
 describe("halaman warga", () => {
+  beforeAll(() => {
+    const date = rondaDate(new Date());
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(`${date}T21:00:00+07:00`));
+  });
+  afterAll(() => vi.useRealTimers());
+
   it("memerlukan login akun, lalu Info warga bisa dibaca petugas biasa", async () => {
     const warga = apiClient(env);
     expect((await warga.get("/api/warga/akses")).data).toMatchObject({ access: false });

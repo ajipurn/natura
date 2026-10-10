@@ -1,3 +1,5 @@
+import { adoptLegacyResidents } from "@/server/residents";
+import { listHouses } from "@/server/queries";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Db } from "@/server/db";
 import { listSchedule, saveSchedule } from "@/server/schedule";
@@ -32,7 +34,7 @@ describe("saveSchedule", () => {
       saved: 6,
       days: 4,
       namesFilled: 1,
-      linked: 0,
+      linked: 1,
       housesLinked: 0,
       unknown: ["C-1"],
       conflicting: ["AB-1 (Kantor, Eko)"],
@@ -41,12 +43,12 @@ describe("saveSchedule", () => {
     // Tanpa akun: baris menunjuk rumahnya (namanya dari data rumah); kode rumah tak terdaftar jadi nama.
     const rows = await listSchedule(db);
     expect(rows.map((r) => [r.day, r.position, r.name, slotHouseLabel(r), r.ownerName])).toEqual([
-      [0, 0, null, "AD-3", "Yusuf"],
-      [1, 0, null, "AB-8", "Lama"],
-      [1, 1, null, "AB-1", null],
+      [0, 0, "Yusuf", "AD-3", "Yusuf"],
+      [1, 0, "Bu Ros (AB-8)", "", null],
+      [1, 1, "Kantor (AB-1)", "", null],
       [2, 0, "Apri (C-1)", "", null],
       [2, 1, null, "AD-3", "Yusuf"],
-      [5, 0, null, "AB-1", null],
+      [5, 0, "Eko (AB-1)", "", null],
     ]);
   });
 
@@ -65,12 +67,12 @@ describe("saveSchedule", () => {
       overwriteNames: true,
     });
     expect(summary.namesFilled).toBe(0);
-    expect((await listSchedule(db))[0].ownerName).toBe("Yusuf");
+    expect((await listHouses(db)).find((h) => h.block === "AD" && h.number === "3")?.ownerName).toBe("Yusuf");
   });
 });
 
 describe("satu sumber: akun petugas dan rumah", () => {
-  it("baris rumah yang dihuni petugas jadi baris petugas itu; nama kembar dibedakan rumahnya", async () => {
+  it("nama kembar dibedakan rumahnya; baris tanpa nama tidak otomatis menugaskan penghuni", async () => {
     const [ad5, af7] = await db
       .insert(houses)
       .values([
@@ -83,6 +85,7 @@ describe("satu sumber: akun petugas dan rumah", () => {
       { name: "Wawan", pinHash: "x", houseId: af7.id },
       { name: "Nino", pinHash: "x" },
     ]);
+    await adoptLegacyResidents(db);
     const summary = await saveSchedule(
       db,
       [
@@ -92,15 +95,15 @@ describe("satu sumber: akun petugas dan rumah", () => {
       ],
       { fillNames: true, overwriteNames: true },
     );
-    expect(summary).toMatchObject({ linked: 3, housesLinked: 1, namesFilled: 0 });
+    expect(summary).toMatchObject({ linked: 2, housesLinked: 0, namesFilled: 0 });
 
     const rows = await listSchedule(db);
     expect(rows.map((r) => [r.day, r.name, slotHouseLabel(r), r.userId !== null])).toEqual([
-      [1, "Nino", "AB-8", true],
+      [1, "Nino", "", true],
       [6, "Wawan", "AF-7", true],
-      [6, "Wawan", "AD-5", true],
+      [6, null, "AD-5", false],
     ]);
-    // Nino belum punya rumah: diisi AB-8 dari jadwal, dan nama KK lama rumah itu diganti nama akunnya.
-    expect(rows.map((r) => r.ownerName)).toEqual(["Nino", "Wawan", "Wawan"]);
+    // Nino tetap tanpa rumah; jadwal tidak mengubah tempat tinggal atau nama penghuni lain.
+    expect(rows.map((r) => r.ownerName)).toEqual([null, "Wawan", "Wawan"]);
   });
 });

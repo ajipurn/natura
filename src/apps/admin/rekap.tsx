@@ -275,7 +275,7 @@ function RecapBody({
   const [sort, setSort] = useState<Sort>("rumah");
   const canFinance = usePermission("finance");
   const canCorrect = usePermission("patrols", true);
-  const [view, setView] = useState<RecapView>("houses");
+  const [view, setView] = useState<RecapView>(params.get("view") === "payments" ? "payments" : "houses");
   const [dateView, setDateView] = useState<DateView>("recorded");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [trendOpen, setTrendOpen] = useState(false);

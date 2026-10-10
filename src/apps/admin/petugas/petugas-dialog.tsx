@@ -9,12 +9,10 @@ import { Collapsible } from "@/components/collapsible";
 import { Dialog } from "@/components/dialog";
 import { QueryState } from "@/components/query-state";
 import { Select } from "@/components/select";
-import { Alert, Button, Field, Input, buttonClass, cx } from "@/components/ui";
-import { scheduleQuery } from "@/features/jadwal/queries";
+import { Alert, Button, Field, Input, buttonClass } from "@/components/ui";
 import { formatTime } from "@/lib/dates";
 import { groupByBlock, houseLabel } from "@/lib/houses";
 import { randomPin } from "@/lib/random-pin";
-import { DAY_NAMES } from "@/lib/schedule";
 import type { Role } from "@/lib/types";
 import { ROLES as ROLE_VALUES, ROLE_LABEL, ROLE_HINT, isManager } from "@/lib/permissions";
 import { housesQuery, residentsQuery, usersQuery } from "../queries";
@@ -68,12 +66,9 @@ export function PetugasDialog({
 
 function CreateForm({ onDone, initialResidentId }: { onDone: () => void; initialResidentId?: number }) {
   const query = useQuery(residentsQuery);
-  return <QueryState query={query}>{({ residents }) => {
-    const available = residents.filter((r) => !r.userId);
-    return initialResidentId && !available.some((r) => r.id === initialResidentId)
-      ? <Alert>Warga ini sudah memiliki akun atau datanya tidak tersedia. <Link to={adminPath("/warga")} className="font-semibold underline">Kembali ke Warga</Link></Alert>
-      : <CreateAccountForm residents={available} initialResidentId={initialResidentId} onDone={onDone} />;
-  }}</QueryState>;
+  return <QueryState query={query}>{({ residents }) => (
+    <CreateAccountForm residents={residents} initialResidentId={initialResidentId} onDone={onDone} />
+  )}</QueryState>;
 }
 
 function CreateAccountForm({ residents, initialResidentId, onDone }: { residents: Resident[]; initialResidentId?: number; onDone: () => void }) {
@@ -91,6 +86,11 @@ function CreateAccountForm({ residents, initialResidentId, onDone }: { residents
   if (create.isSuccess) {
     return <SharePin name={name.trim()} role={role} pin={pin} onDone={onDone} />;
   }
+  const available = residents.filter((r) => !r.userId);
+  // Penyegaran setelah berhasil membuat akun tidak boleh mengganti layar PIN atau melepas mutasi.
+  if (!create.isPending && initialResidentId && !available.some((r) => r.id === initialResidentId)) {
+    return <Alert>Warga ini sudah memiliki akun atau datanya tidak tersedia. <Link to={adminPath("/warga")} className="font-semibold underline">Kembali ke Warga</Link></Alert>;
+  }
 
   return (
     <form
@@ -101,9 +101,9 @@ function CreateAccountForm({ residents, initialResidentId, onDone }: { residents
       }}
     >
       <Select label="Warga" value={residentId === null ? "baru" : String(residentId)}
-        options={[{ value: "baru", label: "Warga baru" }, ...residents.map((r) => ({ value: String(r.id), label: r.name, hint: r.block ? `${r.block}-${r.number}` : "Belum terhubung" }))]}
+        options={[{ value: "baru", label: "Warga baru" }, ...available.map((r) => ({ value: String(r.id), label: r.name, hint: r.block ? `${r.block}-${r.number}` : "Belum terhubung" }))]}
         onValueChange={(value) => {
-          const selected = residents.find((r) => String(r.id) === value);
+          const selected = available.find((r) => String(r.id) === value);
           setResidentId(selected?.id ?? null);
           setName(selected?.name ?? "");
           setHouseId(selected?.houseId ?? null);
@@ -135,10 +135,9 @@ function CreateAccountForm({ residents, initialResidentId, onDone }: { residents
           </Button>
         </div>
       </Field>
-      <GuardFields
+      <ResidenceField
         houseId={houseId}
         onHouse={setHouseId}
-        days={[]}
       />
       <RoleField role={role} onRole={setRole} />
       {create.isError && <Alert>{create.error.message}</Alert>}
@@ -219,11 +218,10 @@ function EditForm({ petugas, isSelf, onDone }: { petugas: Petugas; isSelf: boole
         <Field label="Nama">
           <Input value={name} onChange={(e) => setName(e.target.value)} required maxLength={40} />
         </Field>
-        <GuardFields
+        <ResidenceField
           userId={petugas.id}
           houseId={houseId}
           onHouse={(id) => setHouseId(id)}
-          days={petugas.days}
         />
         <RoleField role={role} onRole={setRole} disabled={isSelf} />
         <SwitchField
@@ -309,32 +307,20 @@ function ResetPin({ petugas, locked }: { petugas: Petugas; locked: string | null
   );
 }
 
-/**
- * Rumah petugas dan malam jaganya. Nama akun ikut ditampilkan pada data rumah,
- * dan jadwal rumah itu (kalau sudah ada) jadi jadwal petugas ini. Malam jaga hanya diubah di Jadwal
- * ronda; di sini cukup terlihat.
- */
-function GuardFields({
+/** Tempat tinggal akun; penugasan ronda dikelola di Jadwal ronda. */
+function ResidenceField({
   userId,
   houseId,
   onHouse,
-  days,
 }: {
   userId?: number;
   houseId: number | null;
   onHouse: (id: number | null) => void;
-  /** Malam jaga sekarang. */
-  days: number[];
 }) {
   const houses = useQuery(housesQuery).data?.houses ?? [];
   const users = useQuery(usersQuery).data?.users ?? [];
-  const schedule = useQuery(scheduleQuery).data?.schedule ?? [];
-  const houseDays = (id: number) => schedule.filter((s) => s.userId === null && s.houseId === id).map((s) => s.day);
   const house = houses.find((h) => h.id === houseId);
   const others = users.filter((u) => u.houseId === houseId && u.id !== userId);
-  const scheduled = houseId ? [...new Set(houseDays(houseId))].sort() : [];
-  // Setelah disimpan: malam jaga sekarang ditambah jadwal rumah yang dipilih.
-  const nights = [...new Set([...days, ...scheduled])].sort();
 
   return (
     <>
@@ -354,20 +340,8 @@ function GuardFields({
             {others.length > 0
               ? `Rumah ini juga dihuni ${others.map((u) => u.name).join(", ")}.`
               : "Nama akun ikut ditampilkan di data rumah. Warga lain tetap tercatat."}
-            {scheduled.length > 0 && ` Jadwal rumah ini (${scheduled.map((d) => DAY_NAMES[d]).join(", ")}) jadi jadwal petugas ini.`}
           </span>
         )}
-      </div>
-      <div>
-        <p className="mb-1 text-sm font-medium">Jaga malam</p>
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-line px-3 py-2.5 text-sm">
-          <span className={cx(nights.length === 0 && "text-muted")}>
-            {nights.length ? nights.map((d) => DAY_NAMES[d]).join(", ") : "Belum dijadwalkan"}
-          </span>
-          <Link to={adminPath("/jadwal")} className="font-semibold text-primary">
-            Atur di Jadwal ronda
-          </Link>
-        </div>
       </div>
     </>
   );

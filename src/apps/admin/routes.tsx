@@ -1,4 +1,4 @@
-import { createBrowserRouter, Link, Navigate, Outlet } from "react-router";
+import { createBrowserRouter, Link, Navigate, Outlet, useSearchParams } from "react-router";
 import type { ReactNode } from "react";
 import { usePermission } from "@/client/permissions";
 import { Card, buttonClass } from "@/components/ui";
@@ -14,7 +14,6 @@ import { JadwalPage } from "./jadwal/jadwal-page";
 import { KasPage } from "./kas/kas-page";
 import { AdminLayout } from "./layout";
 import { PengaturanPage } from "./pengaturan/pengaturan-page";
-import { PetugasPage } from "./petugas/petugas-page";
 import { RekapPage } from "./rekap";
 import { AuditRedirect, NightLog, NightLogAlerts } from "./riwayat/night-log";
 import { RingkasanPage } from "./ringkasan-page";
@@ -40,6 +39,21 @@ function AdminPatrolDetail() {
 function DashboardHome() {
   const canOverview = usePermission("overview");
   return canOverview ? <RingkasanPage /> : <Navigate to={adminPath("/info")} replace />;
+}
+
+function WargaAccess() {
+  const [params] = useSearchParams();
+  const canReadResidents = usePermission("residents");
+  const tab = params.get("tab");
+  const resource = tab === "akun" || (!tab && !canReadResidents) ? "accounts" : "residents";
+  return <Access resource={resource}><WargaPage /></Access>;
+}
+
+function AccountsRedirect() {
+  const [params] = useSearchParams();
+  const next = new URLSearchParams(params);
+  next.set("tab", "akun");
+  return <Navigate to={adminPath(`/warga?${next}`)} replace />;
 }
 
 export const router = createBrowserRouter([
@@ -69,8 +83,8 @@ export const router = createBrowserRouter([
       { path: "rumah", element: <Access resource="houses"><RumahPage /></Access> },
       { path: "rumah/cetak", element: <Access resource="houses"><CetakPage /></Access> },
       { path: "denah", element: <Access resource="patrols"><DenahPage /></Access> },
-      { path: "petugas", element: <Access resource="accounts" write><PetugasPage /></Access> },
-      { path: "warga", element: <Access resource="residents"><WargaPage /></Access> },
+      { path: "petugas", element: <Access resource="accounts"><AccountsRedirect /></Access> },
+      { path: "warga", element: <WargaAccess /> },
       { path: "keluarga", element: <Navigate to={adminPath("/warga?tab=keluarga")} replace /> },
       { path: "info", element: <Access resource="info"><InfoPage /></Access> },
       { path: "pengaturan", element: <Access resource="settings" write><PengaturanPage /></Access> },

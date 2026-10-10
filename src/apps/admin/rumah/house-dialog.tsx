@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { ExternalLink, Printer, RefreshCw, Trash2, UserRound } from "lucide-react";
 import { useId, useState } from "react";
 import { Link } from "react-router";
@@ -8,12 +8,14 @@ import { invalidate } from "@/client/query";
 import { RadioCards } from "@/components/choice";
 import { Dialog } from "@/components/dialog";
 import { QrSvg } from "@/components/qr-svg";
+import { Select } from "@/components/select";
 import { Alert, Button, Field, Input, buttonClass, cx } from "@/components/ui";
-import { houseLabelLong, normalizeHouseField, parseNumberList } from "@/lib/houses";
+import { houseLabel, houseLabelLong, normalizeHouseField, parseNumberList } from "@/lib/houses";
 import { houseUrl } from "@/lib/qr";
 import type { PaymentCadence } from "@/lib/payments";
 import type { HouseDTO, HouseStatus } from "@/lib/types";
-import { HOUSE_REFRESH } from "../queries";
+import { HOUSE_REFRESH, residentsQuery } from "../queries";
+import type { Resident } from "../warga/warga-dialog";
 import { PaymentPlanSection } from "../payments/plan-section";
 import { adminPath } from "@/lib/app-paths";
 
@@ -45,27 +47,28 @@ export function AddHouseDialog({
 function AddForm({ houses, initial, onDone }: { houses: HouseDTO[]; initial: { block: string; number: string }; onDone: () => void }) {
   const [block, setBlock] = useState(initial.block);
   const [numbers, setNumbers] = useState(initial.number);
-  const [ownerName, setOwnerName] = useState("");
+  const [residentId, setResidentId] = useState<number | null>(null);
+  const people = useQuery(residentsQuery);
+  const parsed = numbers.trim() ? parseNumberList(numbers) : [];
+  const single = parsed?.length === 1;
+  const selected = people.data?.residents.find((person) => person.id === residentId);
   const blocksId = useId();
   const add = useMutation({
-    mutationFn: () => call(api.admin.rumah.$post({ json: { block, numbers, ownerName } })),
+    mutationFn: () => call(api.admin.rumah.$post({ json: { block, numbers, residentId: single ? residentId : null } })),
     onSuccess: () => {
       // Dari kavling di denah: langsung tutup supaya bisa lanjut ke kavling berikutnya.
       if (initial.number) onDone();
       // Selain itu blok dibiarkan supaya bisa langsung menambah nomor lain di blok yang sama.
       setNumbers("");
-      setOwnerName("");
-      return invalidate(...HOUSE_REFRESH);
+      setResidentId(null);
+      return invalidate(...HOUSE_REFRESH, ["warga"], ["auth"]);
     },
   });
 
   const blockKey = normalizeHouseField(block);
-  const parsed = numbers.trim() ? parseNumberList(numbers) : [];
   const existing = new Set(houses.filter((h) => h.block === blockKey).map((h) => h.number));
   const fresh = (parsed ?? []).filter((n) => !existing.has(n));
   const skipped = (parsed?.length ?? 0) - fresh.length;
-  // Server hanya memakai nama KK kalau menambah satu rumah.
-  const single = parsed !== null && parsed.length <= 1;
 
   return (
     <form
@@ -115,18 +118,13 @@ function AddForm({ houses, initial, onDone }: { houses: HouseDTO[]; initial: { b
         <p className="-mt-2 text-xs text-muted">Satu nomor (12), rentang (1-20), atau daftar (1, 3, 5A).</p>
       )}
 
-      <Field label="Nama warga (opsional)" hint={single ? "Warga ini akan terdaftar di menu Warga." : "Hanya dipakai kalau menambah satu rumah."}>
-        <Input
-          value={single ? ownerName : ""}
-          onChange={(e) => setOwnerName(e.target.value)}
-          disabled={!single}
-          maxLength={80}
-          // Blok/nomor sudah terisi dari denah: tinggal isi nama.
-          data-autofocus={Boolean(initial.block) || undefined}
-          placeholder="Pak Budi"
-          className="disabled:opacity-50"
-        />
-      </Field>
+      <ResidentSelect query={people} value={single ? residentId : null} onValueChange={setResidentId} disabled={!single || add.isPending} />
+      {!single && <p className="-mt-2 text-xs text-muted">Pilih warga saat menambah satu rumah.</p>}
+      {single && residentId !== null && <p className="-mt-2 text-xs text-muted">
+        {selected?.block && selected.number
+          ? `${selected.name} akan dipindahkan dari ${houseLabel({ block: selected.block, number: selected.number })} ke rumah baru ini.`
+          : "Warga yang dipilih akan terhubung ke rumah baru ini."}
+      </p>}
 
       {add.isError && <Alert>{add.error.message}</Alert>}
       {add.isSuccess && <Alert tone="success">{add.data.success}</Alert>}
@@ -148,7 +146,7 @@ function previewLabels(block: string, numbers: string[]) {
   return labels.length > 5 ? `${labels.slice(0, 3).join(", ")}, …, ${labels.at(-1)}` : labels.join(", ");
 }
 
-/** `accounts` = nama akun petugas yang tinggal di rumah ini; nama warganya diambil dari akun itu. */
+/** `accounts` = nama akun penghuni rumah ini; nama warganya diambil dari akun itu. */
 export function EditHouseDialog({
   house,
   accounts,
@@ -168,7 +166,7 @@ export function EditHouseDialog({
       description={
         accounts.length > 0 && (
           <span className="inline-flex items-center gap-1.5">
-            <UserRound className="size-4 text-primary" /> Rumah petugas {accounts.join(", ")}
+            <UserRound className="size-4 text-primary" /> Penghuni berakun: {accounts.join(", ")}
           </span>
         )
       }
@@ -183,13 +181,19 @@ function EditForm({ house, accounts, origin, onDone }: { house: AdminHouse; acco
   const canFinance = usePermission("finance");
   const [block, setBlock] = useState(house.block);
   const [number, setNumber] = useState(house.number);
-  const [ownerName, setOwnerName] = useState(house.ownerName ?? "");
+  const people = useQuery({ ...residentsQuery, enabled: canEdit });
+  const current = people.data?.residents.filter((person) => person.houseId === house.id) ?? house.residents ?? [];
+  const [selection, setSelection] = useState<{ residentId: number | null; previousResidentId: number | null } | null>(null);
+  const residentId = selection ? selection.residentId : current[0]?.id ?? null;
+  const previous = selection ? people.data?.residents.find((person) => person.id === selection.previousResidentId) : undefined;
+  const selected = people.data?.residents.find((person) => person.id === residentId);
+  const changed = selection !== null && selection.residentId !== selection.previousResidentId;
   const [status, setStatus] = useState<HouseStatus>(house.status);
   const save = useMutation({
     mutationFn: () =>
-      call(api.admin.rumah[":id"].$patch({ param: { id: String(house.id) }, json: { block, number, ownerName, status } })),
+      call(api.admin.rumah[":id"].$patch({ param: { id: String(house.id) }, json: { block, number, status, ...selection } })),
     onSuccess: async () => {
-      await invalidate(...HOUSE_REFRESH);
+      await invalidate(...HOUSE_REFRESH, ["warga"], ["auth"]);
       onDone();
     },
   });
@@ -214,11 +218,11 @@ function EditForm({ house, accounts, origin, onDone }: { house: AdminHouse; acco
           </Field>
         </div>
 
-        {(house.residents?.length ?? 0) > 1 || accounts.length > 1 ? (
+        {current.length > 1 || accounts.length > 1 ? (
           <div>
             <p className="mb-1.5 text-sm font-medium">Penghuni</p>
             <div className="flex flex-wrap gap-1.5">
-              {(house.residents?.map((r) => r.name) ?? accounts).map((name, index) => (
+              {(current.length ? current.map((r) => r.name) : accounts).map((name, index) => (
                 <span key={index} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-sm text-primary">
                   <UserRound className="size-3.5" /> {name}
                 </span>
@@ -233,19 +237,18 @@ function EditForm({ house, accounts, origin, onDone }: { house: AdminHouse; acco
             </p>
           </div>
         ) : (
-          <Field
-            label="Nama warga"
-            hint={accounts.length ? "Sama dengan nama akun petugasnya: mengubah di sini ikut mengubah nama akun itu." : undefined}
-          >
-            <Input
-              value={ownerName}
-              onChange={(e) => setOwnerName(e.target.value)}
-              required={accounts.length > 0}
-              maxLength={accounts.length ? 40 : 80}
-              placeholder="Pak Budi"
-             
-            />
-          </Field>
+          <div className="space-y-1.5">
+            <ResidentSelect query={people} value={residentId} currentHouseId={house.id}
+              disabled={save.isPending || Boolean(current[0]?.familyId)}
+              onValueChange={(id) => setSelection({ residentId: id, previousResidentId: selection ? selection.previousResidentId : current[0]?.id ?? null })} />
+            {current[0]?.familyId && <p className="text-xs text-muted">Perpindahan keluarga dikelola di menu Warga.</p>}
+            {changed && <p className="text-xs text-muted">
+              {residentId !== null && (selected?.block && selected.number && selected.houseId !== house.id
+                ? `${selected.name} akan dipindahkan dari ${houseLabel({ block: selected.block, number: selected.number })} ke rumah ini. `
+                : "Warga yang dipilih akan terhubung ke rumah ini. ")}
+              {previous && `${previous.name} tidak lagi terhubung ke rumah ini.`}
+            </p>}
+          </div>
         )}
 
         <RadioCards legend="Status" value={status} onValueChange={setStatus} options={STATUSES} />
@@ -266,6 +269,31 @@ function EditForm({ house, accounts, origin, onDone }: { house: AdminHouse; acco
       <DeleteSection house={house} onDeleted={onDone} />
     </div>
   );
+}
+
+function ResidentSelect({ query, value, onValueChange, disabled, currentHouseId }: {
+  query: UseQueryResult<{ residents: Resident[] }>;
+  value: number | null;
+  onValueChange: (value: number | null) => void;
+  disabled?: boolean;
+  currentHouseId?: number;
+}) {
+  return <div>
+    <Select label="Nama warga" value={value === null ? "" : String(value)}
+      onValueChange={(id) => onValueChange(id ? Number(id) : null)}
+      disabled={disabled || query.isPending || query.isError}
+      placeholder={query.isPending ? "Memuat warga…" : "Pilih warga"}
+      searchPlaceholder="Cari nama atau rumah…"
+      options={[
+        { value: "", label: "Belum ditentukan" },
+        ...(query.data?.residents ?? [])
+          .filter((person) => !person.familyId || person.houseId === currentHouseId)
+          .map((person) => ({ value: String(person.id), label: person.name,
+            hint: person.block && person.number ? houseLabel({ block: person.block, number: person.number }) : "Tanpa rumah" })),
+      ]} />
+    <p className="mt-1.5 text-xs text-muted">Kelola data penghuni di <Link to={adminPath(currentHouseId ? `/warga?rumah=${currentHouseId}` : "/warga")} className="font-semibold text-primary underline">Warga</Link>.</p>
+    {query.isError && <Alert>Daftar warga belum dimuat. <Button variant="ghost" size="sm" onClick={() => query.refetch()}>Coba lagi</Button></Alert>}
+  </div>;
 }
 
 function QrSection({ house, origin }: { house: AdminHouse; origin: string }) {

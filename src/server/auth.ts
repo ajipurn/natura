@@ -4,7 +4,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { createMiddleware } from "hono/factory";
 import { jwtVerify, SignJWT } from "jose";
 import type { Role } from "@/lib/types";
-import { can, type Resource } from "@/lib/permissions";
+import { can, canRonda, type Resource } from "@/lib/permissions";
 import { COMMUNITY_DOMAIN, appSurface } from "@/lib/app-paths";
 import type { AppEnv } from "./env";
 import { users } from "./schema";
@@ -110,7 +110,7 @@ export async function getSessionUser(c: Ctx): Promise<SessionUser | null> {
 
 const unauthorized = (c: Ctx) => c.json({ error: "Sesi login habis. Silakan masuk lagi." }, 401);
 
-/** Wajib login (petugas atau admin). Sesi diperpanjang supaya petugas yang rutin ronda tidak perlu login ulang. */
+/** Wajib login akun. Sesi diperpanjang supaya pengguna rutin tidak perlu login ulang. */
 export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
   const session = await readSession(c);
   if (!session) return unauthorized(c);
@@ -118,6 +118,12 @@ export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
     await startSession(c, { id: session.user.id, sessionVersion: session.sessionVersion });
   }
   c.set("user", session.user);
+  await next();
+});
+
+/** Dipasang setelah requireUser untuk fitur pencatatan dan pengaturan jaga di app. */
+export const requireRonda = createMiddleware<AppEnv>(async (c, next) => {
+  if (!canRonda(c.var.user.role)) return c.json({ error: "Akun Warga tidak memiliki akses ronda." }, 403);
   await next();
 });
 

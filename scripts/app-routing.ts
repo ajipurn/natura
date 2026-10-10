@@ -75,6 +75,9 @@ const under = (base: string) => `^(?=${base}(?:/|$))${PAGE_PATTERN.slice(1)}`;
 export const vercelRoutes = [
   { src: "^/assets/.*$", headers: { "cache-control": "public, max-age=31536000, immutable" }, continue: true },
   { src: "^/api(?:/.*)?$", dest: "/api" },
+  // Manifest di HTML awal harus benar sebelum JavaScript mengganti href-nya.
+  { src: "^/petugas\\.webmanifest$", has: [{ type: "host", value: APP_DOMAINS.petugas }], dest: "/petugas-domain.webmanifest" },
+  { src: "^/admin\\.webmanifest$", has: [{ type: "host", value: APP_DOMAINS.admin }], dest: "/admin-domain.webmanifest" },
   ...DOMAIN_REDIRECTS.map(({ hostname, src, destination }) => ({
     src, has: [{ type: "host", value: hostname }], status: 308, headers: { Location: destination },
   })),

@@ -6,7 +6,7 @@ import { requireResource } from "../auth";
 import type { AppEnv } from "../env";
 import type { Executor } from "../db";
 import { body, idParam } from "../http";
-import { getPaymentMonth, getPaymentPlansForHouse, getRapelDates, paymentLogsFor } from "../payments";
+import { getPaymentMonth, getPaymentPlansForHouse, getRapelDates, getRapelOptions, paymentLogsFor } from "../payments";
 import { houses, paymentLogs, paymentPlans, payments, users } from "../schema";
 import { monthQuery } from "./ronda";
 
@@ -83,6 +83,7 @@ export const paymentRoutes = new Hono<AppEnv>().use(requireResource("finance"))
         .map((p) => ({ ...p, updatedAt: p.updatedAt.toISOString() })),
     });
   })
+  .get("/rapel", async (c) => c.json({ dates: await getRapelOptions(c.var.db, localDate(new Date())) }))
   .get("/rapel/:id", idParam(), async (c) => c.json({ dates: await getRapelDates(c.var.db, c.req.valid("param").id, localDate(new Date())) }))
   .get("/kesepakatan/:id", idParam(), async (c) => c.json({ plans: await getPaymentPlansForHouse(c.var.db, c.req.valid("param").id) }))
   .put("/kesepakatan/:id", idParam(), body(planSchema), async (c) => {

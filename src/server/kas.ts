@@ -1,11 +1,27 @@
 import { and, asc, desc, eq, gte, isNull, lt, lte, min, sql } from "drizzle-orm";
 import { daysInMonth } from "@/lib/dates";
+import { houseLabel } from "@/lib/houses";
+import { PAYMENT_LABEL } from "@/lib/payments";
 import type { Db } from "./db";
 import { listPatrols } from "./queries";
-import { cashDeposits, cashEntries, collections, duesReceipts, payments, patrols, settings, users } from "./schema";
+import { cashDeposits, cashEntries, collections, duesInvoices, duesReceipts, duesTypes, houses, payments, patrols, settings, users } from "./schema";
 
 /** Batas satu catatan kas (Rp). */
 export const MAX_CASH = 100_000_000;
+
+/** Tampilan transaksi kas dari catatan asalnya, tanpa membuat penerimaan kedua. */
+export type CashTransaction = {
+  id: string;
+  source: "deposit" | "payment" | "dues" | "entry";
+  sourceId: number;
+  date: string;
+  direction: "in" | "out";
+  amount: number;
+  description: string;
+  note: string | null;
+  recordedByName: string | null;
+  relatedMonth: string;
+};
 
 /**
  * Jumlah kas: saldo sebelum bulan itu, setoran/pemasukan lain/pengeluaran di bulan itu, saldo akhir
@@ -97,16 +113,16 @@ export async function undepositedNights(db: Db, tonight: string): Promise<string
 }
 
 /**
- * Kas satu bulan untuk admin: jumlah-jumlahnya, setoran tiap malam dibanding jimpitan yang tercatat
- * petugas malam itu, serta pemasukan lain dan pengeluaran.
+ * Kas satu bulan: ringkasan, semua transaksi yang masuk saldo, dan pencocokan setoran jimpitan.
  */
 export async function getCashMonth(db: Db, month: string, tonight: string) {
   const days = daysInMonth(month);
-  const [totals, patrolRows, depositRows, entries, undeposited, periodRows] = await Promise.all([
+  const [totals, patrolRows, depositRows, entries, undeposited, periodRows, duesRows] = await Promise.all([
     cashTotals(db, month),
     listPatrols(db, days.length, month),
     db
       .select({
+        id: cashDeposits.id,
         date: cashDeposits.date,
         amount: cashDeposits.amount,
         note: cashDeposits.note,
@@ -121,8 +137,40 @@ export async function getCashMonth(db: Db, month: string, tonight: string) {
     db.select({
       id: payments.id, date: payments.receivedDate, amount: payments.amount, receivedBy: payments.receivedBy,
       periodStart: payments.periodStart, periodEnd: payments.periodEnd, houseId: payments.houseId,
-    }).from(payments).where(and(isNull(payments.cancelledAt), gte(payments.receivedDate, days[0]), lte(payments.receivedDate, days[days.length - 1]))),
+      cadence: payments.cadence, block: houses.block, number: houses.number, note: payments.note, recordedByName: users.name,
+    }).from(payments)
+      .innerJoin(houses, eq(houses.id, payments.houseId))
+      .leftJoin(users, eq(users.id, payments.recordedBy))
+      .where(and(isNull(payments.cancelledAt), gte(payments.receivedDate, days[0]), lte(payments.receivedDate, days[days.length - 1]))),
+    db.select({
+      id: duesReceipts.id, date: duesReceipts.date, amount: duesReceipts.amount, note: duesReceipts.note,
+      name: duesTypes.name, block: houses.block, number: houses.number, recordedByName: users.name,
+    }).from(duesReceipts)
+      .innerJoin(duesInvoices, eq(duesInvoices.id, duesReceipts.invoiceId))
+      .innerJoin(duesTypes, eq(duesTypes.id, duesInvoices.typeId))
+      .innerJoin(houses, eq(houses.id, duesInvoices.houseId))
+      .leftJoin(users, eq(users.id, duesReceipts.recordedBy))
+      .where(and(isNull(duesReceipts.cancelledAt), gte(duesReceipts.date, days[0]), lte(duesReceipts.date, days[days.length - 1]))),
   ]);
+
+  const transactions: CashTransaction[] = [
+    ...depositRows.map((d): CashTransaction => ({
+      id: `deposit:${d.id}`, source: "deposit", sourceId: d.id, date: d.date, direction: "in", amount: d.amount,
+      description: "Setoran ronda", note: d.note, recordedByName: d.recordedByName, relatedMonth: month,
+    })),
+    ...periodRows.filter((p) => p.receivedBy === "treasurer").map((p): CashTransaction => ({
+      id: `payment:${p.id}`, source: "payment", sourceId: p.id, date: p.date, direction: "in", amount: p.amount,
+      description: `Jimpitan ${PAYMENT_LABEL[p.cadence].toLocaleLowerCase("id")} · ${houseLabel(p)}`,
+      note: p.note, recordedByName: p.recordedByName, relatedMonth: p.periodStart.slice(0, 7),
+    })),
+    ...duesRows.map((r): CashTransaction => ({
+      id: `dues:${r.id}`, source: "dues", sourceId: r.id, date: r.date, direction: "in", amount: r.amount,
+      description: `${r.name} · ${houseLabel(r)}`, note: r.note, recordedByName: r.recordedByName, relatedMonth: month,
+    })),
+    ...entries.map((e): CashTransaction => ({
+      ...e, id: `entry:${e.id}`, source: "entry", sourceId: e.id, note: null, relatedMonth: month,
+    })),
+  ].sort((a, b) => b.date.localeCompare(a.date) || b.sourceId - a.sourceId || a.source.localeCompare(b.source));
 
   const recorded = new Map(patrolRows.map((p) => [p.date, { total: p.total, filled: p.collectedHouses }]));
   const heldByCollectors = new Map<string, number>();
@@ -136,6 +184,7 @@ export async function getCashMonth(db: Db, month: string, tonight: string) {
     month,
     tonight,
     ...totals,
+    transactions,
     nights: dates.map((date) => ({
       date,
       recorded: (recorded.get(date)?.total ?? 0) + (heldByCollectors.get(date) ?? 0),

@@ -42,7 +42,7 @@ export function RingkasanPage() {
           if (item.to.includes("/kas")) return canFinance;
           if (item.to.includes("/jadwal")) return canSchedule;
           if (item.to.includes("/rumah")) return canHouse;
-          if (item.to.includes("/petugas")) return canAccounts;
+          if (item.to.includes("/warga?tab=akun")) return canAccounts;
           if (item.to.includes("/info")) return canInfo;
           return true;
         });
@@ -113,7 +113,7 @@ export function RingkasanPage() {
                 ) : (
                   <ul className="mt-2 flex flex-wrap gap-1.5">
                     {t.guards.map((g) => (
-                      <GuardChip key={g.id} name={g.name} house={g.label} color={g.color} />
+                      <GuardChip key={g.id} name={g.name} house={g.label} color={g.color} unassigned={g.unassigned} />
                     ))}
                   </ul>
                 )}
@@ -179,7 +179,7 @@ function todoItems(
     });
   }
   if (todo.undeposited > 0) {
-    items.push({ to: adminPath("/kas"), icon: Wallet, text: `${todo.undeposited} malam belum dicatat setorannya ke bendahara` });
+    items.push({ to: adminPath("/kas?view=deposits"), icon: Wallet, text: `${todo.undeposited} malam belum dicatat setorannya ke bendahara` });
   }
   if (todo.pendingRequests > 0) {
     items.push({ to: adminPath("/jadwal"), icon: CalendarClock, text: `${todo.pendingRequests} permintaan ubah jadwal menunggu keputusan` });
@@ -187,7 +187,7 @@ function todoItems(
   if (todo.planMissing > 0) {
     items.push({ to: adminPath("/rumah?tampilan=denah"), icon: MapIcon, text: `Daftarkan ${todo.planMissing} rumah dari denah` });
   }
-  if (todo.onlyOneUser) items.push({ to: adminPath("/petugas"), icon: Users, text: "Tambahkan petugas ronda" });
+  if (todo.onlyOneUser) items.push({ to: adminPath("/warga?tab=akun"), icon: Users, text: "Buat akun warga" });
   if (todo.noSchedule) items.push({ to: adminPath("/jadwal"), icon: CalendarDays, text: "Impor jadwal ronda" });
   return items;
 }

@@ -23,11 +23,27 @@ afterEach(async () => {
   container.remove();
   vi.unstubAllGlobals();
 });
-async function render(history: unknown[], periods: BillingPeriod[] = [], status = "active", month?: string, paymentInfo: { cells?: Record<string, PaymentCell>; receipts?: unknown[] } = {}) {
-  client.setQueryData(month ? ["warga", "rumah", 1, month] : ["warga", "rumah", 1], { house: { id: 1, block: "AA", number: "9", status }, today: "2026-10-07", history, paymentInfo: { periods, receipts: [], tonight: null, ...paymentInfo } });
+async function render(history: unknown[], periods: BillingPeriod[] = [], status = "active", month?: string, paymentInfo: { cells?: Record<string, PaymentCell>; receipts?: unknown[] } = {}, clock = { today: "2026-10-07", through: "2026-10-07" }) {
+  client.setQueryData(month ? ["warga", "rumah", 1, month] : ["warga", "rumah", 1], { house: { id: 1, block: "AA", number: "9", status }, ...clock, history, paymentInfo: { periods, receipts: [], tonight: null, ...paymentInfo } });
   await act(async () => root.render(<QueryClientProvider client={client}><HouseHistoryDialog houseId={1} label="AA-9" month={month} myHouse={null} onMyHouse={() => {}} onClose={() => {}} /></QueryClientProvider>));
 }
 describe("kalender rumah dari awal bulan", () => {
+  it("tanggal hari ini belum dihitung sebelum malam dimulai, walaupun catatannya sudah ada", async () => {
+    await render(Array.from({ length: 10 }, (_, i) => ({ date: `2026-10-${String(i + 1).padStart(2, "0")}`, status: "filled", amount: 500 })), [], "active", undefined, {}, { today: "2026-10-10", through: "2026-10-09" });
+    const month = document.querySelector('section[aria-label="Oktober 2026"]')!;
+    expect(month.textContent).toContain("9 malam berjalan");
+    expect(month.textContent).toContain("Dari ronda Rp 4.500");
+    expect(month.querySelectorAll('[role="listitem"][aria-label*="ada Rp 500"]')).toHaveLength(9);
+    expect(month.querySelector('[role="listitem"][aria-label*="10 Okt"]')?.getAttribute("aria-label")).toContain("belum tiba");
+  });
+
+  it("awal bulan sebelum malam pertama tetap menampilkan bulan baru dengan nol malam", async () => {
+    await render([], [], "active", undefined, {}, { today: "2026-11-01", through: "2026-10-31" });
+    const month = document.querySelector('section[aria-label="November 2026"]')!;
+    expect(month.textContent).toContain("0 malam berjalan");
+    expect(month.querySelectorAll('[role="listitem"][aria-label*="belum tiba"]')).toHaveLength(30);
+    expect(month.querySelector('[role="listitem"][aria-label*="belum dicatat"]')).toBeNull();
+  });
   it("menandai 1–5 belum dicatat, 6–7 terisi, dan 8–31 belum tiba", async () => {
     await render([{ date: "2026-10-05", status: null, amount: null }, { date: "2026-10-06", status: "filled", amount: 500 }, { date: "2026-10-07", status: "filled", amount: 500 }]);
     const month = document.querySelector('section[aria-label="Oktober 2026"]')!;

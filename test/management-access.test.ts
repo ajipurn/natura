@@ -80,7 +80,7 @@ describe("akses pengurus dari peran di database", () => {
     });
 
   it("akses tulis dibatasi meski mengirim peran palsu di payload", async () => {
-    for (const role of ["sekretaris", "bendahara", "humas", "petugas"] as const) {
+    for (const role of ["sekretaris", "bendahara", "humas", "petugas", "warga"] as const) {
       const client = clients.get(role)!;
       expect(
         (

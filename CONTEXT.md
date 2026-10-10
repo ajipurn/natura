@@ -11,10 +11,24 @@ Satu orang dalam pendataan lingkungan. Warga dapat didata sebelum rumahnya diten
 Hunian dengan alamat blok dan nomor. Rumah tetap memiliki identitas yang sama saat penghuninya berganti.
 
 **Akun**:
-Akses seseorang ke aplikasi sesuai perannya sebagai petugas atau pengurus. Warga dapat didata tanpa memiliki akun.
+Akses satu warga ke aplikasi, dengan PIN, peran, dan status aktif. Setiap warga memiliki paling banyak satu akun; membuat akun tidak membentuk orang baru atau otomatis memberi tugas ronda.
 
-**Petugas**:
-Pemegang akun yang menjalankan tugas ronda dan pencatatan jimpitan.
+Pengelolaan akun ada pada tab Akun di halaman Warga. Data orang, keluarga, dan aksesnya tetap terhubung; penugasan ronda dikelola melalui Jadwal ronda.
+
+**Petugas ronda**:
+Warga tertentu yang ditugaskan pada suatu malam. Rumahnya adalah penunjuk alamat, bukan pihak yang menerima atau mewariskan tugas.
+
+**Peran Petugas**:
+Hak akun untuk menggunakan fitur ronda dan mencatat jimpitan ketika mendapat tugas. Peran ini berbeda dari penugasan malam jaga.
+
+**Peran Warga**:
+Hak akun untuk membaca informasi lingkungan tanpa fitur ronda dan pencatatan jimpitan.
+
+**Penugasan ronda**:
+Hubungan warga dengan malam jaganya, yang tetap melekat pada warga saat dibuatkan akun atau pindah rumah. Warga tanpa akun dapat didata dalam jadwal; akses pencatatan membutuhkan akun dengan hak ronda.
+
+**Penanda jadwal**:
+Rumah atau nama dari jadwal lama yang belum terhubung ke orang tertentu. Pengurus harus memilih petugasnya; penanda ini tidak memberi hak pencatatan kepada penghuni rumah.
 
 **Pengurus**:
 Warga yang mengelola data, layanan, dan kegiatan lingkungan melalui dashboard.

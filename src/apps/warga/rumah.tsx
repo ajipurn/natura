@@ -13,6 +13,7 @@ import { PaymentNotice } from "@/components/payment-notice";
 import { PAYMENT_LABEL } from "@/lib/payments";
 import { petugasPath, wargaPath } from "@/lib/app-paths";
 import { DEFAULT_LOGO_URL } from "@/lib/branding";
+import { canRonda } from "@/lib/permissions";
 
 /** Halaman yang terbuka saat QR rumah di-scan pakai kamera HP biasa. */
 export function HousePage() {
@@ -48,7 +49,7 @@ export function HousePage() {
                 </p>
               )}
 
-              {user && (
+              {user && canRonda(user.role) && (
                 <Card className="mt-5">
                   <p className="flex items-center gap-2 font-semibold">
                     <ScanLine className="size-5 text-primary" /> Catat malam ini
@@ -110,11 +111,11 @@ export function HousePage() {
               )}
 
               <div className="mt-8 flex flex-col items-center gap-2 text-center">
-                {user ? (
+                {user && canRonda(user.role) ? (
                   <a href={petugasPath("/ronda")} className={buttonClass("secondary")}>
                     Buka Ronda
                   </a>
-                ) : (
+                ) : !user && (
                   <a href={petugasPath(`/masuk?next=${encodeURIComponent(`/r/${house.token}`)}`)} className={cx(buttonClass("ghost", "sm"))}>
                     <LogIn className="size-4" /> Petugas ronda? Masuk
                   </a>

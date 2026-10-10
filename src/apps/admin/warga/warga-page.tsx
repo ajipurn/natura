@@ -12,7 +12,7 @@ import { Link, useSearchParams } from "react-router";
 import { QueryState } from "@/components/query-state";
 import { Select } from "@/components/select";
 import { Button, Card, Input, PageHeader } from "@/components/ui";
-import { ChipGroup } from "@/components/toggle-group";
+import { SegmentedControl } from "@/components/toggle-group";
 import { usePermission } from "@/client/permissions";
 import { ROLE_LABEL } from "@/lib/permissions";
 import { HOUSING_LABEL } from "@/lib/community";
@@ -20,12 +20,30 @@ import { KeluargaPanel } from "./keluarga-page";
 import { adminPath } from "@/lib/app-paths";
 import { residentsQuery } from "../queries";
 import { WargaDialog, type Resident } from "./warga-dialog";
+import { AccountsPanel } from "./accounts-panel";
 
 export function WargaPage() {
+  const canReadResidents = usePermission("residents");
+  const canReadAccounts = usePermission("accounts");
+  const [params, setParams] = useSearchParams();
+  const requested = params.get("tab");
+  const view = requested === "akun" || requested === "keluarga" ? requested : canReadResidents ? "warga" : "akun";
+  return <>
+    <PageHeader title="Warga" subtitle="Data warga, keluarga, dan akses aplikasi." />
+    <SegmentedControl aria-label="Pendataan warga" size="sm" className="mb-5 w-fit max-w-full" value={view}
+      onValueChange={(value) => setParams(value === "warga" ? {} : { tab: value })}
+      options={[
+        ...(canReadResidents ? [{ value: "warga", label: "Daftar warga" }, { value: "keluarga", label: "Keluarga" }] : []),
+        ...(canReadAccounts ? [{ value: "akun", label: "Akun" }] : []),
+      ]} />
+    {view === "keluarga" ? <KeluargaPanel /> : view === "akun" ? <AccountsPanel /> : <ResidentsPanel />}
+  </>;
+}
+
+function ResidentsPanel() {
   const canEdit = usePermission("residents", true);
   const query = useQuery(residentsQuery);
   const [params, setParams] = useSearchParams();
-  const familyView = params.get("tab") === "keluarga";
   const [search, setSearch] = useState("");
   const [block, setBlock] = useState("semua");
   const [editing, setEditing] = useState<number | "baru" | null>(
@@ -61,128 +79,109 @@ export function WargaPage() {
             : undefined;
         return (
           <>
-            <PageHeader
-              title="Warga"
-              subtitle="Pendataan warga, keluarga, dan tempat tinggal."
-              action={
-                canEdit && !familyView && (
-                  <Button size="sm" onClick={() => setEditing("baru")}>
+            {canEdit && <div className="mb-4 flex justify-end">
+              <Button size="sm" onClick={() => setEditing("baru")}><UserPlus className="size-4" /> Tambah warga</Button>
+            </div>}
+            <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <Summary label="Warga terdaftar" value={residents.length} />
+              <Summary
+                label="Rumah terhubung"
+                value={new Set(homed.map((r) => r.houseId)).size}
+              />
+              <Summary
+                label="Belum terhubung"
+                value={residents.length - homed.length}
+              />
+            </div>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+              <label className="relative min-w-0 flex-1">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"
+                  aria-hidden
+                />
+                <Input
+                  type="search"
+                  aria-label="Cari warga"
+                  placeholder="Cari nama, telepon, atau rumah…"
+                  value={search}
+                  onValueChange={setSearch}
+                  className="pl-10"
+                />
+              </label>
+              <div className="sm:w-52">
+                <Select
+                  aria-label="Filter blok"
+                  value={block}
+                  onValueChange={setBlock}
+                  options={[
+                    { value: "semua", label: "Semua blok" },
+                    {
+                      value: "tanpa-rumah",
+                      label: "Rumah belum ditentukan",
+                    },
+                    ...blocks.map((value) => ({
+                      value,
+                      label: `Blok ${value}`,
+                    })),
+                  ]}
+                />
+              </div>
+            </div>
+            {houseFilter && (
+              <p className="mb-3 text-sm text-muted">
+                Menampilkan warga pada rumah yang dipilih.{" "}
+                <Link
+                  to={adminPath("/warga")}
+                  className="font-medium text-primary underline underline-offset-4"
+                >
+                  Lihat semua warga
+                </Link>
+              </p>
+            )}
+            <p className="mb-2 text-xs text-muted" role="status">
+              {shown.length} warga ditampilkan
+            </p>
+            {shown.length ? (
+              <ResidentList residents={shown} onEdit={setEditing} />
+            ) : (
+              <Card className="py-12 text-center">
+                <Users
+                  className="mx-auto mb-3 size-8 text-primary"
+                  aria-hidden
+                />
+                <p className="font-semibold">
+                  {residents.length
+                    ? "Tidak ada warga yang cocok"
+                    : "Belum ada warga"}
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  {residents.length
+                    ? "Ubah pencarian atau filter blok."
+                    : canEdit ? "Tambahkan warga. Rumahnya bisa ditentukan nanti." : "Data warga belum dicatat pengurus."}
+                </p>
+                {canEdit && !residents.length && (
+                  <Button
+                    className="mt-4"
+                    size="sm"
+                    onClick={() => setEditing("baru")}
+                  >
                     <UserPlus className="size-4" /> Tambah warga
                   </Button>
-                )
-              }
-            />
-            <ChipGroup
-              aria-label="Pendataan warga"
-              className="mb-5"
-              value={familyView ? "keluarga" : "warga"}
-              onValueChange={(value) =>
-                setParams(value === "keluarga" ? { tab: "keluarga" } : {})
-              }
-              options={[
-                { value: "warga", label: "Daftar warga" },
-                { value: "keluarga", label: "Keluarga" },
-              ]}
-            />
-            {familyView ? (
-              <KeluargaPanel />
-            ) : (
-              <>
-                <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  <Summary label="Warga terdaftar" value={residents.length} />
-                  <Summary
-                    label="Rumah terhubung"
-                    value={new Set(homed.map((r) => r.houseId)).size}
-                  />
-                  <Summary
-                    label="Belum terhubung"
-                    value={residents.length - homed.length}
-                  />
-                </div>
-                <div className="mb-4 flex flex-col gap-3 sm:flex-row">
-                  <label className="relative min-w-0 flex-1">
-                    <Search
-                      className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"
-                      aria-hidden
-                    />
-                    <Input
-                      type="search"
-                      aria-label="Cari warga"
-                      placeholder="Cari nama, telepon, atau rumah…"
-                      value={search}
-                      onValueChange={setSearch}
-                      className="pl-10"
-                    />
-                  </label>
-                  <div className="sm:w-52">
-                    <Select
-                      aria-label="Filter blok"
-                      value={block}
-                      onValueChange={setBlock}
-                      options={[
-                        { value: "semua", label: "Semua blok" },
-                        {
-                          value: "tanpa-rumah",
-                          label: "Rumah belum ditentukan",
-                        },
-                        ...blocks.map((value) => ({
-                          value,
-                          label: `Blok ${value}`,
-                        })),
-                      ]}
-                    />
-                  </div>
-                </div>
-                {houseFilter && (
-                  <p className="mb-3 text-sm text-muted">
-                    Menampilkan warga pada rumah yang dipilih.{" "}
-                    <Link
-                      to={adminPath("/warga")}
-                      className="font-medium text-primary underline underline-offset-4"
-                    >
-                      Lihat semua warga
-                    </Link>
-                  </p>
                 )}
-                <p className="mb-2 text-xs text-muted" role="status">
-                  {shown.length} warga ditampilkan
-                </p>
-                {shown.length ? (
-                  <ResidentList residents={shown} onEdit={setEditing} />
-                ) : (
-                  <Card className="py-12 text-center">
-                    <Users
-                      className="mx-auto mb-3 size-8 text-primary"
-                      aria-hidden
-                    />
-                    <p className="font-semibold">
-                      {residents.length
-                        ? "Tidak ada warga yang cocok"
-                        : "Belum ada warga"}
-                    </p>
-                    <p className="mt-1 text-sm text-muted">
-                      {residents.length
-                        ? "Ubah pencarian atau filter blok."
-                        : canEdit ? "Tambahkan warga. Rumahnya bisa ditentukan nanti." : "Data warga belum dicatat pengurus."}
-                    </p>
-                    {canEdit && !residents.length && (
-                      <Button
-                        className="mt-4"
-                        size="sm"
-                        onClick={() => setEditing("baru")}
-                      >
-                        <UserPlus className="size-4" /> Tambah warga
-                      </Button>
-                    )}
-                  </Card>
-                )}
-                {canEdit && <WargaDialog
-                  open={editing === "baru" || Boolean(selected)}
-                  resident={selected}
-                  onClose={() => setEditing(null)}
-                />}
-              </>
+              </Card>
             )}
+            {canEdit && <WargaDialog
+              open={editing === "baru" || Boolean(selected)}
+              resident={selected}
+              onClose={() => {
+                setEditing(null);
+                if (params.has("ubah")) setParams((previous) => {
+                  const next = new URLSearchParams(previous);
+                  next.delete("ubah");
+                  return next;
+                }, { replace: true });
+              }}
+            />}
           </>
         );
       }}
@@ -208,6 +207,7 @@ function ResidentList({
 }) {
   const canEdit = usePermission("residents", true);
   const manageAccounts = usePermission("accounts", true);
+  const readAccounts = usePermission("accounts");
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-card">
       <div
@@ -272,13 +272,16 @@ function ResidentList({
             </div>
             <div className="col-start-1 row-start-3 text-xs sm:col-auto sm:row-auto">
               {resident.userId ? (
-                <span className="inline-flex rounded-full bg-primary/8 px-2 py-1 font-medium text-primary">
+                readAccounts ? <Link to={adminPath(`/warga?tab=akun&akun=${resident.userId}`)} aria-label={`Akun ${resident.name}`} className="inline-flex rounded-full bg-primary/8 px-2 py-1 font-medium text-primary hover:underline">
+                  {ROLE_LABEL[resident.role!]}
+                  {resident.accountActive === false ? " · nonaktif" : ""}
+                </Link> : <span className="inline-flex rounded-full bg-primary/8 px-2 py-1 font-medium text-primary">
                   {ROLE_LABEL[resident.role!]}
                   {resident.accountActive === false ? " · nonaktif" : ""}
                 </span>
               ) : manageAccounts ? (
                 <Link
-                  to={adminPath(`/petugas?warga=${resident.id}`)}
+                  to={adminPath(`/warga?tab=akun&warga=${resident.id}`)}
                   className="inline-flex items-center gap-1 text-muted hover:text-primary hover:underline"
                 >
                   Buat akun <ArrowUpRight className="size-3" aria-hidden />

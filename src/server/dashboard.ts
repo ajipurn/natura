@@ -68,7 +68,7 @@ export async function getDashboard(db: Db, now: Date) {
       collectors: tonight.collectors,
       guards: schedule
         .filter((s) => s.day === day)
-        .map((s) => ({ id: s.id, label: slotHouseLabel(s), name: s.name ?? s.ownerName, color: s.color })),
+        .map((s) => ({ id: s.id, label: slotHouseLabel(s), name: s.name ?? s.ownerName, color: s.color, unassigned: s.residentId === null })),
     },
     monthSummary: { nights: stats.nights, total: stats.perNight.reduce((sum, n) => sum + n.total, 0) + paymentOverview.receivedMonth, average: stats.average },
     paymentOverview,

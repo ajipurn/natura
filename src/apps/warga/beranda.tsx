@@ -77,11 +77,12 @@ function WargaContent() {
   const info = useQuery({
     queryKey: ["warga", "info"],
     queryFn: () => call(api.warga.$get()),
+    refetchInterval: 60_000,
   });
 
   return (
     <QueryState query={info}>
-      {({ announcements, schedule, tonight, date, contacts, cash }) => {
+      {({ announcements, schedule, tonight, date, today, contacts, cash }) => {
         return (
           <div className="space-y-2">
             {announcements.length > 0 && (
@@ -127,7 +128,7 @@ function WargaContent() {
             </SectionTitle>
             <GuardSchedule schedule={schedule} tonight={tonight} date={date} />
 
-            <MonthRecap today={date}>
+            <MonthRecap today={today}>
               {cash && <CashCard cash={cash} />}
             </MonthRecap>
 
@@ -183,6 +184,7 @@ function WargaContent() {
 }
 
 type Guard = {
+  unassigned?: boolean;
   id: number;
   day: number;
   position: number;
@@ -280,6 +282,7 @@ function GuardSchedule({
                 name={g.name}
                 house={slotHouseLabel(g)}
                 color={null}
+                unassigned={g.unassigned}
                 mine={isMine(g)}
               />
             ))}
@@ -313,18 +316,16 @@ function MonthRecap({
   children?: ReactNode;
 }) {
   const thisMonth = today.slice(0, 7);
-  const [month, setMonth] = useState(thisMonth);
+  const [selectedMonth, setMonth] = useState<string | null>(null);
+  const month = selectedMonth ?? thisMonth;
   const recap = useQuery({
     queryKey: ["warga", "rekap", month],
     queryFn: () => call(api.warga.rekap.$get({ query: { bulan: month } })),
     placeholderData: (previous) => previous,
+    refetchInterval: 60_000,
   });
 
-  const dataMonth = recap.data?.month ?? month;
-  const through =
-    dataMonth === thisMonth
-      ? (recap.data?.today ?? today)
-      : daysInMonth(dataMonth).at(-1)!;
+  const through = recap.data?.perNight.at(-1)?.date ?? recap.data?.through ?? today;
 
   return (
     <>
@@ -347,7 +348,10 @@ function MonthRecap({
           <Button
             variant="secondary"
             size="icon"
-            onClick={() => setMonth(shiftMonth(month, 1))}
+            onClick={() => {
+              const next = shiftMonth(month, 1);
+              setMonth(next === thisMonth ? null : next);
+            }}
             disabled={month >= thisMonth}
             aria-label="Bulan berikutnya"
           >
@@ -364,8 +368,7 @@ function MonthRecap({
                 {month === thisMonth ? (
                   <>
                     <p>
-                      Belum ada ronda tercatat bulan ini. Rekapnya muncul
-                      setelah petugas mencatat malam pertama.
+                      Malam pertama bulan ini mulai dihitung pukul 20.00 WIB tanggal 1.
                     </p>
                     <Button
                       variant="ghost"
@@ -408,14 +411,14 @@ function MonthRecap({
                   className="mt-5"
                   caption={`Jimpitan per malam, ${formatMonth(month)}`}
                   bars={daysInMonth(month)
-                    .filter((date) => date <= data.today)
+                    .filter((date) => date <= data.through)
                     .map((date) => {
                       const night = data.perNight.find((n) => n.date === date);
                       return {
                         key: date,
                         label: String(Number(date.slice(8))),
                         value: night?.total ?? 0,
-                        highlight: date === data.today,
+                        highlight: date === data.through,
                         title: night
                           ? `${formatDateShort(date)}: hasil ronda ${formatRupiah(night.total)}`
                           : `${formatDateShort(date)}: tidak ada catatan ronda`,
@@ -432,10 +435,7 @@ function MonthRecap({
         </QueryState>
       </Card>
       {children}
-      {recap.data &&
-        (recap.data.nights > 0 ||
-          recap.data.total > 0 ||
-          recap.data.paymentPeriods.length > 0) && (
+      {recap.data && (
           <HouseStatus
             perHouse={recap.data.perHouse.map((h) => ({
               ...h,

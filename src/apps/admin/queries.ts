@@ -14,6 +14,11 @@ export const paymentsQuery = (month: string) => queryOptions({
   queryFn: () => call(api.admin.pembayaran.$get({ query: { bulan: month } })),
 });
 
+export const rapelQuery = queryOptions({
+  queryKey: ["admin", "pembayaran", "rapel"],
+  queryFn: () => call(api.admin.pembayaran.rapel.$get()),
+});
+
 export const PAYMENT_REFRESH = [["admin"], ["rekap"], ["riwayat"], ["ronda"], ["rumah"], ["warga"]];
 
 export const usersQuery = queryOptions({

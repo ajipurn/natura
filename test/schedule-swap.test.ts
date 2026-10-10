@@ -1,3 +1,5 @@
+import { profileForUser } from "./helpers/residents";
+import { scheduledAccount } from "@/server/schedule";
 import { eq, sql } from "drizzle-orm";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScheduleDTO } from "@/lib/types";
@@ -45,11 +47,11 @@ beforeEach(async () => {
   await db.delete(rondaSchedule);
   await db.update(users).set({ active: true });
   await db.insert(rondaSchedule).values([
-    { userId: yusufId, dayOfWeek: 0, position: 1, color: "orange" },
-    { userId: yusufId, dayOfWeek: 6, position: 0, color: "green" },
-    { userId: ninoId, dayOfWeek: 1, position: 2, color: "green" },
-    { userId: ninoId, dayOfWeek: 4, position: 0, color: "yellow" },
-    { userId: jamroniId, dayOfWeek: 3, position: 0, color: "green" },
+    { residentId: await profileForUser(db, yusufId), dayOfWeek: 0, position: 1, color: "orange" },
+    { residentId: await profileForUser(db, yusufId), dayOfWeek: 6, position: 0, color: "green" },
+    { residentId: await profileForUser(db, ninoId), dayOfWeek: 1, position: 2, color: "green" },
+    { residentId: await profileForUser(db, ninoId), dayOfWeek: 4, position: 0, color: "yellow" },
+    { residentId: await profileForUser(db, jamroniId), dayOfWeek: 3, position: 0, color: "green" },
     { name: "Satpam", dayOfWeek: 0, position: 0, color: "green" },
   ]);
 });
@@ -126,10 +128,10 @@ describe("tukar jadwal mingguan", () => {
       { fromDay: 0, toDay: 1, targetUserId: 999999 },
       { fromDay: 0, toDay: 1, targetUserId: 0 },
     ]) expect((await yusuf.post("/api/jadwal/permintaan", { ...input, note: "" })).status).toBe(400);
-    await db.insert(rondaSchedule).values({ userId: ninoId, dayOfWeek: 0, position: 2, color: "green" });
+    await db.insert(rondaSchedule).values({ residentId: await profileForUser(db, ninoId), dayOfWeek: 0, position: 2, color: "green" });
     expect((await send()).data.error).toMatch(/sudah jaga/);
     await db.delete(rondaSchedule).where(eq(rondaSchedule.dayOfWeek, 0));
-    await db.insert(rondaSchedule).values({ userId: yusufId, dayOfWeek: 0, position: 0, color: "green" });
+    await db.insert(rondaSchedule).values({ residentId: await profileForUser(db, yusufId), dayOfWeek: 0, position: 0, color: "green" });
     await db.update(users).set({ active: false }).where(eq(users.id, ninoId));
     expect((await send()).data.error).toMatch(/nonaktif/);
     expect(await db.select().from(scheduleRequests)).toEqual([]);
@@ -152,16 +154,16 @@ describe("tukar jadwal mingguan", () => {
   it("jadwal berubah, ganda, atau petugas nonaktif: persetujuan gagal tanpa memindah separuh pertukaran", async () => {
     await send();
     const id = await requestId();
-    await db.update(rondaSchedule).set({ dayOfWeek: 2 }).where(eq(rondaSchedule.userId, ninoId));
+    await db.update(rondaSchedule).set({ dayOfWeek: 2 }).where(scheduledAccount(ninoId));
     let before = await schedule();
     expect((await admin.post(`/api/admin/permintaan/${id}/setujui`, { response: "" })).status).toBe(409);
     expect(await schedule()).toEqual(before);
-    await db.update(rondaSchedule).set({ dayOfWeek: 1 }).where(eq(rondaSchedule.userId, ninoId));
+    await db.update(rondaSchedule).set({ dayOfWeek: 1 }).where(scheduledAccount(ninoId));
     before = await schedule();
     expect((await admin.post(`/api/admin/permintaan/${id}/setujui`, { response: "" })).status).toBe(409);
     expect(await schedule()).toEqual(before);
-    await db.delete(rondaSchedule).where(eq(rondaSchedule.userId, ninoId));
-    await db.insert(rondaSchedule).values({ userId: ninoId, dayOfWeek: 1, position: 2, color: "green" });
+    await db.delete(rondaSchedule).where(scheduledAccount(ninoId));
+    await db.insert(rondaSchedule).values({ residentId: await profileForUser(db, ninoId), dayOfWeek: 1, position: 2, color: "green" });
     await db.update(users).set({ active: false }).where(eq(users.id, ninoId));
     before = await schedule();
     expect((await admin.post(`/api/admin/permintaan/${id}/setujui`, { response: "" })).data.error).toMatch(/nonaktif/);

@@ -220,30 +220,30 @@ export type GuardAccount = { id: number; name: string; houseId: number | null };
 export function matchGuardAccount<U extends GuardAccount>(accounts: U[], name: string | null, houseId: number | null): U | undefined {
   if (!name) return undefined;
   const same = accounts.filter((a) => a.name.toLowerCase() === name.toLowerCase());
-  const atHouse = houseId === null ? undefined : same.find((a) => a.houseId === houseId);
-  return atHouse ?? (same.length === 1 && (houseId === null || same[0].houseId === null) ? same[0] : undefined);
+  const atHouse = houseId === null ? [] : same.filter((a) => a.houseId === houseId);
+  if (atHouse.length > 1) return undefined;
+  return atHouse[0] ?? (same.length === 1 && (houseId === null || same[0].houseId === null) ? same[0] : undefined);
 }
 
-/** Isi satu baris jadwal yang disimpan: tepat satu dari akun petugas, rumah tanpa akun, atau nama bebas. */
-export type SlotSource = { userId: number | null; houseId: number | null; name: string | null };
+/** Warga yang dapat ditugaskan, dengan identitas profil yang tidak berubah saat mendapat akun. */
+export type ScheduleResident = { id: number; name: string; houseId: number | null };
+
+/** Tepat satu dari warga yang ditugaskan, penanda rumah, atau nama yang belum terhubung. */
+export type SlotSource = { residentId: number | null; houseId: number | null; name: string | null };
 
 /**
- * Baris jadwal hasil impor ("Nama (BLOK-NO)") menjadi rujukan ke akun atau rumah, supaya nama dan
- * rumahnya tidak disalin ke jadwal. Rumah yang dihuni satu petugas dihitung sebagai petugas itu.
- * Kode rumah yang tidak terdaftar disimpan sebagai nama, mis. "Apri (C-1)".
+ * Impor hanya menghubungkan nama yang cocok ke profil warga. Alamat saja tidak menentukan orang;
+ * nama yang belum dikenal tetap menjadi penanda, tanpa mengubah nama atau tempat tinggal warga.
  */
 export function resolveEntry(
   entry: { name: string | null; block: string; number: string },
   houses: Map<string, { id: number }>,
-  accounts: GuardAccount[],
+  people: ScheduleResident[],
 ): SlotSource {
   const house = entry.block ? houses.get(lotKey(entry.block, entry.number)) : undefined;
-  const account = matchGuardAccount(accounts, entry.name, house?.id ?? null);
-  if (account) return { userId: account.id, houseId: null, name: null };
-  if (house) {
-    const residents = accounts.filter((a) => a.houseId === house.id);
-    return residents.length === 1 ? { userId: residents[0].id, houseId: null, name: null } : { userId: null, houseId: house.id, name: null };
-  }
+  const person = matchGuardAccount(people, entry.name, house?.id ?? null);
+  if (person) return { residentId: person.id, houseId: null, name: null };
+  if (house && !entry.name) return { residentId: null, houseId: house.id, name: null };
   const label = slotHouseLabel(entry);
-  return { userId: null, houseId: null, name: entry.name ? (label ? `${entry.name} (${label})` : entry.name) : label };
+  return { residentId: null, houseId: null, name: entry.name ? (label ? `${entry.name} (${label})` : entry.name) : label };
 }

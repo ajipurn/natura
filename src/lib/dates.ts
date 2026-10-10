@@ -26,6 +26,11 @@ export function rondaDate(at: Date, timeZone = APP_TIMEZONE): string {
   );
 }
 
+/** Malam terakhir yang sudah dimulai untuk rekap jimpitan; hari ini masuk pukul 20.00 WIB. */
+export function startedRondaDate(at: Date, timeZone = APP_TIMEZONE): string {
+  return localDate(new Date(at.getTime() - 20 * 60 * 60 * 1000), timeZone);
+}
+
 function parseIsoDate(isoDate: string): Date {
   const [y, m, d] = isoDate.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d));

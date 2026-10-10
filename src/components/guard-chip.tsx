@@ -13,12 +13,14 @@ export function GuardChip({
   color,
   me = false,
   mine = false,
+  unassigned = false,
 }: {
   name: string | null;
   house: string;
   color: GuardColor | null;
   me?: boolean;
   mine?: boolean;
+  unassigned?: boolean;
 }) {
   return (
     <li
@@ -34,6 +36,7 @@ export function GuardChip({
       {/* Spasi supaya pembaca layar membaca "Nino AB-3", bukan "NinoAB-3". */}
       {name && house && " "}
       {house && <span className={cx(name ? "opacity-85" : "font-semibold")}>{house}</span>}
+      {unassigned && <span className="text-xs opacity-85">· belum dipilih</span>}
       <span className="sr-only">, {GUARD_COLOR_MEANING[color ?? "white"]}</span>
     </li>
   );

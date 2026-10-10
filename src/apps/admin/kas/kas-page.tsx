@@ -1,5 +1,6 @@
+import { Tabs } from "@base-ui/react/tabs";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, Pencil, Plus, ReceiptText, TriangleAlert, Wallet } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, CheckCircle2, ChevronLeft, ChevronRight, Pencil, Plus, TriangleAlert, Wallet } from "lucide-react";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { api, call } from "@/client/api";
@@ -9,32 +10,47 @@ import { DatePicker } from "@/components/date-picker";
 import { Dialog } from "@/components/dialog";
 import { QueryState } from "@/components/query-state";
 import { RupiahInput } from "@/components/rupiah-input";
+import { Select } from "@/components/select";
 import { Alert, Button, Card, Field, Input, PageHeader, buttonClass, cx } from "@/components/ui";
 import { formatDateShort, formatMonth, isMonth, localDate, rondaDate, shiftMonth } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import type { CashMonth } from "@/server/kas";
 import { CASH_REFRESH, cashQuery, settingsQuery } from "../queries";
 import { adminPath } from "@/lib/app-paths";
+import { CashTransactions } from "./cash-transactions";
+import { CashIncomeChart } from "./cash-income-chart";
 
 type Night = CashMonth["nights"][number];
 type Entry = CashMonth["entries"][number];
 type Direction = Entry["direction"];
+type CashView = "transactions" | "deposits";
+type DepositFilter = "attention" | "pending" | "difference" | "all";
+
+const depositStatus = (night: Night) => !night.deposit ? "pending" : night.deposit.amount !== night.recorded ? "difference" : "matched";
+const depositPriority = { pending: 0, difference: 1, matched: 2 };
+const cashTabClass = "inline-flex h-8 shrink-0 select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-muted transition-colors hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary data-active:bg-primary data-active:text-primary-fg data-active:hover:text-primary-fg";
 
 /** "2026-10-05" → "5 Okt" */
 const dayMonth = (isoDate: string) => formatDateShort(isoDate).split(", ")[1];
 
 /**
- * Kas jimpitan: uang tiap malam disetor petugas jaga ke bendahara selesai keliling, lalu dicatat di
- * sini dan dibandingkan dengan jimpitan yang tercatat malam itu. Ditambah pemasukan lain (mis. saldo
- * awal) dan pengeluaran, jadi saldonya terlihat.
+ * Kas lingkungan: seluruh pemasukan/pengeluaran, dengan pencocokan setoran jimpitan tersendiri.
  */
 export function KasPage() {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const view: CashView = params.get("view") === "deposits" ? "deposits" : "transactions";
+  const selectView = (value: CashView) => {
+    const next = new URLSearchParams(params);
+    if (value === "transactions") next.delete("view");
+    else next.set("view", value);
+    setParams(next, { replace: true });
+  };
   const tonight = rondaDate(new Date());
   const thisMonth = tonight.slice(0, 7);
   const bulan = params.get("bulan") ?? "";
   const month = isMonth(bulan) && bulan <= thisMonth ? bulan : thisMonth;
   const query = useQuery({ ...cashQuery(month), placeholderData: (previous) => previous });
+  const attentionCount = query.data?.nights.filter((n) => depositStatus(n) !== "matched").length ?? 0;
   const cashPublic = useQuery(settingsQuery).data?.cashPublic;
   // Dialog pengeluaran/pemasukan lain (tanpa `entry` = tambah baru). Isinya tetap selama dialog menutup.
   const [entryTarget, setEntryTarget] = useState<{ entry?: Entry }>({});
@@ -43,25 +59,51 @@ export function KasPage() {
     setEntryTarget({ entry });
     setEntryOpen(true);
   };
+  const [depositTarget, setDepositTarget] = useState<Night>();
+  const [depositOpen, setDepositOpen] = useState(false);
+  const openDeposit = (night: Night) => { setDepositTarget(night); setDepositOpen(true); };
 
   return (
     <>
-      <PageHeader title="Kas" subtitle="Setoran jimpitan, penerimaan iuran, dan transaksi lingkungan." action={<Link to={adminPath("/iuran")} className={buttonClass("secondary", "sm")}>Kelola iuran</Link>} />
-      <div className="mb-4 flex items-center justify-between gap-2 sm:gap-3">
-        <MonthNav month={month} thisMonth={thisMonth} />
-        <Button size="sm" className="shrink-0" onClick={() => openEntry()}>
-          <Plus className="size-4" aria-hidden /> Catat transaksi
-        </Button>
+      <PageHeader title="Kas lingkungan" subtitle="Pemasukan, pengeluaran, dan saldo bersama." />
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <MonthNav month={month} thisMonth={thisMonth} view={view} />
+        <div className="flex flex-wrap justify-end gap-2">
+          <Link to={adminPath("/iuran")} className={buttonClass("secondary", "sm")}>Kelola iuran</Link>
+          <Button size="sm" onClick={() => openEntry()}><Plus className="size-4" aria-hidden /> Catat transaksi</Button>
+        </div>
       </div>
 
       <QueryState query={query}>
         {(data) => (
           <div className={cx("space-y-6", query.isPlaceholderData && "opacity-60")}>
             <Summary data={data} />
-            {data.undeposited.length > 0 && <Undeposited dates={data.undeposited} month={month} />}
-            <Deposits nights={data.nights} tonight={tonight} />
-            {data.directReceipts.length > 0 && <section aria-label="Pembayaran langsung bendahara"><h2 className="font-semibold">Pembayaran langsung bendahara</h2><p className="mt-1 text-sm text-muted">Sudah masuk kas pada tanggal diterima. Koreksi di Rekap bulanan.</p><ul className="mt-3 divide-y divide-line rounded-2xl border border-line bg-card">{data.directReceipts.map((p) => <li key={p.id} className="flex flex-wrap justify-between gap-2 px-4 py-3"><div><p className="text-sm font-semibold">Diterima {formatDateShort(p.date)}</p><p className="text-xs text-muted">Periode {formatDateShort(p.periodStart)} – {formatDateShort(p.periodEnd)} <Link to={adminPath("/rekap")} className="font-semibold text-primary underline">Lihat pembayaran</Link></p></div><span className="text-sm font-semibold text-filled">{formatRupiah(p.amount)}</span></li>)}</ul></section>}
-            <Entries entries={data.entries} onOpen={openEntry} onAdd={() => openEntry()} />
+            {data.undeposited.length > 0 && <Undeposited dates={data.undeposited} month={month} onOpen={() => selectView("deposits")} />}
+            <Tabs.Root value={view} onValueChange={(value: CashView) => selectView(value)}>
+              <Tabs.List aria-label="Tampilan kas" activateOnFocus className="mb-5 flex w-fit max-w-full rounded-xl border border-line bg-card p-0.5">
+                <Tabs.Tab value="transactions" className={cashTabClass}>Transaksi</Tabs.Tab>
+                <Tabs.Tab value="deposits" className={cashTabClass}>
+                  <span>Setoran jimpitan</span>
+                  {attentionCount > 0 && <span className="shrink-0 rounded-full bg-warn-soft px-2 py-0.5 text-xs text-warn">
+                    {attentionCount}<span className="sr-only"> malam perlu dicek</span>
+                  </span>}
+                </Tabs.Tab>
+              </Tabs.List>
+              <Tabs.Panel value="transactions" keepMounted className="rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
+                <CashTransactions key={data.month} transactions={data.transactions} month={data.month} onEdit={(transaction) => {
+                  if (transaction.source === "entry") {
+                    const entry = data.entries.find((e) => e.id === transaction.sourceId);
+                    if (entry) openEntry(entry);
+                  } else if (transaction.source === "deposit") {
+                    const night = data.nights.find((n) => n.date === transaction.date);
+                    if (night) openDeposit(night);
+                  }
+                }} />
+              </Tabs.Panel>
+              <Tabs.Panel value="deposits" keepMounted className="rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
+                <Deposits key={data.month} nights={data.nights} tonight={tonight} onOpen={openDeposit} />
+              </Tabs.Panel>
+            </Tabs.Root>
             {cashPublic !== undefined && (
               <p className="text-xs text-muted">
                 {cashPublic
@@ -77,14 +119,22 @@ export function KasPage() {
       </QueryState>
 
       <EntryDialog entry={entryTarget.entry} open={entryOpen} onClose={() => setEntryOpen(false)} />
+      <Dialog open={depositOpen} onClose={() => setDepositOpen(false)} title={depositTarget?.deposit ? "Ubah setoran jimpitan" : "Catat setoran jimpitan"}
+        description={depositTarget ? `Ronda ${formatDateShort(depositTarget.date)} · tercatat ${formatRupiah(depositTarget.recorded)}.` : undefined}>
+        {depositTarget && <DepositForm key={`${depositTarget.date}:${depositTarget.deposit?.updatedAt ?? "baru"}`} night={depositTarget} onDone={() => setDepositOpen(false)} />}
+      </Dialog>
     </>
   );
 }
 
-function MonthNav({ month, thisMonth }: { month: string; thisMonth: string }) {
-  const link = (m: string) => (m === thisMonth ? adminPath("/kas") : adminPath(`/kas?bulan=${m}`));
+function MonthNav({ month, thisMonth, view }: { month: string; thisMonth: string; view: CashView }) {
+  const link = (m: string) => {
+    const query = new URLSearchParams();
+    if (m !== thisMonth) query.set("bulan", m);
+    if (view === "deposits") query.set("view", view);
+    return adminPath(`/kas${query.size ? `?${query}` : ""}`);
+  };
   const monthLabel = formatMonth(month);
-  const shortMonth = monthLabel.split(" ")[0].slice(0, 3);
   return (
     <nav aria-label="Pilih bulan" className="flex min-w-0 flex-1 items-center rounded-xl border border-line bg-card p-px sm:flex-none">
       <Link
@@ -95,10 +145,7 @@ function MonthNav({ month, thisMonth }: { month: string; thisMonth: string }) {
         <ChevronLeft className="size-5" />
       </Link>
       <span className="min-w-0 flex-1 whitespace-nowrap text-center text-sm font-semibold sm:min-w-36 sm:px-1 sm:text-base">
-        <span className="sr-only">{monthLabel}</span>
-        <span aria-hidden className="min-[360px]:hidden">{shortMonth} {month.slice(2, 4)}</span>
-        <span aria-hidden className="hidden min-[360px]:inline sm:hidden">{shortMonth} {month.slice(0, 4)}</span>
-        <span aria-hidden className="hidden sm:inline">{monthLabel}</span>
+        {monthLabel}
       </span>
       {month < thisMonth ? (
         <Link
@@ -117,18 +164,11 @@ function MonthNav({ month, thisMonth }: { month: string; thisMonth: string }) {
   );
 }
 
-/** Saldo sekarang, dan alur kas bulan itu: saldo awal + setoran + pemasukan lain − pengeluaran. */
+/** Saldo sekarang dan arus kas bulan terpilih dari seluruh sumber penerimaan. */
 function Summary({ data }: { data: CashMonth }) {
-  const rows: [string, number, string?][] = [
-    ["Saldo awal bulan", data.opening],
-    ["+ Setoran jimpitan", data.deposits, "text-filled"],
-    ["+ Pembayaran langsung", data.directPayments, "text-filled"],
-    ["+ Iuran lingkungan", data.duesIncome, "text-filled"],
-    ["+ Pemasukan lain", data.income, "text-filled"],
-    ["− Pengeluaran", data.expenses, "text-empty"],
-  ];
+  const income = data.deposits + data.directPayments + data.duesIncome + data.income;
   return (
-    <Card className="grid overflow-hidden p-0 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+    <Card className="grid overflow-hidden p-0 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_13rem_minmax(0,1.2fr)]" aria-label="Overview kas">
       <div className="bg-primary/5 p-5 sm:p-6">
         <p className="flex items-center gap-2 text-sm font-medium text-muted">
           <Wallet className="size-4 text-primary" aria-hidden /> Saldo kas saat ini
@@ -136,18 +176,24 @@ function Summary({ data }: { data: CashMonth }) {
         <p className={cx("mt-2 break-words text-3xl font-bold tracking-tight tabular-nums", data.balance < 0 && "text-empty")}>
           {formatRupiah(data.balance)}
         </p>
-        <p className="mt-2 text-xs leading-relaxed text-muted">Dari seluruh setoran dan transaksi yang tercatat.</p>
+        <p className="mt-2 text-xs leading-relaxed text-muted">Saldo dari seluruh transaksi sampai saat ini.</p>
       </div>
-      <div className="min-w-0 p-5 sm:p-6">
-        <h2 className="mb-3 text-sm font-semibold">Ringkasan {formatMonth(data.month)}</h2>
-        <dl className="space-y-2 text-sm">
-          {rows.map(([label, value, tone]) => (
-            <div key={label} className="flex items-baseline justify-between gap-3">
-              <dt className="min-w-0 text-muted">{label}</dt>
-              <dd className={cx("shrink-0 font-medium tabular-nums", value > 0 && tone)}>{formatRupiah(value)}</dd>
-            </div>
-          ))}
-          <div className="flex items-baseline justify-between gap-3 border-t border-line pt-3">
+      <CashIncomeChart data={data} />
+      <div className="min-w-0 p-5 sm:col-span-2 sm:p-6 xl:col-span-1">
+        <h2 className="mb-4 text-sm font-semibold">Arus kas {formatMonth(data.month)}</h2>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
+          <div>
+            <dt className="flex items-center gap-1.5 text-muted"><ArrowDownLeft className="size-4 text-filled" aria-hidden /> Pemasukan</dt>
+            <dd className="mt-1 break-words text-xl font-semibold tracking-tight tabular-nums text-filled">{formatRupiah(income)}</dd>
+          </div>
+          <div>
+            <dt className="flex items-center gap-1.5 text-muted"><ArrowUpRight className="size-4 text-empty" aria-hidden /> Pengeluaran</dt>
+            <dd className="mt-1 break-words text-xl font-semibold tracking-tight tabular-nums text-empty">{formatRupiah(data.expenses)}</dd>
+          </div>
+          <div className="col-span-2 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-3">
+            <dt className="text-muted">Saldo awal bulan</dt><dd className="font-medium tabular-nums">{formatRupiah(data.opening)}</dd>
+          </div>
+          <div className="col-span-2 flex flex-wrap items-baseline justify-between gap-2">
             <dt className="font-semibold">Saldo akhir bulan</dt>
             <dd className="shrink-0 font-bold tabular-nums">{formatRupiah(data.closing)}</dd>
           </div>
@@ -158,53 +204,73 @@ function Summary({ data }: { data: CashMonth }) {
 }
 
 /** Malam yang uangnya belum dicatat setorannya (bulan mana pun; bulan lain bisa diketuk). */
-function Undeposited({ dates, month }: { dates: string[]; month: string }) {
+function Undeposited({ dates, month, onOpen }: { dates: string[]; month: string; onOpen: () => void }) {
   const shown = dates.slice(-6);
   const last = shown.length - 1;
   return (
-    <p className="flex gap-2 rounded-xl bg-warn-soft px-3 py-2.5 text-sm text-warn">
-      <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-      <span>
-        <strong>{dates.length} malam</strong> belum dicatat setorannya:{" "}
-        {dates.length > shown.length && "…, "}
-        {shown.map((d, i) => (
-          <span key={d}>
-            {i > 0 && (i === last ? " dan " : ", ")}
-            {d.startsWith(month) ? (
-              dayMonth(d)
-            ) : (
-              <Link to={adminPath(`/kas?bulan=${d.slice(0, 7)}`)} className="underline">
-                {dayMonth(d)}
-              </Link>
-            )}
-          </span>
-        ))}
-        .
-      </span>
-    </p>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-warn-soft px-3 py-2.5 text-sm text-warn">
+      <p className="flex min-w-0 flex-1 basis-64 gap-2">
+        <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+        <span>
+          <strong>{dates.length} malam</strong> belum dicatat setorannya:{" "}
+          {dates.length > shown.length && "…, "}
+          {shown.map((d, i) => (
+            <span key={d}>
+              {i > 0 && (i === last ? " dan " : ", ")}
+              {d.startsWith(month) ? (
+                dayMonth(d)
+              ) : (
+                <Link to={adminPath(`/kas?bulan=${d.slice(0, 7)}&view=deposits`)} className="underline">
+                  {dayMonth(d)}
+                </Link>
+              )}
+            </span>
+          ))}
+          .
+        </span>
+      </p>
+      <Button variant="ghost" size="sm" onClick={onOpen} className="text-warn hover:text-warn">Periksa setoran <ChevronRight className="size-4" aria-hidden /></Button>
+    </div>
   );
 }
 
-function Deposits({ nights, tonight }: { nights: Night[]; tonight: string }) {
-  const [editing, setEditing] = useState<string | null>(null);
+function Deposits({ nights, tonight, onOpen }: { nights: Night[]; tonight: string; onOpen: (night: Night) => void }) {
+  const [filter, setFilter] = useState<DepositFilter>("attention");
+  const pending = nights.filter((n) => depositStatus(n) === "pending").length;
+  const difference = nights.filter((n) => depositStatus(n) === "difference").length;
+  const shown = nights.filter((n) => filter === "all" || (filter === "attention" ? depositStatus(n) !== "matched" : depositStatus(n) === filter))
+    .sort((a, b) => depositPriority[depositStatus(a)] - depositPriority[depositStatus(b)] || b.date.localeCompare(a.date));
+  const options = [
+    { value: "attention", label: "Perlu dicek", hint: `${pending + difference} malam` },
+    { value: "pending", label: "Belum disetor", hint: `${pending} malam` },
+    { value: "difference", label: "Ada selisih", hint: `${difference} malam` },
+    { value: "all", label: "Semua setoran", hint: `${nights.length} malam` },
+  ] as const;
   return (
     <section aria-labelledby="setoran">
-      <h2 id="setoran" className="flex flex-wrap items-center gap-2 font-semibold">
-        Setoran jimpitan
-        {nights.length > 0 && <span className="rounded-full bg-idle-soft px-2 py-0.5 text-xs font-medium text-muted">{nights.length} malam</span>}
-      </h2>
-      <p className="mb-3 mt-1 text-sm text-muted">Setoran yang diterima bendahara dibandingkan dengan catatan petugas.</p>
+      <h2 id="setoran" className="font-semibold">Setoran jimpitan</h2>
+      <p className="mb-3 mt-1 text-sm text-muted">Cocokkan uang yang diterima dengan catatan ronda. Setoran tersimpan otomatis tampil di transaksi kas.</p>
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="sm:w-72"><Select label="Status setoran" value={filter} onValueChange={setFilter} options={options} /></div>
+        <p role="status" className="text-xs text-muted">{shown.length} dari {nights.length} malam</p>
+      </div>
       {nights.length === 0 ? (
         <Card className="py-6 text-center text-sm text-muted">Belum ada jimpitan tercatat bulan ini.</Card>
+      ) : shown.length === 0 ? (
+        <Card className="flex flex-col items-center px-5 py-8 text-center">
+          {filter === "attention" && <CheckCircle2 className="mb-3 size-8 text-filled" aria-hidden />}
+          <p className="text-sm font-semibold">{filter === "attention" ? "Semua setoran sudah sesuai" : "Tidak ada setoran dengan status ini"}</p>
+          <p className="mt-1 text-sm text-muted">{filter === "attention" ? `${nights.length} malam sudah dicatat setorannya dan sesuai dengan catatan ronda.` : "Pilih status lain atau lihat seluruh setoran bulan ini."}</p>
+          <Button variant="secondary" size="sm" className="mt-4" onClick={() => setFilter("all")}>Lihat semua setoran</Button>
+        </Card>
       ) : (
         <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
-          {nights.map((n) => (
+          {shown.map((n) => (
             <NightRow
               key={n.date}
               night={n}
               isTonight={n.date === tonight}
-              editing={editing === n.date}
-              onEdit={(on) => setEditing(on ? n.date : null)}
+              onEdit={() => onOpen(n)}
             />
           ))}
         </ul>
@@ -216,17 +282,15 @@ function Deposits({ nights, tonight }: { nights: Night[]; tonight: string }) {
 function NightRow({
   night,
   isTonight,
-  editing,
   onEdit,
 }: {
   night: Night;
   isTonight: boolean;
-  editing: boolean;
-  onEdit: (on: boolean) => void;
+  onEdit: () => void;
 }) {
   const { date, recorded, filled, deposit } = night;
   return (
-    <li className={cx("px-4 py-4", editing && "bg-idle-soft/50")}>
+    <li className="px-4 py-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-x-2 font-semibold">
@@ -257,25 +321,20 @@ function NightRow({
               size="icon-sm"
               aria-label={`Ubah setoran ${formatDateShort(date)}`}
               title="Ubah setoran"
-              aria-expanded={editing}
-              onClick={() => onEdit(!editing)}
-              className={cx(editing && "bg-idle-soft text-fg")}
+              onClick={onEdit}
             >
               <Pencil className="size-4" />
             </Button>
           </div>
         ) : (
-          !editing && (
-            <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
-              {!isTonight && <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn">Belum dicatat</span>}
-              <Button variant="secondary" size="sm" aria-expanded={editing} onClick={() => onEdit(true)}>
-                Catat setoran
-              </Button>
-            </div>
-          )
+          <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
+            <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn">Belum disetor</span>
+            <Button variant="secondary" size="sm" onClick={onEdit}>
+              Catat setoran
+            </Button>
+          </div>
         )}
       </div>
-      {editing && <DepositForm night={night} onDone={() => onEdit(false)} />}
     </li>
   );
 }
@@ -313,7 +372,7 @@ function DepositForm({ night, onDone }: { night: Night; onDone: () => void }) {
 
   return (
     <form
-      className="mt-3 max-w-xl space-y-3 border-t border-line pt-3"
+      className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
         save.mutate();
@@ -352,70 +411,6 @@ function DepositForm({ night, onDone }: { night: Night; onDone: () => void }) {
   );
 }
 
-function Entries({ entries, onOpen, onAdd }: { entries: Entry[]; onOpen: (entry: Entry) => void; onAdd: () => void }) {
-  return (
-    <section aria-labelledby="transaksi">
-      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h2 id="transaksi" className="font-semibold">
-            Transaksi kas
-          </h2>
-          <p className="mt-1 text-sm text-muted">Pengeluaran dan pemasukan lain di luar setoran jimpitan.</p>
-        </div>
-        <Button variant="secondary" size="sm" className="self-start sm:shrink-0" onClick={onAdd}>
-          <Plus className="size-4" aria-hidden /> Catat transaksi
-        </Button>
-      </div>
-      {entries.length === 0 ? (
-        <Card className="flex items-start gap-3 py-5">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-idle-soft/60 text-muted">
-            <ReceiptText className="size-5" aria-hidden />
-          </span>
-          <div>
-            <p className="text-sm font-medium">Belum ada transaksi bulan ini</p>
-            <p className="mt-1 text-sm text-muted">Pengeluaran dan pemasukan lain akan tampil di sini setelah dicatat.</p>
-          </div>
-        </Card>
-      ) : (
-        <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
-          {entries.map((e) => {
-            const out = e.direction === "out";
-            return (
-              <li key={e.id}>
-                <Button
-                  variant="plain"
-                  onClick={() => onOpen(e)}
-                  className="grid w-full grid-cols-[2rem_minmax(0,1fr)] items-start gap-x-3 gap-y-1 px-4 py-4 text-left hover:bg-idle-soft/50 sm:grid-cols-[2rem_minmax(0,1fr)_auto] sm:items-center"
-                >
-                  <span
-                    className={cx(
-                      "row-span-2 flex size-8 items-center justify-center rounded-full sm:row-span-1",
-                      out ? "bg-empty-soft text-empty" : "bg-filled-soft text-filled",
-                    )}
-                  >
-                    {out ? <ArrowUpRight className="size-4" aria-label="Pengeluaran" /> : <ArrowDownLeft className="size-4" aria-label="Pemasukan" />}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block break-words font-medium">{e.description}</span>
-                    <span className="mt-0.5 block break-words text-xs text-muted">
-                      {formatDateShort(e.date)}
-                      {e.recordedByName && ` · dicatat ${e.recordedByName}`}
-                    </span>
-                  </span>
-                  <span className={cx("col-start-2 font-semibold tabular-nums sm:col-start-auto sm:text-right", out ? "text-empty" : "text-filled")}>
-                    {out ? "−" : "+"}
-                    {formatRupiah(e.amount)}
-                  </span>
-                </Button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
-  );
-}
-
 const DIRECTIONS: RadioCardOption<Direction>[] = [
   { value: "out", label: "Pengeluaran", hint: "Uang keluar dari kas" },
   { value: "in", label: "Pemasukan lain", hint: "Saldo awal atau sumbangan" },
@@ -428,7 +423,7 @@ function EntryDialog({ entry, open, onClose }: { entry?: Entry; open: boolean; o
       open={open}
       onClose={onClose}
       title={entry ? "Ubah transaksi kas" : "Catat transaksi"}
-      description="Pengeluaran atau pemasukan lain di luar setoran jimpitan."
+      description="Catat pengeluaran, saldo awal, atau pemasukan lain. Jimpitan dan iuran tercatat otomatis dari penerimaannya."
     >
       <EntryForm key={entry?.id ?? "baru"} entry={entry} onDone={onClose} />
     </Dialog>

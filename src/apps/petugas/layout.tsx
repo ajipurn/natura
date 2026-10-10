@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { NavLink } from "react-router";
 import { cx } from "@/components/ui";
 import { petugasPath } from "@/lib/app-paths";
+import { useAuth } from "@/client/auth";
+import { canRonda } from "@/lib/permissions";
 
 const ITEMS: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
   { to: petugasPath(), label: "Beranda", icon: Home, end: true },
@@ -14,12 +16,14 @@ const ITEMS: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = 
 
 /** Kerangka app warga/petugas: tampilan satu kolom dan navigasi bawah pada semua ukuran layar. */
 export function PetugasLayout({ children }: { children: ReactNode }) {
+  const user = useAuth().data?.user;
+  const items = ITEMS.filter((item) => item.to !== petugasPath("/ronda") || (user && canRonda(user.role)));
   return (
     <>
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 pb-28 pt-5">{children}</div>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-        <ul className="mx-auto grid max-w-3xl grid-cols-5">
-          {ITEMS.map(({ to, label, icon: Icon, end }) => (
+        <ul className={cx("mx-auto grid max-w-3xl", items.length === 5 ? "grid-cols-5" : "grid-cols-4")}>
+          {items.map(({ to, label, icon: Icon, end }) => (
             <li key={to}>
               <NavLink
                 to={to}

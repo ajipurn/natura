@@ -103,7 +103,7 @@ describe("dashboard Humas", () => {
   it("membaca rumah dan QR tanpa meminta daftar akun atau menawarkan simpan", async () => {
     await renderPage("/admin/rumah?ubah=1");
     const dialog = document.querySelector('[role="dialog"]')!;
-    expect(dialog.textContent).toContain("Rumah petugas Budi");
+    expect(dialog.textContent).toContain("Penghuni berakun: Budi");
     expect(dialog.textContent).toContain("Budi");
     expect(dialog.textContent).toContain("Stiker QR");
     expect(dialog.textContent).not.toContain("Simpan");

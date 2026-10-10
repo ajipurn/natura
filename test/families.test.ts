@@ -178,7 +178,7 @@ describe("keluarga memakai data orang dan alamat yang sama", () => {
       .from(users)
       .where(eq(users.id, spouseUserId));
     await env.db.insert(rondaSchedule).values([
-      { dayOfWeek: 1, position: 0, userId: spouseUserId },
+      { dayOfWeek: 1, position: 0, residentId: spouseId },
       { dayOfWeek: 3, position: 0, houseId: a2 },
     ]);
     const result = await admin.patch(`/api/admin/keluarga/${familyId}`, {
@@ -204,7 +204,7 @@ describe("keluarga memakai data orang dan alamat yang sama", () => {
       (await listSchedule(env.db))
         .filter((slot) => slot.userId === spouseUserId)
         .map((slot) => slot.day),
-    ).toEqual([1, 3]);
+    ).toEqual([1]);
     for (const id of [headId, spouseId, childId]) {
       expect(
         (await admin.get(`/api/admin/warga/${id}/riwayat`)).data.moves,

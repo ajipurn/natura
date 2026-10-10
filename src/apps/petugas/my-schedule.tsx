@@ -1,4 +1,4 @@
-import { can } from "@/lib/permissions";
+import { can, canRonda } from "@/lib/permissions";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowRightLeft, CalendarClock, CalendarDays, LayoutDashboard } from "lucide-react";
 import { useState } from "react";
@@ -17,15 +17,16 @@ import { adminPath } from "@/lib/app-paths";
 /** Malam jaga petugas yang sedang masuk, plus permintaan ubah jadwal ke admin. */
 export function MySchedule() {
   const user = useAuth().data?.user;
-  const schedule = useQuery({ ...scheduleQuery, refetchInterval: 30_000 });
-  const requests = useQuery(myRequestsQuery);
+  const enabled = Boolean(user && canRonda(user.role));
+  const schedule = useQuery({ ...scheduleQuery, refetchInterval: 30_000, enabled });
+  const requests = useQuery({ ...myRequestsQuery, enabled });
   const [open, setOpen] = useState(false);
   const [swapOpen, setSwapOpen] = useState(false);
   const cancel = useMutation({
     mutationFn: (id: number) => call(api.jadwal.permintaan[":id"].batal.$post({ param: { id: String(id) } })),
     onSuccess: () => invalidate(["jadwal"]),
   });
-  if (!user) return null;
+  if (!user || !enabled) return null;
 
   const mySlots = schedule.data?.schedule.filter((s) => s.userId === user.id) ?? [];
   const list = requests.data?.requests ?? [];

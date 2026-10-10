@@ -264,10 +264,10 @@ function WargaForm({
         <p className="text-sm text-muted">
           Akses akun dikelola di{" "}
           <Link
-            to={adminPath("/petugas")}
+            to={adminPath(`/warga?tab=akun&akun=${resident.userId}`)}
             className="font-medium text-primary underline underline-offset-4"
           >
-            Akun & akses
+            Akun
           </Link>
           .
         </p>

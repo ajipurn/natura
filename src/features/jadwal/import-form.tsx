@@ -22,7 +22,7 @@ function importScheduleAction(_prev: FormState, formData: FormData) {
           json: {
             text: typeof text === "string" ? text : "",
             fillNames: checked(formData, "fillNames"),
-            overwriteNames: checked(formData, "overwriteNames"),
+            overwriteNames: false,
             ...(typeof colors === "string" && colors && { colors: JSON.parse(colors) as (GuardColor | null)[] }),
           },
         }),
@@ -144,7 +144,7 @@ export function ScheduleImportForm({
               <p className="text-warn">Belum ada di data rumah: {analysis.unknown.join(", ")}</p>
             )}
             {analysis.conflicting.length > 0 && (
-              <p className="text-warn">Nama ganda (nama KK-nya tidak akan diisi): {analysis.conflicting.join("; ")}</p>
+              <p className="text-warn">Nama perlu dipilih setelah impor: {analysis.conflicting.join("; ")}</p>
             )}
             {preview.warnings.map((w) => (
               <p key={w} className="text-warn">
@@ -158,9 +158,9 @@ export function ScheduleImportForm({
         <CheckboxField
           name="fillNames"
           defaultChecked
-          label="Isi nama KK dari jadwal untuk rumah tanpa akun petugas yang nama KK-nya masih kosong"
+          label="Data warga baru"
         />
-        <CheckboxField name="overwriteNames" label="Ganti juga nama KK yang sudah terisi" />
+        <p className="text-xs text-muted">Tambahkan nama untuk rumah yang belum memiliki data warga.</p>
 
         {state?.error && <Alert>{state.error}</Alert>}
         {state?.success && <Alert tone="success">{state.success}</Alert>}

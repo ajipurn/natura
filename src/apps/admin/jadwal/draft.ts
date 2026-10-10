@@ -17,12 +17,13 @@ export function toSlots(draft: DraftSlot[]) {
   return [...draft]
     .map((s, index) => ({ s, index }))
     .sort((a, b) => a.s.day - b.s.day || a.index - b.index)
-    // Jadwal hanya menyimpan rujukan: akun petugas, rumah tanpa akun, atau nama bebas.
+    // Cache lama masih memakai userId; jadwal baru selalu menunjuk profil warga.
     .map(({ s }) => ({
       day: s.day,
-      userId: s.userId,
-      houseId: s.userId ? null : s.houseId,
-      name: s.userId || s.houseId ? null : s.name,
+      residentId: s.residentId ?? null,
+      userId: s.residentId ? null : s.userId,
+      houseId: s.residentId || s.userId ? null : s.houseId,
+      name: s.residentId || s.userId || s.houseId ? null : s.name,
       color: s.color,
     }));
 }
@@ -79,7 +80,9 @@ export function shiftSlot(draft: DraftSlot[], key: string, delta: -1 | 1): Draft
 }
 
 function sameGuard(a: DraftSlot, b: DraftSlot) {
+  if (a.residentId && b.residentId) return a.residentId === b.residentId;
   if (a.userId !== null || b.userId !== null) return a.userId !== null && a.userId === b.userId;
+  if (a.residentId || b.residentId) return false;
   if (a.houseId !== null || b.houseId !== null) return a.houseId !== null && a.houseId === b.houseId;
   return a.name !== null && a.name === b.name;
 }

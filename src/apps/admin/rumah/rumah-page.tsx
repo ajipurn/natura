@@ -29,7 +29,7 @@ const FILTERS: { value: Filter; label: string; match: (h: AdminHouse, hasAccount
   { value: "semua", label: "Semua", match: () => true },
   { value: "dihuni", label: "Dihuni", match: (h) => h.status === "active" },
   { value: "kosong", label: "Kosong/mudik", match: (h) => h.status === "vacant" },
-  { value: "petugas", label: "Rumah petugas", match: (_, hasAccount) => hasAccount },
+  { value: "petugas", label: "Berakun", match: (_, hasAccount) => hasAccount },
   { value: "tanpa-nama", label: "Tanpa nama", match: (h) => !h.ownerName },
 ];
 
@@ -56,7 +56,7 @@ export function RumahPage() {
   return (
     <QueryState query={query}>
       {({ houses, origin }) => {
-        // Akun petugas per rumah: nama warga rumah itu diambil dari akunnya.
+        // Akun penghuni per rumah: nama warga rumah itu diambil dari akunnya.
         const accounts = new Map<number, string[]>();
         if (canReadAccounts) {
           for (const u of users) if (u.houseId) accounts.set(u.houseId, [...(accounts.get(u.houseId) ?? []), u.name]);
@@ -249,7 +249,7 @@ function HouseTile({ house, hasAccount, onOpen }: { house: AdminHouse; hasAccoun
         {vacant && <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-medium text-warn">mudik</span>}
       </span>
       <span className="flex w-full min-w-0 items-center gap-1.5 text-sm">
-        {hasAccount && <UserRound className="size-3.5 shrink-0 text-primary" aria-label="Rumah petugas" />}
+        {hasAccount && <UserRound className="size-3.5 shrink-0 text-primary" aria-label="Penghuni punya akun" />}
         {house.ownerName ? (
           <span className={cx("truncate", vacant ? "text-muted" : "text-fg/80")}>{house.ownerName}</span>
         ) : (

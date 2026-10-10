@@ -99,9 +99,9 @@ describe("pendataan warga per orang", () => {
 });
 
 describe("warga terhubung akun petugas", () => {
-  it("membuat akun memakai profil yang sama, menyimpan telepon, dan mengambil jadwal rumah", async () => {
+  it("membuat akun memakai profil yang sama, menyimpan telepon, dan menjaga tugas yang sudah diberikan ke orangnya", async () => {
     const id = await add("Petugas dari warga", a2, "08111222333");
-    await db.insert(rondaSchedule).values({ dayOfWeek: 2, position: 0, houseId: a2 });
+    await db.insert(rondaSchedule).values({ dayOfWeek: 2, position: 0, residentId: id });
     const result = await admin.post("/api/admin/petugas", { residentId: id, name: "Petugas dari warga", pin: "1234", role: "petugas", houseId: a2 });
     expect(result.status).toBe(200);
     const userId = Number(result.data.id);
@@ -117,7 +117,7 @@ describe("warga terhubung akun petugas", () => {
     expect((await admin.patch(`/api/admin/warga/${id}`, { name: "Nama akun berubah", houseId: b1, phone: "+62 811-1222-333" })).status).toBe(200);
     const after = (await db.select().from(users).where(eq(users.id, userId)))[0];
     expect(after).toMatchObject({ name: "Nama akun berubah", houseId: b1, role: before.role, active: before.active, pinHash: before.pinHash, sessionVersion: before.sessionVersion });
-    expect((await listSchedule(db)).filter((s) => s.userId === userId).map((s) => [s.day, s.houseId])).toEqual([[2, b1], [4, b1]]);
+    expect((await listSchedule(db)).filter((s) => s.userId === userId).map((s) => [s.day, s.houseId])).toEqual([[2, b1]]);
 
     expect((await admin.patch(`/api/admin/petugas/${userId}`, { name: "Nama dari akun", role: "petugas", active: true, houseId: a2 })).status).toBe(200);
     expect((await directory()).find((r) => r.id === id)).toMatchObject({ name: "Nama dari akun", houseId: a2, phone: "+62 811-1222-333" });

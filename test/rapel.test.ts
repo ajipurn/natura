@@ -51,6 +51,11 @@ beforeAll(async () => {
 
 describe("rapel harian", () => {
   it("menawarkan hanya catatan kosong harian, tanpa menagih rumah mudik atau periode bulanan", async () => {
+    const options = (await admin.get("/api/admin/pembayaran/rapel")).data.dates as { houseId: number; date: string; amount: number }[];
+    for (const houseId of ids) {
+      const dates = (await admin.get("/api/admin/pembayaran/rapel/" + houseId)).data.dates;
+      expect(options.filter((d) => d.houseId === houseId).map(({ date, amount }) => ({ date, amount }))).toEqual(dates);
+    }
     expect((await admin.get("/api/admin/pembayaran/rapel/" + ids[0])).data.dates).toEqual([
       { date: "2026-09-30", amount: 500 }, ...selected.map((date) => ({ date, amount: 500 })),
     ]);
@@ -73,6 +78,8 @@ describe("rapel harian", () => {
     expect(row.nights.filter((n) => n.rapel).map((n) => n.date)).toEqual(selected);
     expect(summarizeMonth(recap).dateTotals.reduce((sum, value) => sum + value, 0)).toBe(ids.length * 500);
     expect((await admin.get("/api/admin/pembayaran/rapel/" + ids[0])).data.dates).toEqual([{ date: "2026-09-30", amount: 500 }]);
+    expect(((await admin.get("/api/admin/pembayaran/rapel")).data.dates as { houseId: number; date: string; amount: number }[]).filter((d) => d.houseId === ids[0]))
+      .toEqual([{ houseId: ids[0], date: "2026-09-30", amount: 500 }]);
     expect((await admin.post("/api/admin/pembayaran", make(ids[0]))).status).toBe(400);
     const receipt = recap.periodPayments!.find((p) => p.houseId === ids[0])!;
     expect(allocatePayment(receipt)).toEqual(selected.map((date) => [date, 500]));
@@ -197,9 +204,20 @@ describe("rapel harian", () => {
     expect((await db.select().from(payments).where(eq(payments.id, receipt.id)))[0]).toMatchObject({ amount: 1500, allocations: selected.map((date) => [date, 500]), note: "Koreksi catatan rapel" });
   });
 
+  it("rumah hilang dari pilihan rapel setelah seluruh bolongnya dilunasi", async () => {
+    const dates = (await admin.get("/api/admin/pembayaran/rapel/" + ids[8])).data.dates as { date: string; amount: number }[];
+    const allocations = dates.map(({ date, amount }) => [date, amount]);
+    expect(dates.length).toBeGreaterThan(0);
+    expect((await admin.post("/api/admin/pembayaran", make(ids[8], dates.map((d) => d.date), {
+      allocations, amount: dates.reduce((sum, d) => sum + d.amount, 0),
+    }))).status).toBe(200);
+    expect(((await admin.get("/api/admin/pembayaran/rapel")).data.dates as { houseId: number }[]).some((d) => d.houseId === ids[8])).toBe(false);
+  });
+
   it("petugas biasa tidak dapat mencatat rapel atau melihat pilihan pembayaran", async () => {
     expect((await staff.post("/api/admin/pembayaran", make(ids[8]))).status).toBe(403);
     expect((await staff.get("/api/admin/pembayaran/rapel/" + ids[8])).status).toBe(403);
+    expect((await staff.get("/api/admin/pembayaran/rapel")).status).toBe(403);
   });
 });
 

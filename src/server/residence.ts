@@ -2,16 +2,14 @@ import { asc, eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import type { Executor } from "./db";
 import { accountNameTaken, accountNameTakenError } from "./residents";
-import { houseSlots, userDaysStatements } from "./schedule";
 import {
   families,
   residenceMoves,
   residents,
-  rondaSchedule,
   users,
 } from "./schema";
 
-/** Perpindahan selalu memperbarui sumber rumah yang sama dengan akun dan jadwal. Panggil dalam transaksi. */
+/** Pindah tempat tinggal tidak mengubah penugasan ronda. Panggil dalam transaksi. */
 export async function moveResident(
   db: Executor,
   residentId: number,
@@ -60,20 +58,6 @@ export async function moveResident(
       .where(eq(residents.id, residentId));
   }
   if (account) {
-    const current = await db
-      .selectDistinct({ day: rondaSchedule.dayOfWeek })
-      .from(rondaSchedule)
-      .where(eq(rondaSchedule.userId, account.id));
-    const slots = await houseSlots(db, houseId);
-    const days = current.map((row) => row.day);
-    for (const statement of userDaysStatements(
-      db,
-      account.id,
-      [...days, ...slots.map((slot) => slot.day)],
-      days,
-      slots,
-    ))
-      await statement;
     await db.update(users).set({ houseId }).where(eq(users.id, account.id));
   } else
     await db

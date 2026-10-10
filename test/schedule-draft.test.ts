@@ -54,9 +54,9 @@ describe("draf jadwal", () => {
     const withName = [...schedule, { ...slot(5, 3, 0, "Satpam"), houseId: null, block: "", number: "" }];
     const draft = toDraft(withName);
     const slots = toSlots(draft);
-    expect(slots[0]).toEqual({ day: 0, userId: 10, houseId: null, name: null, color: "green" });
-    expect(slots[1]).toEqual({ day: 0, userId: null, houseId: 2, name: null, color: null });
-    expect(slots.at(-1)).toEqual({ day: 3, userId: null, houseId: null, name: "Satpam", color: null });
+    expect(slots[0]).toEqual({ day: 0, residentId: null, userId: 10, houseId: null, name: null, color: "green" });
+    expect(slots[1]).toEqual({ day: 0, residentId: null, userId: null, houseId: 2, name: null, color: null });
+    expect(slots.at(-1)).toEqual({ day: 3, residentId: null, userId: null, houseId: null, name: "Satpam", color: null });
     expect(sameSchedule(draft, toDraft(withName))).toBe(true);
     expect(sameSchedule(draft, shiftSlot(draft, "slot-2", -1))).toBe(false);
   });
@@ -71,10 +71,10 @@ describe("draf jadwal", () => {
     expect(swapped[1]).toBe(draft[1]);
     expect(swapped[3]).toBe(draft[3]);
     expect(toSlots(swapped)).toEqual([
-      { day: 0, userId: null, houseId: 3, name: null, color: null },
-      { day: 0, userId: null, houseId: 2, name: null, color: null },
-      { day: 1, userId: 10, houseId: null, name: null, color: "green" },
-      { day: 2, userId: null, houseId: 4, name: null, color: null },
+      { day: 0, residentId: null, userId: null, houseId: 3, name: null, color: null },
+      { day: 0, residentId: null, userId: null, houseId: 2, name: null, color: null },
+      { day: 1, residentId: null, userId: 10, houseId: null, name: null, color: "green" },
+      { day: 2, residentId: null, userId: null, houseId: 4, name: null, color: null },
     ]);
     expect(draft).toEqual(toDraft(schedule));
     expect(swapSlots(swapped, "slot-1", "slot-3")).toEqual(draft);

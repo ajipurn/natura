@@ -65,6 +65,7 @@ export function TonightGuards({ schedule, date, userId }: { schedule: ScheduleDT
                 name={e.name}
                 house={slotHouseLabel(e)}
                 color={null}
+                unassigned={e.residentId === null}
                 me={userId !== undefined && e.userId === userId}
               />
             ))}

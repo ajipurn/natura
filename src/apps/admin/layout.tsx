@@ -12,7 +12,6 @@ import {
   Settings,
   Table2,
   Users,
-  KeyRound,
   ReceiptText,
   Wallet,
   X,
@@ -31,7 +30,7 @@ import { adminPath, petugasPath } from "@/lib/app-paths";
 import { can, ROLE_LABEL, type Resource } from "@/lib/permissions";
 import { DEFAULT_LOGO_URL } from "@/lib/branding";
 
-type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; resource?: Resource; write?: boolean };
+type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; resource?: Resource | Resource[]; write?: boolean };
 
 /** Data lingkungan terpisah dari kegiatan ronda, kas, dan akses akun. */
 const NAV: { group: string; items: NavItem[] }[] = [
@@ -44,7 +43,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: "Lingkungan",
     items: [
-      { to: adminPath("/warga"), label: "Warga", icon: Users, resource: "residents" },
+      { to: adminPath("/warga"), label: "Warga", icon: Users, resource: ["residents", "accounts"] },
       { to: adminPath("/rumah"), label: "Rumah & QR", icon: Home, resource: "houses" },
       { to: adminPath("/info"), label: "Info warga", icon: Megaphone, resource: "info" },
     ],
@@ -61,12 +60,6 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: "Keuangan",
     items: [{ to: adminPath("/kas"), label: "Kas", icon: Wallet, resource: "finance" }, { to: adminPath("/iuran"), label: "Iuran", icon: ReceiptText, resource: "finance" }],
-  },
-  {
-    group: "Akses",
-    items: [
-      { to: adminPath("/petugas"), label: "Akun & akses", icon: KeyRound, resource: "accounts", write: true },
-    ],
   },
 ];
 
@@ -190,7 +183,7 @@ function Sidebar({ user }: { user: SessionUser }) {
         className="min-h-0 flex-1 overflow-y-auto"
       >
         <div className="px-3">
-          {NAV.map(({ group, items }) => ({ group, items: items.filter((item) => !item.resource || can(user.role, item.resource, item.write)) })).filter(({ items }) => items.length).map(({ group, items }) => (
+          {NAV.map(({ group, items }) => ({ group, items: items.filter((item) => !item.resource || (Array.isArray(item.resource) ? item.resource : [item.resource]).some((resource) => can(user.role, resource, item.write))) })).filter(({ items }) => items.length).map(({ group, items }) => (
             <div key={group} className="mb-4">
               <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted">
                 {group}

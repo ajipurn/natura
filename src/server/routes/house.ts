@@ -3,7 +3,8 @@ import { validator } from "hono/validator";
 import { z } from "zod";
 import { rondaDate } from "@/lib/dates";
 import { scheduleDay } from "@/lib/schedule";
-import { getSessionUser, requireUser } from "../auth";
+import { getSessionUser, requireRonda, requireUser } from "../auth";
+import { canRonda } from "@/lib/permissions";
 import { applyEntries, dutyDays, MAX_AMOUNT } from "../collections";
 import type { AppEnv } from "../env";
 import { body } from "../http";
@@ -29,7 +30,7 @@ export const houseRoutes = new Hono<AppEnv>()
     const tonight = rondaDate(new Date());
     const paymentInfo = await getHousePaymentInfo(db, house.id, tonight);
     // Hanya yang dijadwalkan jaga malam ini yang bisa mencatat (admin juga; koreksi lewat dashboard).
-    const canRecord = user ? (await dutyDays(db, user.id)).has(scheduleDay(tonight)) : false;
+    const canRecord = user && canRonda(user.role) ? (await dutyDays(db, user.id)).has(scheduleDay(tonight)) : false;
     return c.json({
       communityName: settings.communityName,
       logoUrl: settings.logoUrl,
@@ -51,7 +52,7 @@ export const houseRoutes = new Hono<AppEnv>()
   })
 
   /** Petugas yang membuka QR lewat kamera HP biasa bisa langsung mencatat dari halaman rumah. */
-  .post("/:token/catat", requireUser, tokenParam, body(recordSchema), async (c) => {
+  .post("/:token/catat", requireUser, requireRonda, tokenParam, body(recordSchema), async (c) => {
     const house = await getHouseByToken(c.var.db, c.req.valid("param").token);
     if (!house) return c.json({ error: "Rumah tidak ditemukan." }, 404);
     const { status, amount } = c.req.valid("json");

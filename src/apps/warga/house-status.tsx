@@ -77,7 +77,7 @@ export function HouseStatus({ perHouse, month, nights, through }: {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-semibold">{formatMonth(month)}</h2>
-          <p className="mt-0.5 text-xs text-muted">{nights} malam berjalan · tanggal 1–{Number(through.slice(8))}</p>
+          <p className="mt-0.5 text-xs text-muted">{nights ? `${nights} malam berjalan · tanggal 1–${Number(through.slice(8))}` : "Belum ada malam berjalan"}</p>
         </div>
         <SegmentedControl
           aria-label="Tampilan status rumah"
@@ -93,7 +93,7 @@ export function HouseStatus({ perHouse, month, nights, through }: {
           ]}
         />
       </div>
-      <p className="text-sm text-muted">Harian dihitung sejak tanggal 1. Mingguan/bulanan mengikuti pembayaran periode. Ketuk rumah untuk melihat kalender.</p>
+      <p className="text-sm text-muted">Harian dihitung sejak tanggal 1, dengan waktu malam pukul 20.00–00.00 WIB. Malam hari ini masuk hitungan mulai pukul 20.00. Mingguan/bulanan mengikuti pembayaran periode. Ketuk rumah untuk melihat kalender.</p>
       {mine && (
         <Button variant="plain" onClick={() => setOpen(mine)} className="flex w-full items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2.5 text-left">
           <Star className="size-5 shrink-0 fill-current text-primary" aria-hidden />
