@@ -9,8 +9,8 @@ import {
   LogIn,
   Map as MapIcon,
   RefreshCw,
-  ScanLine,
-  Search,
+  // ScanLine,
+  // Search,
   ShieldAlert,
 } from "lucide-react";
 import {
@@ -43,10 +43,7 @@ import { HouseList, type ListFilter } from "./house-list";
 import { HouseSearch } from "./house-search";
 import { HouseSheet } from "./house-sheet";
 import { TonightGuards } from "./tonight-guards";
-import {
-  type MergedCollection,
-  type SyncStatus,
-} from "./use-ronda-store";
+import { type MergedCollection, type SyncStatus } from "./use-ronda-store";
 import { useRondaStore } from "./ronda-store";
 import { recordingHoursLabel } from "@/lib/recording-window";
 import { adminPath, petugasPath } from "@/lib/app-paths";
@@ -164,7 +161,13 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   function openHouse(house: HouseDTO) {
     if (canRecord || paymentPeriods.some((p) => p.houseId === house.id))
       setActive({ house, method: "manual" });
-    else showToast(onDuty ? `Pencatatan dibuka pukul ${recordingHoursLabel(snapshot?.settings)}.` : "Bukan jadwal jagamu malam ini.", "error");
+    else
+      showToast(
+        onDuty
+          ? `Pencatatan dibuka pukul ${recordingHoursLabel(snapshot?.settings)}.`
+          : "Bukan jadwal jagamu malam ini.",
+        "error",
+      );
   }
 
   function handleDetect(text: string) {
@@ -193,7 +196,10 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
     if (!active) return;
     if (paymentPeriods.some((p) => p.houseId === active.house.id)) return;
     if (!store.record(active.house, status, amount, active.method)) {
-      showToast("Pencatatan tidak tersedia. Periksa jadwal dan jam pencatatan.", "error");
+      showToast(
+        "Pencatatan tidak tersedia. Periksa jadwal dan jam pencatatan.",
+        "error",
+      );
       setActive(null);
       return;
     }
@@ -352,10 +358,15 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
             >
               <ShieldAlert className="size-5 shrink-0" aria-hidden />
               <div>
-                <p className="font-semibold">{onDuty ? "Di luar jam pencatatan" : "Bukan jadwal jagamu malam ini"}</p>
+                <p className="font-semibold">
+                  {onDuty
+                    ? "Di luar jam pencatatan"
+                    : "Bukan jadwal jagamu malam ini"}
+                </p>
                 <p className="mt-0.5">
                   Pencatatan dibuka untuk petugas yang jaga{" "}
-                  {dayLabel(scheduleDay(store.date))}, pukul {recordingHoursLabel(snapshot.settings)}.
+                  {dayLabel(scheduleDay(store.date))}, pukul{" "}
+                  {recordingHoursLabel(snapshot.settings)}.
                 </p>
                 <p className="mt-2">
                   {mySchedule.length > 0
@@ -562,14 +573,14 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
           {/* Ruang supaya bagian bawah daftar tidak tertutup bar aksi. */}
           <div className="h-16" aria-hidden />
           {/* Beri jarak dari tombol scan yang menonjol di navigasi bawah. */}
-          <div className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom,0px)+8rem)] z-20 mx-auto max-w-3xl rounded-2xl bg-card p-2 shadow-lg">
+          {/* <div className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom,0px)+8rem)] z-20 mx-auto max-w-3xl rounded-2xl bg-card p-2 shadow-lg">
             <div className="flex gap-2">
               <ActionButtons
                 onSearch={() => setSearchOpen(true)}
                 onScan={() => setScannerOpen(true)}
               />
             </div>
-          </div>
+          </div> */}
         </>
       )}
 
@@ -634,34 +645,34 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
 const percent = (part: number, whole: number) =>
   whole ? (part / whole) * 100 : 0;
 
-function ActionButtons({
-  onSearch,
-  onScan,
-}: {
-  onSearch: () => void;
-  onScan: () => void;
-}) {
-  return (
-    <>
-      {/* Ukuran teks, ikon, dan bayangannya sama; tepi Cari dipertegas supaya tidak tampak lebih kecil
-          di samping tombol yang berwarna penuh. */}
-      <Button
-        onClick={onSearch}
-        variant="secondary"
-        className="h-12 shrink-0 border-fg/15 px-4 text-lg shadow-sm"
-      >
-        <Search className="size-5" /> Cari
-      </Button>
-      <Button
-        onClick={onScan}
-        variant="primary"
-        className="h-12 flex-1 text-lg"
-      >
-        <ScanLine className="size-5" /> Scan QR
-      </Button>
-    </>
-  );
-}
+// function ActionButtons({
+//   onSearch,
+//   onScan,
+// }: {
+//   onSearch: () => void;
+//   onScan: () => void;
+// }) {
+//   return (
+//     <>
+//       {/* Ukuran teks, ikon, dan bayangannya sama; tepi Cari dipertegas supaya tidak tampak lebih kecil
+//           di samping tombol yang berwarna penuh. */}
+//       <Button
+//         onClick={onSearch}
+//         variant="secondary"
+//         className="h-12 shrink-0 border-fg/15 px-4 text-lg shadow-sm"
+//       >
+//         <Search className="size-5" /> Cari
+//       </Button>
+//       <Button
+//         onClick={onScan}
+//         variant="primary"
+//         className="h-12 flex-1 text-lg"
+//       >
+//         <ScanLine className="size-5" /> Scan QR
+//       </Button>
+//     </>
+//   );
+// }
 
 /** Catatan terakhir malam ini, supaya salah ketuk bisa langsung dibetulkan. */
 function LastEntry({
@@ -684,7 +695,11 @@ function LastEntry({
         <span
           className={entry.status === "filled" ? "text-filled" : "text-empty"}
         >
-          {entry.status === "filled" ? <NumberTicker value={formatRupiah(entry.amount)} /> : "kosong"}
+          {entry.status === "filled" ? (
+            <NumberTicker value={formatRupiah(entry.amount)} />
+          ) : (
+            "kosong"
+          )}
         </span>
         <span className="text-muted">
           {" "}
