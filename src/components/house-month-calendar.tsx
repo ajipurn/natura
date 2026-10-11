@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { Check } from "lucide-react";
 import { cx } from "./ui";
 import { BILLING_LABEL, CADENCE_LABEL, type BillingPeriod, type PaymentCell } from "@/lib/payments";
@@ -39,7 +40,7 @@ export function HouseMonthCalendar({ month, byDate, today, house, periods, payme
     <section aria-label={formatMonth(month)}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
         <h3 className="font-semibold">{formatMonth(month)}</h3>
-        <p className="text-xs text-muted">Dari ronda <span className="ml-1 text-sm font-semibold text-fg">{formatRupiah(total)}</span></p>
+        <p className="text-xs text-muted">Dari ronda <span className="ml-1 text-sm font-semibold text-fg"><NumberTicker value={formatRupiah(total)} /></span></p>
       </div>
       <p className="text-sm text-muted">
         {nights.length} malam berjalan · sejak tanggal 1
@@ -52,7 +53,7 @@ export function HouseMonthCalendar({ month, byDate, today, house, periods, payme
             { count: unchecked, label: "Belum dicatat", color: "text-muted" },
           ].map(({ count, label, color }) => (
             <div key={label} className="rounded-lg bg-idle-soft py-2">
-              <p className={cx("text-lg font-bold tabular-nums", color)}>{count}</p>
+              <p className={cx("text-lg font-bold tabular-nums", color)}><NumberTicker value={count} /></p>
               <p className="text-muted">{label}</p>
             </div>
           ))}
@@ -100,7 +101,7 @@ export function HouseMonthCalendar({ month, byDate, today, house, periods, payme
               )}
             >
               {Number(date.slice(8))}
-              {night?.rapel ? <span className="text-[10px] font-semibold">R</span> : automatic && state === "filled" ? <Check className="size-3" aria-hidden /> : state === "filled" && <span className="text-[10px] font-medium">{formatAmountShort(night?.cell?.amount ?? 0)}</span>}
+              {night?.rapel ? <span className="text-[10px] font-semibold">R</span> : automatic && state === "filled" ? <Check className="size-3" aria-hidden /> : state === "filled" && <span className="text-[10px] font-medium"><NumberTicker value={formatAmountShort(night?.cell?.amount ?? 0)} /></span>}
               {state === "empty" && <span className="text-[10px] font-medium">{automatic ? "belum" : "kosong"}</span>}
             </span>
           );

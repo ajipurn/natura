@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { Pie, PieChart, Tooltip } from "recharts";
 import { formatRupiah } from "@/lib/format";
 import type { CashMonth } from "@/server/kas";
@@ -23,13 +24,13 @@ export function CashIncomeChart({ data }: { data: CashMonth }) {
           {total > 0 && <Tooltip isAnimationActive={false} wrapperStyle={{ zIndex: 60 }} content={({ active, payload }) => {
             const part = payload?.[0]?.payload as Segment | undefined;
             return active && part ? <div role="tooltip" className="rounded-lg border border-line bg-card px-3 py-2 text-xs text-fg shadow-lg">
-              <p className="text-muted">{part.name}</p><p className="mt-1 font-semibold tabular-nums">{formatRupiah(part.value)} · {Math.round(part.value / total * 100)}%</p>
+              <p className="text-muted">{part.name}</p><p className="mt-1 font-semibold tabular-nums"><NumberTicker value={formatRupiah(part.value)} /> · {Math.round(part.value / total * 100)}%</p>
             </div> : null;
           }} />}
         </PieChart>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center">
           <span className="text-xs text-muted">Total pemasukan</span>
-          <strong className="max-w-32 break-words text-sm font-semibold tabular-nums">{formatRupiah(total)}</strong>
+          <strong className="max-w-32 break-words text-sm font-semibold tabular-nums"><NumberTicker value={formatRupiah(total)} /></strong>
         </div>
       </div>
       <figcaption className="sr-only">Komposisi pemasukan bulan terpilih: {segments.map((part) => `${part.name} ${formatRupiah(part.value)}`).join(", ")}. {total === 0 && "Belum ada pemasukan bulan ini."}</figcaption>

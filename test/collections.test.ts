@@ -5,7 +5,7 @@ import { getAudit } from "@/server/audit";
 import { applyEntries, writeCollections } from "@/server/collections";
 import type { Db } from "@/server/db";
 import { getCollectionsForDate, getMonthRecap, listPatrols } from "@/server/queries";
-import { collectionLogs, houses, paymentPlans, rondaSchedule, users } from "@/server/schema";
+import { collectionLogs, houses, paymentPlans, rondaSchedule, settings, users } from "@/server/schema";
 import type { SessionUser } from "@/server/auth";
 import type { EntryInput } from "@/lib/types";
 import { createTestEnv } from "./helpers/db";
@@ -31,6 +31,7 @@ function entry(partial: Partial<EntryInput> & { houseId: number }): EntryInput {
 
 beforeAll(async () => {
   ({ db } = await createTestEnv());
+  await db.insert(settings).values({ communityName: "Natura" });
   const [u] = await db
     .insert(users)
     .values({ name: "Budi", pinHash: "x", role: "petugas" })
@@ -106,7 +107,8 @@ describe("applyEntries", () => {
     expect(await getCollectionsForDate(db, "2026-10-04")).toHaveLength(0);
   });
 
-  it("catatan lewat tengah malam masuk malam sebelumnya", async () => {
+  it("catatan lewat tengah malam masuk malam sebelumnya jika jam selesai diperpanjang", async () => {
+    await db.update(settings).set({ recordingEnd: "02:00" });
     const afterMidnight = "2026-10-04T18:30:00Z"; // 01:30 WIB tanggal 5
     const results = await applyEntries(
       db,
@@ -115,6 +117,7 @@ describe("applyEntries", () => {
       new Date("2026-10-04T19:00:00Z"),
     );
     expect(results[0]).toMatchObject({ ok: true, date: "2026-10-04" });
+    await db.update(settings).set({ recordingEnd: "00:00" });
   });
 
   it("muncul di daftar riwayat dan rekap bulanan", async () => {

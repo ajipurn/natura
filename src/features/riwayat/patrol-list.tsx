@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { useQuery } from "@tanstack/react-query";
 import {
   CalendarDays,
@@ -174,7 +175,7 @@ function MonthSection({
         </div>
         <p className="shrink-0 text-right">
           <span className="block text-[11px] text-muted">Terkumpul</span>
-          <span className="font-bold tabular-nums">{formatRupiah(total)}</span>
+          <span className="font-bold tabular-nums"><NumberTicker value={formatRupiah(total)} /></span>
         </p>
       </div>
       <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
@@ -222,7 +223,7 @@ function NightRow({
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
               <span className="whitespace-nowrap text-lg font-bold leading-tight tabular-nums">
-                {formatRupiah(p.total)}
+                <NumberTicker value={formatRupiah(p.total)} />
               </span>
               {tonight && (
                 <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
@@ -377,7 +378,7 @@ function Count({
   return (
     <span className="flex items-center gap-1">
       <span aria-hidden className={cx("size-1.5 rounded-full", color)} />
-      <span className="font-semibold text-fg tabular-nums">{value}</span>{" "}
+      <span className="font-semibold text-fg tabular-nums"><NumberTicker value={value} /></span>{" "}
       {label}
     </span>
   );

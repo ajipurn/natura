@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, call } from "@/client/api";
@@ -158,16 +159,16 @@ function PaymentForm({ month, payment, onDone }: { month: string; payment?: Admi
                 {eligible.filter(([date]) => date.startsWith(visibleMonth ?? "")).map(([date, value]) => <label key={date} className="flex min-h-11 cursor-pointer items-center gap-3 border-b border-line px-3 py-2 text-sm last:border-0 hover:bg-idle-soft/40">
                   <input type="checkbox" className="size-4 accent-primary" checked={selectedDates.has(date)} onChange={(e) => { const next = new Set(selectedDates); if (e.target.checked) next.add(date); else next.delete(date); setSelectedDates(next); }} />
                   <span className="flex-1">{new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric" }).format(new Date(date + "T12:00:00+07:00"))}</span>
-                  <span className="tabular-nums text-muted">{formatRupiah(value)}</span>
+                  <span className="tabular-nums text-muted"><NumberTicker value={formatRupiah(value)} /></span>
                 </label>)}
               </div>
             </>
           )}
-          <p role="status" className="rounded-xl bg-filled-soft px-3 py-2 text-sm text-filled">{allocations.length} hari dipilih · {formatRupiah(rapelAmount)}</p>
+          <p role="status" className="rounded-xl bg-filled-soft px-3 py-2 text-sm text-filled">{allocations.length} hari dipilih · <NumberTicker value={formatRupiah(rapelAmount)} /></p>
           {!validRapelRange && <Alert>Pilih hari dalam rentang maksimal 366 hari. Catat pembayaran terpisah untuk rentang yang lebih lama.</Alert>}
         </fieldset>
       ) : <>
-      {validRange && <p className="rounded-xl bg-idle-soft px-3 py-2 text-sm">{count} hari · nominal periode {formatRupiah(totalExpected)}{previous > 0 && " · sudah tercatat " + formatRupiah(previous)}. {!planAt(data.data?.plans ?? [], Number(houseId), periodStart) && <span className="block text-xs text-muted">Perkiraan dari nominal awal. Atur cara bayar dan nominalnya di Rumah & QR.</span>}</p>}
+      {validRange && <p className="rounded-xl bg-idle-soft px-3 py-2 text-sm">{count} hari · nominal periode <NumberTicker value={formatRupiah(totalExpected)} />{previous > 0 && <> · sudah tercatat <NumberTicker value={formatRupiah(previous)} /></>}. {!planAt(data.data?.plans ?? [], Number(houseId), periodStart) && <span className="block text-xs text-muted">Perkiraan dari nominal awal. Atur cara bayar dan nominalnya di Rumah & QR.</span>}</p>}
       <Field label="Uang diterima (Rp)" hint="Pembayaran sebagian boleh dicatat. Nominal dapat diubah sesuai uang yang benar-benar diterima."><RupiahInput value={amount} onValueChange={setAmount} required /></Field>
       <Button variant="ghost" size="sm" onClick={() => suggest(periodStart, periodEnd)} disabled={!validRange || data.isPending}>Isi sisa nominal periode</Button>
       </>}

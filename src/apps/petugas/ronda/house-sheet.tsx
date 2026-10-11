@@ -1,4 +1,6 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { Check, UserCheck, X } from "lucide-react";
+import { Dialog } from "@base-ui/react/dialog";
 import { useState } from "react";
 import { AmountField } from "@/components/amount-field";
 import { Button, cx } from "@/components/ui";
@@ -48,28 +50,20 @@ export function HouseSheet({
   const [replacing, setReplacing] = useState(false);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50"
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="house-sheet-title"
-        className="w-full max-w-lg rounded-t-3xl bg-card p-5 pb-[max(env(safe-area-inset-bottom),20px)] text-fg shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog.Root open onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/50" />
+      <Dialog.Popup initialFocus={true} className="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[92dvh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-3xl bg-card p-5 pb-[max(env(safe-area-inset-bottom),20px)] text-fg shadow-2xl outline-none">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-muted">
               {paymentPeriod ? "Status pembayaran" : method === "scan" ? "Hasil scan" : "Catat manual"}
             </p>
-            <h2
-              id="house-sheet-title"
+            <Dialog.Title
               className="text-3xl font-bold tracking-tight"
             >
               {houseLabelLong(house)}
-            </h2>
+            </Dialog.Title>
             {house.ownerName && <p className="text-muted">{house.ownerName}</p>}
           </div>
           <Button
@@ -98,7 +92,7 @@ export function HouseSheet({
                 Sudah dicatat {otherName} pukul{" "}
                 {formatTime(existing.recordedAt)}:{" "}
                 {existing.status === "filled"
-                  ? `Ada · ${formatRupiah(existing.amount)}`
+                  ? <NumberTicker value={`Ada · ${formatRupiah(existing.amount)}`} />
                   : "Kosong"}
               </p>
               <p className="mt-0.5">
@@ -124,7 +118,7 @@ export function HouseSheet({
               : ""}:{" "}
             <strong>
               {existing.status === "filled"
-                ? `Ada · ${formatRupiah(existing.amount)}`
+                ? <NumberTicker value={`Ada · ${formatRupiah(existing.amount)}`} />
                 : "Kosong"}
             </strong>
             {existing.pending && " (belum terkirim)"}
@@ -175,7 +169,7 @@ export function HouseSheet({
                         : "border-line text-muted",
                     )}
                   >
-                    {formatRupiah(p)}
+                    <NumberTicker value={formatRupiah(p)} />
                   </Button>
                 ))}
               </div>
@@ -189,7 +183,7 @@ export function HouseSheet({
                 className="flex h-16 items-center justify-center gap-2 rounded-2xl bg-filled text-xl font-bold text-white shadow-sm active:scale-[0.98] disabled:opacity-50 dark:text-black"
               >
                 <Check className="size-7" strokeWidth={3} /> Ada ·{" "}
-                {formatRupiah(amount)}
+                <NumberTicker value={formatRupiah(amount)} />
               </Button>
               <Button
                 variant="plain"
@@ -218,7 +212,8 @@ export function HouseSheet({
             </div>
           </>
         )}
-      </div>
-    </div>
+      </Dialog.Popup>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

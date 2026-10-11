@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { ArrowUpRight, Pencil, ReceiptText, Search } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -100,10 +101,10 @@ export function CashTransactions({ transactions, month, onEdit }: {
                       </div>
                     </td>
                     <td className={cx("py-4 pe-2 text-end text-xs font-semibold tabular-nums sm:hidden", out ? "text-empty" : "text-filled")}>
-                      <span className="sr-only">{out ? "Pengeluaran " : "Pemasukan "}</span>{out ? "−" : "+"}{formatRupiah(t.amount)}
+                      <span className="sr-only">{out ? "Pengeluaran " : "Pemasukan "}</span>{out ? "−" : "+"}<NumberTicker value={formatRupiah(t.amount)} />
                     </td>
-                    <td className="hidden whitespace-nowrap px-4 py-4 text-end font-medium tabular-nums text-filled sm:table-cell">{!out ? formatRupiah(t.amount) : <span className="text-muted/50">—</span>}</td>
-                    <td className="hidden whitespace-nowrap px-4 py-4 text-end font-medium tabular-nums text-empty sm:table-cell">{out ? formatRupiah(t.amount) : <span className="text-muted/50">—</span>}</td>
+                    <td className="hidden whitespace-nowrap px-4 py-4 text-end font-medium tabular-nums text-filled sm:table-cell">{!out ? <NumberTicker value={formatRupiah(t.amount)} /> : <span className="text-muted/50">—</span>}</td>
+                    <td className="hidden whitespace-nowrap px-4 py-4 text-end font-medium tabular-nums text-empty sm:table-cell">{out ? <NumberTicker value={formatRupiah(t.amount)} /> : <span className="text-muted/50">—</span>}</td>
                     <td className="py-2 pe-1 sm:px-2">
                       {editable ? (
                         <Button variant="ghost" size="sm" className="size-11 gap-1.5 px-0 sm:w-auto sm:px-2" aria-label={`Ubah ${t.description}, ${day}`} onClick={() => onEdit(t)}>
@@ -124,8 +125,8 @@ export function CashTransactions({ transactions, month, onEdit }: {
         <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 border-t border-line bg-idle-soft/20 px-4 py-3 text-xs">
           <p className="text-muted" role="status">{filtered ? `${shown.length} dari ${transactions.length} transaksi` : "Total bulan ini"}</p>
           <div className="flex flex-wrap gap-x-4 gap-y-1 tabular-nums">
-            <span>Masuk <strong className="font-semibold text-filled">{formatRupiah(income)}</strong></span>
-            <span>Keluar <strong className="font-semibold text-empty">{formatRupiah(expenses)}</strong></span>
+            <span>Masuk <strong className="font-semibold text-filled"><NumberTicker value={formatRupiah(income)} /></strong></span>
+            <span>Keluar <strong className="font-semibold text-empty"><NumberTicker value={formatRupiah(expenses)} /></strong></span>
           </div>
           {filtered && <Button variant="ghost" size="sm" className="h-8 px-0" onClick={clear}>Hapus filter</Button>}
         </div>

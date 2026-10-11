@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // @vitest-environment-options {"url":"https://app.clusternatura.com/"}
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
-import { act } from "react";
+import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,6 +17,7 @@ vi.mock("idb-keyval", () => ({ del: vi.fn(async () => {}), get: vi.fn(async () =
 
 // Pencatatan diuji tersendiri; di sini router dan menu Beranda dirender sungguhan.
 vi.mock("@/apps/petugas/ronda/ronda-page", () => ({ RondaPage: () => <h1>Ronda</h1> }));
+vi.mock("@/apps/petugas/ronda/ronda-store-provider", () => ({ RondaStoreProvider: ({ children }: { children: ReactNode }) => children }));
 let root: Root;
 let container: HTMLDivElement;
 let client: QueryClient;
@@ -26,11 +27,24 @@ const warga: SessionUser = { id: 2, name: "Warga contoh", role: "warga" };
 const history = { patrols: [{ date: "2026-10-09", filled: 1, empty: 0, checked: 1, unchecked: 0, expected: 1, total: 500, collectors: "Petugas contoh" }], today: "2026-10-10" };
 const schedule = { schedule: [{ id: 1, day: 6, position: 0, userId: 1, houseId: 1, block: "AF", number: "13", name: "Petugas contoh", ownerName: "Petugas contoh", color: "green" }] };
 const requests = { requests: [] };
+const currentPatrol = {
+  houses: [
+    { id: 1, block: "AF", number: "13", ownerName: "Petugas contoh", token: "HOUSE1", status: "active" },
+    { id: 2, block: "AF", number: "14", ownerName: "Warga contoh", token: "HOUSE2", status: "active" },
+    { id: 3, block: "AF", number: "15", ownerName: "Warga lain", token: "HOUSE3", status: "active" },
+  ],
+  collections: [
+    { houseId: 1, status: "filled", amount: 500, method: "scan", recordedAt: "2026-10-10T13:30:00Z", collectorName: "Petugas contoh" },
+    { houseId: 2, status: "empty", amount: 0, method: "manual", recordedAt: "2026-10-10T13:31:00Z", collectorName: "Petugas contoh" },
+  ],
+  settings: { communityName: "Cluster Natura", defaultAmount: 500 },
+  paymentPeriods: [],
+};
 const pages = [
   ["/ronda", "Ronda", "/ronda"],
   ["/riwayat", "Riwayat ronda", "/riwayat"],
   ["/riwayat/2026-10-09", formatDateLong("2026-10-09"), "/riwayat"],
-  ["/jadwal", "Jadwal ronda", "/jadwal"],
+  ["/akun/jadwal", "Jadwal ronda", "/akun"],
   ["/akun", "Akun", "/akun"],
 ] as const;
 
@@ -97,7 +111,7 @@ describe("Beranda di dalam app dengan login", () => {
     await render(`/masuk?next=${encodeURIComponent(path)}`, petugas);
     expect(router.state.location.pathname).toBe(path);
     expect(container.querySelector("h1")?.textContent).toBe(title);
-    expect(container.querySelector('nav a[aria-current="page"]')?.getAttribute("href")).toBe(active);
+    expect(container.querySelector('nav a[aria-current="page"]')?.getAttribute("href") ?? null).toBe(active);
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -105,16 +119,19 @@ describe("Beranda di dalam app dengan login", () => {
     await render("/", petugas);
     expect(container.querySelector("h1")?.textContent).toBe("Beranda");
     expect(container.textContent).toContain("Kerja bakti");
-    expect([...container.querySelectorAll("nav a")].map((a) => a.textContent)).toEqual(["Beranda", "Ronda", "Riwayat", "Jadwal", "Akun"]);
+    expect([...container.querySelectorAll("nav li")].map((a) => a.textContent?.trim())).toEqual(["Beranda", "Ronda", "Scan QR", "Riwayat", "Akun"]);
     expect(container.querySelector('nav a[aria-current="page"]')?.getAttribute("href")).toBe("/");
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("Warga membuka Beranda dengan empat menu tanpa Ronda", async () => {
+  it("Warga membuka Beranda dengan menu Ronda dan Scan QR di tengah", async () => {
     await render("/", warga);
     expect(container.textContent).toContain("Kerja bakti");
-    expect([...container.querySelectorAll("nav a")].map((a) => a.textContent)).toEqual(["Beranda", "Riwayat", "Jadwal", "Akun"]);
-    expect(container.querySelector("nav ul")?.classList.contains("grid-cols-4")).toBe(true);
+    expect([...container.querySelectorAll("nav a")].map((a) => a.textContent)).toEqual(["Beranda", "Ronda", "Riwayat", "Akun"]);
+    expect(container.querySelector("nav ul")?.classList.contains("grid-cols-5")).toBe(true);
+    expect([...container.querySelectorAll("nav li")][2].textContent?.trim()).toBe("Scan QR");
+    expect(container.querySelector('nav a[href="/ronda"]')).not.toBeNull();
+    expect(container.querySelector('nav a[href="/akun/jadwal"]')).toBeNull();
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -131,7 +148,6 @@ describe("Beranda di dalam app dengan login", () => {
     const bars = [...container.querySelectorAll("figure table tr")];
     expect(bars).toHaveLength(9);
     expect(bars.at(-1)?.textContent).toContain("9 Okt");
-    expect(container.textContent).toContain("20.00–00.00 WIB");
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -149,14 +165,56 @@ describe("Beranda di dalam app dengan login", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it.each(["/ronda", "/app/ronda", "/petugas/ronda", "/masuk?next=%2Fronda"])("Warga tidak membuka Ronda melalui %s", async (path) => {
+  it.each(["/ronda", "/app/ronda", "/petugas/ronda", "/masuk?next=%2Fronda"])("Warga membuka ringkasan Ronda melalui %s", async (path) => {
     await render(path, warga);
-    expect(router.state.location.pathname).toBe("/");
-    expect(container.querySelector("h1")?.textContent).toBe("Beranda");
+    expect(router.state.location.pathname).toBe("/ronda");
+    expect(container.querySelector("h1")?.textContent).toBe("Ronda malam ini");
+    expect(container.querySelector('nav a[aria-current="page"]')?.getAttribute("href")).toBe("/ronda");
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it.each(["/jadwal", "/akun", "/riwayat", "/riwayat/2026-10-09"])("Warga tetap membaca %s tanpa kontrol tugas jaga", async (path) => {
+  it("ringkasan Warga memakai malam dari server dan menampilkan petugas serta hasil tanpa kontrol pencatatan", async () => {
+    // Jam perangkat yang keliru tidak boleh mengubah malam yang sedang dibaca.
+    vi.setSystemTime(new Date("2026-10-12T13:00:00Z"));
+    client.setQueryData(["warga", "info"], { announcements: [], schedule: [{ id: 1, day: 6, position: 0, houseId: 1, block: "AF", number: "13", name: "Petugas contoh", unassigned: false }], tonight: 6, date: "2026-10-10", today: "2026-10-10", contacts: [], cash: null });
+    client.setQueryData(["riwayat", "2026-10-10"], currentPatrol);
+    await render("/ronda", warga);
+    expect(container.textContent).toContain(formatDateLong("2026-10-10"));
+    expect(container.textContent).toContain("2 dari 3 rumah dicek");
+    expect(container.textContent).toContain("Rp 500");
+    expect(container.querySelector('[aria-label="Jaga malam ini"]')?.textContent).toContain("Petugas contoh");
+    expect([...container.querySelectorAll('[aria-label="Blok AF"] li')].map((li) => li.textContent)).toEqual([
+      expect.stringContaining("Rp 500"), expect.stringContaining("Kosong"), expect.stringContaining("Belum dicek"),
+    ]);
+    expect(container.querySelector('[aria-label^="Koreksi"]')).toBeNull();
+    expect(container.querySelector("form")).toBeNull();
+    expect(container.textContent).not.toContain("Isi yang belum dicek");
+    expect(container.textContent).not.toContain("Cari manual");
+    await act(async () => (container.querySelector('[aria-label="Jaga malam ini"] button') as HTMLButtonElement).click());
+    expect(container.querySelector('a[href="/akun/jadwal"]')?.textContent).toBe("Jadwal lengkap");
+    expect(container.querySelector('[aria-label="Jaga malam ini"]')?.textContent).not.toContain("Kosong/mudik/dijual/dilelang/over");
+    expect(container.textContent).not.toContain("Kamu jaga");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("ringkasan Ronda memperbarui hasil lewat API baca ketika catatan petugas berubah", async () => {
+    client.setQueryData(["riwayat", "2026-10-10"], currentPatrol);
+    await render("/ronda", warga);
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({
+      ...currentPatrol,
+      collections: [...currentPatrol.collections, { houseId: 3, status: "filled", amount: 1000, method: "scan", recordedAt: "2026-10-10T13:35:00Z", collectorName: "Petugas contoh" }],
+    }), { headers: { "Content-Type": "application/json" } }));
+    await act(async () => client.invalidateQueries({ queryKey: ["riwayat", "2026-10-10"], exact: true }));
+    await expect.poll(() => container.textContent).toContain("3 dari 3 rumah dicek");
+    expect(container.textContent).toContain("Rp 1.500");
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, options] = vi.mocked(fetch).mock.calls[0];
+    expect(String(url)).toContain("/api/riwayat/2026-10-10");
+    expect(options?.method).toBe("GET");
+    expect(container.querySelector('[aria-label^="Koreksi"]')).toBeNull();
+  });
+
+  it.each(["/akun/jadwal", "/akun", "/riwayat", "/riwayat/2026-10-09"])("Warga tetap membaca %s tanpa kontrol tugas jaga", async (path) => {
     client.removeQueries({ queryKey: ["jadwal", "permintaan"], exact: true });
     await render(path, warga);
     expect(router.state.location.pathname).toBe(path);
@@ -236,10 +294,10 @@ describe("Beranda di dalam app dengan login", () => {
 
   it("menu Ronda dan Beranda berpindah di router yang sama", async () => {
     await render("/", petugas);
-    await act(async () => (container.querySelector('nav a[href="/ronda"]') as HTMLAnchorElement).click());
+    await act(async () => (container.querySelector('nav[aria-label="Menu app"] a[href="/ronda"]') as HTMLAnchorElement).click());
     expect(router.state.location.pathname).toBe("/ronda");
     expect(container.querySelector("h1")?.textContent).toBe("Ronda");
-    expect(container.querySelector('nav a[aria-current="page"]')?.getAttribute("href")).toBe("/ronda");
+    expect(container.querySelector('nav button[aria-label="Scan QR rumah"]')).not.toBeNull();
     await act(async () => (container.querySelector('nav a[href="/"]') as HTMLAnchorElement).click());
     expect(container.querySelector("h1")?.textContent).toBe("Beranda");
     expect(fetch).not.toHaveBeenCalled();
@@ -263,7 +321,7 @@ describe("Beranda di dalam app dengan login", () => {
     expect(router.state.location.search).toBe("?hari=1");
     expect(router.state.location.hash).toBe("#malam");
     expect(container.querySelector("h1")?.textContent).toBe(title);
-    expect(container.querySelector('nav a[aria-current="page"]')?.getAttribute("href")).toBe(active);
+    expect(container.querySelector('nav a[aria-current="page"]')?.getAttribute("href") ?? null).toBe(active);
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -275,7 +333,7 @@ describe("Beranda di dalam app dengan login", () => {
       client.setQueryData(["auth"], { setupNeeded: false, user: petugas });
       await expect.poll(() => router.state.location.pathname).toBe("/jadwal");
     });
-    expect(router.state.location.pathname).toBe("/jadwal");
+    expect(router.state.location.pathname).toBe("/akun/jadwal");
     expect(router.state.location.search).toBe("?hari=1");
     expect(router.state.location.hash).toBe("#malam");
     expect(container.querySelector("h1")?.textContent).toBe("Jadwal ronda");
@@ -297,6 +355,32 @@ describe("Beranda di dalam app dengan login", () => {
     await act(async () => (container.querySelector('nav a[href="/"]') as HTMLAnchorElement).click());
     expect(router.state.location.pathname).toBe("/");
     expect(container.querySelector("h1")?.textContent).toBe("Beranda");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([petugas, warga])("Akun $role membuka Jadwal sebagai halaman lanjutan dan kembali ke Akun", async (user) => {
+    await render("/akun", user);
+    expect(container.querySelector('nav[aria-label="Akses cepat"] a[href="/akun/jadwal"]')).not.toBeNull();
+    await act(async () => (container.querySelector('nav[aria-label="Akses cepat"] a[href="/akun/jadwal"]') as HTMLAnchorElement).click());
+    expect(router.state.location.pathname).toBe("/akun/jadwal");
+    expect(container.querySelector("h1")?.textContent).toBe("Jadwal ronda");
+    expect(container.querySelector('nav[aria-label="Menu app"] a[aria-current="page"]')?.getAttribute("href")).toBe("/akun");
+    expect(container.textContent?.includes("Jadwal jagamu")).toBe(user.role === "petugas");
+    const back = [...container.querySelectorAll<HTMLAnchorElement>('a[href="/akun"]')].find((a) => a.textContent?.includes("Kembali ke Akun"));
+    expect(back).toBeDefined();
+    await act(async () => back!.click());
+    expect(container.querySelector("h1")?.textContent).toBe("Akun");
+    expect(container.textContent).not.toContain("Jadwal jagamu");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(["/jadwal", "/app/jadwal", "/petugas/jadwal"])("bookmark Jadwal %s tetap menuju halaman lanjutan Akun", async (path) => {
+    await render(`${path}?hari=1#malam`, petugas);
+    expect(router.state.location.pathname).toBe("/akun/jadwal");
+    expect(router.state.location.search).toBe("?hari=1");
+    expect(router.state.location.hash).toBe("#malam");
+    expect(container.querySelector("h1")?.textContent).toBe("Jadwal ronda");
+    expect(container.querySelector('nav[aria-label="Menu app"] a[aria-current="page"]')?.getAttribute("href")).toBe("/akun");
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -329,7 +413,7 @@ describe("Beranda di dalam app dengan login", () => {
     });
     expect(fetch).toHaveBeenCalledWith("/api/auth/login", expect.objectContaining({ method: "POST", body: JSON.stringify({ userId: 1, pin: "1234" }) }));
     expect(container.querySelector("h1")?.textContent).toBe("Jadwal ronda");
-    expect(container.querySelector('nav a[aria-current="page"]')?.getAttribute("href")).toBe("/jadwal");
+    expect(container.querySelector('nav a[aria-current="page"]')?.getAttribute("href")).toBe("/akun");
   });
 
   it("keluar dari Akun menghapus akses Beranda dan kembali ke login app", async () => {

@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { usePermission } from "@/client/permissions";
 import { Field } from "@base-ui/react/field";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -62,6 +63,7 @@ import { buildRecapSheets } from "@/lib/recap-xlsx";
 import type { MonthCell, MonthRecap } from "@/lib/types";
 import { recapQuery } from "./queries";
 import { SheetsLinkDialog } from "./sheets-link";
+import { RecapReportDialog } from "./recap-report-dialog";
 import { PaymentPanel } from "./payments/payment-panel";
 import { adminPath } from "@/lib/app-paths";
 
@@ -140,6 +142,7 @@ export function RekapPage() {
   const [exporting, setExporting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [sheetsOpen, setSheetsOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const ready = query.data && query.data.month === month;
 
   async function exportXlsx() {
@@ -158,45 +161,51 @@ export function RekapPage() {
         title="Rekap bulanan"
         subtitle="Ringkasan jimpitan dan catatan setiap rumah."
         action={
-          <Menu
-            label="Unduh rekap"
-            className="shrink-0"
-            trigger={
-              <>
-                <Download className="size-4" />
-                {exporting ? "Menyiapkan…" : "Unduh"}
-                <ChevronDown className="-mr-1 size-4 text-muted" />
-              </>
-            }
-            items={[
-              {
-                label: "Excel (.xlsx)",
-                hint: "Per rumah, per malam, dan pembayaran periode",
-                icon: (
-                  <FileSpreadsheet className="mt-0.5 size-4 shrink-0 text-filled" />
-                ),
-                onSelect: exportXlsx,
-                disabled: !ready || exporting,
-              },
-              {
-                label: "CSV",
-                hint: "Tabel polos untuk aplikasi lain",
-                icon: (
-                  <FileText className="mt-0.5 size-4 shrink-0 text-muted" />
-                ),
-                onSelect: () => query.data && downloadCsv(month, query.data),
-                disabled: !ready,
-              },
-              ...(canSettings ? [{
-                label: "Google Sheets",
-                hint: "Link IMPORTDATA yang ikut terbarui",
-                icon: <Sheet className="mt-0.5 size-4 shrink-0 text-primary" />,
-                onSelect: () => setSheetsOpen(true),
-              }] : []),
-            ]}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="secondary" disabled={!ready} onClick={() => setReportOpen(true)}>
+              <FileText className="size-4" /> Buat laporan
+            </Button>
+            <Menu
+              label="Unduh rekap"
+              className="shrink-0"
+              trigger={
+                <>
+                  <Download className="size-4" />
+                  {exporting ? "Menyiapkan…" : "Unduh"}
+                  <ChevronDown className="-mr-1 size-4 text-muted" />
+                </>
+              }
+              items={[
+                {
+                  label: "Excel (.xlsx)",
+                  hint: "Per rumah, per malam, dan pembayaran periode",
+                  icon: (
+                    <FileSpreadsheet className="mt-0.5 size-4 shrink-0 text-filled" />
+                  ),
+                  onSelect: exportXlsx,
+                  disabled: !ready || exporting,
+                },
+                {
+                  label: "CSV",
+                  hint: "Tabel polos untuk aplikasi lain",
+                  icon: (
+                    <FileText className="mt-0.5 size-4 shrink-0 text-muted" />
+                  ),
+                  onSelect: () => query.data && downloadCsv(month, query.data),
+                  disabled: !ready,
+                },
+                ...(canSettings ? [{
+                  label: "Google Sheets",
+                  hint: "Link IMPORTDATA yang ikut terbarui",
+                  icon: <Sheet className="mt-0.5 size-4 shrink-0 text-primary" />,
+                  onSelect: () => setSheetsOpen(true),
+                }] : []),
+              ]}
+            />
+          </div>
         }
       />
+      <RecapReportDialog open={reportOpen} onClose={() => setReportOpen(false)} month={month} data={query.data} saveFile={saveFile} />
       <SheetsLinkDialog
         open={sheetsOpen}
         onClose={() => setSheetsOpen(false)}
@@ -584,19 +593,19 @@ function RecapBody({
           <div className="col-span-2 md:col-span-1">
             <dt className="text-sm text-muted">Total jimpitan</dt>
             <dd className="mt-1 text-3xl font-bold tracking-tight tabular-nums">
-              {formatRupiah(grandTotal)}
+              <NumberTicker value={formatRupiah(grandTotal)} />
             </dd>
           </div>
           <div>
             <dt className="text-xs text-muted">Hasil ronda harian</dt>
             <dd className="mt-1 text-lg font-semibold tabular-nums">
-              {formatRupiah(grandTotal - monthlyTotal - weeklyTotal)}
+              <NumberTicker value={formatRupiah(grandTotal - monthlyTotal - weeklyTotal)} />
             </dd>
           </div>
           <div>
             <dt className="text-xs text-muted">Pembayaran periode</dt>
             <dd className="mt-1 text-lg font-semibold tabular-nums">
-              {formatRupiah(monthlyTotal + weeklyTotal)}
+              <NumberTicker value={formatRupiah(monthlyTotal + weeklyTotal)} />
             </dd>
           </div>
           <div className="col-span-2 flex items-center justify-between gap-3 md:col-span-1 md:block">
@@ -631,7 +640,7 @@ function RecapBody({
               <div>
                 <p className="text-xs text-muted">Rata-rata per malam</p>
                 <p className="mt-1 font-semibold tabular-nums">
-                  {average === null ? "–" : formatRupiah(Math.round(average))}
+                  {average === null ? "–" : <NumberTicker value={formatRupiah(Math.round(average))} />}
                 </p>
                 {partialNights > 0 && (
                   <p className="mt-1 text-xs text-muted">
@@ -643,7 +652,7 @@ function RecapBody({
                 <div>
                   <p className="text-xs text-muted">Ronda tertinggi</p>
                   <p className="mt-1 font-semibold tabular-nums">
-                    {formatRupiah(dateTotals[best])}{" "}
+                    <NumberTicker value={formatRupiah(dateTotals[best])} />{" "}
                     <span className="font-normal text-muted">
                       · {formatDateShort(dates[best])}
                     </span>
@@ -1076,9 +1085,9 @@ function RecapBody({
                               {/* Sel ini selebar tabel, jadi yang menempel di kiri saat digeser teksnya. */}
                               <span className="sticky left-3 inline-block">
                                 Blok {block} · {list.length} rumah ·{" "}
-                                {formatRupiah(
+                                <NumberTicker value={formatRupiah(
                                   list.reduce((s, r) => s + r.total, 0),
-                                )}
+                                )} />
                               </span>
                             </th>
                           </tr>
@@ -1226,12 +1235,12 @@ function RecapBody({
                                 title={column.hint}
                               >
                                 {r[column.field] > 0
-                                  ? formatRupiah(r[column.field])
+                                  ? <NumberTicker value={formatRupiah(r[column.field])} />
                                   : "–"}
                               </td>
                             ))}
                             <td className="whitespace-nowrap px-3 py-1.5 text-right font-semibold tabular-nums">
-                              {formatRupiah(r.total)}
+                              <NumberTicker value={formatRupiah(r.total)} />
                             </td>
                           </tr>
                         ))}
@@ -1244,17 +1253,17 @@ function RecapBody({
                         {tableIndices.map((i) => (
                           <td key={dates[i]}>
                             {shownDateTotals[i] > 0
-                              ? formatRupiah(shownDateTotals[i])
+                              ? <NumberTicker value={formatRupiah(shownDateTotals[i])} />
                               : "–"}
                           </td>
                         ))}
                         <td />
                         {paymentColumns.map((column) => (
                           <td key={column.key}>
-                            {formatRupiah(shownTotals[column.key])}
+                            <NumberTicker value={formatRupiah(shownTotals[column.key])} />
                           </td>
                         ))}
-                        <td>{formatRupiah(shownTotals.total)}</td>
+                        <td><NumberTicker value={formatRupiah(shownTotals.total)} /></td>
                       </tr>
                     </tfoot>
                   </table>
@@ -1312,11 +1321,11 @@ function RecapBody({
                           key={column.key}
                           className="whitespace-nowrap px-2 py-2 text-right tabular-nums"
                         >
-                          {formatRupiah(shownTotals[column.key])}
+                          <NumberTicker value={formatRupiah(shownTotals[column.key])} />
                         </td>
                       ))}
                       <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                        {formatRupiah(shownTotals.total)}
+                        <NumberTicker value={formatRupiah(shownTotals.total)} />
                       </td>
                     </tr>
                   </tbody>
@@ -1432,7 +1441,7 @@ function Cell({
           "bg-filled-soft text-[9px] font-semibold leading-none text-filled ring-1 ring-inset ring-filled/15",
         )}
       >
-        {cell.amount !== defaultAmount && formatAmountShort(cell.amount)}
+        {cell.amount !== defaultAmount && <NumberTicker value={formatAmountShort(cell.amount)} />}
       </span>
     );
   }
@@ -1564,7 +1573,7 @@ function BulkBar({
                   {Number(amount) > 0 && (
                     <span className="font-normal text-muted">
                       {" "}
-                      · Ada = {formatRupiah(count * Number(amount))}
+                      · Ada = <NumberTicker value={formatRupiah(count * Number(amount))} />
                     </span>
                   )}
                 </p>

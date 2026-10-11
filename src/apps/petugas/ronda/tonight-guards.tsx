@@ -8,19 +8,28 @@ import { NIGHT_OF, scheduleDay, slotHouseLabel } from "@/lib/schedule";
 import type { ScheduleDTO } from "@/lib/types";
 import { petugasPath } from "@/lib/app-paths";
 
+/** Jadwal warga sudah disaring server dan tidak membawa identitas akun atau warna roster. */
+type WargaGuard = Pick<ScheduleDTO, "id" | "day" | "position" | "name" | "houseId" | "block" | "number"> & { unassigned: boolean };
+
 /**
  * Siapa yang dijadwalkan jaga di malam ronda ini, diringkas jadi satu baris
  * ("Kamu jaga · bersama Nino, Sahrul +5") yang bisa dibuka untuk melihat semuanya. Baris rumah yang
  * belum ada nama warganya dan baris putih (kosong/tidak dihuni, lihat `shownToGuards`) tidak ditampilkan
  * dan tidak dihitung; warna lainnya tidak dipakai.
  */
-export function TonightGuards({ schedule, date, userId }: { schedule: ScheduleDTO[]; date: string; userId?: number }) {
+export function TonightGuards({ schedule, date, userId }: { schedule: (ScheduleDTO | WargaGuard)[]; date: string; userId?: number }) {
   const [expanded, setExpanded] = useState(false);
   const day = scheduleDay(date);
   const entries = schedule
     .flatMap((e) => {
-      const name = e.name ?? e.ownerName;
-      return e.day === day && name && shownToGuards(e, userId) ? [{ ...e, name }] : [];
+      const name = e.name ?? ("ownerName" in e ? e.ownerName : null);
+      const visible = "color" in e ? shownToGuards(e, userId) : true;
+      return e.day === day && name && visible ? [{
+        ...e,
+        name,
+        userId: "userId" in e ? e.userId : null,
+        unassigned: "residentId" in e ? e.residentId === null : "unassigned" in e && e.unassigned,
+      }] : [];
     })
     // Petugas yang sedang masuk ditaruh paling depan.
     .sort((a, b) => Number(b.userId === userId) - Number(a.userId === userId) || a.position - b.position);
@@ -54,7 +63,7 @@ export function TonightGuards({ schedule, date, userId }: { schedule: ScheduleDT
           <div className="flex items-baseline justify-between gap-2">
             {/* Tanggalnya sudah ada di kartu ringkasan. */}
             <p className="text-xs text-muted">Malam {NIGHT_OF[day]}</p>
-            <Link to={petugasPath("/jadwal")} className="shrink-0 text-xs font-semibold text-primary">
+            <Link to={petugasPath("/akun/jadwal")} className="shrink-0 text-xs font-semibold text-primary">
               Jadwal lengkap
             </Link>
           </div>
@@ -65,7 +74,8 @@ export function TonightGuards({ schedule, date, userId }: { schedule: ScheduleDT
                 name={e.name}
                 house={slotHouseLabel(e)}
                 color={null}
-                unassigned={e.residentId === null}
+                showColorMeaning={false}
+                unassigned={e.unassigned}
                 me={userId !== undefined && e.userId === userId}
               />
             ))}

@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { useQuery } from "@tanstack/react-query";
 import { LogIn, ScanLine } from "lucide-react";
 import { useParams } from "react-router";
@@ -21,12 +22,13 @@ export function HousePage() {
   const query = useQuery({
     queryKey: ["rumah", token],
     queryFn: () => call(api.rumah[":token"].$get({ param: { token } })),
+    refetchInterval: 15_000,
   });
 
   return (
     <main className="mx-auto w-full max-w-md px-4 py-8">
       <QueryState query={query}>
-        {({ communityName, logoUrl, defaultAmount, tonight, canRecord, house, history, user, paymentInfo }) => {
+        {({ communityName, logoUrl, defaultAmount, tonight, canRecord, onDuty, recordingHours, house, history, user, paymentInfo }) => {
           const month = tonight.slice(0, 7);
           const thisMonth = history.filter((h) => h.date.startsWith(month));
           const monthFilled = thisMonth.filter((h) => h.status === "filled");
@@ -59,8 +61,9 @@ export function HousePage() {
                     <><p className="mt-2 text-xs text-muted">Catat uang yang benar-benar diambil malam ini. Pembayaran periode sudah tercatat terpisah.</p><QuickRecord token={house.token} defaultAmount={defaultAmount} current={current} /></>
                   ) : (
                     <p className="mt-3 rounded-xl bg-warn-soft px-3 py-2.5 text-sm text-warn">
-                      Bukan jadwal jagamu malam ini ({dayLabel(scheduleDay(tonight))}). Catatan hanya bisa diisi petugas
-                      yang jaga.{" "}
+                      {onDuty
+                        ? `Di luar jam pencatatan. Pencatatan dibuka pukul ${recordingHours}.`
+                        : `Bukan jadwal jagamu malam ini (${dayLabel(scheduleDay(tonight))}). Catatan hanya bisa diisi petugas yang jaga.`}{" "}
                       <a href={petugasPath("/jadwal")} className="font-semibold underline">
                         Lihat jadwal
                       </a>
@@ -77,11 +80,11 @@ export function HousePage() {
                     <strong className="text-2xl">{monthFilled.length}</strong>
                     <span className="text-muted"> / {thisMonth.length} malam ada isinya</span>
                   </p>
-                  <p className="text-xl font-bold">{formatRupiah(monthTotal)}</p>
+                  <p className="text-xl font-bold"><NumberTicker value={formatRupiah(monthTotal)} /></p>
                 </div>
               </Card>
 
-              {paymentInfo.receipts.length > 0 && <Card className="mt-5"><h2 className="font-semibold">Pembayaran jimpitan</h2><ul className="mt-3 space-y-3">{paymentInfo.receipts.map((p, i) => <li key={i} className="text-sm"><p className="flex flex-wrap justify-between gap-2"><span>{PAYMENT_LABEL[p.cadence]}</span><strong>{formatRupiah(p.amount)}</strong></p><p className="text-xs text-muted">Untuk {p.allocations ? p.allocations.map(([date]) => `${formatDateShort(date)} ${date.slice(0, 4)}`).join(", ") : `${formatDateShort(p.periodStart)} – ${formatDateShort(p.periodEnd)} ${p.periodEnd.slice(0, 4)}`} · diterima {formatDateShort(p.receivedDate)}.</p></li>)}</ul></Card>}
+              {paymentInfo.receipts.length > 0 && <Card className="mt-5"><h2 className="font-semibold">Pembayaran jimpitan</h2><ul className="mt-3 space-y-3">{paymentInfo.receipts.map((p, i) => <li key={i} className="text-sm"><p className="flex flex-wrap justify-between gap-2"><span>{PAYMENT_LABEL[p.cadence]}</span><strong><NumberTicker value={formatRupiah(p.amount)} /></strong></p><p className="text-xs text-muted">Untuk {p.allocations ? p.allocations.map(([date]) => `${formatDateShort(date)} ${date.slice(0, 4)}`).join(", ") : `${formatDateShort(p.periodStart)} – ${formatDateShort(p.periodEnd)} ${p.periodEnd.slice(0, 4)}`} · diterima {formatDateShort(p.receivedDate)}.</p></li>)}</ul></Card>}
 
               <h2 className="mb-2 mt-6 text-sm font-semibold uppercase tracking-wide text-muted">30 malam terakhir</h2>
               {history.length === 0 ? (
@@ -103,7 +106,7 @@ export function HousePage() {
                           !h.status && !rapel && "bg-idle-soft text-muted",
                         )}
                       >
-                        {rapel ? `Rapel · ${formatRupiah(payment?.rapelAmount ?? 0)}` : h.status === "filled" ? formatRupiah(h.amount ?? 0) : h.status === "empty" ? "Kosong" : "Tidak dicek"}
+                        {rapel ? <NumberTicker value={`Rapel · ${formatRupiah(payment?.rapelAmount ?? 0)}`} /> : h.status === "filled" ? <NumberTicker value={formatRupiah(h.amount ?? 0)} /> : h.status === "empty" ? "Kosong" : "Tidak dicek"}
                       </span>
                     </li>
                     );

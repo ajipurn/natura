@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { Tabs } from "@base-ui/react/tabs";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowDownLeft, ArrowUpRight, CheckCircle2, ChevronLeft, ChevronRight, Pencil, Plus, TriangleAlert, Wallet } from "lucide-react";
@@ -174,7 +175,7 @@ function Summary({ data }: { data: CashMonth }) {
           <Wallet className="size-4 text-primary" aria-hidden /> Saldo kas saat ini
         </p>
         <p className={cx("mt-2 break-words text-3xl font-bold tracking-tight tabular-nums", data.balance < 0 && "text-empty")}>
-          {formatRupiah(data.balance)}
+          <NumberTicker value={formatRupiah(data.balance)} />
         </p>
         <p className="mt-2 text-xs leading-relaxed text-muted">Saldo dari seluruh transaksi sampai saat ini.</p>
       </div>
@@ -184,18 +185,18 @@ function Summary({ data }: { data: CashMonth }) {
         <dl className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
           <div>
             <dt className="flex items-center gap-1.5 text-muted"><ArrowDownLeft className="size-4 text-filled" aria-hidden /> Pemasukan</dt>
-            <dd className="mt-1 break-words text-xl font-semibold tracking-tight tabular-nums text-filled">{formatRupiah(income)}</dd>
+            <dd className="mt-1 break-words text-xl font-semibold tracking-tight tabular-nums text-filled"><NumberTicker value={formatRupiah(income)} /></dd>
           </div>
           <div>
             <dt className="flex items-center gap-1.5 text-muted"><ArrowUpRight className="size-4 text-empty" aria-hidden /> Pengeluaran</dt>
-            <dd className="mt-1 break-words text-xl font-semibold tracking-tight tabular-nums text-empty">{formatRupiah(data.expenses)}</dd>
+            <dd className="mt-1 break-words text-xl font-semibold tracking-tight tabular-nums text-empty"><NumberTicker value={formatRupiah(data.expenses)} /></dd>
           </div>
           <div className="col-span-2 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-3">
-            <dt className="text-muted">Saldo awal bulan</dt><dd className="font-medium tabular-nums">{formatRupiah(data.opening)}</dd>
+            <dt className="text-muted">Saldo awal bulan</dt><dd className="font-medium tabular-nums"><NumberTicker value={formatRupiah(data.opening)} /></dd>
           </div>
           <div className="col-span-2 flex flex-wrap items-baseline justify-between gap-2">
             <dt className="font-semibold">Saldo akhir bulan</dt>
-            <dd className="shrink-0 font-bold tabular-nums">{formatRupiah(data.closing)}</dd>
+            <dd className="shrink-0 font-bold tabular-nums"><NumberTicker value={formatRupiah(data.closing)} /></dd>
           </div>
         </dl>
       </div>
@@ -300,10 +301,10 @@ function NightRow({
             {isTonight && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">Malam ini</span>}
           </p>
           <p className="mt-0.5 text-sm text-muted">
-            Tercatat <span className="font-semibold text-fg tabular-nums">{formatRupiah(recorded)}</span>
+            Tercatat <span className="font-semibold text-fg tabular-nums"><NumberTicker value={formatRupiah(recorded)} /></span>
             {filled > 0 && ` · ${filled} rumah`}
           </p>
-          {night.periodPayments > 0 && <p className="mt-1 text-xs text-muted">Termasuk pembayaran periode ke petugas {formatRupiah(night.periodPayments)}.</p>}
+          {night.periodPayments > 0 && <p className="mt-1 text-xs text-muted">Termasuk pembayaran periode ke petugas <NumberTicker value={formatRupiah(night.periodPayments)} />.</p>}
           {deposit && (deposit.note || deposit.recordedByName) && (
             <p className="mt-1 break-words text-xs text-muted">
               {[deposit.note, deposit.recordedByName && `dicatat ${deposit.recordedByName}`].filter(Boolean).join(" · ")}
@@ -313,7 +314,7 @@ function NightRow({
         {deposit ? (
           <div className="flex items-center justify-between gap-3 sm:justify-end">
             <div className="sm:text-right">
-              <p className="text-sm font-semibold tabular-nums">Disetor {formatRupiah(deposit.amount)}</p>
+              <p className="text-sm font-semibold tabular-nums">Disetor <NumberTicker value={formatRupiah(deposit.amount)} /></p>
               <Difference value={deposit.amount - recorded} />
             </div>
             <Button
@@ -344,7 +345,7 @@ function Difference({ value }: { value: number }) {
   if (value === 0) return <span className="text-xs font-semibold text-filled">Sesuai catatan</span>;
   return (
     <span className={cx("rounded-full px-2 py-0.5 text-xs font-semibold", value < 0 ? "bg-empty-soft text-empty" : "bg-warn-soft text-warn")}>
-      {value < 0 ? "Kurang" : "Lebih"} {formatRupiah(Math.abs(value))}
+      {value < 0 ? "Kurang" : "Lebih"} <NumberTicker value={formatRupiah(Math.abs(value))} />
     </span>
   );
 }

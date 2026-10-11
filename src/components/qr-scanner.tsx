@@ -1,6 +1,7 @@
 import jsQR from "jsqr";
+import { Dialog } from "@base-ui/react/dialog";
 import { Flashlight, FlashlightOff, Keyboard, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Button, cx } from "./ui";
 
 type Detect = (video: HTMLVideoElement) => Promise<string | null>;
@@ -64,6 +65,8 @@ export function QrScanner({
   onDetect,
   onClose,
   onManual,
+  description,
+  finalFocus,
 }: {
   /** Tidak memicu onDetect (mis. saat lembar rumah sedang terbuka), kamera tetap menyala. */
   paused: boolean;
@@ -71,6 +74,8 @@ export function QrScanner({
   onClose: () => void;
   /** Cadangan kalau QR tidak terbaca: cari rumah dengan mengetik. */
   onManual?: () => void;
+  description?: ReactNode;
+  finalFocus?: ComponentProps<typeof Dialog.Popup>["finalFocus"];
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const trackRef = useRef<MediaStreamTrack | null>(null);
@@ -173,9 +178,11 @@ export function QrScanner({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-black text-white">
+    <Dialog.Root open onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Portal>
+    <Dialog.Popup initialFocus={true} finalFocus={finalFocus} className="fixed inset-0 z-40 flex flex-col bg-black text-white outline-none">
       <div className="flex items-center justify-between px-4 pb-2 pt-[max(env(safe-area-inset-top),12px)]">
-        <p className="font-semibold">Scan QR rumah</p>
+        <Dialog.Title className="font-semibold">Scan QR rumah</Dialog.Title>
         <Button
           variant="plain"
           onClick={onClose}
@@ -186,6 +193,7 @@ export function QrScanner({
         </Button>
       </div>
 
+      <p role="status" className="px-4 pt-3 text-sm text-white/90">{description}</p>
       <div className="relative flex-1 overflow-hidden">
         <video ref={videoRef} playsInline muted className="absolute inset-0 size-full object-cover" />
         {!error && (
@@ -249,6 +257,8 @@ export function QrScanner({
           </Button>
         )}
       </div>
-    </div>
+    </Dialog.Popup>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

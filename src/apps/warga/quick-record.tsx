@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { useMutation } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 import { api, call } from "@/client/api";
@@ -33,7 +34,7 @@ export function QuickRecord({
           )}
         >
           Malam ini sudah dicatat:{" "}
-          <strong>{current.status === "filled" ? `Ada · ${formatRupiah(current.amount)}` : "Kosong"}</strong>
+          <strong>{current.status === "filled" ? <NumberTicker value={`Ada · ${formatRupiah(current.amount)}`} /> : "Kosong"}</strong>
         </p>
       )}
       <Button
@@ -42,7 +43,7 @@ export function QuickRecord({
         onClick={() => submit("filled", defaultAmount)}
         className="flex h-16 w-full items-center justify-center gap-2 rounded-2xl bg-filled text-xl font-bold text-white disabled:opacity-60 dark:text-black"
       >
-        <Check className="size-7" strokeWidth={3} /> Ada · {formatRupiah(defaultAmount)}
+        <Check className="size-7" strokeWidth={3} /> Ada · <NumberTicker value={formatRupiah(defaultAmount)} />
       </Button>
       <Button
         variant="plain"

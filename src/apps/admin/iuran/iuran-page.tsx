@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ChevronLeft,
@@ -285,9 +286,9 @@ export function IuranPage() {
                           </div>
                           <div className="sm:text-right">
                             <p className="font-semibold tabular-nums">
-                              {formatRupiah(bill.paid)}{" "}
+                              <NumberTicker value={formatRupiah(bill.paid)} />{" "}
                               <span className="text-xs font-normal text-muted">
-                                / {formatRupiah(bill.amount)}
+                                / <NumberTicker value={formatRupiah(bill.amount)} />
                               </span>
                             </p>
                             <p
@@ -377,7 +378,7 @@ export function IuranPage() {
                                 )}
                               </p>
                               <p className="mt-1 text-sm">
-                                {formatRupiah(type.amount)} ·{" "}
+                                <NumberTicker value={formatRupiah(type.amount)} /> ·{" "}
                                 {type.cadence === "monthly"
                                   ? "Bulanan"
                                   : "Sekali bayar"}
@@ -427,7 +428,7 @@ export function IuranPage() {
                                     "text-muted line-through",
                                 )}
                               >
-                                {formatRupiah(receipt.amount)}
+                                <NumberTicker value={formatRupiah(receipt.amount)} />
                               </p>
                             </div>
                             <p className="text-xs text-muted">
@@ -582,7 +583,7 @@ function Stat({ label, amount }: { label: string; amount: number }) {
   return (
     <Card>
       <p className="break-words text-2xl font-semibold tabular-nums">
-        {formatRupiah(amount)}
+        <NumberTicker value={formatRupiah(amount)} />
       </p>
       <p className="mt-1 text-xs text-muted">{label}</p>
     </Card>
@@ -857,7 +858,7 @@ function ReceiptForm({ bill, onDone }: { bill: Bill; onDone: () => void }) {
           {bill.block}-{bill.number} · {bill.typeName}
         </strong>
         <span className="mt-1 block text-muted">
-          Sisa tagihan {formatRupiah(bill.remaining)}
+          Sisa tagihan <NumberTicker value={formatRupiah(bill.remaining)} />
         </span>
       </p>
       <Field
@@ -973,7 +974,7 @@ function LogDialog({
             {logs.map((log) => (
               <li key={log.id} className="rounded-xl bg-idle-soft p-3 text-sm">
                 <p className="font-semibold">{labels[log.action]}</p>
-                <p className="mt-1">{formatRupiah(log.amount)}</p>
+                <p className="mt-1"><NumberTicker value={formatRupiah(log.amount)} /></p>
                 <p className="mt-1 text-xs text-muted">
                   {log.name ?? "Pengurus"} ·{" "}
                   {formatDateShort(localDate(new Date(log.createdAt)))}

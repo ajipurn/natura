@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { useQuery } from "@tanstack/react-query";
 import { Star } from "lucide-react";
 import { api, call } from "@/client/api";
@@ -69,7 +70,7 @@ function HistoryBody({ houseId, selectedMonth }: { houseId: number; selectedMont
           <div className="space-y-5">
             {house.status === "active" && <PaymentNotice period={paymentInfo.periods.find((b) => b.start <= through && b.end >= through)} cell={through === lastNight ? paymentInfo.tonight : null} />}
             {paymentInfo.periods.some((p) => p.status === "unpaid" && p.end < lastNight) && house.status === "active" && <p className="text-sm text-muted">Periode sebelumnya belum dibayar: {paymentInfo.periods.filter((p) => p.status === "unpaid" && p.end < lastNight).map((p) => formatDateShort(p.start) + " – " + formatDateShort(p.end)).join("; ")}.</p>}
-            {paymentInfo.receipts.length > 0 && <section><h3 className="font-semibold">Pembayaran jimpitan</h3><ul className="mt-2 space-y-2">{paymentInfo.receipts.map((p, i) => <li key={i} className="rounded-xl bg-primary/5 px-3 py-2 text-sm"><div className="flex flex-wrap justify-between gap-2"><span>{PAYMENT_LABEL[p.cadence]}</span><strong>{formatRupiah(p.amount)}</strong></div><p className="text-xs text-muted">Untuk {p.allocations ? p.allocations.map(([date]) => `${formatDateShort(date)} ${date.slice(0, 4)}`).join(", ") : `${formatDateShort(p.periodStart)} – ${formatDateShort(p.periodEnd)} ${p.periodEnd.slice(0, 4)}`} · diterima {formatDateShort(p.receivedDate)}.</p></li>)}</ul><p className="mt-2 text-xs text-muted">Dicatat terpisah dari uang yang diambil saat ronda.</p></section>}
+            {paymentInfo.receipts.length > 0 && <section><h3 className="font-semibold">Pembayaran jimpitan</h3><ul className="mt-2 space-y-2">{paymentInfo.receipts.map((p, i) => <li key={i} className="rounded-xl bg-primary/5 px-3 py-2 text-sm"><div className="flex flex-wrap justify-between gap-2"><span>{PAYMENT_LABEL[p.cadence]}</span><strong><NumberTicker value={formatRupiah(p.amount)} /></strong></div><p className="text-xs text-muted">Untuk {p.allocations ? p.allocations.map(([date]) => `${formatDateShort(date)} ${date.slice(0, 4)}`).join(", ") : `${formatDateShort(p.periodStart)} – ${formatDateShort(p.periodEnd)} ${p.periodEnd.slice(0, 4)}`} · diterima {formatDateShort(p.receivedDate)}.</p></li>)}</ul><p className="mt-2 text-xs text-muted">Dicatat terpisah dari uang yang diambil saat ronda.</p></section>}
             {house.status === "vacant" && (
               <p className="rounded-xl bg-warn-soft px-3 py-2 text-sm text-warn">
                 Ditandai rumah kosong/mudik: tidak dihitung bolong walau wadahnya kosong.

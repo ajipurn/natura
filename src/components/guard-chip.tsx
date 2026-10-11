@@ -14,6 +14,7 @@ export function GuardChip({
   me = false,
   mine = false,
   unassigned = false,
+  showColorMeaning = true,
 }: {
   name: string | null;
   house: string;
@@ -21,10 +22,13 @@ export function GuardChip({
   me?: boolean;
   mine?: boolean;
   unassigned?: boolean;
+  /** Matikan saat warna hanya netral, bukan penanda dari roster admin. */
+  showColorMeaning?: boolean;
 }) {
+  const meaning = showColorMeaning ? GUARD_COLOR_MEANING[color ?? "white"] : undefined;
   return (
     <li
-      title={GUARD_COLOR_MEANING[color ?? "white"]}
+      title={meaning}
       className={cx(
         "inline-flex items-baseline gap-1 rounded-full px-2.5 py-1 text-sm leading-tight",
         guardColorClass(color),
@@ -37,7 +41,7 @@ export function GuardChip({
       {name && house && " "}
       {house && <span className={cx(name ? "opacity-85" : "font-semibold")}>{house}</span>}
       {unassigned && <span className="text-xs opacity-85">· belum dipilih</span>}
-      <span className="sr-only">, {GUARD_COLOR_MEANING[color ?? "white"]}</span>
+      {meaning && <span className="sr-only">, {meaning}</span>}
     </li>
   );
 }

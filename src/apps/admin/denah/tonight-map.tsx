@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { NumberTicker } from "@/components/number-ticker";
 import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -60,7 +61,7 @@ export function TonightMap() {
                   {emptyCount > 0 && <span className="bg-empty" style={{ width: `${(emptyCount / summary.expected) * 100}%` }} />}
                 </div>
                 <p className="mt-1.5 text-sm text-muted">
-                  <strong className="text-fg">{summary.checked}</strong> dari {summary.expected} rumah selesai
+                  <strong className="text-fg"><NumberTicker value={summary.checked} /></strong> dari <NumberTicker value={summary.expected} /> rumah selesai
                   {summary.expected > 0 && ` (${Math.round((summary.checked / summary.expected) * 100)}%)`}
                 </p>
               </div>
@@ -127,7 +128,7 @@ export function TonightMap() {
 function Stat({ value, label, className }: { value: number | string; label: string; className?: string }) {
   return (
     <div className="rounded-xl bg-idle-soft/50 px-3 py-2">
-      <p className={cx("whitespace-nowrap text-xl font-bold", className)}>{value}</p>
+      <p className={cx("whitespace-nowrap text-xl font-bold", className)}><NumberTicker value={value} /></p>
       <p className="text-xs text-muted">{label}</p>
     </div>
   );

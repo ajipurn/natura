@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { useQuery } from "@tanstack/react-query";
 import { Hand, PenLine, Pencil, ScanLine, Table2, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -243,9 +244,9 @@ export function HousePanel({
             </ul>
             <p className="mt-2 text-xs text-muted">
               {automatic
-                ? `Status periode otomatis dari pembayaran. Total jimpitan ${formatRupiah(total)}.`
+                ? <>Status periode otomatis dari pembayaran. Total jimpitan <NumberTicker value={formatRupiah(total)} />.</>
                 : filled + empty > 0
-                ? `Kosong ${Math.round((empty / (filled + empty)) * 100)}% dari ${filled + empty} malam yang dicek · ${formatRupiah(total)}`
+                ? <>Kosong {Math.round((empty / (filled + empty)) * 100)}% dari {filled + empty} malam yang dicek · <NumberTicker value={formatRupiah(total)} /></>
                 : "Belum pernah dicek bulan ini."}
             </p>
           </>
@@ -295,7 +296,7 @@ function TonightStatus({
           filled ? "bg-filled-soft text-filled" : "bg-empty-soft text-empty",
         )}
       >
-        {filled ? `Ada ${formatRupiah(collection.amount)}` : "Kosong"}
+        {filled ? <NumberTicker value={`Ada ${formatRupiah(collection.amount)}`} /> : "Kosong"}
       </span>
       <span className="flex min-w-0 items-center gap-1 text-xs text-muted">
         {collection.method === "scan" ? (

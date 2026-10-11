@@ -1,5 +1,7 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { Search, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Dialog } from "@base-ui/react/dialog";
+import { useMemo, useRef, useState } from "react";
 import { Button, cx } from "@/components/ui";
 import { formatRupiah } from "@/lib/format";
 import { houseLabel, searchHouses } from "@/lib/houses";
@@ -22,21 +24,18 @@ export function HouseSearch({
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
   const results = useMemo(() => searchHouses(houses, query), [houses, query]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="house-search-title"
-        className="flex max-h-[85dvh] w-full max-w-lg flex-col rounded-b-3xl bg-card p-4 pt-[max(env(safe-area-inset-top),16px)] text-fg shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog.Root open onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/50" />
+      <Dialog.Popup initialFocus={inputRef} className="fixed inset-x-0 top-0 z-50 mx-auto flex max-h-[85dvh] w-full max-w-lg flex-col rounded-b-3xl bg-card p-4 pt-[max(env(safe-area-inset-top),16px)] text-fg shadow-2xl outline-none">
         <div className="flex items-center justify-between gap-3">
-          <h2 id="house-search-title" className="text-lg font-bold">
+          <Dialog.Title className="text-lg font-bold">
             Catat manual
-          </h2>
+          </Dialog.Title>
           <Button
             variant="plain"
             onClick={onClose}
@@ -56,7 +55,7 @@ export function HouseSearch({
           <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted" />
           <input
             type="search"
-            autoFocus
+            ref={inputRef}
             enterKeyHint="search"
             autoComplete="off"
             value={query}
@@ -90,7 +89,7 @@ export function HouseSearch({
                     )}
                   >
                     {c?.status === "filled"
-                      ? formatRupiah(c.amount)
+                      ? <NumberTicker value={formatRupiah(c.amount)} />
                       : c?.status === "empty"
                         ? "Kosong"
                         : h.status === "vacant"
@@ -105,7 +104,8 @@ export function HouseSearch({
             <li className="py-6 text-center text-sm text-muted">Tidak ada rumah yang cocok.</li>
           )}
         </ul>
-      </div>
-    </div>
+      </Dialog.Popup>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

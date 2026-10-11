@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { Field } from "@base-ui/react/field";
 import {
+  CalendarDays,
   ChevronRight,
   KeyRound,
   LayoutDashboard,
@@ -8,7 +9,7 @@ import {
   Moon,
   Smartphone,
 } from "lucide-react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { api, call } from "@/client/api";
 import { useAuth } from "@/client/auth";
 import { clearCache } from "@/client/query";
@@ -16,7 +17,6 @@ import { setTheme, useTheme } from "@/client/theme";
 import { SwitchControl } from "@/components/choice";
 import { Collapsible } from "@/components/collapsible";
 import { ChangePinForm } from "@/features/auth/change-pin-form";
-import { MySchedule } from "./my-schedule";
 import {
   Alert,
   Button,
@@ -46,7 +46,7 @@ export function AkunPage() {
 
   return (
     <main>
-      <PageHeader title="Akun" subtitle={canRonda(user.role) ? "Pengaturan akun dan jadwal jagamu." : "Pengaturan akunmu."} />
+      <PageHeader title="Akun" subtitle="Pengaturan akun dan jadwal ronda." />
 
       <Card className="flex items-center gap-4">
         <div
@@ -70,17 +70,19 @@ export function AkunPage() {
           isManager(user.role) && "sm:grid-cols-2",
         )}
       >
-        {/* <Link
-          to={wargaPath()}
-          className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:bg-primary/15"
+        <Link
+          to={petugasPath("/akun/jadwal")}
+          className="flex items-center gap-3 rounded-2xl border border-line bg-card p-4 transition-colors hover:bg-idle-soft/50 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 active:bg-idle-soft"
         >
-          <Megaphone className="size-5 shrink-0 text-primary" aria-hidden />
+          <CalendarDays className="size-5 shrink-0 text-primary" aria-hidden />
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-primary">Buka info warga</span>
-            <span className="mt-0.5 block text-xs text-muted">Pengumuman, rekap, dan kas</span>
+            <span className="block text-sm font-semibold">Jadwal ronda</span>
+            <span className="mt-0.5 block text-xs text-muted">
+              {canRonda(user.role) ? "Lihat jadwal dan atur permintaan jadwal jagamu." : "Lihat jadwal petugas ronda."}
+            </span>
           </span>
-          <ChevronRight className="size-4 shrink-0 text-primary" aria-hidden />
-        </Link> */}
+          <ChevronRight className="size-4 shrink-0 text-muted" aria-hidden />
+        </Link>
         {isManager(user.role) && (
           <a
             href={adminPath("/")}
@@ -102,11 +104,6 @@ export function AkunPage() {
           </a>
         )}
       </nav>
-
-      {canRonda(user.role) && <>
-        <SectionTitle>Jadwal jagamu</SectionTitle>
-        <MySchedule />
-      </>}
 
       <SectionTitle>Pengaturan</SectionTitle>
       <Card className="divide-y divide-line p-0">

@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { PaymentDialog, type AdminPayment } from "@/apps/admin/payments/payment-dialog";
 import type { PaymentPlanDTO } from "@/lib/payments";
+import { accessibleText } from "./helpers/dom";
 
 const month = "2026-10";
 const homes = Array.from({ length: 6 }, (_, i) => ({ id: i + 1, block: "A", number: String(i + 1), ownerName: `Warga ${i + 1}`, status: "active", token: `HOME${i + 1}` }));
@@ -92,7 +93,7 @@ it("bulanan mengikuti kesepakatan pada periode, termasuk sisa tagihan sebelum be
   await choose("Rumah", "A-5");
   expect(control("Jenis pembayaran").textContent).toBe("Bulanan");
   expect(control("Periode sampai").textContent).toContain("8 Okt 2026");
-  expect(dialog().textContent).toContain("8 hari · nominal periode Rp 4.000 · sudah tercatat Rp 3.000");
+  expect(accessibleText(dialog())).toContain("8 hari · nominal periode Rp 4.000 · sudah tercatat Rp 3.000");
   await submit();
   expect(payload()).toMatchObject({ houseId: 5, cadence: "monthly", amount: 1000, periodStart: "2026-10-01", periodEnd: "2026-10-08", allocations: null });
   expect(onClose).toHaveBeenCalled();

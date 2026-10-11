@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import {
   Box,
   CheckCircle2,
@@ -43,10 +44,11 @@ import { HouseSearch } from "./house-search";
 import { HouseSheet } from "./house-sheet";
 import { TonightGuards } from "./tonight-guards";
 import {
-  useRondaStore,
   type MergedCollection,
   type SyncStatus,
 } from "./use-ronda-store";
+import { useRondaStore } from "./ronda-store";
+import { recordingHoursLabel } from "@/lib/recording-window";
 import { adminPath, petugasPath } from "@/lib/app-paths";
 
 type Toast = { text: string; tone: "ok" | "error" };
@@ -157,13 +159,12 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   const mySchedule = (snapshot?.schedule ?? []).filter(
     (e) => e.userId === snapshot?.user.id,
   );
-  const onDuty = mySchedule.some((e) => e.day === scheduleDay(store.date));
-  const canRecord = onDuty;
+  const { onDuty, canRecord } = store;
 
   function openHouse(house: HouseDTO) {
     if (canRecord || paymentPeriods.some((p) => p.houseId === house.id))
       setActive({ house, method: "manual" });
-    else showToast("Bukan jadwal jagamu malam ini.", "error");
+    else showToast(onDuty ? `Pencatatan dibuka pukul ${recordingHoursLabel(snapshot?.settings)}.` : "Bukan jadwal jagamu malam ini.", "error");
   }
 
   function handleDetect(text: string) {
@@ -191,7 +192,11 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   function handleRecord(status: CollectionStatus | "none", amount: number) {
     if (!active) return;
     if (paymentPeriods.some((p) => p.houseId === active.house.id)) return;
-    store.record(active.house, status, amount, active.method);
+    if (!store.record(active.house, status, amount, active.method)) {
+      showToast("Pencatatan tidak tersedia. Periksa jadwal dan jam pencatatan.", "error");
+      setActive(null);
+      return;
+    }
     const label = houseLabel(active.house);
     showToast(
       status === "filled"
@@ -276,12 +281,12 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                 <div className="mt-2 flex items-baseline justify-between">
                   <p className="text-sm text-muted">
                     <strong className="text-2xl text-fg">
-                      {summary.checked}
+                      <NumberTicker value={summary.checked} />
                     </strong>{" "}
-                    / {summary.expected} selesai
+                    / <NumberTicker value={summary.expected} /> selesai
                   </p>
                   <p className="text-xl font-bold">
-                    {formatRupiah(summary.total)}
+                    <NumberTicker value={formatRupiah(summary.total)} />
                   </p>
                 </div>
                 <div
@@ -308,17 +313,17 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                 {/* Titik warnanya sama dengan bilah progres dan kotak rumah. */}
                 <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted">
                   <LegendItem swatch="bg-filled">
-                    Ada {summary.filled.length}
+                    Ada <NumberTicker value={summary.filled.length} />
                   </LegendItem>
                   <LegendItem swatch="bg-empty">
-                    Kosong {summary.empty.length}
+                    Kosong <NumberTicker value={summary.empty.length} />
                   </LegendItem>
                   <LegendItem swatch="border border-line bg-idle-soft">
-                    Belum {summary.unchecked.length}
+                    Belum <NumberTicker value={summary.unchecked.length} />
                   </LegendItem>
                   {summary.vacant.length > 0 && (
                     <LegendItem swatch="border border-dashed border-muted/60">
-                      Mudik {summary.vacant.length}
+                      Mudik <NumberTicker value={summary.vacant.length} />
                     </LegendItem>
                   )}
                 </p>
@@ -347,10 +352,10 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
             >
               <ShieldAlert className="size-5 shrink-0" aria-hidden />
               <div>
-                <p className="font-semibold">Bukan jadwal jagamu malam ini</p>
+                <p className="font-semibold">{onDuty ? "Di luar jam pencatatan" : "Bukan jadwal jagamu malam ini"}</p>
                 <p className="mt-0.5">
                   Pencatatan dibuka untuk petugas yang jaga{" "}
-                  {dayLabel(scheduleDay(store.date))}.
+                  {dayLabel(scheduleDay(store.date))}, pukul {recordingHoursLabel(snapshot.settings)}.
                 </p>
                 <p className="mt-2">
                   {mySchedule.length > 0
@@ -366,7 +371,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                   </p>
                 )}
                 <Link
-                  to={petugasPath("/jadwal")}
+                  to={petugasPath("/akun/jadwal")}
                   className="mt-2 inline-block font-semibold underline"
                 >
                   Lihat jadwal atau minta ubah jadwal
@@ -556,9 +561,9 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
         <>
           {/* Ruang supaya bagian bawah daftar tidak tertutup bar aksi. */}
           <div className="h-16" aria-hidden />
-          {/* Bar aksi menempel tepat di atas navigasi bawah (tingginya h-14, lihat PetugasLayout). */}
-          <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] z-20 border-t border-line bg-card/95 py-2 backdrop-blur">
-            <div className="mx-auto flex max-w-3xl gap-2 px-4">
+          {/* Beri jarak dari tombol scan yang menonjol di navigasi bawah. */}
+          <div className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom,0px)+8rem)] z-20 mx-auto max-w-3xl rounded-2xl bg-card p-2 shadow-lg">
+            <div className="flex gap-2">
               <ActionButtons
                 onSearch={() => setSearchOpen(true)}
                 onScan={() => setScannerOpen(true)}
@@ -679,7 +684,7 @@ function LastEntry({
         <span
           className={entry.status === "filled" ? "text-filled" : "text-empty"}
         >
-          {entry.status === "filled" ? formatRupiah(entry.amount) : "kosong"}
+          {entry.status === "filled" ? <NumberTicker value={formatRupiah(entry.amount)} /> : "kosong"}
         </span>
         <span className="text-muted">
           {" "}

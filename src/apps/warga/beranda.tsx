@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { useQuery } from "@tanstack/react-query";
 import {
   ChevronLeft,
@@ -12,6 +13,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
+// import { Link } from "react-router";
 import { api, call } from "@/client/api";
 import { BarChart } from "@/components/bar-chart";
 import { GuardChip } from "@/components/guard-chip";
@@ -39,6 +41,9 @@ import type { CashPublic } from "@/server/kas";
 import { HouseStatus } from "./house-status";
 import { useMyHouse } from "./my-house";
 import { DEFAULT_LOGO_URL } from "@/lib/branding";
+// import { useAuth } from "@/client/auth";
+// import { canRonda } from "@/lib/permissions";
+// import { petugasPath } from "@/lib/app-paths";
 
 const accessQuery = {
   queryKey: ["warga", "akses"],
@@ -48,6 +53,7 @@ const accessQuery = {
 /** Beranda app; login dijaga oleh router app dan API. */
 export function BerandaPage() {
   const access = useQuery(accessQuery);
+  // const user = useAuth().data?.user;
   return (
     <main>
       <PageTitle title="Beranda" />
@@ -66,6 +72,7 @@ export function BerandaPage() {
           </div>
         </div>
       </header>
+      {/* {user && canRonda(user.role) && <Link to={petugasPath("/ronda")} className={cx(buttonClass("secondary"), "mt-4 w-full")}><ShieldCheck className="size-5" aria-hidden /> Ronda malam ini</Link>} */}
       <div className="mt-5">
         <WargaContent />
       </div>
@@ -325,7 +332,8 @@ function MonthRecap({
     refetchInterval: 60_000,
   });
 
-  const through = recap.data?.perNight.at(-1)?.date ?? recap.data?.through ?? today;
+  const through =
+    recap.data?.perNight.at(-1)?.date ?? recap.data?.through ?? today;
 
   return (
     <>
@@ -368,7 +376,8 @@ function MonthRecap({
                 {month === thisMonth ? (
                   <>
                     <p>
-                      Malam pertama bulan ini mulai dihitung pukul 20.00 WIB tanggal 1.
+                      Malam pertama bulan ini mulai dihitung pukul 20.00 WIB
+                      tanggal 1.
                     </p>
                     <Button
                       variant="ghost"
@@ -389,20 +398,20 @@ function MonthRecap({
                   <div className="min-w-0">
                     <p className="text-xs text-muted">Total jimpitan</p>
                     <p className="mt-1 text-2xl font-bold tracking-tight tabular-nums sm:text-3xl">
-                      {formatRupiah(data.total)}
+                      <NumberTicker value={formatRupiah(data.total)} />
                     </p>
                   </div>
                   <dl className="grid grid-cols-2 gap-4">
                     <div className="min-w-0">
                       <dt className="text-xs text-muted">Malam berjalan</dt>
                       <dd className="mt-1 text-base font-semibold leading-tight tabular-nums sm:text-lg">
-                        {data.nights}
+                        <NumberTicker value={data.nights} />
                       </dd>
                     </div>
                     <div className="min-w-0">
                       <dt className="text-xs text-muted">Rata-rata / malam</dt>
                       <dd className="mt-1 text-base font-semibold leading-tight tabular-nums sm:text-lg">
-                        {formatRupiah(data.average)}
+                        <NumberTicker value={formatRupiah(data.average)} />
                       </dd>
                     </div>
                   </dl>
@@ -426,8 +435,8 @@ function MonthRecap({
                     })}
                 />
                 <p className="mt-3 border-t border-line pt-3 text-xs text-muted">
-                  Grafik dan rata-rata: hasil ronda. Total bulan juga
-                  mencakup pembayaran periode dan rapel.
+                  Grafik dan rata-rata: hasil ronda. Total bulan juga mencakup
+                  pembayaran periode dan rapel.
                 </p>
               </>
             )
@@ -436,23 +445,23 @@ function MonthRecap({
       </Card>
       {children}
       {recap.data && (
-          <HouseStatus
-            perHouse={recap.data.perHouse.map((h) => ({
-              ...h,
-              paymentPeriod: recap.data.paymentPeriods.find(
-                (p) =>
-                  h.status === "active" &&
-                  p.houseId === h.id &&
-                  p.cadence !== "daily" &&
-                  p.start <= through &&
-                  p.end >= through,
-              ),
-            }))}
-            month={recap.data.month}
-            nights={recap.data.nights}
-            through={through}
-          />
-        )}
+        <HouseStatus
+          perHouse={recap.data.perHouse.map((h) => ({
+            ...h,
+            paymentPeriod: recap.data.paymentPeriods.find(
+              (p) =>
+                h.status === "active" &&
+                p.houseId === h.id &&
+                p.cadence !== "daily" &&
+                p.start <= through &&
+                p.end >= through,
+            ),
+          }))}
+          month={recap.data.month}
+          nights={recap.data.nights}
+          through={through}
+        />
+      )}
     </>
   );
 }
@@ -472,7 +481,7 @@ function CashCard({ cash }: { cash: CashPublic }) {
           <div>
             <p className="text-xs text-muted">Saldo kas sekarang</p>
             <p className="mt-1 text-3xl font-bold tracking-tight tabular-nums">
-              {formatRupiah(cash.balance)}
+              <NumberTicker value={formatRupiah(cash.balance)} />
             </p>
           </div>
           <span className="rounded-full bg-idle-soft px-3 py-1 text-xs font-medium text-muted">
@@ -518,7 +527,7 @@ function CashCard({ cash }: { cash: CashPublic }) {
                   )}
                 >
                   {e.direction === "out" ? "−" : "+"}
-                  {formatRupiah(e.amount)}
+                  <NumberTicker value={formatRupiah(e.amount)} />
                 </span>
               </li>
             ))}
@@ -532,7 +541,7 @@ function CashCard({ cash }: { cash: CashPublic }) {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-lg font-bold leading-tight tabular-nums">{value}</p>
+      <p className="text-lg font-bold leading-tight tabular-nums"><NumberTicker value={value} /></p>
       <p className="mt-1 text-xs text-muted">{label}</p>
     </div>
   );

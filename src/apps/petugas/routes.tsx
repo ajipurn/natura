@@ -8,6 +8,7 @@ import { AkunPage } from "./akun";
 import { PetugasLayout } from "./layout";
 import { JadwalPetugas } from "./jadwal";
 import { RondaPage } from "./ronda/ronda-page";
+import { RondaSummary } from "./ronda/ronda-summary";
 import { BerandaPage } from "../warga/beranda";
 import { adminPath, petugasPath } from "@/lib/app-paths";
 import { useAuth } from "@/client/auth";
@@ -15,7 +16,7 @@ import { canRonda } from "@/lib/permissions";
 
 function RondaAccess() {
   const user = useAuth().data?.user;
-  return user && canRonda(user.role) ? <RondaPage /> : <Navigate to={petugasPath()} replace />;
+  return user && canRonda(user.role) ? <RondaPage /> : <RondaSummary />;
 }
 
 function LegacyAppRedirect() {
@@ -23,6 +24,11 @@ function LegacyAppRedirect() {
   const suffix = pathname.replace(/^\/(?:app|petugas)(?=\/|$)/, "");
   const target = suffix === "/info" || suffix === "/info/" ? "" : suffix;
   return <Navigate to={petugasPath(target) + search + hash} replace />;
+}
+
+function LegacyScheduleRedirect() {
+  const { search, hash } = useLocation();
+  return <Navigate to={petugasPath("/akun/jadwal") + search + hash} replace />;
 }
 
 const atAppRoot = petugasPath() === "/";
@@ -47,7 +53,8 @@ export const router = createBrowserRouter([
       ...(atAppRoot ? [] : [{ path: petugasPath("/info"), element: <Navigate to={petugasPath()} replace /> }]),
       { path: petugasPath("/riwayat"), element: <PatrolList basePath={petugasPath("/riwayat")} /> },
       { path: petugasPath("/riwayat/:tanggal"), element: <PatrolDetail basePath={petugasPath("/riwayat")} canCorrect={false} /> },
-      { path: petugasPath("/jadwal"), element: <JadwalPetugas /> },
+      { path: petugasPath("/jadwal"), element: <LegacyScheduleRedirect /> },
+      { path: petugasPath("/akun/jadwal"), element: <JadwalPetugas /> },
       { path: petugasPath("/akun"), element: <AkunPage /> },
       { path: petugasPath("/*"), element: <NotFound home={petugasPath()} /> },
     ],

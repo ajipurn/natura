@@ -44,6 +44,8 @@ export const settings = pgTable("settings", {
   id: integer("id").primaryKey().default(1),
   communityName: text("community_name").notNull(),
   defaultAmount: integer("default_amount").notNull().default(500),
+  recordingStart: text("recording_start").notNull().default("20:00"),
+  recordingEnd: text("recording_end").notNull().default("00:00"),
   /** Kode untuk membuka halaman warga. Null = halaman warga belum dibuka untuk umum. */
   wargaCode: text("warga_code"),
   /** Dinaikkan saat kode warga diganti supaya akses lama tidak berlaku lagi. */

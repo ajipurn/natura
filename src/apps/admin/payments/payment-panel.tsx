@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Check, ChevronDown, Circle, History, Pencil, Plus, ReceiptText } from "lucide-react";
 import { useId, useState } from "react";
@@ -51,9 +52,9 @@ export function PaymentPanel({ month }: { month: string }) {
           return (
             <>
               <dl className="grid grid-cols-2 gap-3 @xl:grid-cols-3">
-                <div className="rounded-xl bg-idle-soft/40 px-4 py-3.5"><dt className="text-xs text-muted">Belum lunas</dt><dd className="mt-1.5 text-2xl font-semibold tabular-nums">{unpaid.length} <span className="text-sm font-normal text-muted">periode</span></dd></div>
-                <div className="rounded-xl bg-idle-soft/40 px-4 py-3.5"><dt className="text-xs text-muted">Sudah lunas</dt><dd className="mt-1.5 text-2xl font-semibold tabular-nums">{paid.length} <span className="text-sm font-normal text-muted">periode</span></dd></div>
-                <div className="col-span-2 rounded-xl bg-primary/5 px-4 py-3.5 @xl:col-span-1"><dt className="text-xs text-muted">Sisa pembayaran</dt><dd className="mt-1.5 break-words text-2xl font-semibold tracking-tight tabular-nums text-primary">{formatRupiah(unpaid.reduce((sum, b) => sum + b.remaining, 0))}</dd></div>
+                <div className="rounded-xl bg-idle-soft/40 px-4 py-3.5"><dt className="text-xs text-muted">Belum lunas</dt><dd className="mt-1.5 text-2xl font-semibold tabular-nums"><NumberTicker value={unpaid.length} /> <span className="text-sm font-normal text-muted">periode</span></dd></div>
+                <div className="rounded-xl bg-idle-soft/40 px-4 py-3.5"><dt className="text-xs text-muted">Sudah lunas</dt><dd className="mt-1.5 text-2xl font-semibold tabular-nums"><NumberTicker value={paid.length} /> <span className="text-sm font-normal text-muted">periode</span></dd></div>
+                <div className="col-span-2 rounded-xl bg-primary/5 px-4 py-3.5 @xl:col-span-1"><dt className="text-xs text-muted">Sisa pembayaran</dt><dd className="mt-1.5 break-words text-2xl font-semibold tracking-tight tabular-nums text-primary"><NumberTicker value={formatRupiah(unpaid.reduce((sum, b) => sum + b.remaining, 0))} /></dd></div>
               </dl>
               <div>
                 <h3 className="text-sm font-semibold">Status per rumah</h3>
@@ -71,7 +72,7 @@ export function PaymentPanel({ month }: { month: string }) {
                         </div>
                         <p className="col-span-2 col-start-1 row-start-2 text-xs text-muted @2xl:col-span-1 @2xl:col-start-auto @2xl:row-start-auto @2xl:text-sm">{formatDateShort(b.start)} – {formatDateShort(b.end)}</p>
                         <p className="col-span-2 row-start-3 flex flex-wrap items-baseline gap-x-1 text-sm tabular-nums @2xl:col-span-1 @2xl:row-start-auto @2xl:justify-end">
-                          <span className="me-1 text-xs text-muted @2xl:sr-only">Terbayar</span><span className="font-semibold">{formatRupiah(b.paid)}</span><span className="text-muted">/ {formatRupiah(b.expected)}</span>
+                          <span className="me-1 text-xs text-muted @2xl:sr-only">Terbayar</span><span className="font-semibold"><NumberTicker value={formatRupiah(b.paid)} /></span><span className="text-muted">/ <NumberTicker value={formatRupiah(b.expected)} /></span>
                         </p>
                         <span className={cx("col-start-2 row-start-1 inline-flex items-center gap-1.5 self-start justify-self-end whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium @2xl:col-start-auto @2xl:row-start-auto @2xl:self-center", b.status === "paid" ? "bg-filled-soft text-filled" : "bg-empty-soft text-empty")}>
                           {b.status === "paid" ? <Check className="size-3.5" aria-hidden /> : <Circle className="size-1.5 fill-current" aria-hidden />}{BILLING_LABEL[b.status]}
@@ -88,7 +89,7 @@ export function PaymentPanel({ month }: { month: string }) {
                 {expanded && <div id={historyId} className="mt-3 space-y-3">
                   <p className="text-xs text-muted">Uang diterima atau pembayaran yang mencakup bulan ini.</p>
                   {data.history.length === 0 ? <p className="text-sm text-muted">Belum ada pembayaran tercatat. Gunakan Catat pembayaran saat menerima uang dari warga.</p> : <ul className="divide-y divide-line">{data.history.map((p) => <li key={p.id} className="space-y-2 py-3">
-                    <div className="flex flex-wrap justify-between gap-2"><p className="font-semibold">{label(p.houseId)} <span className="text-xs font-normal text-muted">{PAYMENT_LABEL[p.cadence]}{p.cancelledAt && " · Dibatalkan"}</span></p><p className={cx("font-semibold tabular-nums", !!p.cancelledAt && "text-muted line-through")}>{formatRupiah(p.amount)}</p></div>
+                    <div className="flex flex-wrap justify-between gap-2"><p className="font-semibold">{label(p.houseId)} <span className="text-xs font-normal text-muted">{PAYMENT_LABEL[p.cadence]}{p.cancelledAt && " · Dibatalkan"}</span></p><p className={cx("font-semibold tabular-nums", !!p.cancelledAt && "text-muted line-through")}><NumberTicker value={formatRupiah(p.amount)} /></p></div>
                     <p className="break-words text-xs text-muted">{byId.get(p.houseId)?.ownerName || "Belum ada nama"}</p>
                     <p className="text-xs text-muted">Periode {formatDateShort(p.periodStart)} – {formatDateShort(p.periodEnd)} {p.periodEnd.slice(0, 4)} · diterima {formatDateShort(p.receivedDate)} oleh {p.receivedBy === "treasurer" ? "bendahara" : p.collectorName ?? "petugas"}.</p>
                     {p.allocations && <p className="text-xs text-muted">Hari rapel: {p.allocations.map(([date]) => formatDateShort(date)).join(", ")}.</p>}
@@ -115,6 +116,6 @@ function PaymentLogDialog({ id, onClose }: { id: number | null; onClose: () => v
     const payload = log.payload as { before?: AdminPayment; after?: AdminPayment };
     const action = { create: "Dicatat", update: "Diubah", cancel: "Dibatalkan" }[log.action];
     const coverage = (p: AdminPayment) => p.allocations ? "hari rapel " + p.allocations.map(([date, amount]) => `${date} (${formatRupiah(amount)})`).join(", ") : `${p.periodStart} – ${p.periodEnd}`;
-    return <li key={log.id} className="rounded-xl bg-idle-soft p-3 text-sm"><p className="font-semibold">{action} oleh {log.name ?? "akun yang dihapus"}</p><p className="text-xs text-muted">{formatDateShort(localDate(new Date(log.createdAt)))} · {formatTime(log.createdAt)}</p>{payload.before && <p className="mt-2">Sebelumnya: {formatRupiah(payload.before.amount)}, {coverage(payload.before)}, diterima {payload.before.receivedDate}.</p>}{payload.after && <p className="mt-1">{log.action === "create" ? "Pembayaran" : "Sesudahnya"}: {formatRupiah(payload.after.amount)}, {coverage(payload.after)}, diterima {payload.after.receivedDate}.</p>}</li>;
+    return <li key={log.id} className="rounded-xl bg-idle-soft p-3 text-sm"><p className="font-semibold">{action} oleh {log.name ?? "akun yang dihapus"}</p><p className="text-xs text-muted">{formatDateShort(localDate(new Date(log.createdAt)))} · {formatTime(log.createdAt)}</p>{payload.before && <p className="mt-2">Sebelumnya: <NumberTicker value={formatRupiah(payload.before.amount)} />, {coverage(payload.before)}, diterima {payload.before.receivedDate}.</p>}{payload.after && <p className="mt-1">{log.action === "create" ? "Pembayaran" : "Sesudahnya"}: <NumberTicker value={formatRupiah(payload.after.amount)} />, {coverage(payload.after)}, diterima {payload.after.receivedDate}.</p>}</li>;
   })}</ul>}</QueryState></Dialog>;
 }

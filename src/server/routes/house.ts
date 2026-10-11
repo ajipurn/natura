@@ -3,6 +3,7 @@ import { validator } from "hono/validator";
 import { z } from "zod";
 import { rondaDate } from "@/lib/dates";
 import { scheduleDay } from "@/lib/schedule";
+import { isRecordingTime, recordingHoursLabel } from "@/lib/recording-window";
 import { getSessionUser, requireRonda, requireUser } from "../auth";
 import { canRonda } from "@/lib/permissions";
 import { applyEntries, dutyDays, MAX_AMOUNT } from "../collections";
@@ -27,17 +28,23 @@ export const houseRoutes = new Hono<AppEnv>()
     const house = await getHouseByToken(db, c.req.valid("param").token);
     if (!house) return c.json({ error: "Rumah tidak ditemukan." }, 404);
     const [user, settings, history] = await Promise.all([getSessionUser(c), getSettings(db), getHouseHistory(db, house, 30)]);
-    const tonight = rondaDate(new Date());
+    const now = new Date();
+    const tonight = rondaDate(now);
     const paymentInfo = await getHousePaymentInfo(db, house.id, tonight);
     const hasPaymentPeriod = paymentInfo.periods.some((p) => p.start <= tonight && p.end >= tonight);
     // Rumah periode dikelola otomatis; harian hanya bisa dicatat petugas yang dijadwalkan malam ini.
-    const canRecord = !hasPaymentPeriod && user && canRonda(user.role) ? (await dutyDays(db, user.id)).has(scheduleDay(tonight)) : false;
+    const onDuty = user && canRonda(user.role) ? (await dutyDays(db, user.id)).has(scheduleDay(tonight)) : false;
+    const recordingOpen = isRecordingTime(now, settings);
+    const canRecord = !hasPaymentPeriod && onDuty && recordingOpen;
     return c.json({
       communityName: settings.communityName,
       logoUrl: settings.logoUrl,
       defaultAmount: settings.defaultAmount,
       tonight,
       canRecord,
+      onDuty,
+      recordingOpen,
+      recordingHours: recordingHoursLabel(settings),
       house: {
         block: house.block,
         number: house.number,

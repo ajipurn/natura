@@ -19,6 +19,8 @@ export function PengaturanPage() {
                 communityName={settings.communityName}
                 defaultAmount={settings.defaultAmount}
                 cashPublic={settings.cashPublic}
+                recordingStart={settings.recordingStart}
+                recordingEnd={settings.recordingEnd}
               />
             </div>
           </Card>

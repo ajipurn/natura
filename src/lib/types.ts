@@ -1,4 +1,5 @@
 import type { GeoAnchor } from "./geo";
+import type { RecordingWindow } from "./recording-window";
 import type { GuardColor } from "./guard-color";
 import type { BillingPeriod, PaymentCadence, PaymentCell, PaymentPlanDTO, PeriodPayment } from "./payments";
 
@@ -51,7 +52,7 @@ export type ScheduleDTO = {
 export type RondaSnapshot = {
   date: string;
   serverTime: string;
-  settings: { communityName: string; defaultAmount: number };
+  settings: { communityName: string; defaultAmount: number } & Partial<RecordingWindow>;
   user: { id: number; name: string; role: Role };
   houses: HouseDTO[];
   collections: CollectionDTO[];

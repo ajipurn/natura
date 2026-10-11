@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { usePermission } from "@/client/permissions";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -90,12 +91,12 @@ export function RingkasanPage() {
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <Link to={adminPath("/rekap")} className="flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-3 transition-colors hover:border-primary/40">
                 <Wallet className="size-5 shrink-0 text-primary" aria-hidden />
-                <div className="min-w-0 flex-1"><p className="text-xs text-muted">Pembayaran periode diterima hari ini</p><p className="mt-0.5 text-sm font-semibold tabular-nums">{formatRupiah(d.paymentOverview.receivedToday)}</p></div>
+                <div className="min-w-0 flex-1"><p className="text-xs text-muted">Pembayaran periode diterima hari ini</p><p className="mt-0.5 text-sm font-semibold tabular-nums"><NumberTicker value={formatRupiah(d.paymentOverview.receivedToday)} /></p></div>
                 <ChevronRight className="size-4 text-muted" aria-hidden />
               </Link>
               <Link to={adminPath("/rekap")} className="flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-3 transition-colors hover:border-primary/40">
                 <CalendarClock className="size-5 shrink-0 text-primary" aria-hidden />
-                <div className="min-w-0 flex-1"><p className="text-xs text-muted">Belum bayar periode berjalan</p><p className="mt-0.5 text-sm font-semibold tabular-nums">{d.paymentOverview.unpaidHouses} rumah · {formatRupiah(d.paymentOverview.unpaidAmount)}</p></div>
+                <div className="min-w-0 flex-1"><p className="text-xs text-muted">Belum bayar periode berjalan</p><p className="mt-0.5 text-sm font-semibold tabular-nums">{d.paymentOverview.unpaidHouses} rumah · <NumberTicker value={formatRupiah(d.paymentOverview.unpaidAmount)} /></p></div>
                 <ChevronRight className="size-4 text-muted" aria-hidden />
               </Link>
             </div>
@@ -196,7 +197,7 @@ function StatCard({ label, value, hint, to }: { label: string; value: string; hi
   const body = (
     <>
       <p className="text-sm text-muted">{label}</p>
-      <p className="mt-1 text-2xl font-bold tracking-tight tabular-nums">{value}</p>
+      <p className="mt-1 text-2xl font-bold tracking-tight tabular-nums"><NumberTicker value={value} /></p>
       {hint && <p className="mt-1 text-xs text-muted">{hint}</p>}
     </>
   );

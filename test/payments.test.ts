@@ -15,7 +15,7 @@ import { profileForUser } from "./helpers/residents";
 // Tanggal kalender dan malam ronda harus sama dalam fixture kas; sebelum 06.00 berbeda.
 vi.hoisted(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
-  vi.setSystemTime(new Date("2026-10-07T12:00:00Z"));
+  vi.setSystemTime(new Date("2026-10-07T14:00:00Z"));
 });
 afterAll(() => vi.useRealTimers());
 

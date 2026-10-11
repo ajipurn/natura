@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -15,7 +16,7 @@ import {
   Search,
   Users,
 } from "lucide-react";
-import { useState, type ComponentType } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { ErrorCard, QueryState } from "@/components/query-state";
 import { ScrollArea } from "@/components/scroll-area";
@@ -177,6 +178,32 @@ export function PatrolDetail({
   );
 }
 
+/** Ringkasan malam berjalan: hanya baca dan diperbarui selama halaman terbuka. */
+export function PatrolSummary({ date, intro }: { date: string; intro?: ReactNode }) {
+  const query = useQuery({ ...patrolQuery(date), refetchInterval: 15_000 });
+  return (
+    <QueryState query={query}>
+      {({ houses, collections, settings, paymentPeriods }) => (
+        <NightDetail
+          key={date}
+          date={date}
+          isTonight
+          title="Ronda malam ini"
+          intro={intro}
+          houses={houses}
+          collections={collections}
+          paymentPeriods={paymentPeriods}
+          communityName={settings.communityName}
+          defaultAmount={settings.defaultAmount}
+          canCorrect={false}
+          tab="rumah"
+          logTo=""
+        />
+      )}
+    </QueryState>
+  );
+}
+
 function NightDetail({
   date,
   isTonight,
@@ -189,6 +216,8 @@ function NightDetail({
   log,
   tab,
   logTo,
+  title,
+  intro,
 }: {
   date: string;
   isTonight: boolean;
@@ -201,6 +230,8 @@ function NightDetail({
   log?: NightLogSlot;
   tab: Tab;
   logTo: string;
+  title?: string;
+  intro?: ReactNode;
 }) {
   const [, setParams] = useSearchParams();
   const [filter, setFilter] = useState<Filter>("semua");
@@ -246,25 +277,27 @@ function NightDetail({
 
   return (
     <>
-      <PageTitle title={formatDateLong(date)} />
+      <PageTitle title={title ?? formatDateLong(date)} />
       <header className="mb-4">
         <h1 className="flex flex-wrap items-center gap-x-2 text-2xl font-bold tracking-tight">
-          {formatDateLong(date)}
-          {isTonight && (
+          {title ?? formatDateLong(date)}
+          {isTonight && !title && (
             <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-sm font-semibold text-primary">
               Malam ini
             </span>
           )}
         </h1>
-        <p className="mt-0.5 text-sm text-muted">Jimpitan {communityName}</p>
+        <p className="mt-0.5 text-sm text-muted">{title && `${formatDateLong(date)} · `}Jimpitan {communityName}</p>
       </header>
+
+      {intro && <div className="mb-4">{intro}</div>}
 
       <Card>
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
           <div>
             <p className="text-xs text-muted">Terkumpul</p>
             <p className="text-3xl font-bold tabular-nums">
-              {formatRupiah(summary.total)}
+              <NumberTicker value={formatRupiah(summary.total)} />
             </p>
           </div>
           <dl className="grid grid-cols-3 gap-4 text-center sm:gap-6">
@@ -575,7 +608,7 @@ function Stat({
     <div className="flex flex-col-reverse">
       <dt className="text-xs text-muted">{label}</dt>
       <dd className={cx("text-2xl font-bold tabular-nums", className)}>
-        {value}
+        <NumberTicker value={value} />
       </dd>
     </div>
   );
@@ -611,7 +644,7 @@ function StatusBadge({
         styles,
       )}
     >
-      {label}
+      {status === "filled" && period?.status !== "paid" ? <NumberTicker value={label} /> : label}
     </span>
   );
 }

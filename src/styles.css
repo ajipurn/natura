@@ -4,6 +4,8 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --bg: #f4f6f8;
   --card: #ffffff;
   --fg: #0f172a;
@@ -103,6 +105,16 @@ body {
   background: var(--bg);
   color: var(--fg);
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Nominal tetap sejajar dengan teks di sekitarnya saat Torph membentuk slot digit. */
+.number-ticker-visual[torph-root] {
+  vertical-align: baseline;
+}
+
+/* Navigasi keyboard langsung menandai menu tujuan tanpa gerakan posisi. */
+nav:has(a:focus-visible) .app-menu-indicator {
+  transition: none;
 }
 
 @media print {

@@ -11,9 +11,10 @@ import { houseName } from "./house-name";
 import { guardDaysByUser, listSchedule } from "./schedule";
 import { collectionLogs, collections, duesInvoices, houses, paymentPlans, payments, patrols, residenceMoves, settings, users } from "./schema";
 import { getPaymentData, getPaymentMonth } from "./payments";
+import { DEFAULT_RECORDING_WINDOW } from "@/lib/recording-window";
 import { listResidents } from "./residents";
 
-export const DEFAULT_SETTINGS = { communityName: "Lingkungan Kita", defaultAmount: 500 };
+export const DEFAULT_SETTINGS = { communityName: "Lingkungan Kita", defaultAmount: 500, ...DEFAULT_RECORDING_WINDOW };
 
 /** Kolom untuk `logoUrl`, tanpa memuat gambarnya. */
 export const logoColumns = { logoVersion: settings.logoVersion, hasLogo: sql<boolean>`${settings.logo} is not null` };
@@ -25,11 +26,11 @@ export function logoUrl(row: { logoVersion: number; hasLogo: boolean } | undefin
 
 export async function getSettings(db: Db) {
   const [row] = await db
-    .select({ communityName: settings.communityName, defaultAmount: settings.defaultAmount, ...logoColumns })
+    .select({ communityName: settings.communityName, defaultAmount: settings.defaultAmount, recordingStart: settings.recordingStart, recordingEnd: settings.recordingEnd, ...logoColumns })
     .from(settings)
     .where(eq(settings.id, 1))
     .limit(1);
-  return row ? { communityName: row.communityName, defaultAmount: row.defaultAmount, logoUrl: logoUrl(row) } : { ...DEFAULT_SETTINGS, logoUrl: null };
+  return row ? { communityName: row.communityName, defaultAmount: row.defaultAmount, recordingStart: row.recordingStart, recordingEnd: row.recordingEnd, logoUrl: logoUrl(row) } : { ...DEFAULT_SETTINGS, logoUrl: null };
 }
 
 /** Titik acuan kalibrasi denah ↔ GPS (kosong = belum dikalibrasi). */

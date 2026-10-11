@@ -5,10 +5,11 @@ import { formatTime, rondaDate } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { dayLabel, scheduleDay } from "@/lib/schedule";
 import { CADENCE_LABEL, planAt } from "@/lib/payments";
+import { isRecordingTime, recordingHoursLabel } from "@/lib/recording-window";
 import type { EntryInput, EntryResult } from "@/lib/types";
 import type { SessionUser } from "./auth";
 import { runBatch, type Db, type Executor, type Statement } from "./db";
-import { getHouseIds } from "./queries";
+import { getHouseIds, getSettings } from "./queries";
 import { collectionLogs, collections, paymentPlans, patrols, rondaSchedule, users } from "./schema";
 import { scheduledAccount } from "./schedule";
 
@@ -211,7 +212,7 @@ export async function applyEntries(
   now = new Date(),
 ): Promise<EntryResult[]> {
   if (!canRonda(user.role)) return entries.map(({ clientId }) => ({ clientId, ok: false, error: "Akun Warga tidak memiliki akses ronda." }));
-  const [known, duty, plans] = await Promise.all([getHouseIds(db), dutyDays(db, user.id), db.select().from(paymentPlans)]);
+  const [known, duty, plans, settings] = await Promise.all([getHouseIds(db), dutyDays(db, user.id), db.select().from(paymentPlans), getSettings(db)]);
   const results: EntryResult[] = [];
   const logs: LogWrite[] = [];
   // Per malam + rumah cukup simpan catatan terbaru; yang lebih lama toh akan kalah.
@@ -237,6 +238,8 @@ export async function applyEntries(
       // Hanya yang dijadwalkan jaga malam itu yang boleh scan/catat, admin juga. Admin tetap bisa
       // mengoreksi lewat Riwayat di dashboard (`writeCollections`).
       fail(`Bukan jadwal jagamu: ${dayLabel(scheduleDay(rondaDate(at)))}.`);
+    } else if (!isRecordingTime(at, settings)) {
+      fail(`Pencatatan jimpitan hanya dibuka pukul ${recordingHoursLabel(settings)}.`);
     } else {
       const date = rondaDate(at);
       logs.push({

@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, call } from "@/client/api";
@@ -34,11 +35,11 @@ export function PaymentPlanSection({ houseId }: { houseId: number }) {
       {query.isPending ? <p className="text-sm text-muted">Memuat kesepakatan…</p> : !current ? (
         <p className="text-sm text-muted">Belum ada kesepakatan pembayaran. Rumah ini tetap memakai pencatatan ronda harian.</p>
       ) : (
-        <p className="text-sm">{CADENCE_LABEL[current.cadence]} · {formatRupiah(current.ratePerNight)}/hari</p>
+        <p className="text-sm">{CADENCE_LABEL[current.cadence]} · <NumberTicker value={formatRupiah(current.ratePerNight)} />/hari</p>
       )}
       {(query.data?.plans ?? []).map((p) => (
         <div key={p.id} className="flex items-start justify-between gap-2 text-xs text-muted">
-          <p>Mulai {formatDateShort(p.effectiveFrom)} {p.effectiveFrom.slice(0, 4)}: {CADENCE_LABEL[p.cadence]}, {formatRupiah(p.ratePerNight)}/hari.</p>
+          <p>Mulai {formatDateShort(p.effectiveFrom)} {p.effectiveFrom.slice(0, 4)}: {CADENCE_LABEL[p.cadence]}, <NumberTicker value={formatRupiah(p.ratePerNight)} />/hari.</p>
           {p.effectiveFrom > today && <Button variant="ghost" size="sm" disabled={remove.isPending} onClick={() => remove.mutate(p.id)}>Hapus</Button>}
         </div>
       ))}

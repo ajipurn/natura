@@ -98,6 +98,12 @@ describe("setup & login", () => {
 });
 
 describe("rumah, ronda, riwayat", () => {
+  beforeAll(() => {
+    const date = rondaDate(new Date());
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(`${date}T21:00:00+07:00`));
+  });
+  afterAll(() => vi.useRealTimers());
   it("mendaftarkan semua rumah dari denah sekaligus", async () => {
     const res = await admin.post("/api/admin/rumah/dari-denah");
     expect(res.data.success).toMatch(/^76 rumah didaftarkan/);
@@ -499,7 +505,6 @@ describe("halaman warga", () => {
     vi.setSystemTime(new Date(`${date}T21:00:00+07:00`));
   });
   afterAll(() => vi.useRealTimers());
-
   it("memerlukan login akun, lalu Info warga bisa dibaca petugas biasa", async () => {
     const warga = apiClient(env);
     expect((await warga.get("/api/warga/akses")).data).toMatchObject({ access: false });
@@ -587,6 +592,12 @@ describe("link Google Sheets", () => {
 });
 
 describe("audit catatan", () => {
+  beforeAll(() => {
+    const date = rondaDate(new Date());
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(`${date}T21:00:00+07:00`));
+  });
+  afterAll(() => vi.useRealTimers());
   it("catatan tercatat dengan pencatatnya; petugas di luar jadwal ditolak", async () => {
     const tonight = rondaDate(new Date());
     const day = scheduleDay(tonight);

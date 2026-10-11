@@ -1,4 +1,5 @@
 import { ChevronRight, House, ScanLine } from "lucide-react";
+import { NumberTicker } from "@/components/number-ticker";
 import { Link } from "react-router";
 import { Card, cx } from "@/components/ui";
 import type { Dashboard } from "@/server/dashboard";
@@ -21,7 +22,7 @@ export function TonightCard({ tonight: t, date }: { tonight: Dashboard["tonight"
           <>
             <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs text-muted">
               <span>Status jimpitan · {t.expected} rumah aktif</span>
-              <span className="tabular-nums">{t.checked}/{t.expected} berstatus</span>
+              <span className="tabular-nums"><NumberTicker value={t.checked} />/<NumberTicker value={t.expected} /> berstatus</span>
             </div>
             <div
               className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-idle-soft"
@@ -49,7 +50,7 @@ export function TonightCard({ tonight: t, date }: { tonight: Dashboard["tonight"
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                 <h3 className="text-sm font-medium">Pemeriksaan harian</h3>
-                {t.daily.expected > 0 && <span className="text-sm font-semibold tabular-nums">{t.daily.checked}/{t.daily.expected} dicek</span>}
+                {t.daily.expected > 0 && <span className="text-sm font-semibold tabular-nums"><NumberTicker value={t.daily.checked} />/<NumberTicker value={t.daily.expected} /> dicek</span>}
               </div>
               <p className="mt-0.5 text-xs text-muted">{!t.daily.expected ? "Tidak ada rumah harian; tidak perlu scan." : t.daily.unchecked ? `${t.daily.unchecked} rumah harian belum dicek.` : "Semua rumah harian sudah dicek."}</p>
             </div>
@@ -73,7 +74,7 @@ function StatusCount({ label, count, dot, color }: { label: string; count: numbe
   return (
     <div className="rounded-xl bg-idle-soft/50 px-3 py-2.5">
       <dt className="flex min-h-8 items-start gap-1.5 text-xs text-muted sm:min-h-0 sm:items-center"><span className={cx("mt-1 size-2 shrink-0 rounded-full sm:mt-0", dot)} aria-hidden />{label}</dt>
-      <dd className={cx("mt-1 text-2xl font-bold tabular-nums", count ? color : "text-muted")}>{count}</dd>
+      <dd className={cx("mt-1 text-2xl font-bold tabular-nums", count ? color : "text-muted")}><NumberTicker value={count} /></dd>
     </div>
   );
 }

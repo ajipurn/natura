@@ -12,6 +12,7 @@ import { GUARD_COLORS } from "@/lib/guard-color";
 import { parseSchedule } from "@/lib/schedule";
 import { matchPlan } from "@/lib/site-plan";
 import { SITE_PLAN } from "@/site-plan";
+import { DEFAULT_RECORDING_WINDOW, RECORDING_TIME_PATTERN } from "@/lib/recording-window";
 import { requireDashboardResource } from "../auth";
 import { ROLES, can, canRonda } from "@/lib/permissions";
 import { MAX_AMOUNT, writeCollections } from "../collections";
@@ -90,7 +91,13 @@ const settingsSchema = z.object({
   communityName: trimmed(80, "Isi nama lingkungan (maks. 80 karakter).").min(1, "Isi nama lingkungan (maks. 80 karakter)."),
   defaultAmount: z.number("Nominal jimpitan tidak valid.").int().positive("Nominal jimpitan tidak valid.").max(MAX_AMOUNT, "Nominal jimpitan tidak valid."),
   cashPublic: z.boolean().optional(),
-});
+  recordingStart: z.string().regex(RECORDING_TIME_PATTERN, "Jam mulai tidak valid.").optional(),
+  recordingEnd: z.string().regex(RECORDING_TIME_PATTERN, "Jam selesai tidak valid.").optional(),
+}).refine((v) =>
+  (v.recordingStart === undefined && v.recordingEnd === undefined) ||
+  (v.recordingStart !== undefined && v.recordingEnd !== undefined && v.recordingStart !== v.recordingEnd),
+  "Isi jam mulai dan selesai yang berbeda.",
+);
 
 const cashAmount = (message: string) => z.number(message).int(message).max(MAX_CASH, "Jumlahnya terlalu besar.");
 const cashNote = z.string().trim().max(200, "Catatan maks. 200 karakter.").optional().transform((v) => v || null);
@@ -399,6 +406,8 @@ export const adminRoutes = new Hono<AppEnv>()
       .select({
         communityName: settings.communityName,
         defaultAmount: settings.defaultAmount,
+        recordingStart: settings.recordingStart,
+        recordingEnd: settings.recordingEnd,
         wargaCode: settings.wargaCode,
         exportToken: settings.exportToken,
         cashPublic: settings.cashPublic,
@@ -410,6 +419,8 @@ export const adminRoutes = new Hono<AppEnv>()
     return c.json({
       communityName: row?.communityName ?? "",
       defaultAmount: row?.defaultAmount ?? 500,
+      recordingStart: row?.recordingStart ?? DEFAULT_RECORDING_WINDOW.recordingStart,
+      recordingEnd: row?.recordingEnd ?? DEFAULT_RECORDING_WINDOW.recordingEnd,
       wargaCode: can(c.var.user.role, "info", true) ? row?.wargaCode ?? null : null,
       exportToken: can(c.var.user.role, "settings", true) ? row?.exportToken ?? null : null,
       cashPublic: row?.cashPublic ?? true,

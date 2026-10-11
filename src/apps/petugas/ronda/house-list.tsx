@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { CheckCircle2, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { ScrollArea } from "@/components/scroll-area";
@@ -190,7 +191,7 @@ function HouseTile({
     >
       {houseLabel(house)}
       {state === "filled" && collection && recordedFilled && (
-        <span className="mt-1 text-[10px] font-semibold">{formatAmountShort(collection.amount)}</span>
+        <span className="mt-1 text-[10px] font-semibold"><NumberTicker value={formatAmountShort(collection.amount)} /></span>
       )}
       {paymentPeriod && !vacant && <span className="mt-1 text-[10px] font-semibold">{paid ? "sudah bayar" : "belum bayar"}</span>}
       {state === "empty" && !paymentPeriod && <span className="mt-1 text-[10px] font-semibold">kosong</span>}

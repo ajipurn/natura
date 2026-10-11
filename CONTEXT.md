@@ -22,7 +22,7 @@ Warga tertentu yang ditugaskan pada suatu malam. Rumahnya adalah penunjuk alamat
 Hak akun untuk menggunakan fitur ronda dan mencatat jimpitan ketika mendapat tugas. Peran ini berbeda dari penugasan malam jaga.
 
 **Peran Warga**:
-Hak akun untuk membaca informasi lingkungan tanpa fitur ronda dan pencatatan jimpitan.
+Hak akun untuk membaca informasi lingkungan dan ringkasan ronda, tanpa penugasan atau pencatatan jimpitan.
 
 **Penugasan ronda**:
 Hubungan warga dengan malam jaganya, yang tetap melekat pada warga saat dibuatkan akun atau pindah rumah. Warga tanpa akun dapat didata dalam jadwal; akses pencatatan membutuhkan akun dengan hak ronda.

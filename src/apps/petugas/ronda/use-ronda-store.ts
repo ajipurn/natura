@@ -3,6 +3,9 @@ import { api } from "@/client/api";
 import { rondaDate } from "@/lib/dates";
 import { houseLabel } from "@/lib/houses";
 import { planAt, rondaPaymentPeriods } from "@/lib/payments";
+import { canRonda } from "@/lib/permissions";
+import { isRecordingTime } from "@/lib/recording-window";
+import { scheduleDay } from "@/lib/schedule";
 import type {
   CollectionDTO,
   CollectionMethod,
@@ -78,7 +81,7 @@ function newClientId(): string {
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function useRondaStore() {
+export function useRondaStoreState(userId: number, enabled: boolean) {
   const [snapshot, setSnapshot] = useState<StoredSnapshot | null>(null);
   const [pending, setPendingState] = useState<PendingEntry[]>([]);
   const [status, setStatus] = useState<SyncStatus>("idle");
@@ -89,6 +92,7 @@ export function useRondaStore() {
   const pendingRef = useRef<PendingEntry[]>([]);
   const snapshotRef = useRef<StoredSnapshot | null>(null);
   const syncingRef = useRef(false);
+  const initializedRef = useRef(false);
   /** Ada permintaan sinkron baru saat sinkron sebelumnya masih berjalan. */
   const resyncRef = useRef(false);
 
@@ -118,6 +122,7 @@ export function useRondaStore() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as RondaSnapshot;
       saveSnapshot({ ...data, clockOffset: new Date(data.serverTime).getTime() - Date.now() });
+      setNow(Date.now());
       setStatus((s) => (s === "syncing" ? s : "idle"));
     } catch {
       setStatus("offline");
@@ -187,6 +192,7 @@ export function useRondaStore() {
       return;
     }
     syncingRef.current = true;
+    setStatus("syncing");
     try {
       do {
         resyncRef.current = false;
@@ -195,24 +201,33 @@ export function useRondaStore() {
       } while (resyncRef.current);
     } finally {
       syncingRef.current = false;
+      setStatus((s) => s === "syncing" ? "idle" : s);
     }
   }, [pushPending, refresh]);
 
   // Muat data tersimpan dulu (bisa offline), lalu ambil yang terbaru dari server.
   useEffect(() => {
-    const storedSnapshot = readJson<StoredSnapshot>(SNAPSHOT_KEY);
-    const storedPending = readJson<PendingEntry[]>(PENDING_KEY) ?? [];
-    snapshotRef.current = storedSnapshot;
-    pendingRef.current = storedPending;
+    if (!enabled) return;
     /* eslint-disable react-hooks/set-state-in-effect -- localStorage hanya bisa dibaca setelah mount */
-    setSnapshot(storedSnapshot);
-    setPendingState(storedPending);
-    setLoaded(true);
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      const cached = readJson<StoredSnapshot>(SNAPSHOT_KEY);
+      const storedSnapshot = cached?.user.id === userId ? cached : null;
+      const storedPending = storedSnapshot ? readJson<PendingEntry[]>(PENDING_KEY) ?? [] : [];
+      snapshotRef.current = storedSnapshot;
+      pendingRef.current = storedPending;
+      setSnapshot(storedSnapshot);
+      setPendingState(storedPending);
+      setLoaded(true);
+    }
+    setNow(Date.now());
     /* eslint-enable react-hooks/set-state-in-effect */
     sync();
-  }, [sync]);
+  }, [sync, enabled, userId]);
 
   useEffect(() => {
+    // Setelah data pertama dimuat, antrean tetap disinkronkan meskipun scanner ditutup.
+    if (!loaded) return;
     const onOnline = () => sync();
     const onVisible = () => {
       if (document.visibilityState === "visible") sync();
@@ -228,10 +243,16 @@ export function useRondaStore() {
       window.removeEventListener("online", onOnline);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [sync]);
+  }, [sync, loaded]);
 
   /** Malam ronda yang sedang berjalan menurut jam server. */
   const date = useMemo(() => rondaDate(new Date(now + clockOffset)), [now, clockOffset]);
+  const onDuty = Boolean(
+    snapshot && snapshot.user.id === userId && canRonda(snapshot.user.role) &&
+    snapshot.schedule?.some((e) => e.userId === userId && e.day === scheduleDay(date)),
+  );
+  const recordingOpen = isRecordingTime(new Date(now + clockOffset), snapshot?.settings);
+  const canRecord = onDuty && recordingOpen && status !== "auth";
 
   const collections = useMemo(() => {
     const map = new Map<number, MergedCollection>();
@@ -263,8 +284,14 @@ export function useRondaStore() {
     (house: HouseDTO, entryStatus: CollectionStatus | "none", amount: number, method: CollectionMethod) => {
       const at = serverNow();
       const saved = snapshotRef.current;
-      if (saved && (planAt(saved.paymentPlans ?? [], house.id, rondaDate(at))?.cadence ?? "daily") !== "daily") return;
-      if (saved && rondaPaymentPeriods(saved, rondaDate(at)).some((p) => p.houseId === house.id)) return;
+      setNow(Date.now());
+      if (
+        !saved || saved.user.id !== userId || !canRonda(saved.user.role) || status === "auth" ||
+        !isRecordingTime(at, saved.settings) ||
+        !saved.schedule?.some((e) => e.userId === userId && e.day === scheduleDay(rondaDate(at)))
+      ) return false;
+      if ((planAt(saved.paymentPlans ?? [], house.id, rondaDate(at))?.cadence ?? "daily") !== "daily") return false;
+      if (rondaPaymentPeriods(saved, rondaDate(at)).some((p) => p.houseId === house.id)) return false;
       const entry: PendingEntry = {
         clientId: newClientId(),
         houseId: house.id,
@@ -277,10 +304,10 @@ export function useRondaStore() {
       };
       // Catatan terbaru untuk rumah & malam yang sama menggantikan yang lama di antrean.
       setPending((prev) => [...prev.filter((p) => !(p.houseId === house.id && p.date === entry.date)), entry]);
-      setNow(Date.now());
       sync();
+      return true;
     },
-    [serverNow, setPending, sync],
+    [serverNow, setPending, sync, userId, status],
   );
 
   const dismissRejections = useCallback(() => setRejections([]), []);
@@ -289,6 +316,9 @@ export function useRondaStore() {
     loaded,
     snapshot,
     date,
+    onDuty,
+    recordingOpen,
+    canRecord,
     collections,
     pendingCount: pending.length,
     status,

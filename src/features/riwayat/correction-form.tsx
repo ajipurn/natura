@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { useMutation } from "@tanstack/react-query";
@@ -245,7 +246,7 @@ export function AmountChoice({ value, onChange, defaultAmount }: { value: string
             Number(value) === n ? "border-primary bg-primary/10 text-primary" : "border-line text-muted",
           )}
         >
-          {formatRupiah(n)}
+          <NumberTicker value={formatRupiah(n)} />
         </Button>
       ))}
     </div>

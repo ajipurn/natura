@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { rondaDate } from "@/lib/dates";
 import { scheduleDay } from "@/lib/schedule";
 import { applyEntries } from "@/server/collections";
@@ -26,6 +26,8 @@ const entry = (id: string, house = houseId) => ({
 });
 
 beforeAll(async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(`${today}T21:00:00+07:00`));
   ({ env } = await createTestEnv());
   admin = apiClient(env);
   expect((await admin.post("/api/auth/setup", {
@@ -41,6 +43,7 @@ beforeAll(async () => {
   residentId = Number((await admin.post("/api/admin/warga", { name: "Ipung", houseId, phone: "081234567890" })).data.id);
   await env.db.insert(rondaSchedule).values({ dayOfWeek: tonight, position: 0, houseId });
 });
+afterAll(() => vi.useRealTimers());
 
 describe("akun Warga tanpa tugas ronda", () => {
   it("membuat akun Warga memakai profil yang sama tanpa mengambil jadwal rumah", async () => {
@@ -64,7 +67,7 @@ describe("akun Warga tanpa tugas ronda", () => {
     expect((await warga.post("/api/auth/login", { userId: wargaId, pin: "5678" })).status).toBe(200);
   });
 
-  it("menolak URL/API ronda, antrean offline, QR, dan permintaan jaga walaupun masih ada slot lama", async () => {
+  it("menolak API pencatatan ronda, antrean offline, QR, dan permintaan jaga walaupun masih ada slot lama", async () => {
     const [legacySlot] = await env.db.insert(rondaSchedule).values({ dayOfWeek: tonight, position: 1, residentId }).returning({ id: rondaSchedule.id });
     expect((await warga.get("/api/ronda")).status).toBe(403);
     expect((await warga.post("/api/ronda/catatan", { entries: [entry("warga-offline")] })).status).toBe(403);

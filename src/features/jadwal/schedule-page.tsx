@@ -55,7 +55,7 @@ export function SchedulePage({
 export function ScheduleList({ schedule, tonight, currentUserId }: { schedule: ScheduleDTO[]; tonight: number; currentUserId?: number }) {
   const days = DAY_NAMES.map((_, i) => (tonight + i) % 7);
   return (
-    <div className="grid gap-3 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
       {days.map((day) => (
         <DayCard key={day} day={day} tonight={day === tonight} entries={schedule.filter((entry) => entry.day === day)} currentUserId={currentUserId} />
       ))}
@@ -77,18 +77,18 @@ function DayCard({
   return (
     <section
       aria-label={dayLabel(day)}
-      className={cx("rounded-2xl border bg-card p-4", tonight ? "border-primary ring-2 ring-primary/30" : "border-line")}
+      className={cx("min-w-0 rounded-2xl border bg-card p-4", tonight ? "border-primary ring-2 ring-primary/30" : "border-line")}
     >
-      <h2 className="flex items-baseline justify-between gap-2">
-        <span className="font-semibold">
-          {dayLabel(day)}
+      <h2 className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+        <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 font-semibold">
+          <span>{dayLabel(day)}</span>
           {tonight && (
-            <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-fg">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-fg">
               Malam ini
             </span>
           )}
         </span>
-        <span className="text-sm text-muted">{entries.length} orang</span>
+        <span className="shrink-0 whitespace-nowrap text-sm text-muted">{entries.length} orang</span>
       </h2>
       {entries.length === 0 ? (
         <p className="mt-2 text-sm text-muted">Tidak ada jadwal.</p>

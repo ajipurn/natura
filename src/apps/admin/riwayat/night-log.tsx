@@ -1,3 +1,4 @@
+import { NumberTicker } from "@/components/number-ticker";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, ChevronRight, CloudOff, QrCode, ShieldCheck, Users } from "lucide-react";
 import { Fragment, useState } from "react";
@@ -233,7 +234,7 @@ export function AuditRedirect() {
 function StatusText({ status, amount, className }: { status: "filled" | "empty" | "none"; amount: number; className?: string }) {
   return (
     <span className={cx("font-semibold", status === "filled" ? "text-filled" : status === "empty" ? "text-empty" : "text-muted", className)}>
-      {status === "filled" ? formatRupiah(amount) : status === "empty" ? "Kosong" : "Dihapus"}
+      {status === "filled" ? <NumberTicker value={formatRupiah(amount)} /> : status === "empty" ? "Kosong" : "Dihapus"}
     </span>
   );
 }

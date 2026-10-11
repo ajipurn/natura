@@ -14,6 +14,8 @@ function saveSettingsAction(_prev: FormState, formData: FormData) {
             communityName: str(formData, "communityName"),
             defaultAmount: int(formData, "defaultAmount"),
             cashPublic: checked(formData, "cashPublic"),
+            recordingStart: str(formData, "recordingStart"),
+            recordingEnd: str(formData, "recordingEnd"),
           },
         }),
       ),
@@ -26,10 +28,14 @@ export function SettingsForm({
   communityName,
   defaultAmount,
   cashPublic,
+  recordingStart,
+  recordingEnd,
 }: {
   communityName: string;
   defaultAmount: number;
   cashPublic: boolean;
+  recordingStart: string;
+  recordingEnd: string;
 }) {
   const [state, formAction] = useActionState(saveSettingsAction, undefined);
   return (
@@ -40,6 +46,15 @@ export function SettingsForm({
       <Field label="Nominal jimpitan per rumah (Rp)" hint="Nilai awal saat petugas menekan “Ada”.">
         <Input name="defaultAmount" required inputMode="numeric" defaultValue={defaultAmount} />
       </Field>
+      <fieldset className="space-y-2">
+        <legend className="font-semibold">Jam pencatatan jimpitan</legend>
+        <p className="text-sm text-muted">Hanya petugas yang dijadwalkan boleh mencatat pada jam ini. Di luar jam tersebut, scan QR membuka informasi rumah.</p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Mulai (WIB)"><Input type="time" name="recordingStart" required defaultValue={recordingStart} /></Field>
+          <Field label="Selesai (WIB)"><Input type="time" name="recordingEnd" required defaultValue={recordingEnd} /></Field>
+        </div>
+        <p className="text-xs text-muted">00.00 berarti tengah malam. Jam selesai boleh melewati tengah malam.</p>
+      </fieldset>
       <SwitchField
         name="cashPublic"
         defaultChecked={cashPublic}
