@@ -54,6 +54,8 @@ function cameraErrorMessage(err: unknown): string {
 }
 
 const SCAN_INTERVAL_MS = 120;
+const TORCH_CHECK_INTERVAL_MS = 250;
+const TORCH_CHECK_ATTEMPTS = 20;
 /**
  * QR yang sama diabaikan selama masih terlihat kamera (dan sampai 2,5 detik setelahnya),
  * supaya rumah yang baru dicatat tidak langsung terbuka lagi.
@@ -86,6 +88,8 @@ export function QrScanner({
   const [starting, setStarting] = useState(true);
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
+  const [torchPending, setTorchPending] = useState(false);
+  const [torchError, setTorchError] = useState<string | null>(null);
 
   useEffect(() => {
     pausedRef.current = paused;
@@ -96,6 +100,7 @@ export function QrScanner({
     let stopped = false;
     let stream: MediaStream | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let torchTimer: ReturnType<typeof setTimeout> | undefined;
 
     async function start() {
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -123,10 +128,27 @@ export function QrScanner({
       const video = videoRef.current!;
       video.srcObject = stream;
       await video.play().catch(() => {});
+      if (stopped) return;
       const track = stream.getVideoTracks()[0];
       trackRef.current = track;
-      const caps = track.getCapabilities?.() as (MediaTrackCapabilities & { torch?: boolean }) | undefined;
-      setTorchSupported(Boolean(caps?.torch));
+      function checkTorchSupport(attemptsLeft: number) {
+        if (stopped || !track.getCapabilities) return;
+        try {
+          const caps = track.getCapabilities() as MediaTrackCapabilities & { torch?: boolean | boolean[] };
+          const supported = Array.isArray(caps.torch) ? caps.torch.includes(true) : caps.torch === true;
+          if (supported) {
+            setTorchSupported(true);
+            return;
+          }
+        } catch {
+          // Kemampuan kamera bisa belum siap walaupun video sudah mulai diputar.
+        }
+        // Chrome dapat melaporkan torch setelah kamera benar-benar mengirim gambar.
+        if (attemptsLeft > 1) {
+          torchTimer = setTimeout(() => checkTorchSupport(attemptsLeft - 1), TORCH_CHECK_INTERVAL_MS);
+        }
+      }
+      checkTorchSupport(TORCH_CHECK_ATTEMPTS);
       setStarting(false);
 
       const detect = await createDetector();
@@ -160,6 +182,7 @@ export function QrScanner({
     return () => {
       stopped = true;
       clearTimeout(timer);
+      clearTimeout(torchTimer);
       stream?.getTracks().forEach((t) => t.stop());
       trackRef.current = null;
     };
@@ -167,13 +190,19 @@ export function QrScanner({
 
   async function toggleTorch() {
     const track = trackRef.current;
-    if (!track) return;
+    if (!track || torchPending) return;
     const next = !torchOn;
+    setTorchPending(true);
+    setTorchError(null);
     try {
       await track.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] });
-      setTorchOn(next);
+      if (trackRef.current === track) setTorchOn(next);
     } catch {
-      setTorchSupported(false);
+      if (trackRef.current === track) {
+        setTorchError(next ? "Senter belum bisa dinyalakan. Coba lagi." : "Senter belum bisa dimatikan. Coba lagi.");
+      }
+    } finally {
+      if (trackRef.current === track) setTorchPending(false);
     }
   }
 
@@ -232,7 +261,7 @@ export function QrScanner({
           error && "invisible",
         )}
       >
-        <p className="text-sm text-white/80">Arahkan kamera ke stiker QR di wadah jimpitan.</p>
+        <p role="status" className="text-sm text-white/80">{torchError ?? "Arahkan kamera ke stiker QR di wadah jimpitan."}</p>
         {onManual && (
           <Button
             variant="plain"
@@ -246,6 +275,7 @@ export function QrScanner({
           <Button
             variant="plain"
             onClick={toggleTorch}
+            disabled={torchPending}
             className={cx(
               "flex size-12 shrink-0 items-center justify-center rounded-full",
               torchOn ? "bg-yellow-300 text-black" : "bg-white/15",
