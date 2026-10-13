@@ -119,7 +119,7 @@ export const rondaRoutes = new Hono<AppEnv>()
     const month = c.req.valid("query").bulan;
     const db = c.var.db;
     const [recap, settings] = await Promise.all([getMonthRecap(db, month), getSettings(db)]);
-    return c.json({ month, communityName: settings.communityName, defaultAmount: settings.defaultAmount, ...recap });
+    return c.json({ month, communityName: settings.communityName, defaultAmount: settings.defaultAmount, logoUrl: settings.logoUrl, ...recap });
   });
 
 export { monthQuery };

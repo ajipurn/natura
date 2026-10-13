@@ -1,9 +1,10 @@
-import { daysInMonth, formatDateLong, formatDateShort, formatMonth, localDate } from "./dates";
+import { APP_TIMEZONE, daysInMonth, formatDateLong, formatDateShort, formatMonth, localDate } from "./dates";
 import { formatRupiah } from "./format";
 import { compareHouses, houseLabel } from "./houses";
 import { monthHouseStatusLabel, summarizeMonth } from "./month-summary";
 import { PAYMENT_LABEL } from "./payments";
 import type { MonthRecap } from "./types";
+import { mergeReportRecaps, reportMonths, reportPeriodLabel } from "./recap-report-period";
 
 export type ReportTable = {
   title: string;
@@ -15,6 +16,20 @@ export type ReportTable = {
   pageBreak?: boolean;
 };
 
+export type ReportImage = { dataUrl: string; width: number; height: number };
+export type ReportDetails = {
+  address?: string;
+  place?: string;
+  chairName?: string;
+  logo?: ReportImage;
+  stamp?: ReportImage;
+};
+export const DEFAULT_REPORT_DETAILS = {
+  address: "Karangsari, Kebumen",
+  place: "Kebumen",
+  chairName: "April Bambang Sumariawan",
+};
+
 export type RecapReport = {
   title: string;
   communityName: string;
@@ -23,12 +38,53 @@ export type RecapReport = {
   generatedLabel: string;
   introduction: string;
   note: string;
+  letterhead: { organization: string; address: string; logo?: ReportImage };
+  approval: { dateLabel: string; chairName: string; stamp?: ReportImage };
   metrics: { label: string; value: string }[];
   tables: ReportTable[];
+  monthlySummary?: ReportTable;
 };
 
+/** Ringkasan ditandatangani di depan; rincian tetap lengkap sebagai lampiran. */
+export function reportAttachments(report: RecapReport): ReportTable[] {
+  const [, blocks, nights, houses, ...payments] = report.tables;
+  return [...(report.monthlySummary ? [{ ...report.monthlySummary, pageBreak: true }] : []), { ...nights, pageBreak: !report.monthlySummary && nights.pageBreak }, { ...blocks, pageBreak: true }, { ...houses, pageBreak: blocks.rows.length === 0 }, ...payments.map((table) => ({ ...table, pageBreak: true }))]
+    .filter((table) => table.rows.length > 0);
+}
+
+export function reportIncomeTable(report: RecapReport): ReportTable {
+  const source = report.tables[0];
+  return {
+    ...source, title: "Rekap penerimaan",
+    columns: [{ label: "No", width: 8 }, { label: "Uraian penerimaan", width: 58 }, { label: "Jumlah", width: 34, numeric: true }],
+    rows: source.rows.map((row, index) => [String(index + 1), ...row]),
+    total: source.total ? ["", ...source.total] : undefined,
+  };
+}
+
 /** Satu sumber angka untuk Word dan PDF, sama dengan rekap dan tanpa filter tampilan. */
-export function buildRecapReport(recap: MonthRecap, communityName: string, month: string, generatedAt = new Date()): RecapReport {
+export function buildRecapReport(recap: MonthRecap, communityName: string, month: string, generatedAt = new Date(), details: ReportDetails = {}): RecapReport {
+  reportMonths(month, month);
+  return buildReport(recap, communityName, month, month, generatedAt, details);
+}
+
+export function buildRecapPeriodReport(recaps: MonthRecap[], communityName: string, from: string, to: string, generatedAt = new Date(), details: ReportDetails = {}): RecapReport {
+  const report = buildReport(mergeReportRecaps(recaps, from, to), communityName, from, to, generatedAt, details);
+  if (from !== to) {
+    const totals = recaps.map((recap) => summarizeMonth(mergeReportRecaps([recap], recap.month!, recap.month!)));
+    const sum = (field: "collectedTotal" | "monthlyTotal" | "weeklyTotal" | "rapelTotal", i: number) => totals[i].rows.reduce((total, row) => total + row[field], 0);
+    const all = (field: "collectedTotal" | "monthlyTotal" | "weeklyTotal" | "rapelTotal") => totals.reduce((total, _, i) => total + sum(field, i), 0);
+    report.monthlySummary = {
+      title: "Ringkasan per bulan", columns: [{ label: "Bulan", width: 28 }, { label: "Hasil ronda", width: 18, numeric: true }, { label: "Pembayaran periode", width: 18, numeric: true }, { label: "Rapel", width: 16, numeric: true }, { label: "Total", width: 20, numeric: true }],
+      rows: recaps.map((recap, i) => [formatMonth(recap.month!), formatRupiah(sum("collectedTotal", i)), formatRupiah(sum("monthlyTotal", i) + sum("weeklyTotal", i)), formatRupiah(sum("rapelTotal", i)), formatRupiah(totals[i].grandTotal)]),
+      total: ["Total", formatRupiah(all("collectedTotal")), formatRupiah(all("monthlyTotal") + all("weeklyTotal")), formatRupiah(all("rapelTotal")), formatRupiah(totals.reduce((total, value) => total + value.grandTotal, 0))],
+      empty: "Belum ada jimpitan pada periode ini.",
+    };
+  }
+  return report;
+}
+
+function buildReport(recap: MonthRecap, communityName: string, month: string, endMonth: string, generatedAt: Date, details: ReportDetails): RecapReport {
   if (recap.month && recap.month !== month) throw new Error("Data rekap belum sesuai bulan laporan. Tunggu sampai bulan yang dipilih selesai dimuat.");
   const { rows, dateTotals, grandTotal } = summarizeMonth(recap);
   const sorted = [...rows].sort((a, b) => compareHouses(a.house, b.house));
@@ -36,7 +92,10 @@ export function buildRecapReport(recap: MonthRecap, communityName: string, month
   const monthly = rows.reduce((sum, r) => sum + r.monthlyTotal, 0);
   const weekly = rows.reduce((sum, r) => sum + r.weeklyTotal, 0);
   const rapel = rows.reduce((sum, r) => sum + r.rapelTotal, 0);
-  const days = daysInMonth(month);
+  const days = daysInMonth(endMonth);
+  const periodLabel = reportPeriodLabel(month, endMonth);
+  const crossYear = month.slice(0, 4) !== endMonth.slice(0, 4);
+  const dateLabel = (date: string) => `${formatDateShort(date)}${crossYear ? ` ${date.slice(0, 4)}` : ""}`;
   const blocks = [...new Set(sorted.map((r) => r.house.block))];
   const sources = [["Hasil ronda", formatRupiah(collected)], ["Pembayaran bulanan", formatRupiah(monthly)], ["Rapel harian", formatRupiah(rapel)]];
   if (weekly > 0) sources.push(["Pembayaran mingguan lama", formatRupiah(weekly)]);
@@ -63,7 +122,7 @@ export function buildRecapReport(recap: MonthRecap, communityName: string, month
       title: "Hasil ronda per malam", description: "Nominal berasal dari uang yang diambil saat ronda. Pembayaran bulanan dan rapel disajikan terpisah pada ringkasan sumber jimpitan.", pageBreak: true,
       columns: [{ label: "Malam ronda", width: 32 }, { label: "Ada", width: 12, numeric: true }, { label: "Kosong", width: 14, numeric: true }, { label: "Belum dicek", width: 18, numeric: true }, { label: "Jumlah", width: 24, numeric: true }],
       rows: recap.dates.map((date, i) => [
-        formatDateShort(date), String(rows.filter((r) => r.cells[i]?.status === "filled").length),
+        dateLabel(date), String(rows.filter((r) => r.cells[i]?.status === "filled").length),
         String(rows.filter((r) => r.house.status === "active" && r.cells[i]?.status === "empty" && !r.nights[i].period && !r.nights[i].rapel).length),
         String(rows.filter((r) => r.house.status === "active" && !r.nights[i].cell && !r.nights[i].period).length), formatRupiah(dateTotals[i]),
       ]), total: ["Total hasil ronda", "", "", "", formatRupiah(collected)], empty: "Belum ada ronda tercatat untuk bulan ini.",
@@ -77,18 +136,27 @@ export function buildRecapReport(recap: MonthRecap, communityName: string, month
     },
   ];
   const bills = recap.paymentPeriods ?? [];
+  const place = (details.place ?? DEFAULT_REPORT_DETAILS.place).trim();
   if (bills.length) tables.push({
     title: "Status pembayaran periode",
     description: "Periode dan nominal tagihan ditampilkan utuh. Periode yang melintasi bulan dapat mencakup hari di luar bulan laporan. Sisa di sini hanya tagihan pembayaran periode, bukan hari kosong harian.",
     columns: [{ label: "Rumah dan warga", width: 25 }, { label: "Periode", width: 25 }, { label: "Tagihan", width: 17, numeric: true }, { label: "Terbayar", width: 17, numeric: true }, { label: "Sisa", width: 16, numeric: true }],
-    rows: bills.map((p) => [houseName(p.houseId), `${PAYMENT_LABEL[p.cadence]}\n${formatDateShort(p.start)} - ${formatDateShort(p.end)}\n${p.status === "paid" ? "Lunas" : p.paid > 0 ? "Dibayar sebagian" : "Belum bayar"}`, formatRupiah(p.expected), formatRupiah(p.paid), formatRupiah(p.remaining)]),
+    rows: bills.map((p) => [houseName(p.houseId), `${PAYMENT_LABEL[p.cadence]}\n${dateLabel(p.start)} - ${dateLabel(p.end)}\n${p.status === "paid" ? "Lunas" : p.paid > 0 ? "Dibayar sebagian" : "Belum bayar"}`, formatRupiah(p.expected), formatRupiah(p.paid), formatRupiah(p.remaining)]),
     empty: "Belum ada tagihan pembayaran periode.",
   });
   return {
-    title: "Laporan bulanan jimpitan", communityName, month, monthLabel: formatMonth(month),
+    title: month === endMonth ? "Laporan bulanan jimpitan" : "Laporan jimpitan", communityName, month, monthLabel: periodLabel,
     generatedLabel: `Dibuat ${formatDateLong(localDate(generatedAt))}`,
-    introduction: `Jimpitan untuk ${formatMonth(month)} tercatat sebesar ${formatRupiah(grandTotal)} dari ${recap.dates.length} malam ronda dan pembayaran yang dialokasikan ke bulan ini. Laporan mencakup seluruh ${rows.length} rumah terdaftar.`,
-    note: "Total mengikuti periode yang dibayar, bukan tanggal uang diterima atau disetor. Pembayaran periode dihitung satu kali; status otomatis tidak menambah uang baru. Laporan ini merupakan rekap jimpitan, bukan saldo kas.",
-    metrics: [{ label: "Periode laporan", value: `${formatDateShort(days[0])} - ${formatDateShort(days.at(-1)!)}` }, { label: "Total jimpitan", value: formatRupiah(grandTotal) }, { label: "Malam ronda tercatat", value: String(recap.dates.length) }, { label: "Rumah terdaftar", value: String(rows.length) }], tables,
+    introduction: `Berikut kami sampaikan laporan penerimaan jimpitan ${communityName} untuk periode ${periodLabel}. Laporan ini disusun berdasarkan catatan ronda dan pembayaran warga yang dialokasikan pada periode tersebut.`,
+    note: "Penerimaan disajikan sesuai periode pembayaran. Laporan ini mencakup jimpitan dan tidak mencerminkan saldo kas paguyuban.",
+    letterhead: {
+      organization: /^paguyuban\b/i.test(communityName) ? communityName : `Paguyuban ${communityName}`,
+      address: (details.address ?? DEFAULT_REPORT_DETAILS.address).trim(), logo: details.logo,
+    },
+    approval: {
+      dateLabel: `${place ? `${place}, ` : ""}${new Intl.DateTimeFormat("id-ID", { timeZone: APP_TIMEZONE, day: "numeric", month: "long", year: "numeric" }).format(generatedAt)}`,
+      chairName: (details.chairName ?? DEFAULT_REPORT_DETAILS.chairName).trim(), stamp: details.stamp,
+    },
+    metrics: [{ label: "Periode laporan", value: month === endMonth ? `1–${days.length} ${formatMonth(month)}` : `1 ${formatMonth(month)} - ${days.length} ${formatMonth(endMonth)}` }, { label: "Total jimpitan", value: formatRupiah(grandTotal) }, { label: "Malam ronda tercatat", value: String(recap.dates.length) }, { label: "Rumah terdaftar", value: String(rows.length) }], tables,
   };
 }

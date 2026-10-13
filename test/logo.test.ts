@@ -33,6 +33,7 @@ describe("logo lingkungan", () => {
     expect(logoUrl).toMatch(/^\/api\/logo\?v=\d+$/);
     expect((await admin.get("/api/admin/pengaturan")).data.logoUrl).toBe(logoUrl);
     expect((await admin.get("/api/admin/rumah")).data.logoUrl).toBe(logoUrl);
+    expect((await admin.get("/api/rekap?bulan=2026-10")).data.logoUrl).toBe(logoUrl);
     // Halaman warga dan halaman rumah terbuka tanpa login.
     expect((await apiClient(env).get("/api/warga/akses")).data.logoUrl).toBe(logoUrl);
 

@@ -10,9 +10,12 @@ import type { BillingPeriod } from "@/lib/payments";
 import type { HouseDTO } from "@/lib/types";
 import { buildRecapDocx } from "@/lib/recap-report-docx";
 import { buildRecapPdf } from "@/lib/recap-report-pdf";
+import { createReportStamp, loadReportLogo, readReportImage } from "@/client/report-image";
 
 vi.mock("@/lib/recap-report-pdf", () => ({ buildRecapPdf: vi.fn() }));
 vi.mock("@/lib/recap-report-docx", () => ({ buildRecapDocx: vi.fn() }));
+vi.mock("@/client/report-image", () => ({ createReportStamp: vi.fn(), loadReportLogo: vi.fn(), readReportImage: vi.fn() }));
+const reportImage = { dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAADCAYAAAC09K7GAAAAFElEQVR4nGPkL8v7z4AEmJA5WAUAXcEB+OGNog0AAAAASUVORK5CYII=", width: 4, height: 3 };
 
 let container: HTMLDivElement;
 let root: Root;
@@ -27,6 +30,9 @@ const bill: BillingPeriod = { houseId: 2, planId: 1, cadence: "monthly", start: 
 beforeEach(async () => {
   vi.mocked(buildRecapPdf).mockReset().mockReturnValue(new Blob(["pdf"], { type: "application/pdf" }));
   vi.mocked(buildRecapDocx).mockReset().mockResolvedValue(new Blob(["docx"]));
+  vi.mocked(loadReportLogo).mockReset().mockResolvedValue(reportImage);
+  vi.mocked(readReportImage).mockReset().mockResolvedValue(reportImage);
+  vi.mocked(createReportStamp).mockReset().mockResolvedValue(reportImage);
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-07T12:00:00Z"));
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -81,6 +87,50 @@ async function addVacantHouse() {
 }
 
 describe("rekap bulanan yang dikelompokkan", () => {
+  it("laporan rentang memuat seluruh bulan pilihan dan memberi nama berkas sesuai periode", async () => {
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:range-report"); vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    const save = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    vi.mocked(fetch).mockImplementation(async (url) => {
+      const selectedMonth = new URL(String(url), "http://localhost").searchParams.get("bulan")!;
+      return new Response(JSON.stringify({ month: selectedMonth, houses, dates: [`${selectedMonth}-01`], cells: { [`1:${selectedMonth}-01`]: { status: "filled", amount: 500 } } }), { headers: { "Content-Type": "application/json" } });
+    });
+    await click(button("Buat laporan"));
+    const inputs = [...document.querySelectorAll<HTMLInputElement>('input[type="month"]')];
+    await act(async () => {
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      setValue.call(inputs[0], "2026-09"); inputs[0].dispatchEvent(new Event("input", { bubbles: true }));
+      setValue.call(inputs[1], "2026-11"); inputs[1].dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await click(button("Unduh PDF")); await vi.waitFor(() => expect(buildRecapPdf).toHaveBeenCalledOnce());
+    expect(vi.mocked(fetch).mock.calls.map(([url]) => new URL(String(url), "http://localhost").searchParams.get("bulan"))).toEqual(["2026-09", "2026-10", "2026-11"]);
+    const report = vi.mocked(buildRecapPdf).mock.calls[0][0]; expect(report.monthLabel).toBe("September - November 2026");
+    expect(report.metrics.find((m) => m.label === "Total jimpitan")?.value).toBe("Rp 1.500"); expect(report.monthlySummary?.rows).toHaveLength(3);
+    expect((save.mock.contexts[0] as HTMLAnchorElement).download).toBe("laporan-jimpitan-2026-09-sampai-2026-11.pdf");
+  });
+
+  it("rentang terbalik mencegah unduh; kegagalan memuat satu bulan tidak menghasilkan laporan sebagian", async () => {
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:range-report"); vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    const save = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    await click(button("Buat laporan")); const inputs = [...document.querySelectorAll<HTMLInputElement>('input[type="month"]')];
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    await act(async () => { setValue.call(inputs[0], "2026-11"); inputs[0].dispatchEvent(new Event("input", { bubbles: true })); });
+    expect(button("Unduh PDF").disabled).toBe(true); expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Bulan akhir harus");
+    await act(async () => { setValue.call(inputs[0], "2026-09"); inputs[0].dispatchEvent(new Event("input", { bubbles: true })); });
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ month: "2026-09", houses, dates: [], cells: {} }), { headers: { "Content-Type": "application/json" } })).mockRejectedValueOnce(new Error("offline"));
+    await click(button("Unduh PDF")); await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Laporan belum berhasil dibuat"));
+    expect(buildRecapPdf).not.toHaveBeenCalled(); expect(save).not.toHaveBeenCalled(); expect(button("Unduh PDF").disabled).toBe(false);
+  });
+
+  it("membatalkan pemuatan periode menghentikan request dan tidak mengunduh di belakang dialog", async () => {
+    const save = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    vi.mocked(fetch).mockImplementation((_url, init) => new Promise((_resolve, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("cancelled", "AbortError")), { once: true })));
+    await click(button("Buat laporan")); const input = document.querySelector<HTMLInputElement>('input[type="month"]')!;
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "2026-09"); input.dispatchEvent(new Event("input", { bubbles: true })); });
+    await click(button("Unduh PDF")); await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    await click(button("Batal")); await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull());
+    expect(vi.mocked(fetch).mock.calls[0][1]?.signal?.aborted).toBe(true); expect(save).not.toHaveBeenCalled(); expect(buildRecapPdf).not.toHaveBeenCalled();
+  });
+
   it("laporan PDF mencakup seluruh bulan dan rumah walaupun tabel sedang difilter", async () => {
     const create = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:report");
     const release = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
@@ -91,12 +141,47 @@ describe("rekap bulanan yang dikelompokkan", () => {
     const dialog = document.querySelector('[role="dialog"]')!;
     expect(dialog.textContent).toContain("Rekap jimpitan Oktober 2026");
     expect(dialog.textContent).toContain("Mencakup semua rumah");
+    expect([...dialog.querySelectorAll<HTMLTextAreaElement>("textarea")][0].value).toBe("Karangsari, Kebumen");
+    expect([...dialog.querySelectorAll<HTMLInputElement>("input")].some((input) => input.value === "April Bambang Sumariawan")).toBe(true);
     await click(button("Unduh PDF"));
     await vi.waitFor(() => expect(buildRecapPdf).toHaveBeenCalledOnce());
     expect(vi.mocked(buildRecapPdf).mock.calls[0][0].tables[3].rows).toHaveLength(3);
+    expect(vi.mocked(buildRecapPdf).mock.calls[0][0].letterhead.logo).toEqual(reportImage);
+    expect(vi.mocked(buildRecapPdf).mock.calls[0][0].approval.chairName).toBe("April Bambang Sumariawan");
+    expect(createReportStamp).toHaveBeenCalledWith(reportImage, "Natura");
+    expect(vi.mocked(buildRecapPdf).mock.calls[0][0].approval.stamp).toEqual(reportImage);
     expect(save).toHaveBeenCalledOnce();
     expect((save.mock.contexts[0] as HTMLAnchorElement).download).toBe("laporan-jimpitan-2026-10.pdf");
     expect(create).toHaveBeenCalledOnce(); expect(release).toHaveBeenCalledWith("blob:report");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("alamat dan ketua dapat diubah, gambar cap hanya dimasukkan ke laporan", async () => {
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:formal-report");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    await click(button("Buat laporan"));
+    const dialog = document.querySelector('[role="dialog"]')!;
+    const address = dialog.querySelector("textarea")!;
+    const chair = [...dialog.querySelectorAll<HTMLInputElement>("input")].find((input) => input.value === "April Bambang Sumariawan")!;
+    await act(async () => {
+      const setTextarea = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
+      const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      setTextarea.call(address, "Alamat baru"); address.dispatchEvent(new Event("input", { bubbles: true }));
+      setInput.call(chair, "Ketua berikutnya"); chair.dispatchEvent(new Event("input", { bubbles: true }));
+      const file = new File(["image"], "cap-resmi.png", { type: "image/png" });
+      const upload = dialog.querySelector<HTMLInputElement>('input[type="file"]')!;
+      Object.defineProperty(upload, "files", { value: [file], configurable: true });
+      upload.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await vi.waitFor(() => expect(dialog.querySelector('img[alt="Pratinjau stempel"]')).not.toBeNull());
+    await click(button("Unduh PDF"));
+    await vi.waitFor(() => expect(buildRecapPdf).toHaveBeenCalledOnce());
+    const report = vi.mocked(buildRecapPdf).mock.calls[0][0];
+    expect(report.letterhead.address).toBe("Alamat baru");
+    expect(report.approval.chairName).toBe("Ketua berikutnya");
+    expect(report.approval.stamp).toEqual(reportImage);
+    expect(createReportStamp).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
   });
 
