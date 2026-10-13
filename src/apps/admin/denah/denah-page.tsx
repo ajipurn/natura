@@ -30,7 +30,7 @@ export function DenahPage() {
         value={mode}
         onValueChange={(next) => setParams(next === "malam" ? {} : { mode: next }, { replace: true })}
         options={MODES}
-        className="mb-4 sm:w-fit"
+        className="mb-4"
       />
       {mode === "bulan" ? <MonthMap /> : <TonightMap />}
     </>

@@ -11,7 +11,7 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { QueryState } from "@/components/query-state";
 import { Select } from "@/components/select";
-import { Button, Card, Input, PageHeader } from "@/components/ui";
+import { Button, Card, Input, PageActions, PageHeader } from "@/components/ui";
 import { SegmentedControl } from "@/components/toggle-group";
 import { usePermission } from "@/client/permissions";
 import { ROLE_LABEL } from "@/lib/permissions";
@@ -30,7 +30,7 @@ export function WargaPage() {
   const view = requested === "akun" || requested === "keluarga" ? requested : canReadResidents ? "warga" : "akun";
   return <>
     <PageHeader title="Warga" subtitle="Data warga, keluarga, dan akses aplikasi." />
-    <SegmentedControl aria-label="Pendataan warga" size="sm" className="mb-5 w-fit max-w-full" value={view}
+    <SegmentedControl aria-label="Pendataan warga" fill className="mb-5" value={view}
       onValueChange={(value) => setParams(value === "warga" ? {} : { tab: value })}
       options={[
         ...(canReadResidents ? [{ value: "warga", label: "Daftar warga" }, { value: "keluarga", label: "Keluarga" }] : []),
@@ -79,9 +79,9 @@ function ResidentsPanel() {
             : undefined;
         return (
           <>
-            {canEdit && <div className="mb-4 flex justify-end">
+            {canEdit && <PageActions className="mb-4">
               <Button size="sm" onClick={() => setEditing("baru")}><UserPlus className="size-4" /> Tambah warga</Button>
-            </div>}
+            </PageActions>}
             <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
               <Summary label="Warga terdaftar" value={residents.length} />
               <Summary
@@ -211,7 +211,7 @@ function ResidentList({
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-card">
       <div
-        className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)_2.5rem] gap-4 border-b border-line bg-idle-soft/40 px-5 py-3 text-xs font-medium text-muted sm:grid"
+        className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)_2.75rem] gap-4 border-b border-line bg-idle-soft/40 px-5 py-3 text-xs font-medium text-muted sm:grid"
         aria-hidden
       >
         <span>Nama warga</span>
@@ -223,12 +223,12 @@ function ResidentList({
         {residents.map((resident) => (
           <li
             key={resident.id}
-            className="grid grid-cols-[minmax(0,1fr)_2.5rem] items-center gap-x-3 gap-y-2 px-4 py-4 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)_2.5rem] sm:gap-4 sm:px-5"
+            className="grid grid-cols-[minmax(0,1fr)_2.75rem] items-center gap-x-3 gap-y-2 px-4 py-4 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)_2.75rem] sm:gap-4 sm:px-5"
           >
             <div className="min-w-0">
               {canEdit ? <Button
                 variant="plain"
-                className="min-h-6 max-w-full break-words text-left text-sm font-semibold hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary"
+                className="min-h-11 max-w-full break-words text-left text-sm font-semibold hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary"
                 onClick={() => onEdit(resident.id)}
               >
                 {resident.name}

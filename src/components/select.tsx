@@ -1,6 +1,7 @@
 import { Combobox } from "@base-ui/react/combobox";
 import { Check, ChevronsUpDown, Search } from "lucide-react";
 import { useId, type ReactNode } from "react";
+import { Tooltip } from "./tooltip";
 import { cx, inputClass } from "./ui";
 
 /**
@@ -91,18 +92,20 @@ export function Select<T extends string>({
           : <Combobox.Label className="mb-1 block text-sm font-medium">{label}</Combobox.Label>)}
         {searchInField ? (
           <Combobox.InputGroup
-            className={cx(inputClass, "flex items-center gap-2 pe-0 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30 data-disabled:opacity-50", className)}
+            className={cx(inputClass, "flex items-center gap-2 pe-0 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary data-disabled:opacity-50", className)}
           >
             <Search className="size-4 shrink-0 text-muted" aria-hidden />
             <Combobox.Input
               id={inputId}
               aria-label={ariaLabel}
               placeholder={placeholder}
-              className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted/70"
+              className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted"
             />
-            <Combobox.Trigger aria-label="Tampilkan pilihan" className="flex size-11 shrink-0 items-center justify-center rounded-xl text-muted">
-              <ChevronsUpDown className="size-4" aria-hidden />
-            </Combobox.Trigger>
+            <Tooltip label="Tampilkan pilihan">
+              <Combobox.Trigger aria-label="Tampilkan pilihan" className="flex h-full w-11 shrink-0 items-center justify-center rounded-[11px] text-muted hover:text-fg focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-primary">
+                <ChevronsUpDown className="size-4" aria-hidden />
+              </Combobox.Trigger>
+            </Tooltip>
           </Combobox.InputGroup>
         ) : <Combobox.Trigger
           aria-label={ariaLabel}
@@ -114,7 +117,7 @@ export function Select<T extends string>({
         >
           <Combobox.Value>
             {(option: SelectOption<T> | null) =>
-              option ? <OptionText option={option} /> : <span className="truncate text-muted/70">{placeholder}</span>
+              option ? <OptionText option={option} /> : <span className="truncate text-muted">{placeholder}</span>
             }
           </Combobox.Value>
           <Combobox.Icon className="shrink-0 text-muted">
@@ -133,7 +136,7 @@ export function Select<T extends string>({
                   placeholder={searchPlaceholder}
                   aria-label={searchPlaceholder.replace(/…$/, "")}
                   // 16px di HP supaya iOS tidak memperbesar halaman saat kolom ini difokus.
-                  className="h-9 w-full rounded-lg border border-line bg-bg pl-8 pr-2 text-base text-fg placeholder:text-muted/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 sm:text-sm"
+                  className="h-11 w-full rounded-lg border border-line bg-bg pl-8 pr-2 text-base text-fg placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary sm:text-sm"
                 />
               </div>}
               <Combobox.Empty>
@@ -165,7 +168,7 @@ function Item<T extends string>({ option }: { option: SelectOption<T> }) {
   return (
     <Combobox.Item
       value={option}
-      className="grid cursor-default select-none grid-cols-[1rem_1fr] items-center gap-2 px-3 py-2 text-sm outline-none data-highlighted:bg-idle-soft"
+      className="grid min-h-11 cursor-default select-none grid-cols-[1rem_1fr] items-center gap-2 px-3 py-2 text-sm outline-none data-highlighted:bg-idle-soft"
     >
       <Combobox.ItemIndicator className="col-start-1 text-primary">
         <Check className="size-4" />

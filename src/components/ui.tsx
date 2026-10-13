@@ -10,7 +10,7 @@ export function cx(...classes: (string | false | null | undefined)[]): string {
 }
 
 type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
-/** `icon`/`icon-sm` = tombol persegi berisi ikon saja (wajib `aria-label`). */
+/** Semua tombol tinggi 44 px; ukuran hanya membedakan teks/padding. Ikon wajib `aria-label`. */
 type ButtonSize = "md" | "lg" | "sm" | "icon" | "icon-sm";
 
 /**
@@ -20,12 +20,11 @@ type ButtonSize = "md" | "lg" | "sm" | "icon" | "icon-sm";
 export function buttonClass(variant: ButtonVariant = "primary", size: ButtonSize = "md") {
   const icon = size === "icon" || size === "icon-sm";
   return cx(
-    "inline-flex select-none items-center justify-center gap-2 rounded-xl font-semibold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-50 data-disabled:pointer-events-none data-disabled:opacity-50",
-    size === "lg" && "h-14 px-6 text-lg",
-    size === "md" && "h-11 px-4 text-base",
-    size === "sm" && "h-9 px-3 text-sm",
-    size === "icon" && "size-10 shrink-0 rounded-lg",
-    size === "icon-sm" && "size-8 shrink-0 rounded-lg",
+    "inline-flex h-11 select-none items-center justify-center gap-2 rounded-xl font-semibold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50 data-disabled:pointer-events-none data-disabled:opacity-50",
+    size === "lg" && "px-6 text-lg",
+    size === "md" && "px-4 text-base",
+    size === "sm" && "px-3 text-sm",
+    icon && "w-11 shrink-0",
     variant === "primary" && "bg-primary text-primary-fg shadow-sm",
     variant === "secondary" && "border border-line bg-card text-fg",
     variant === "danger" && "border border-empty/40 bg-empty-soft text-empty",
@@ -47,7 +46,7 @@ export function Button({ variant, size, className, ...props }: ButtonProps) {
 }
 
 export const inputClass =
-  "h-11 w-full rounded-xl border border-line bg-card px-3 text-base text-fg placeholder:text-muted/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50";
+  "h-11 w-full rounded-xl border border-line bg-card px-3 text-base text-fg placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50";
 
 /** Kolom isian (Base UI Input). Di dalam `Field`, label dan keterangannya otomatis tersambung. */
 export function Input({ className, ...props }: Omit<ComponentProps<typeof BaseInput>, "className"> & { className?: string }) {
@@ -63,6 +62,21 @@ export function Card({ className, ...props }: ComponentProps<"div">) {
   return <div className={cx("rounded-2xl border border-line bg-card p-4", className)} {...props} />;
 }
 
+/** Aksi halaman: kolom yang seimbang di HP, satu baris di layar lebar. */
+export function PageActions({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      data-ui-actions
+      className={cx(
+        "grid w-full grid-cols-[repeat(auto-fit,minmax(10.25rem,1fr))] gap-2 sm:flex sm:w-auto sm:shrink-0 sm:items-center sm:justify-end max-sm:[&>button]:min-h-11 max-sm:[&>a]:min-h-11",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function PageHeader({
   title,
   subtitle,
@@ -75,13 +89,13 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <div className={cx("mb-4 flex items-start justify-between gap-3", className)}>
+    <div className={cx("mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between", className)}>
       <PageTitle title={title} />
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
         {subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}
       </div>
-      {action}
+      {action && <PageActions>{action}</PageActions>}
     </div>
   );
 }

@@ -119,7 +119,7 @@ export function ZoomPane({
         <Button
           variant="secondary"
           size="sm"
-          className="h-10 max-sm:size-11 max-sm:p-0"
+          className="max-sm:w-11 max-sm:p-0"
           onClick={() => {
             centerNext.current = zoomIndex !== 0;
             if (zoomIndex === 0 && scrollRef.current) {

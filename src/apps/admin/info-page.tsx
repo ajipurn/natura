@@ -39,8 +39,7 @@ export function InfoPage() {
         subtitle="Pengumuman, kontak pengurus, dan akses Beranda app"
         action={
           <a href={wargaPath()} target="_blank" rel="noopener" className={buttonClass("secondary", "sm")}>
-            <ExternalLink className="size-4" /> <span className="max-sm:hidden">Lihat Beranda</span>
-            <span className="sm:hidden">Lihat</span>
+            <ExternalLink className="size-4" /> Lihat Beranda
           </a>
         }
       />
@@ -540,7 +539,7 @@ function ContactsEditor({ initial, onDone }: { initial: Contact[]; onDone: (save
                   maxLength={60}
                   placeholder="Nama"
                   aria-label={`Nama kontak ${i + 1}`}
-                  className="h-10"
+                  className="h-11"
                   autoFocus={!row.name && i === rows.length - 1}
                 />
                 <Input
@@ -549,7 +548,7 @@ function ContactsEditor({ initial, onDone }: { initial: Contact[]; onDone: (save
                   maxLength={60}
                   placeholder="Jabatan, mis. Ketua RT"
                   aria-label={`Jabatan kontak ${i + 1}`}
-                  className="h-10"
+                  className="h-11"
                 />
               </div>
               <div className="flex items-center gap-1">
@@ -561,7 +560,7 @@ function ContactsEditor({ initial, onDone }: { initial: Contact[]; onDone: (save
                   maxLength={20}
                   placeholder="0812-3456-7890"
                   aria-label={`Nomor HP kontak ${i + 1}`}
-                  className="mr-1 h-10 min-w-0 flex-1 tabular-nums"
+                  className="mr-1 min-w-0 flex-1 tabular-nums"
                 />
                 <Button variant="ghost" size="icon-sm" aria-label="Naikkan" title="Naikkan" disabled={i === 0} onClick={() => move(i, -1)}>
                   <ArrowUp className="size-4" />

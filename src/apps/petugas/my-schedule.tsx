@@ -169,7 +169,7 @@ function RequestForm({ myDays, onDone }: { myDays: number[]; onDone: () => void 
                 title={taken ? "Sudah jagamu" : dayLabel(day)}
                 onClick={() => setToDay(day)}
                 className={cx(
-                  "h-10 rounded-xl border text-sm font-semibold disabled:opacity-35",
+                  "h-11 rounded-xl border text-sm font-semibold disabled:opacity-35",
                   toDay === day ? "border-primary bg-primary text-primary-fg" : "border-line bg-card",
                 )}
               >

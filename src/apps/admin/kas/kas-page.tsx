@@ -12,7 +12,8 @@ import { Dialog } from "@/components/dialog";
 import { QueryState } from "@/components/query-state";
 import { RupiahInput } from "@/components/rupiah-input";
 import { Select } from "@/components/select";
-import { Alert, Button, Card, Field, Input, PageHeader, buttonClass, cx } from "@/components/ui";
+import { segmentedFrameClass, segmentedItemClass } from "@/components/toggle-group";
+import { Alert, Button, Card, Field, Input, PageActions, PageHeader, buttonClass, cx } from "@/components/ui";
 import { formatDateShort, formatMonth, isMonth, localDate, rondaDate, shiftMonth } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import type { CashMonth } from "@/server/kas";
@@ -29,7 +30,7 @@ type DepositFilter = "attention" | "pending" | "difference" | "all";
 
 const depositStatus = (night: Night) => !night.deposit ? "pending" : night.deposit.amount !== night.recorded ? "difference" : "matched";
 const depositPriority = { pending: 0, difference: 1, matched: 2 };
-const cashTabClass = "inline-flex h-8 shrink-0 select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-muted transition-colors hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary data-active:bg-primary data-active:text-primary-fg data-active:hover:text-primary-fg";
+const cashTabClass = cx(segmentedItemClass, "min-w-0 flex-1 whitespace-normal leading-tight data-active:bg-primary data-active:text-primary-fg data-active:hover:text-primary-fg");
 
 /** "2026-10-05" → "5 Okt" */
 const dayMonth = (isoDate: string) => formatDateShort(isoDate).split(", ")[1];
@@ -69,10 +70,9 @@ export function KasPage() {
       <PageHeader title="Kas lingkungan" subtitle="Pemasukan, pengeluaran, dan saldo bersama." />
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <MonthNav month={month} thisMonth={thisMonth} view={view} />
-        <div className="flex flex-wrap justify-end gap-2">
-          <Link to={adminPath("/iuran")} className={buttonClass("secondary", "sm")}>Kelola iuran</Link>
+        <PageActions>
           <Button size="sm" onClick={() => openEntry()}><Plus className="size-4" aria-hidden /> Catat transaksi</Button>
-        </div>
+        </PageActions>
       </div>
 
       <QueryState query={query}>
@@ -81,10 +81,10 @@ export function KasPage() {
             <Summary data={data} />
             {data.undeposited.length > 0 && <Undeposited dates={data.undeposited} month={month} onOpen={() => selectView("deposits")} />}
             <Tabs.Root value={view} onValueChange={(value: CashView) => selectView(value)}>
-              <Tabs.List aria-label="Tampilan kas" activateOnFocus className="mb-5 flex w-fit max-w-full rounded-xl border border-line bg-card p-0.5">
+              <Tabs.List aria-label="Tampilan kas" activateOnFocus className={cx(segmentedFrameClass, "mb-5 w-full")}>
                 <Tabs.Tab value="transactions" className={cashTabClass}>Transaksi</Tabs.Tab>
                 <Tabs.Tab value="deposits" className={cashTabClass}>
-                  <span>Setoran jimpitan</span>
+                  <span className="min-w-0">Setoran jimpitan</span>
                   {attentionCount > 0 && <span className="shrink-0 rounded-full bg-warn-soft px-2 py-0.5 text-xs text-warn">
                     {attentionCount}<span className="sr-only"> malam perlu dicek</span>
                   </span>}
@@ -137,27 +137,27 @@ function MonthNav({ month, thisMonth, view }: { month: string; thisMonth: string
   };
   const monthLabel = formatMonth(month);
   return (
-    <nav aria-label="Pilih bulan" className="flex min-w-0 flex-1 items-center rounded-xl border border-line bg-card p-px sm:flex-none">
+    <nav aria-label="Pilih bulan" className={cx(segmentedFrameClass, "min-w-0 w-full sm:w-auto")}>
       <Link
         to={link(shiftMonth(month, -1))}
-        className={buttonClass("ghost", "icon-sm")}
+        className={cx(buttonClass("ghost", "icon-sm"), "h-9.5 w-9.5 rounded-[9px]")}
         aria-label={`Bulan sebelumnya (${formatMonth(shiftMonth(month, -1))})`}
       >
         <ChevronLeft className="size-5" />
       </Link>
-      <span className="min-w-0 flex-1 whitespace-nowrap text-center text-sm font-semibold sm:min-w-36 sm:px-1 sm:text-base">
+      <span className="flex min-w-0 flex-1 items-center justify-center whitespace-nowrap text-center text-sm font-semibold sm:min-w-36 sm:px-1 sm:text-base">
         {monthLabel}
       </span>
       {month < thisMonth ? (
         <Link
           to={link(shiftMonth(month, 1))}
-          className={buttonClass("ghost", "icon-sm")}
+          className={cx(buttonClass("ghost", "icon-sm"), "h-9.5 w-9.5 rounded-[9px]")}
           aria-label={`Bulan berikutnya (${formatMonth(shiftMonth(month, 1))})`}
         >
           <ChevronRight className="size-5" />
         </Link>
       ) : (
-        <span aria-hidden className={cx(buttonClass("ghost", "icon-sm"), "pointer-events-none text-muted/40")}>
+        <span aria-hidden className={cx(buttonClass("ghost", "icon-sm"), "pointer-events-none h-9.5 w-9.5 text-muted/40")}>
           <ChevronRight className="size-5" />
         </span>
       )}

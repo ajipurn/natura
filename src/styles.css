@@ -9,7 +9,7 @@
   --bg: #f4f6f8;
   --card: #ffffff;
   --fg: #0f172a;
-  --muted: #64748b;
+  --muted: #55657a;
   --line: #e2e8f0;
   --primary: #0f766e;
   --primary-fg: #ffffff;
@@ -36,6 +36,9 @@
   --guard-orange: #ffe699;
   --guard-blue: #bdd7ee;
   --guard-ink: #141a10;
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   color-scheme: light;
 }
 
@@ -118,6 +121,7 @@ nav:has(a:focus-visible) .app-menu-indicator {
 }
 
 @media print {
+  html,
   body {
     background: #fff;
     color: #000;

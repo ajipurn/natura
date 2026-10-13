@@ -97,7 +97,7 @@ export function NightPicker({
                   <span aria-hidden className="size-1.5 rounded-full bg-warn" /> Sebagian
                 </span>
               </div>
-              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-primary" onClick={() => pick(today)}>
+              <Button variant="ghost" size="sm" className="px-2 text-xs text-primary" onClick={() => pick(today)}>
                 Malam ini
               </Button>
             </div>

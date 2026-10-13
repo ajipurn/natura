@@ -51,7 +51,7 @@ export function SwitchField({
     <Field.Root
       ref={ref}
       disabled={disabled}
-      className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5 data-disabled:opacity-60"
+      className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line px-3 data-disabled:opacity-60"
     >
       <div className="min-w-0">
         <Field.Label className="block text-sm font-medium">{label}</Field.Label>
@@ -59,6 +59,7 @@ export function SwitchField({
       </div>
       <SwitchControl
         key={resetKey}
+        className="h-10.5"
         checked={checked}
         defaultChecked={defaultChecked}
         onCheckedChange={onCheckedChange}
@@ -74,11 +75,13 @@ export function SwitchControl({ className, ...props }: Omit<Switch.Root.Props, "
     <Switch.Root
       {...props}
       className={cx(
-        "relative flex h-6 w-10 shrink-0 items-center rounded-full bg-idle-soft p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 data-checked:bg-primary",
+        "group relative flex size-11 shrink-0 items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary data-disabled:opacity-50",
         className,
       )}
     >
-      <Switch.Thumb className="size-5 rounded-full bg-white shadow-sm transition-transform data-checked:translate-x-4 motion-reduce:transition-none" />
+      <span aria-hidden className="flex h-6 w-10 items-center rounded-full bg-idle-soft p-0.5 transition-colors group-data-checked:bg-primary">
+        <Switch.Thumb className="size-5 rounded-full bg-white shadow-sm transition-transform data-checked:translate-x-4 motion-reduce:transition-none" />
+      </span>
     </Switch.Root>
   );
 }
@@ -165,7 +168,7 @@ export function RadioCards<T extends string>({
             // Label = nama pilihan, keterangan = deskripsinya (tidak digabung jadi satu kalimat).
             aria-labelledby={`${legendId}-${o.value}`}
             aria-describedby={o.hint ? `${legendId}-${o.value}-hint` : undefined}
-            className="group flex cursor-pointer flex-col rounded-xl border border-line bg-card px-3 py-2.5 text-left transition hover:bg-idle-soft/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 data-checked:border-primary data-checked:bg-primary/10 data-checked:hover:bg-primary/10 data-disabled:cursor-default data-disabled:opacity-60"
+            className="group flex min-h-11 cursor-pointer flex-col rounded-xl border border-line bg-card px-3 py-2.5 text-left transition hover:bg-idle-soft/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 data-checked:border-primary data-checked:bg-primary/10 data-checked:hover:bg-primary/10 data-disabled:cursor-default data-disabled:opacity-60"
           >
             <span id={`${legendId}-${o.value}`} className="text-sm font-semibold group-data-checked:text-primary">
               {o.label}

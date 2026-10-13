@@ -261,7 +261,7 @@ function GuardSchedule({
                 </>
               ),
               className:
-                "group h-auto min-w-14 shrink-0 py-1.5 text-center leading-tight sm:min-w-0",
+                "group min-w-14 shrink-0 text-center leading-tight sm:min-w-0",
             };
           })}
           // Tanpa garis tepi: menyatu dengan kepala kartu. Di HP bisa digeser, di layar lebar 7 kolom.

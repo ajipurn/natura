@@ -98,7 +98,7 @@ function BlockChip({ to, active, label }: { to: string; active: boolean; label: 
     <Link
       to={to}
       className={cx(
-        "rounded-full border px-3 py-1 text-sm",
+        "h-11 rounded-full border px-3 text-sm",
         active ? "border-primary bg-primary text-primary-fg" : "border-line text-muted",
       )}
     >

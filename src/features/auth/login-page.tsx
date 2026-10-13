@@ -8,6 +8,7 @@ import { clearCache, queryClient } from "@/client/query";
 import { ErrorCard } from "@/components/query-state";
 import { Select } from "@/components/select";
 import { ThemeButton } from "@/components/theme-toggle";
+import { Tooltip } from "@/components/tooltip";
 import { Alert, Button, cx, Field, Input, PageTitle } from "@/components/ui";
 import { DEFAULT_LOGO_URL } from "@/lib/branding";
 import { petugasPath, sameAppPath } from "@/lib/app-paths";
@@ -76,26 +77,26 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-8 sm:py-12">
       <PageTitle title={title} />
-      <header className="mb-6 flex items-center justify-between gap-4 px-1">
-        <div className="flex min-w-0 items-center gap-3">
-          <img src={DEFAULT_LOGO_URL} alt="" className="h-11 w-14 shrink-0 object-contain" />
-          <div>
-            <p className="font-semibold tracking-tight">Cluster Natura</p>
-            <p className="text-xs text-muted">{homePath === petugasPath() ? "Info warga & ronda" : "Dashboard pengurus"}</p>
+      <div className="rounded-3xl bg-card p-6 shadow-sm ring-1 ring-line sm:p-8">
+        <header className="mb-8 flex items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <img src={DEFAULT_LOGO_URL} alt="" className="h-10 w-12 shrink-0 object-contain" />
+            <div>
+              <p className="font-semibold tracking-tight">Cluster Natura</p>
+              <p className="text-xs text-muted">{homePath === petugasPath() ? "Info warga & ronda" : "Dashboard pengurus"}</p>
+            </div>
           </div>
-        </div>
-        <ThemeButton className="size-11 rounded-xl transition-[background-color,color,box-shadow,scale] active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100" />
-      </header>
+          <ThemeButton className="size-11 rounded-xl transition-[background-color,color,box-shadow,scale] active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100" />
+        </header>
 
-      <div className="rounded-[2rem] bg-card p-5 shadow-sm ring-1 ring-line sm:p-8">
-        <h1 className="text-balance text-3xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="text-balance text-2xl font-semibold tracking-tight">{title}</h1>
         <p className="mt-2 text-pretty text-sm leading-relaxed text-muted">Cari nama atau rumah, lalu masukkan PIN untuk melanjutkan.</p>
         {users.isError ? (
-          <div className="mt-7">
+          <div className="mt-6">
             <ErrorCard title={errorTitle(users.error)} message={errorMessage(users.error)} onRetry={() => void users.refetch()} />
           </div>
         ) : (
-          <form className="mt-7 space-y-5" onSubmit={submit} aria-busy={pending}>
+          <form className="mt-6 space-y-5" onSubmit={submit} aria-busy={pending}>
             <Select
               label="Nama atau rumah"
               searchInField
@@ -107,7 +108,7 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
               options={list.map((u) => ({ value: String(u.id), label: u.name, hint: u.house ?? undefined }))}
               placeholder={users.isPending ? "Memuat nama…" : "Cari nama atau rumah…"}
               disabled={users.isPending || pending}
-              className="h-12 bg-bg/50"
+              className="bg-bg/50"
             />
             <Field label="PIN" hint="Gunakan PIN 4–6 angka.">
               <div className="relative">
@@ -125,23 +126,24 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
                   readOnly={pending}
                   aria-invalid={error ? true : undefined}
                   aria-describedby={error ? errorId : undefined}
-                  className={cx("h-12 bg-bg/50 pe-14 text-xl tracking-[0.35em]", error && "border-empty focus:border-empty focus:ring-empty/30")}
+                  className={cx("bg-bg/50 pe-14 text-xl tracking-[0.35em]", error && "border-empty focus:border-empty focus:ring-empty")}
                 />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Tampilkan PIN"
-                  aria-pressed={showPin}
-                  aria-controls={pinId}
-                  title={showPin ? "Sembunyikan PIN" : "Tampilkan PIN"}
-                  disabled={pending}
-                  onClick={() => setShowPin((shown) => !shown)}
-                  className="absolute end-1 top-0.5 size-11 transition-[background-color,color,box-shadow,scale] active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100"
-                >
-                  <Eye className={cx("size-5 transition-[opacity,scale,filter] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none", showPin ? "scale-[0.25] opacity-0 blur-[4px]" : "scale-100 opacity-100 blur-0")} aria-hidden />
-                  <EyeOff className={cx("absolute size-5 transition-[opacity,scale,filter] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none", showPin ? "scale-100 opacity-100 blur-0" : "scale-[0.25] opacity-0 blur-[4px]")} aria-hidden />
-                </Button>
+                <Tooltip label={showPin ? "Sembunyikan PIN" : "Tampilkan PIN"}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Tampilkan PIN"
+                    aria-pressed={showPin}
+                    aria-controls={pinId}
+                    disabled={pending}
+                    onClick={() => setShowPin((shown) => !shown)}
+                    className="absolute end-0 top-0 size-11 transition-[background-color,color,box-shadow,scale] active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100"
+                  >
+                    <Eye className={cx("size-5 transition-[opacity,scale,filter] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none", showPin ? "scale-[0.25] opacity-0 blur-[4px]" : "scale-100 opacity-100 blur-0")} aria-hidden />
+                    <EyeOff className={cx("absolute size-5 transition-[opacity,scale,filter] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none", showPin ? "scale-100 opacity-100 blur-0" : "scale-[0.25] opacity-0 blur-[4px]")} aria-hidden />
+                  </Button>
+                </Tooltip>
               </div>
             </Field>
             {error && <div id={errorId}><Alert>{error}</Alert></div>}

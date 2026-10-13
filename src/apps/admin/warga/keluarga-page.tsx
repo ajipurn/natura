@@ -65,7 +65,7 @@ export function KeluargaPanel() {
               />
               {canEdit && <Button
                 size="sm"
-                className="shrink-0"
+                className="h-11 shrink-0"
                 onClick={() => setEditing("new")}
               >
                 <Plus className="size-4" />
@@ -318,7 +318,7 @@ function FamilyForm({
                       key={resident.id}
                       className="space-y-1 border-b border-line py-2 last:border-0"
                     >
-                      <label className="flex min-h-10 cursor-pointer items-center gap-3 px-1 text-sm">
+                      <label className="flex min-h-11 cursor-pointer items-center gap-3 px-1 text-sm">
                         <input
                           type="checkbox"
                           className="size-4 shrink-0 accent-primary"

@@ -50,7 +50,7 @@ export function RecapReportDialog({ open, onClose, month, data, saveFile }: {
       <div className="space-y-5">
         <div>
           <p className="mb-2 text-sm font-medium">Format laporan</p>
-          <SegmentedControl aria-label="Format laporan" size="sm" fill value={format} onValueChange={setFormat} options={[
+          <SegmentedControl aria-label="Format laporan" fill value={format} onValueChange={setFormat} options={[
             { value: "pdf", label: "PDF", icon: FileText, disabled: pending },
             { value: "docx", label: "Word (.docx)", icon: FileText, disabled: pending },
           ]} />

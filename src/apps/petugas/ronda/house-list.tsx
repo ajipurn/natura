@@ -123,7 +123,7 @@ function BlockJump({ sections, filter }: { sections: { block: string; visible: H
               variant="plain"
               onClick={() => jump(block)}
               aria-label={`Blok ${block}, ${visible.length} ${filter === "belum" ? "belum dicek" : "rumah"}`}
-              className="inline-flex items-baseline gap-1 rounded-full border border-line bg-card px-2.5 py-1 text-sm font-semibold hover:border-primary/50 active:scale-95"
+              className="inline-flex h-11 items-center gap-1 rounded-full border border-line bg-card px-2.5 py-1 text-sm font-semibold hover:border-primary/50 active:scale-95"
             >
               {block} <span className="text-xs font-normal text-muted">{visible.length}</span>
             </Button>

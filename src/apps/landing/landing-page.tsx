@@ -37,13 +37,13 @@ export function LandingPage() {
             >
               <a
                 href={wargaPath("", APP_DOMAINS.warga)}
-                className="landing-service-link inline-flex min-h-12 items-center gap-3 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-fg hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+                className="landing-service-link inline-flex min-h-11 items-center gap-3 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-fg hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
               >
                 Beranda app <ArrowUpRight className="size-4" aria-hidden />
               </a>
               <a
                 href={petugasPath("/ronda", APP_DOMAINS.warga)}
-                className="landing-service-link inline-flex min-h-12 items-center gap-3 rounded-xl border border-line bg-card px-5 text-sm font-semibold hover:bg-idle-soft/50 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+                className="landing-service-link inline-flex min-h-11 items-center gap-3 rounded-xl border border-line bg-card px-5 text-sm font-semibold hover:bg-idle-soft/50 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
               >
                 <ScanLine className="size-4 text-primary" aria-hidden /> Buka Ronda
               </a>

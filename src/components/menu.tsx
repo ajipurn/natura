@@ -44,8 +44,8 @@ export function Menu({
         </BaseMenu.Trigger>
       )}
       <BaseMenu.Portal>
-        <BaseMenu.Positioner className="z-50 outline-none" sideOffset={4} align="end">
-          <BaseMenu.Popup className="min-w-44 origin-[var(--transform-origin)] rounded-xl border border-line bg-card py-1 text-fg shadow-lg outline-none transition-[opacity,scale] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 motion-reduce:transition-none">
+        <BaseMenu.Positioner className="z-50 outline-none" sideOffset={4} align="end" collisionPadding={16}>
+          <BaseMenu.Popup className="max-h-[var(--available-height)] min-w-44 max-w-[var(--available-width)] origin-[var(--transform-origin)] overflow-y-auto overscroll-contain rounded-xl border border-line bg-card py-1 text-fg shadow-lg outline-none transition-[opacity,scale] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 motion-reduce:transition-none">
             {sections.map((section, i) => (
               <BaseMenu.Group key={i}>
                 {section.heading && (
@@ -59,7 +59,7 @@ export function Menu({
                     disabled={item.disabled}
                     onClick={item.onSelect}
                     className={cx(
-                      "flex w-full cursor-default select-none items-center gap-2 px-3 py-2 text-left text-sm outline-none data-disabled:opacity-40 data-highlighted:bg-idle-soft",
+                      "flex min-h-11 w-full cursor-default select-none items-center gap-2 px-3 py-2 text-left text-sm outline-none data-disabled:opacity-40 data-highlighted:bg-idle-soft",
                       item.danger && "text-empty",
                       item.hint && "items-start gap-2.5",
                     )}

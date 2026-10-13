@@ -27,7 +27,7 @@ import { QueryState } from "@/components/query-state";
 import { PaymentCadenceBadge } from "@/components/payment-cadence-badge";
 import { ScrollArea } from "@/components/scroll-area";
 import { Select } from "@/components/select";
-import { SegmentedControl } from "@/components/toggle-group";
+import { SegmentedControl, segmentedFrameClass } from "@/components/toggle-group";
 import { api, call, errorMessage } from "@/client/api";
 import { invalidate } from "@/client/query";
 import {
@@ -161,7 +161,7 @@ export function RekapPage() {
         title="Rekap bulanan"
         subtitle="Ringkasan jimpitan dan catatan setiap rumah."
         action={
-          <div className="flex flex-wrap items-center gap-2">
+          <>
             <Button size="sm" variant="secondary" disabled={!ready} onClick={() => setReportOpen(true)}>
               <FileText className="size-4" /> Buat laporan
             </Button>
@@ -202,10 +202,10 @@ export function RekapPage() {
                 }] : []),
               ]}
             />
-          </div>
+          </>
         }
       />
-      <RecapReportDialog open={reportOpen} onClose={() => setReportOpen(false)} month={month} data={query.data} saveFile={saveFile} />
+      <RecapReportDialog key={month} open={reportOpen} onClose={() => setReportOpen(false)} month={month} data={query.data} saveFile={saveFile} />
       <SheetsLinkDialog
         open={sheetsOpen}
         onClose={() => setSheetsOpen(false)}
@@ -215,22 +215,22 @@ export function RekapPage() {
 
       <nav
         aria-label="Pilih bulan"
-        className="mb-4 inline-flex items-center rounded-xl border border-line bg-card p-0.5"
+        className={cx(segmentedFrameClass, "mb-4 w-full sm:inline-flex sm:w-auto")}
       >
         <Link
           to={adminPath(`/rekap?bulan=${shiftMonth(month, -1)}`)}
-          className={buttonClass("ghost", "icon-sm")}
+          className={cx(buttonClass("ghost", "icon-sm"), "h-9.5 w-9.5 rounded-[9px]")}
           aria-label={`Bulan sebelumnya (${formatMonth(shiftMonth(month, -1))})`}
         >
           <ChevronLeft className="size-5" />
         </Link>
-        <span className="min-w-36 px-2 text-center font-semibold">
+        <span className="flex min-w-0 flex-1 items-center justify-center whitespace-nowrap px-2 text-center font-semibold sm:min-w-36 sm:flex-none">
           {formatMonth(month)}
         </span>
         {month < shiftMonth(thisMonth, 12) ? (
           <Link
             to={adminPath(`/rekap?bulan=${shiftMonth(month, 1)}`)}
-            className={buttonClass("ghost", "icon-sm")}
+            className={cx(buttonClass("ghost", "icon-sm"), "h-9.5 w-9.5 rounded-[9px]")}
             aria-label={`Bulan berikutnya (${formatMonth(shiftMonth(month, 1))})`}
           >
             <ChevronRight className="size-5" />
@@ -238,7 +238,7 @@ export function RekapPage() {
         ) : (
           <span
             aria-hidden
-            className="flex size-8 items-center justify-center text-muted/40"
+            className="flex h-9.5 w-9.5 items-center justify-center text-muted/40"
           >
             <ChevronRight className="size-5" />
           </span>
@@ -697,6 +697,7 @@ function RecapBody({
 
       {canFinance && <SegmentedControl
         aria-label="Tampilan rekap"
+        fill
         value={view}
         onValueChange={(next) => {
           setView(next);
@@ -707,16 +708,15 @@ function RecapBody({
           { value: "houses", label: "Per rumah", icon: Table2 },
           { value: "payments", label: "Pembayaran", icon: ReceiptText },
         ]}
-        size="sm"
-        className="mb-5 w-fit max-w-full"
+        className="mb-5"
       />}
 
       {canFinance && view === "payments" ? (
         <PaymentPanel key={data.month} month={data.month} />
       ) : (
         <section aria-label="Rekap per rumah">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <h2 className="font-semibold">Catatan rumah</h2>
               <p className="mt-0.5 text-xs text-muted">
                 {visible.length === stats.length
@@ -765,7 +765,7 @@ function RecapBody({
                   }}
                   placeholder="Cari rumah atau nama…"
                   aria-label="Cari rumah"
-                  className="h-9 pl-9 sm:text-sm"
+                  className="pl-9 sm:text-sm"
                 />
               </label>
               <Button
@@ -783,7 +783,7 @@ function RecapBody({
                 )}
               </Button>
             </div>
-            <Field.Root className="ml-auto flex min-h-9 items-center gap-3 text-sm">
+            <Field.Root className="ml-auto flex h-11 items-center gap-3 text-sm">
               <Field.Label className="cursor-pointer">Mudik/kosong</Field.Label>
               <SwitchControl
                 checked={showVacant}
@@ -812,7 +812,7 @@ function RecapBody({
                   label: f.label,
                   hint: String(stats.filter(f.match).length),
                 }))}
-                className="h-9 sm:text-sm"
+                className="sm:text-sm"
               />
               <Select
                 label="Cara bayar"
@@ -829,14 +829,14 @@ function RecapBody({
                     ).length,
                   ),
                 }))}
-                className="h-9 sm:text-sm"
+                className="sm:text-sm"
               />
               <Select
                 label="Urutkan"
                 value={sort}
                 onValueChange={setSort}
                 options={SORTS}
-                className="h-9 sm:text-sm"
+                className="sm:text-sm"
               />
               <Select
                 label="Tanggal ditampilkan"
@@ -847,7 +847,7 @@ function RecapBody({
                   { value: "recorded", label: "Malam tercatat" },
                   { value: "month", label: "Seluruh bulan" },
                 ]}
-                className="h-9 sm:text-sm"
+                className="sm:text-sm"
               />
             </div>
           )}
@@ -939,7 +939,7 @@ function RecapBody({
                */}
               <div
                 ref={headRef}
-                className="sticky top-[57px] z-20 overflow-hidden rounded-t-[15px] border-b border-line bg-card lg:top-0"
+                className="sticky top-[61px] z-20 overflow-hidden rounded-t-[15px] border-b border-line bg-card lg:top-0"
               >
                 <table
                   role="presentation"
@@ -1044,7 +1044,8 @@ function RecapBody({
                   }
                 }}
               >
-                <ScrollArea className="overflow-x-auto">
+                {/* Posisi relative menahan thead sr-only yang absolut di dalam wadah scroll. */}
+                <ScrollArea className="relative min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
                   <table
                     className={cx(
                       "w-full table-fixed border-collapse text-sm",

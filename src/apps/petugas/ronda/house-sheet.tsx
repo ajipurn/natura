@@ -69,7 +69,7 @@ export function HouseSheet({
           <Button
             variant="plain"
             onClick={onClose}
-            className="flex size-10 items-center justify-center rounded-full bg-idle-soft"
+            className="flex size-11 items-center justify-center rounded-full bg-idle-soft"
             aria-label="Tutup"
           >
             <X className="size-5" />
@@ -126,13 +126,13 @@ export function HouseSheet({
         )}
 
         {paymentPeriod ? (
-          <Button onClick={onClose} className="mt-5 h-12 w-full">Tutup</Button>
+          <Button onClick={onClose} className="mt-5 w-full">Tutup</Button>
         ) : byOther && !replacing ? (
           <div className="mt-5 grid gap-3">
             <Button
               variant="plain"
               onClick={onClose}
-              className="flex h-14 items-center justify-center rounded-2xl bg-primary text-lg font-bold text-primary-fg shadow-sm active:scale-[0.98]"
+              className="flex h-11 items-center justify-center rounded-2xl bg-primary text-lg font-bold text-primary-fg shadow-sm active:scale-[0.98]"
             >
               Oke, biarkan
             </Button>
@@ -163,7 +163,7 @@ export function HouseSheet({
                     variant="plain"
                     onClick={() => setAmount(p)}
                     className={cx(
-                      "rounded-full border px-3 py-1 text-sm",
+                      "h-11 rounded-full border px-3 text-sm",
                       p === amount
                         ? "border-primary bg-primary text-primary-fg"
                         : "border-line text-muted",
@@ -180,7 +180,7 @@ export function HouseSheet({
                 variant="plain"
                 onClick={() => onRecord("filled", amount)}
                 disabled={amount <= 0}
-                className="flex h-16 items-center justify-center gap-2 rounded-2xl bg-filled text-xl font-bold text-white shadow-sm active:scale-[0.98] disabled:opacity-50 dark:text-black"
+                className="flex h-11 items-center justify-center gap-2 rounded-2xl bg-filled text-xl font-bold text-white shadow-sm active:scale-[0.98] disabled:opacity-50 dark:text-black"
               >
                 <Check className="size-7" strokeWidth={3} /> Ada ·{" "}
                 <NumberTicker value={formatRupiah(amount)} />
@@ -189,7 +189,7 @@ export function HouseSheet({
                 variant="plain"
                 onClick={() => onRecord("empty", 0)}
                 disabled={keepsFilled}
-                className="flex h-14 items-center justify-center gap-2 rounded-2xl border-2 border-empty text-lg font-bold text-empty active:scale-[0.98] disabled:opacity-40"
+                className="flex h-11 items-center justify-center gap-2 rounded-2xl border-2 border-empty text-lg font-bold text-empty active:scale-[0.98] disabled:opacity-40"
               >
                 Kosong
               </Button>

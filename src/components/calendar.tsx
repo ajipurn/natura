@@ -137,7 +137,7 @@ export function Calendar({
                     onClick={() => onSelect(date)}
                     onFocus={() => setFocused(date)}
                     className={cx(
-                      "relative flex size-9 items-center justify-center rounded-lg text-sm tabular-nums outline-none transition-colors",
+                      "relative flex h-11 w-full items-center justify-center rounded-lg text-sm tabular-nums outline-none transition-colors",
                       "focus-visible:ring-2 focus-visible:ring-primary/50",
                       disabled ? "cursor-not-allowed text-muted/40" : "cursor-pointer hover:bg-idle-soft",
                       isToday && !isSelected && "font-bold text-primary ring-1 ring-inset ring-primary/40",

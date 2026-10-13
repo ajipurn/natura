@@ -82,16 +82,16 @@ export function RumahPage() {
               title="Data rumah"
               subtitle={houses.length ? `${houses.length} rumah · ${blockCount} blok` : undefined}
               action={
-                <div className="flex shrink-0 gap-2">
+                <>
                   {houses.length > 0 && (
                     <Link to={adminPath("/rumah/cetak")} className={buttonClass("secondary", "sm")} title="Cetak QR">
-                      <Printer className="size-4" /> <span className="max-sm:sr-only">Cetak QR</span>
+                      <Printer className="size-4" /> Cetak QR
                     </Link>
                   )}
                   {canEdit && <Button size="sm" onClick={() => setAdding({ block: "", number: "" })}>
                     <Plus className="size-4" /> Tambah
                   </Button>}
-                </div>
+                </>
               }
             />
 
@@ -215,7 +215,7 @@ function BlockSection({
         </h2>
         <Link
           to={adminPath(`/rumah/cetak?blok=${encodeURIComponent(block)}`)}
-          className={cx(buttonClass("ghost", "sm"), "-mr-2")}
+          className={cx(buttonClass("ghost", "sm"), "size-11 shrink-0 px-0 sm:w-auto sm:px-3")}
           title={`Cetak QR blok ${block}`}
         >
           <Printer className="size-4" /> <span className="max-sm:sr-only">Cetak QR blok</span>

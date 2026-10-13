@@ -233,7 +233,7 @@ export function AmountChoice({ value, onChange, defaultAmount }: { value: string
           onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 7))}
           inputMode="numeric"
           aria-label="Nominal (Rp)"
-          className="h-9 text-sm"
+          className="text-sm"
         />
       </div>
       {presets.map((n) => (
@@ -242,7 +242,7 @@ export function AmountChoice({ value, onChange, defaultAmount }: { value: string
           variant="plain"
           onClick={() => onChange(String(n))}
           className={cx(
-            "rounded-full border px-2.5 py-1 text-xs font-semibold",
+            "h-11 rounded-full border px-2.5 text-xs font-semibold",
             Number(value) === n ? "border-primary bg-primary/10 text-primary" : "border-line text-muted",
           )}
         >

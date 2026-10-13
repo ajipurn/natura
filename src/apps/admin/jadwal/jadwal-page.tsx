@@ -83,9 +83,8 @@ export function JadwalPage() {
       <PageHeader
         title="Jadwal ronda"
         subtitle={`Malam ini: ${dayLabel(tonight)}`}
-        className="flex-wrap sm:flex-nowrap"
         action={
-          <div className="flex w-full shrink-0 gap-2 sm:w-auto">
+          <>
             <Button
               onClick={() => exporting.mutate()}
               disabled={editing || exporting.isPending || !schedule.data?.schedule.length}
@@ -93,14 +92,14 @@ export function JadwalPage() {
               title={editing ? "Simpan atau batalkan perubahan sebelum mengekspor" : "Unduh tabel jadwal sebagai PNG"}
               variant="secondary"
               size="sm"
-              className="h-11 sm:h-9"
+              className="h-11"
             >
               <ImageDown className="size-4" /> {exporting.isPending ? "Menyiapkan…" : "Ekspor gambar"}
             </Button>
-            {canEdit && <Button onClick={() => setImportOpen(true)} variant="secondary" size="sm" className="h-11 sm:h-9">
+            {canEdit && <Button onClick={() => setImportOpen(true)} variant="secondary" size="sm" className="h-11">
               <FileSpreadsheet className="size-4" /> Impor
             </Button>}
-          </div>
+          </>
         }
       />
       {exporting.isError && (
@@ -261,14 +260,14 @@ function ScheduleEditor({
       {/* Di HP semua malam bertumpuk: pintasan untuk lompat ke malam tertentu. */}
       <nav
         aria-label="Lompat ke malam"
-        className="sticky top-14 z-10 -mx-4 mb-3 flex gap-1.5 overflow-x-auto bg-bg/95 px-4 py-2 backdrop-blur md:hidden"
+        className="sticky top-[61px] z-10 -mx-4 mb-3 flex gap-1.5 overflow-x-auto bg-bg/95 px-4 py-2 backdrop-blur md:hidden"
       >
         {days.map((day) => (
           <a
             key={day}
             href={`#malam-${day}`}
             className={cx(
-              "shrink-0 rounded-full border px-3 py-1 text-sm font-medium",
+              "h-11 shrink-0 rounded-full border px-3 text-sm font-medium",
               day === tonight ? "border-primary bg-primary text-primary-fg" : "border-line bg-card",
             )}
           >

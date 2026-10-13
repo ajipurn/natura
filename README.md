@@ -150,6 +150,21 @@ Data server ada di `.data/postgres`, dump dan cadangan di `.data/dumps`; keduany
 
 Untuk mencoba scan dari HP di jaringan yang sama, kamera butuh HTTPS. Pakai tunnel, misalnya `bunx cloudflared tunnel --url http://localhost:5173`.
 
+### Memeriksa tampilan dengan lintapple
+
+Saat `bun run dev` berjalan, jalankan `bun run lint:ui` di terminal lain. [lintapple](https://github.com/gholtzap/lintapple) memeriksa `http://localhost:5173/app` pada viewport HP (390×844) dan desktop (1440×900), setelah judul halaman React terlihat. Chromium diunduh otomatis saat pemeriksaan pertama. Tanpa sesi login, yang diperiksa adalah halaman masuk.
+
+`ui-policy.json` mengikuti font sans-serif di `src/styles.css`, font monospace Tailwind, dan ukuran teks yang dipakai aplikasi: 9–14, 16, 18, 20, 24, 30, 36, dan 60 piksel. `typeRules` kosong supaya heading dan tombol memakai skala tersebut; ukuran label denah SVG dikecualikan karena dihitung dari ukuran kavling. Pemeriksaan label mengabaikan input internal Base UI yang tersembunyi; kolom yang terlihat tetap diperiksa. Pemeriksaan memakai tema terang bawaan aplikasi; pilihan tema gelap disimpan di aplikasi, bukan mengikuti `prefers-color-scheme`.
+
+Untuk halaman lain, port berbeda, atau hasil JSON:
+
+```bash
+bunx --no-install lintapple http://localhost:5173/admin --ready 'main h1'
+bunx --no-install lintapple https://app.clusternatura.com/ --ready 'main h1' --json
+```
+
+Kode keluar: `0` lolos, `1` ada temuan UI, `2` pemeriksaan tidak selesai. Temuan menampilkan aturan, elemen, nilai yang diukur, dan saran perbaikan.
+
 ## Deploy ke Vercel + Supabase
 
 Keempat bagian (hasil build Vite) dilayani sebagai file statis, API di `/api/*` berjalan sebagai satu Vercel Function (Node), dan datanya di Postgres Supabase. `bun run build` menyusun semuanya di `.vercel/output` (Build Output API); `vercel.json` membuat Vercel memakai Bun dan perintah build itu. Routing host ada di `scripts/app-routing.ts`, dipakai juga oleh dev/preview.

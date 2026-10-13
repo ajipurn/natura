@@ -17,7 +17,7 @@ export function LogoSettings({ logoUrl }: { logoUrl: string | null }) {
     // Logo tampil di dashboard, stiker QR, Beranda app, halaman rumah, dan sebagai favicon.
     onSuccess: () => {
       refreshFavicon();
-      return invalidate(["admin"], ["warga"], ["rumah"]);
+      return invalidate(["admin"], ["warga"], ["rumah"], ["rekap"]);
     },
   });
 

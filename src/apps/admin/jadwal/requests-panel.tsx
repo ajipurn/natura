@@ -156,7 +156,7 @@ function PendingRequest({ request: r, locked }: { request: Request; locked: bool
             autoFocus
             placeholder="Alasan (opsional), mis. malam Rabu sudah penuh"
             aria-label="Alasan menolak"
-            className="h-9 min-w-0 flex-1 text-sm"
+            className="min-w-0 flex-1 text-sm"
           />
           <Button onClick={() => setRejecting(false)} variant="ghost" size="sm">
             Batal

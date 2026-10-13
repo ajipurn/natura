@@ -41,7 +41,7 @@ export function PaymentPanel({ month }: { month: string }) {
           <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><ReceiptText className="size-5" aria-hidden /></div>
           <div className="min-w-0"><h2 className="font-semibold">Pembayaran</h2><p className="mt-0.5 text-pretty text-sm text-muted">Catat pembayaran bulanan dan rapel warga.</p></div>
         </div>
-        <Button size="sm" className="h-11 w-full shrink-0 transition-[background-color,color,box-shadow,scale] active:scale-[0.96] motion-reduce:active:scale-100 @xl:h-9 @xl:w-auto" onClick={() => record()}><Plus className="size-4" aria-hidden /> Catat pembayaran</Button>
+        <Button size="sm" className="h-11 w-full shrink-0 transition-[background-color,color,box-shadow,scale] active:scale-[0.96] motion-reduce:active:scale-100 @xl:w-auto" onClick={() => record()}><Plus className="size-4" aria-hidden /> Catat pembayaran</Button>
       </div>
       <QueryState query={query}>
         {(data) => {

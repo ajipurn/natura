@@ -114,16 +114,7 @@ export function AdminLayout({
             onClick={() => setOpen(false)}
           />
           <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-card shadow-xl">
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Tutup menu"
-              onClick={() => setOpen(false)}
-              className="absolute right-2 top-3"
-            >
-              <X className="size-5" />
-            </Button>
-            <Sidebar user={user} />
+            <Sidebar user={user} onClose={() => setOpen(false)} />
           </aside>
         </div>
       )}
@@ -140,7 +131,7 @@ export function AdminLayout({
           </Button>
           <span className="font-semibold">Cluster Natura</span>
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-5 lg:px-8 lg:pt-8 print:max-w-none print:p-0">
+        <main className="mx-auto min-w-0 w-full max-w-6xl flex-1 px-4 pb-16 pt-5 lg:px-8 lg:pt-8 print:max-w-none print:p-0">
           {children}
         </main>
       </div>
@@ -148,7 +139,7 @@ export function AdminLayout({
   );
 }
 
-function Sidebar({ user }: { user: SessionUser }) {
+function Sidebar({ user, onClose }: { user: SessionUser; onClose?: () => void }) {
   const navigate = useNavigate();
   // Jumlah permintaan ubah jadwal yang menunggu, tampil di menu Jadwal ronda.
   const pendingRequests = useQuery({ ...requestsQuery, enabled: can(user.role, "schedule", true) }).data?.pending ?? 0;
@@ -172,10 +163,13 @@ function Sidebar({ user }: { user: SessionUser }) {
           alt=""
           className="h-10 w-12 shrink-0 rounded-lg object-contain"
         />
-        <div className="min-w-0">
-          <p className="text-lg font-bold tracking-tight">Cluster Natura</p>
+        <div className="min-w-0 flex-1">
+          <p className={cx("font-bold tracking-tight", onClose ? "text-base" : "text-lg")}>Cluster Natura</p>
           <p className="mt-0.5 text-xs font-medium text-muted">Dashboard · {ROLE_LABEL[user.role]}</p>
         </div>
+        {onClose && <Button variant="ghost" size="icon" aria-label="Tutup menu" onClick={onClose} className="size-11 shrink-0">
+          <X className="size-5" aria-hidden />
+        </Button>}
       </div>
       <ScrollArea
         element="nav"
@@ -214,7 +208,7 @@ function Sidebar({ user }: { user: SessionUser }) {
         <ThemeSwitch />
         <a
           href={petugasPath("/")}
-          className="flex items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium hover:bg-idle-soft"
+          className="flex min-h-11 items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium hover:bg-idle-soft"
         >
           <Smartphone className="size-5 text-primary" aria-hidden /> Buka app
         </a>
@@ -222,7 +216,7 @@ function Sidebar({ user }: { user: SessionUser }) {
           variant="plain"
           onClick={() => logout.mutate()}
           disabled={logout.isPending}
-          className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-sm font-medium text-empty hover:bg-empty-soft"
+          className="flex min-h-11 w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-sm font-medium text-empty hover:bg-empty-soft"
         >
           <LogOut className="size-5" /> Keluar
           <span className="ml-auto truncate text-xs font-normal text-muted">
@@ -247,7 +241,7 @@ function SidebarLink({
       end={end}
       className={({ isActive }) =>
         cx(
-          "flex items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium",
+          "flex min-h-11 items-center gap-3 rounded-xl px-2 py-2 text-sm font-medium",
           isActive
             ? "bg-primary/12 text-primary"
             : "text-fg hover:bg-idle-soft",

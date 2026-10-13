@@ -9,7 +9,7 @@ import {
   ReceiptText,
 } from "lucide-react";
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { useSearchParams } from "react-router";
 import { api, call } from "@/client/api";
 import { invalidate } from "@/client/query";
 import { receiptImage } from "@/client/receipt-image";
@@ -19,7 +19,7 @@ import { Dialog } from "@/components/dialog";
 import { QueryState } from "@/components/query-state";
 import { RupiahInput } from "@/components/rupiah-input";
 import { Select } from "@/components/select";
-import { ChipGroup } from "@/components/toggle-group";
+import { SegmentedControl, segmentedFrameClass } from "@/components/toggle-group";
 import {
   Alert,
   Button,
@@ -27,10 +27,8 @@ import {
   Field,
   Input,
   PageHeader,
-  buttonClass,
   cx,
 } from "@/components/ui";
-import { adminPath } from "@/lib/app-paths";
 import {
   formatDateShort,
   formatMonth,
@@ -104,43 +102,39 @@ export function IuranPage() {
       <PageHeader
         title="Iuran"
         subtitle="Tagihan lingkungan per rumah dan penerimaan pembayarannya."
-        className="max-sm:flex-col"
         action={
-          <div className="flex flex-wrap gap-2">
-            <Link
-              to={adminPath("/kas")}
-              className={buttonClass("secondary", "sm")}
-            >
-              Lihat kas
-            </Link>
-            <Button size="sm" onClick={() => setIssuing(true)}>
-              <ReceiptText className="size-4" />
-              Terbitkan tagihan
-            </Button>
-          </div>
+          <Button size="sm" onClick={() => setIssuing(true)}>
+            <ReceiptText className="size-4" />
+            Terbitkan tagihan
+          </Button>
         }
       />
-      <div className="mb-5 flex items-center justify-between gap-3">
-        <nav aria-label="Bulan iuran" className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Bulan sebelumnya"
-            onClick={() => setParams({ bulan: shiftMonth(month, -1) })}
-          >
-            <ChevronLeft className="size-5" />
-          </Button>
-          <span className="text-sm font-semibold">{formatMonth(month)}</span>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Bulan berikutnya"
-            onClick={() => setParams({ bulan: shiftMonth(month, 1) })}
-          >
-            <ChevronRight className="size-5" />
-          </Button>
-        </nav>
-      </div>
+      <nav
+        aria-label="Pilih bulan"
+        className={cx(segmentedFrameClass, "mb-5 w-full sm:inline-flex sm:w-auto")}
+      >
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="h-9.5 w-9.5 rounded-[9px]"
+          aria-label="Bulan sebelumnya"
+          onClick={() => setParams({ bulan: shiftMonth(month, -1) })}
+        >
+          <ChevronLeft className="size-5" />
+        </Button>
+        <span className="flex min-w-0 flex-1 items-center justify-center whitespace-nowrap px-2 text-center font-semibold sm:min-w-36 sm:flex-none">
+          {formatMonth(month)}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="h-9.5 w-9.5 rounded-[9px]"
+          aria-label="Bulan berikutnya"
+          onClick={() => setParams({ bulan: shiftMonth(month, 1) })}
+        >
+          <ChevronRight className="size-5" />
+        </Button>
+      </nav>
       <QueryState query={query}>
         {(data) => {
           const active = data.bills.filter((bill) => !bill.cancelledAt);
@@ -189,8 +183,9 @@ export function IuranPage() {
                   </p>
                 </Card>
               </div>
-              <ChipGroup
+              <SegmentedControl
                 aria-label="Bagian iuran"
+                fill
                 value={view}
                 onValueChange={setView}
                 options={[

@@ -18,11 +18,12 @@ import {
 } from "lucide-react";
 import { useState, type ComponentType, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
+import { useAuth } from "@/client/auth";
 import { ErrorCard, QueryState } from "@/components/query-state";
 import { ScrollArea } from "@/components/scroll-area";
 import { ShareRecap } from "@/components/share-recap";
 import { SitePlanMap } from "@/components/site-plan-map";
-import { ChipGroup, SegmentedControl } from "@/components/toggle-group";
+import { ChipGroup, SegmentedControl, segmentedFrameClass } from "@/components/toggle-group";
 import { Button, Card, Input, PageTitle, cx } from "@/components/ui";
 import {
   addDays,
@@ -35,6 +36,9 @@ import {
 import { formatRupiah } from "@/lib/format";
 import { rondaHouseState } from "@/lib/house-state";
 import { CADENCE_LABEL, type BillingPeriod } from "@/lib/payments";
+import { canShareRecap } from "@/lib/permissions";
+import { scheduleDay } from "@/lib/schedule";
+import { scheduleQuery } from "@/features/jadwal/queries";
 import { groupByBlock, houseLabel, searchHouses } from "@/lib/houses";
 import { buildRecapText, summarize } from "@/lib/recap";
 import type { CollectionDTO, HouseDTO } from "@/lib/types";
@@ -90,6 +94,9 @@ export function PatrolDetail({
   const valid = isIsoDate(date);
   const query = useQuery({ ...patrolQuery(date), enabled: valid });
   const tonight = rondaDate(new Date());
+  const user = useAuth().data?.user;
+  const schedule = useQuery({ ...scheduleQuery, enabled: valid && user?.role === "petugas", refetchInterval: 60_000 });
+  const onDuty = Boolean(user && schedule.data?.schedule.some((slot) => slot.userId === user.id && slot.day === scheduleDay(tonight)));
   const [params] = useSearchParams();
   const tab: Tab = log && params.get("tab") === "log" ? "log" : "rumah";
   // Pindah malam tetap di tab yang sama.
@@ -108,10 +115,10 @@ export function PatrolDetail({
           <ArrowLeft className="size-4" /> Riwayat
         </Link>
         {valid && (
-          <div className="flex items-center rounded-xl border border-line bg-card p-0.5">
+          <div className={segmentedFrameClass}>
             <Link
               to={`${basePath}/${addDays(date, -1)}${search}`}
-              className="flex h-8 items-center gap-1 rounded-lg px-2 text-muted hover:bg-idle-soft hover:text-fg"
+              className="flex h-9.5 min-w-9.5 items-center justify-center gap-1 rounded-[9px] px-2 text-muted hover:bg-idle-soft hover:text-fg"
               aria-label={`Malam sebelumnya, ${formatDateShort(addDays(date, -1))}`}
             >
               <ChevronLeft className="size-4" />
@@ -126,14 +133,14 @@ export function PatrolDetail({
               label="Pilih tanggal lain"
               variant="ghost"
               size="icon-sm"
-              triggerClassName="text-muted hover:text-fg"
+              triggerClassName="h-9.5 w-9.5 rounded-[9px] text-muted hover:text-fg"
             >
               <CalendarDays className="size-4" />
             </NightPicker>
             {date < tonight ? (
               <Link
                 to={`${basePath}/${addDays(date, 1)}${search}`}
-                className="flex h-8 items-center gap-1 rounded-lg px-2 text-muted hover:bg-idle-soft hover:text-fg"
+                className="flex h-9.5 min-w-9.5 items-center justify-center gap-1 rounded-[9px] px-2 text-muted hover:bg-idle-soft hover:text-fg"
                 aria-label={`Malam berikutnya, ${formatDateShort(addDays(date, 1))}`}
               >
                 <span className="hidden sm:inline">
@@ -144,7 +151,7 @@ export function PatrolDetail({
             ) : (
               <span
                 aria-hidden
-                className="flex h-8 items-center px-2 text-muted/40"
+                className="flex h-9.5 min-w-9.5 items-center justify-center px-2 text-muted/40"
               >
                 <ChevronRight className="size-4" />
               </span>
@@ -167,6 +174,7 @@ export function PatrolDetail({
               defaultAmount={settings.defaultAmount}
               // Malam yang belum tiba belum bisa diisi.
               canCorrect={canCorrect && date <= tonight}
+              canShare={Boolean(user && canShareRecap(user.role, onDuty))}
               log={log}
               tab={tab}
               logTo={`${basePath}/${date}?tab=log`}
@@ -196,6 +204,7 @@ export function PatrolSummary({ date, intro }: { date: string; intro?: ReactNode
           communityName={settings.communityName}
           defaultAmount={settings.defaultAmount}
           canCorrect={false}
+          canShare={false}
           tab="rumah"
           logTo=""
         />
@@ -213,6 +222,7 @@ function NightDetail({
   communityName,
   defaultAmount,
   canCorrect,
+  canShare,
   log,
   tab,
   logTo,
@@ -227,6 +237,7 @@ function NightDetail({
   communityName: string;
   defaultAmount: number;
   canCorrect: boolean;
+  canShare: boolean;
   log?: NightLogSlot;
   tab: Tab;
   logTo: string;
@@ -292,15 +303,16 @@ function NightDetail({
 
       {intro && <div className="mb-4">{intro}</div>}
 
-      <Card>
-        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-          <div>
-            <p className="text-xs text-muted">Terkumpul</p>
-            <p className="text-3xl font-bold tabular-nums">
-              <NumberTicker value={formatRupiah(summary.total)} />
-            </p>
-          </div>
-          <dl className="grid grid-cols-3 gap-4 text-center sm:gap-6">
+      <Card className="overflow-hidden p-0" aria-label="Ringkasan jimpitan">
+        <div className="bg-primary/5 px-5 py-4 sm:px-6">
+          <p className="text-sm font-medium text-muted">Terkumpul</p>
+          <p className="mt-1 break-words text-3xl font-bold tracking-tight tabular-nums">
+            <NumberTicker value={formatRupiah(summary.total)} />
+          </p>
+          <p className="mt-1 text-xs text-muted">Uang yang diambil saat ronda.</p>
+        </div>
+        <div className="space-y-4 p-5 sm:p-6">
+          <dl className="grid grid-cols-3 gap-3 text-center sm:gap-6">
             <Stat
               label="Ada"
               value={summary.filled.length}
@@ -313,83 +325,90 @@ function NightDetail({
             />
             <Stat label="Belum dicek" value={summary.unchecked.length} />
           </dl>
-        </div>
-        <div
-          className="mt-3 flex h-2 overflow-hidden rounded-full bg-idle-soft"
-          aria-hidden
-        >
-          <div
-            className="h-full bg-filled"
-            style={{
-              width: `${percent(summary.filled.length, summary.expected)}%`,
-            }}
-          />
-          <div
-            className="h-full bg-empty"
-            style={{
-              width: `${percent(summary.empty.length, summary.expected)}%`,
-            }}
-          />
-        </div>
-        <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted">
-          <span>
-            {summary.checked} dari {summary.expected} rumah dicek
-            {summary.vacant.length > 0 && ` · ${summary.vacant.length} mudik`}
-          </span>
-          {summary.collectors.length > 0 && (
-            <span className="flex items-center gap-1.5">
-              <Users className="size-4" aria-hidden />{" "}
-              {summary.collectors.join(", ")}
-            </span>
-          )}
-          <PatrolStamp date={date} checked={summary.checked} expected={summary.expected} />
-        </p>
-        {summary.checked > 0 ? (
-          <ShareRecap
-            className="mt-4"
-            text={buildRecapText({ communityName, date, houses, collections, paymentPeriods })}
-          />
-        ) : (
-          <p className="mt-4 rounded-xl bg-idle-soft px-3 py-2.5 text-sm text-muted">
-            Belum ada catatan untuk malam ini.
-            {canCorrect &&
-              " Isi semua rumah sekaligus, lalu ubah yang berbeda lewat tombol koreksi di daftar."}
-          </p>
-        )}
-        {paymentPeriods.length > 0 && <p className="mt-3 text-xs text-muted">Status periode otomatis dari pembayaran; tidak perlu discan. Nominal terkumpul hanya uang yang diambil saat ronda.</p>}
-        {canCorrect &&
-          summary.unchecked.length > 0 &&
-          (bulkFilling ? (
-            <section
-              aria-label="Isi yang belum dicek"
-              className="mt-4 max-w-xl border-t border-line pt-3"
+          <div className="space-y-2">
+            <div
+              className="flex h-2 overflow-hidden rounded-full bg-idle-soft"
+              role="progressbar"
+              aria-label="Progres ronda"
+              aria-valuemin={0}
+              aria-valuemax={summary.expected}
+              aria-valuenow={summary.checked}
+              aria-valuetext={`${summary.checked} dari ${summary.expected} rumah dicek`}
             >
-              <p className="text-sm font-semibold">
-                Isi {summary.unchecked.length} rumah yang belum dicek
-              </p>
-              <p className="mb-2.5 text-xs text-muted">
-                Semuanya dicatat sama.
-                {summary.vacant.length > 0 && " Rumah mudik tidak ikut."} Rumah
-                yang berbeda bisa dikoreksi sesudahnya.
-              </p>
-              <BulkFillForm
-                date={date}
-                houseIds={summary.unchecked.map((h) => h.id)}
-                defaultAmount={defaultAmount}
-                onDone={() => setBulkFilling(false)}
+              <div
+                className="h-full bg-filled"
+                style={{
+                  width: `${percent(summary.checked - summary.empty.length, summary.expected)}%`,
+                }}
               />
-            </section>
-          ) : (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="mt-3"
-              onClick={() => setBulkFilling(true)}
-            >
-              <ListChecks className="size-4" /> Isi yang belum dicek (
-              {summary.unchecked.length})
-            </Button>
-          ))}
+              <div
+                className="h-full bg-empty"
+                style={{
+                  width: `${percent(summary.empty.length, summary.expected)}%`,
+                }}
+              />
+            </div>
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted">
+              <span>
+                {summary.checked} dari {summary.expected} rumah dicek
+                {summary.vacant.length > 0 && ` · ${summary.vacant.length} mudik`}
+              </span>
+              {summary.collectors.length > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <Users className="size-4" aria-hidden />{" "}
+                  {summary.collectors.join(", ")}
+                </span>
+              )}
+              <PatrolStamp date={date} checked={summary.checked} expected={summary.expected} />
+            </p>
+          </div>
+          {canShare && summary.checked > 0 && (
+            <ShareRecap
+              text={buildRecapText({ communityName, date, houses, collections, paymentPeriods })}
+            />
+          )}
+          {summary.checked === 0 && (
+            <p className="rounded-xl bg-idle-soft px-3 py-2.5 text-sm text-muted">
+              Belum ada catatan untuk malam ini.
+              {canCorrect &&
+                " Isi semua rumah sekaligus, lalu ubah yang berbeda lewat tombol koreksi di daftar."}
+            </p>
+          )}
+          {paymentPeriods.length > 0 && <p className="text-xs leading-relaxed text-muted">Status periode otomatis dari pembayaran; tidak perlu discan.</p>}
+          {canCorrect &&
+            summary.unchecked.length > 0 &&
+            (bulkFilling ? (
+              <section
+                aria-label="Isi yang belum dicek"
+                className="mt-4 max-w-xl border-t border-line pt-3"
+              >
+                <p className="text-sm font-semibold">
+                  Isi {summary.unchecked.length} rumah yang belum dicek
+                </p>
+                <p className="mb-2.5 text-xs text-muted">
+                  Semuanya dicatat sama.
+                  {summary.vacant.length > 0 && " Rumah mudik tidak ikut."} Rumah
+                  yang berbeda bisa dikoreksi sesudahnya.
+                </p>
+                <BulkFillForm
+                  date={date}
+                  houseIds={summary.unchecked.map((h) => h.id)}
+                  defaultAmount={defaultAmount}
+                  onDone={() => setBulkFilling(false)}
+                />
+              </section>
+            ) : (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-3"
+                onClick={() => setBulkFilling(true)}
+              >
+                <ListChecks className="size-4" /> Isi yang belum dicek (
+                {summary.unchecked.length})
+              </Button>
+            ))}
+        </div>
       </Card>
 
       {log && (
@@ -397,10 +416,11 @@ function NightDetail({
           {tab === "rumah" && <log.Alerts date={date} logTo={logTo} />}
           <SegmentedControl
             aria-label="Isi detail malam"
+            fill
             value={tab}
             onValueChange={(next) => setParams(next === "log" ? { tab: "log" } : {}, { replace: true })}
             options={TABS}
-            className="mt-5 w-fit"
+            className="mt-5"
           />
         </>
       )}

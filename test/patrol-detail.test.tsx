@@ -4,9 +4,10 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PatrolDetail } from "@/features/riwayat/patrol-detail";
+import { PatrolDetail, PatrolSummary } from "@/features/riwayat/patrol-detail";
 import { PatrolList } from "@/features/riwayat/patrol-list";
 import type { BillingPeriod } from "@/lib/payments";
+import { scheduleDay } from "@/lib/schedule";
 
 const period: BillingPeriod = { houseId: 1, planId: 1, cadence: "monthly", start: "2026-10-01", end: "2026-10-31", expected: 15500, paid: 0, remaining: 15500, status: "unpaid" };
 let container: HTMLDivElement;
@@ -22,6 +23,7 @@ beforeEach(() => {
   document.body.append(container);
   root = createRoot(container);
   client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
+  client.setQueryData(["auth"], { setupNeeded: false, user: { id: 1, name: "Admin", role: "admin" } });
 });
 
 afterEach(async () => {
@@ -55,7 +57,7 @@ describe("detail riwayat mengikuti pembayaran periode", () => {
     await render(period);
     expect(container.textContent).toContain("Bulanan · Belum bayar");
     expect(container.textContent).not.toContain("Isi yang belum dicek (");
-    expect(container.textContent).toContain("Nominal terkumpul hanya uang yang diambil saat ronda");
+    expect(container.textContent).toContain("Uang yang diambil saat ronda");
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -79,6 +81,55 @@ describe("detail riwayat mengikuti pembayaran periode", () => {
     expect(night.textContent).toContain("1 belum dicek");
     expect(night.textContent).toContain("Rp 500");
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("bagikan rekap sesuai role dan jadwal malam ini", () => {
+  it.each([
+    ["warga", 1, 0, false],
+    ["warga", 1, 1, false],
+    ["petugas", 1, 1, false],
+    ["petugas", 1, 0, true],
+    ["petugas", 2, 0, false],
+    ["admin", 2, 1, true],
+    ["sekretaris", 2, 1, true],
+  ] as const)("%s dengan jadwal akun %i dan offset malam %i: bagikan %s", async (role, assignedUser, offset, allowed) => {
+    client.setQueryData(["auth"], { setupNeeded: false, user: { id: 1, name: "Pengguna", role } });
+    client.setQueryData(["jadwal"], { schedule: [{ userId: assignedUser, day: (scheduleDay("2026-10-07") + offset) % 7 }] });
+    await render(period);
+    expect(container.textContent?.includes("Bagikan rekap")).toBe(allowed);
+    expect(Boolean(container.querySelector('button[aria-label="Salin teks rekap"]'))).toBe(allowed);
+    expect(container.textContent).not.toContain("Belum ada catatan untuk malam ini");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("ringkasan warga tetap menampilkan uang dan status tanpa bagikan atau salin", async () => {
+    await render(period);
+    await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><PatrolSummary date="2026-10-07" /></MemoryRouter></QueryClientProvider>));
+    expect(container.textContent).toContain("Rp 0");
+    expect(container.querySelector('[aria-label="Progres ronda"]')?.getAttribute("aria-valuenow")).toBe("1");
+    expect(container.textContent).not.toContain("Bagikan rekap");
+    expect(container.querySelector('button[aria-label="Salin teks rekap"]')).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("uang dari rumah mudik tidak menambah bagian hijau progres rumah aktif", async () => {
+    await render(period);
+    await act(async () => client.setQueryData(["riwayat", "2026-10-07"], {
+      houses: [
+        { id: 1, block: "A", number: "5", status: "active" },
+        { id: 2, block: "A", number: "6", status: "vacant" },
+      ],
+      collections: [{ houseId: 2, status: "filled", amount: 500, collectorName: null, method: "manual", recordedAt: "2026-10-07T12:00:00Z" }],
+      settings: { communityName: "Natura", defaultAmount: 500 }, paymentPeriods: [period],
+    }));
+    await vi.waitFor(() => expect(container.textContent).toContain("Rp 500"));
+    const progress = container.querySelector('[aria-label="Progres ronda"]')!;
+    expect(progress.getAttribute("aria-valuemax")).toBe("1");
+    expect(progress.getAttribute("aria-valuenow")).toBe("1");
+    expect(progress.querySelector<HTMLElement>(".bg-filled")?.style.width).toBe("0%");
+    expect(progress.querySelector<HTMLElement>(".bg-empty")?.style.width).toBe("100%");
+    expect(container.textContent).toContain("Rp 500");
   });
 });
 

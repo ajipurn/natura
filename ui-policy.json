@@ -1,0 +1,46 @@
+{
+  "fonts": [
+    "ui-sans-serif",
+    "system-ui",
+    "-apple-system",
+    "Segoe UI",
+    "Roboto",
+    "Helvetica Neue",
+    "Arial",
+    "sans-serif",
+    "ui-monospace",
+    "SFMono-Regular",
+    "Menlo",
+    "Monaco",
+    "Consolas",
+    "Liberation Mono",
+    "Courier New",
+    "monospace"
+  ],
+  "fontSizes": [9, 10, 11, 12, 13, 14, 16, 18, 20, 24, 30, 36, 60],
+  "typeRules": [],
+  "minControlSize": 15,
+  "controlSizeRules": [],
+  "minControlGap": 8,
+  "minControlInset": 8,
+  "controlContainers": ["[data-ui-container]"],
+  "minLayoutGap": 8,
+  "bannedCopy": ["unlock your potential", "seamlessly", "game-changing"],
+  "viewports": [
+    { "width": 390, "height": 844 },
+    { "width": 1440, "height": 900 }
+  ],
+  "colorSchemes": ["light"],
+  "exceptions": [
+    {
+      "selector": "input[aria-hidden=\"true\"][tabindex=\"-1\"][name]",
+      "rules": ["form-label"],
+      "reason": "Input internal Base UI hanya menyimpan nilai form; kolom combobox yang terlihat sudah terhubung dengan label."
+    },
+    {
+      "selector": "svg[aria-label^=\"Denah \"] text",
+      "rules": ["font-size"],
+      "reason": "Ukuran label denah dihitung dari ukuran kavling dalam koordinat SVG dan ikut diperbesar saat zoom."
+    }
+  ]
+}

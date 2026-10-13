@@ -128,7 +128,7 @@ export function CashTransactions({ transactions, month, onEdit }: {
             <span>Masuk <strong className="font-semibold text-filled"><NumberTicker value={formatRupiah(income)} /></strong></span>
             <span>Keluar <strong className="font-semibold text-empty"><NumberTicker value={formatRupiah(expenses)} /></strong></span>
           </div>
-          {filtered && <Button variant="ghost" size="sm" className="h-8 px-0" onClick={clear}>Hapus filter</Button>}
+          {filtered && <Button variant="ghost" size="sm" className="px-0" onClick={clear}>Hapus filter</Button>}
         </div>
       </Card>
     </section>

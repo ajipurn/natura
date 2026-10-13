@@ -46,6 +46,7 @@ import { TonightGuards } from "./tonight-guards";
 import { type MergedCollection, type SyncStatus } from "./use-ronda-store";
 import { useRondaStore } from "./ronda-store";
 import { recordingHoursLabel } from "@/lib/recording-window";
+import { canShareRecap } from "@/lib/permissions";
 import { adminPath, petugasPath } from "@/lib/app-paths";
 
 type Toast = { text: string; tone: "ok" | "error" };
@@ -243,11 +244,11 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
       value={view}
       onValueChange={changeView}
       options={VIEWS}
-      className="[&>button]:h-11"
     />
   );
   const allDone = summary.unchecked.length === 0 && summary.checked > 0;
-  const recap = (
+  const canShare = canShareRecap(snapshot.user.role, onDuty);
+  const recap = canShare ? (
     <ShareRecap
       text={buildRecapText({
         communityName: snapshot.settings.communityName,
@@ -257,7 +258,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
         paymentPeriods,
       })}
     />
-  );
+  ) : null;
 
   return (
     <main>
@@ -457,17 +458,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                       ["sudah", "Sudah", summary.checked],
                       ["semua", "Semua", houses.length],
                     ] as const
-                  ).map(([value, label, count]) => ({
-                    value,
-                    label: (
-                      <>
-                        {label}{" "}
-                        <span className="text-xs font-normal">{count}</span>
-                      </>
-                    ),
-                    className: "px-2",
-                  }))}
-                  className="[&>button]:h-11"
+                  ).map(([value, label, count]) => ({ value, label, count }))}
                 />
               )}
             </div>
@@ -538,12 +529,12 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                     ? "Semua rumah selesai"
                     : "Tidak ada rumah yang perlu dicek"}
                 </p>
-                {allDone && (
+                {allDone && canShare && (
                   <p className="mt-1 text-sm text-muted">
                     Kirim rekapnya ke grup warga.
                   </p>
                 )}
-                {allDone && <div className="mt-4">{recap}</div>}
+                {allDone && canShare && <div className="mt-4">{recap}</div>}
               </Card>
             ) : (
               <HouseList
@@ -558,7 +549,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
             )}
 
             {/* Rekap bisa dibagikan kapan saja; saat semua selesai tombolnya ada di kartu di atas. */}
-            {!(allDone && view === "list" && filter === "belum") && (
+            {canShare && !(allDone && view === "list" && filter === "belum") && (
               <div className="mt-6 border-t border-line pt-4">
                 <p className="mb-2 text-sm font-semibold">Rekap malam ini</p>
                 {recap}

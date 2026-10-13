@@ -4,6 +4,10 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cx } from "./ui";
 
+/** Tinggi 44 px; inset = border 1 px + padding 2 px, jadi radius dalam = 12 - 3 = 9 px. */
+export const segmentedFrameClass = "flex h-11 min-h-11 items-stretch rounded-xl border border-line bg-card p-0.5";
+export const segmentedItemClass = "inline-flex h-9.5 select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-[9px] px-3 text-sm font-semibold text-muted transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset data-disabled:opacity-40";
+
 export type ToggleOption<T extends string> = {
   value: T;
   label: ReactNode;
@@ -79,7 +83,7 @@ export function ChipGroup<T extends string>(props: {
       // Semua chip bertepi sama tegas dan chip aktif hanya diwarnai tipis: chip aktif yang diisi
       // warna penuh tampak lebih besar dari chip putih bertepi samar, walau ukurannya sama persis.
       // Tanda fokus di dalam chip supaya tidak terpotong oleh baris chip yang bisa digulir.
-      itemClassName="inline-flex shrink-0 select-none items-center gap-1 whitespace-nowrap rounded-full border border-fg/15 bg-card px-3 py-1.5 text-sm font-medium text-muted transition -outline-offset-4 hover:border-fg/30 hover:text-fg focus-visible:outline-2 focus-visible:outline-primary data-disabled:opacity-40 data-pressed:border-primary data-pressed:bg-primary/10 data-pressed:text-primary data-pressed:hover:border-primary data-pressed:hover:text-primary"
+      itemClassName="inline-flex h-11 shrink-0 select-none items-center gap-1 whitespace-nowrap rounded-full border border-fg/15 bg-card px-3 text-sm font-medium text-muted transition -outline-offset-4 hover:border-fg/30 hover:text-fg focus-visible:outline-2 focus-visible:outline-primary data-disabled:opacity-40 data-pressed:border-primary data-pressed:bg-primary/10 data-pressed:text-primary data-pressed:hover:border-primary data-pressed:hover:text-primary"
     />
   );
 }
@@ -92,7 +96,6 @@ export function SegmentedControl<T extends string>({
   compact = false,
   iconOnly = false,
   fill = false,
-  size = "md",
   ...props
 }: {
   value: T;
@@ -104,18 +107,23 @@ export function SegmentedControl<T extends string>({
   iconOnly?: boolean;
   /** Pilihan dibagi rata selebar wadahnya. */
   fill?: boolean;
-  size?: "md" | "sm";
 }) {
   return (
     <SingleToggleGroup
       {...props}
-      className={cx("flex rounded-xl border border-line bg-card p-0.5", props.className)}
+      className={cx(
+        segmentedFrameClass,
+        fill && "w-full",
+        iconOnly ? "gap-0.5" : compact && "max-sm:gap-0.5",
+        props.className,
+      )}
       labelClassName={iconOnly ? "sr-only" : compact ? "max-sm:sr-only" : undefined}
       itemClassName={cx(
-        "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-muted transition hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 data-disabled:opacity-40 data-pressed:bg-primary data-pressed:text-primary-fg data-pressed:hover:text-primary-fg",
-        iconOnly && "px-2.5",
-        size === "md" ? "h-9.5" : "h-8",
-        fill && "flex-1",
+        segmentedItemClass,
+        "data-pressed:bg-primary data-pressed:text-primary-fg data-pressed:hover:text-primary-fg",
+        iconOnly && "w-9.5 shrink-0 gap-0 px-0 [&>svg]:size-4.5",
+        compact && "max-sm:w-9.5 max-sm:shrink-0 max-sm:gap-0 max-sm:px-0 max-sm:[&>svg]:size-4.5",
+        fill && "min-w-0 flex-1 whitespace-normal leading-tight",
       )}
     />
   );

@@ -64,9 +64,9 @@ export function AccountsPanel() {
       .sort(sort === "rumah" ? byHouse : byName);
     const editingUser = users.find((user) => user.id === editingId);
     return <>
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted">{counts.semua} akun aktif · {counts.pengurus} pengurus</p>
-        {canEdit && <Button onClick={() => open("baru")} size="sm"><UserPlus className="size-4" aria-hidden /> Buat akun</Button>}
+        {canEdit && <Button onClick={() => open("baru")} size="sm" className="shrink-0"><UserPlus className="size-4" aria-hidden /> Buat akun</Button>}
       </div>
       <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center">
         <label className="relative block lg:w-72 lg:shrink-0">
@@ -80,7 +80,7 @@ export function AccountsPanel() {
       </div>
       <div className="mb-2 flex flex-wrap items-end justify-between gap-x-3 gap-y-2 text-sm">
         <p className="text-muted"><span className="font-semibold text-fg">{shown.length}</span> akun</p>
-        <div className="w-48"><Select label="Urutkan" value={sort} onValueChange={setSort} options={SORTS} className="h-9" /></div>
+        <div className="w-48"><Select label="Urutkan" value={sort} onValueChange={setSort} options={SORTS} className="text-sm" /></div>
       </div>
       {shown.length ? <div className="overflow-hidden rounded-2xl border border-line bg-card">
         <div className={cx("hidden items-center gap-3 border-b border-line px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted sm:grid", ROW_GRID)} aria-hidden>

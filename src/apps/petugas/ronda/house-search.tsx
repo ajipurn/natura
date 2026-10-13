@@ -39,7 +39,7 @@ export function HouseSearch({
           <Button
             variant="plain"
             onClick={onClose}
-            className="flex size-10 items-center justify-center rounded-full bg-idle-soft"
+            className="flex size-11 items-center justify-center rounded-full bg-idle-soft"
             aria-label="Tutup"
           >
             <X className="size-5" />
@@ -62,7 +62,7 @@ export function HouseSearch({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Contoh: A12, 12, atau nama KK"
             aria-label="Cari rumah"
-            className="h-12 w-full rounded-xl border border-line bg-bg pl-10 pr-3 text-lg focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="h-11 w-full rounded-xl border border-line bg-bg pl-10 pr-3 text-lg focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </form>
         <p className="mt-2 text-xs text-muted">Untuk QR yang tidak bisa di-scan. Catatan ditandai “manual” di riwayat.</p>

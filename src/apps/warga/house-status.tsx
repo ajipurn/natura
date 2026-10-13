@@ -166,7 +166,6 @@ export function HouseStatus({
             aria-label="Tampilan status rumah"
             value={view}
             onValueChange={setView}
-            size="sm"
             className="max-sm:w-full"
             fill
             options={[

@@ -1,23 +1,25 @@
 import { Moon, Sun } from "lucide-react";
 import { setTheme, useTheme } from "@/client/theme";
 import { SwitchControl } from "./choice";
+import { Tooltip } from "./tooltip";
 import { Button, cx } from "./ui";
 
 /** Tombol ikon mode gelap, mis. di kepala halaman warga. */
 export function ThemeButton({ className }: { className?: string }) {
   const dark = useTheme() === "dark";
   return (
-    <Button
-      variant="secondary"
-      size="icon-sm"
-      aria-label="Mode gelap"
-      aria-pressed={dark}
-      title={dark ? "Ganti ke mode terang" : "Ganti ke mode gelap"}
-      onClick={() => setTheme(dark ? "light" : "dark")}
-      className={className}
-    >
-      {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-    </Button>
+    <Tooltip label={dark ? "Ganti ke mode terang" : "Ganti ke mode gelap"}>
+      <Button
+        variant="secondary"
+        size="icon-sm"
+        aria-label="Mode gelap"
+        aria-pressed={dark}
+        onClick={() => setTheme(dark ? "light" : "dark")}
+        className={className}
+      >
+        {dark ? <Sun className="size-4" aria-hidden /> : <Moon className="size-4" aria-hidden />}
+      </Button>
+    </Tooltip>
   );
 }
 

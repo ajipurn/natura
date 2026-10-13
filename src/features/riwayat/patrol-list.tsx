@@ -319,7 +319,7 @@ function GapRow({
               key={date}
               to={`${basePath}/${date}`}
               aria-label={`${formatDateLong(date)}: belum ada catatan`}
-              className="rounded-full border border-line px-2.5 py-1 text-xs font-medium text-fg hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+              className="inline-flex h-11 items-center rounded-full border border-line px-2.5 text-xs font-medium text-fg hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
             >
               {formatDateShort(date)}
             </Link>

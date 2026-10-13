@@ -71,6 +71,9 @@ const ACCESS: Record<Role, Partial<Record<Resource, "read" | "write">>> = {
 export const canRonda = (role: Role) => role !== "warga";
 export const isManager = (role: Role) =>
   ["admin", "ketua", "sekretaris", "bendahara", "humas"].includes(role);
+/** Rekap dibagikan pengurus atau petugas yang jaga malam berjalan. */
+export const canShareRecap = (role: Role, onDuty: boolean) =>
+  isManager(role) || (role === "petugas" && onDuty);
 export function can(role: Role, resource: Resource, write = false): boolean {
   if (role === "admin" || role === "ketua") return true;
   const access = ACCESS[role]?.[resource];
