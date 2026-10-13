@@ -13,6 +13,8 @@ import { paymentRoutes } from "./routes/payments";
 import { residentRoutes } from "./routes/residents";
 import { duesRoutes } from "./routes/dues";
 import { familyRoutes } from "./routes/families";
+import { notificationRoutes } from "./routes/notifications";
+import { triggerTelegramNotifications } from "./telegram";
 
 /** API di /api/*. Tipe `AppType` dipakai klien (hono/client) supaya pemanggilan API ikut dicek TypeScript. */
 export const app = new Hono<AppEnv>()
@@ -23,6 +25,12 @@ export const app = new Hono<AppEnv>()
     await next();
     // Data pribadi: jangan disimpan cache bersama/CDN.
     if (!c.res.headers.has("Cache-Control")) c.header("Cache-Control", "private, no-cache");
+    const successfulWrite = !["GET", "HEAD", "OPTIONS"].includes(c.req.method);
+    const dashboardOpened = c.req.path === "/api/admin/ringkasan";
+    if (c.res.ok && c.get("user") && !c.req.path.startsWith("/api/auth/") && !c.req.path.startsWith("/api/admin/pengaturan/telegram") && (successfulWrite || dashboardOpened)) {
+      const task = triggerTelegramNotifications(c.env);
+      if (!c.env.waitUntil) await task;
+    }
   })
   .route("/auth", authRoutes)
   .route("/rumah", houseRoutes)
@@ -33,6 +41,7 @@ export const app = new Hono<AppEnv>()
   .route("/admin/iuran", duesRoutes)
   .route("/admin/pembayaran", paymentRoutes)
   .route("/admin", adminRoutes)
+  .route("/internal", notificationRoutes)
   .route("/ekspor", eksporRoutes)
   .route("/", rondaRoutes);
 

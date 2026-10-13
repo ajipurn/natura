@@ -32,6 +32,7 @@ import { monthQuery } from "./ronda";
 import { accountNameTaken as nameTaken, accountNameTakenError as nameTakenError, listResidents, selectHouseResident, setHouseResident } from "../residents";
 import { residents } from "../schema";
 import { moveResident } from "../residence";
+import { telegramStatus, testTelegram } from "../telegram";
 
 const BLOCK_PATTERN = /^[0-9A-Z][0-9A-Z .\-/]{0,9}$/;
 const NUMBER_PATTERN = /^[0-9A-Z][0-9A-Z\-/]{0,9}$/;
@@ -400,6 +401,13 @@ export const adminRoutes = new Hono<AppEnv>()
   })
 
   /* ---------- Pengaturan & kode warga ---------- */
+
+  .get("/pengaturan/telegram", async (c) => c.json(await telegramStatus(c.env)))
+  .post("/pengaturan/telegram/test", async (c) => {
+    const result = await testTelegram(c.env);
+    if (!result.ok) return c.json({ error: result.error }, 503);
+    return c.json({ success: "Pesan uji terkirim. Periksa chat Telegram tujuan." });
+  })
 
   .get("/pengaturan", async (c) => {
     const [row] = await c.var.db

@@ -42,7 +42,12 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, vars:
     return;
   }
   const { db } = local;
-  const listener = getRequestListener((request) => app.fetch(request, { db, AUTH_SECRET: vars.AUTH_SECRET, APP_URL: vars.APP_URL, DEV: "1" }), {
+  const listener = getRequestListener((request) => app.fetch(request, {
+    db, AUTH_SECRET: vars.AUTH_SECRET, APP_URL: vars.APP_URL, DEV: "1",
+    TELEGRAM_BOT_TOKEN: vars.TELEGRAM_BOT_TOKEN,
+    TELEGRAM_CHAT_ID: vars.TELEGRAM_CHAT_ID,
+    TELEGRAM_DISABLED: vars.TELEGRAM_DISABLED,
+  }), {
     overrideGlobalObjects: false,
   });
   await listener(req, res);

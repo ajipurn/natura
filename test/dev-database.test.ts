@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { devDb, handleApi } from "@/server/dev";
 import { openLocalDb, type LocalDb } from "@/server/db-local";
+import { app } from "@/server/app";
 
 vi.mock("@/server/db-local", () => ({ openLocalDb: vi.fn() }));
 const store = globalThis as typeof globalThis & { __naturaDevDb?: Promise<LocalDb>; __naturaDevDbUrl?: string };
@@ -96,4 +97,14 @@ it("konfigurasi valid tetap dilayani oleh API Hono", async () => {
   expect(response.status).toBe(404);
   expect(await response.json()).toEqual({ error: "Tidak ditemukan." });
   expect(overlay).not.toHaveBeenCalled();
+});
+
+it("server dev meneruskan konfigurasi Telegram ke API tanpa mengirimkannya ke browser", async () => {
+  const handler = vi.spyOn(app, "fetch");
+  const { response } = await requestApi({ DATABASE_URL: "", TELEGRAM_BOT_TOKEN: "123:local-test-token", TELEGRAM_CHAT_ID: "456", TELEGRAM_DISABLED: "0" }, "/api/tidak-ada");
+  expect(handler.mock.calls[0]?.[1]).toMatchObject({
+    DEV: "1", TELEGRAM_BOT_TOKEN: "123:local-test-token", TELEGRAM_CHAT_ID: "456", TELEGRAM_DISABLED: "0",
+  });
+  expect(response.status).toBe(404);
+  expect(await response.text()).not.toContain("local-test-token");
 });

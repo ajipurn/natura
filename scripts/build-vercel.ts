@@ -51,11 +51,13 @@ json(path.join(FUNC, ".vc-config.json"), {
   shouldAddHelpers: false,
   shouldAddSourcemapSupport: true,
   regions: [region],
+  maxDuration: 60,
 });
 
 json(path.join(OUT, "config.json"), {
   version: 3,
   routes: vercelRoutes,
+  crons: [{ path: "/api/internal/notifications", schedule: "0 0 * * *" }],
 });
 
 for (const { source, target, name, shortName, id, basePath } of DOMAIN_MANIFESTS) {

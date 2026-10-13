@@ -4,6 +4,7 @@ import { Card, PageHeader } from "@/components/ui";
 import { settingsQuery } from "../queries";
 import { LogoSettings } from "./logo-settings";
 import { SettingsForm } from "./settings-form";
+import { TelegramSettings } from "./telegram-settings";
 
 export function PengaturanPage() {
   const query = useQuery(settingsQuery);
@@ -26,6 +27,7 @@ export function PengaturanPage() {
           </Card>
         )}
       </QueryState>
+      <TelegramSettings />
     </>
   );
 }

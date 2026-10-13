@@ -3,6 +3,7 @@ import { getRequestListener } from "@hono/node-server";
 import { app } from "./app";
 import { createDb } from "./db";
 import type { Bindings } from "./env";
+import { waitUntil } from "@vercel/functions";
 
 /**
  * Vercel Function untuk /api/* (dibundel oleh scripts/build-vercel.ts). Koneksi database dibuat
@@ -20,6 +21,11 @@ function getEnv(): Bindings {
     db: createDb(url),
     AUTH_SECRET: process.env.AUTH_SECRET,
     APP_URL: process.env.APP_URL || (production ? `https://${production}` : undefined),
+    TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+    TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID,
+    TELEGRAM_DISABLED: process.env.VERCEL_ENV !== "production" ? "1" : undefined,
+    CRON_SECRET: process.env.CRON_SECRET,
+    waitUntil,
   };
   return env;
 }

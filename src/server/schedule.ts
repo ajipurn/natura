@@ -10,7 +10,7 @@ import { houses, residents, rondaSchedule, settings, users } from "./schema";
 import { listResidents, setHouseResident } from "./residents";
 
 /** Jadwal menunjuk orang; nama, alamat, dan akses akun dibaca dari relasi profilnya. */
-export async function listSchedule(db: Db): Promise<ScheduleDTO[]> {
+export async function listSchedule(db: Executor): Promise<ScheduleDTO[]> {
   const rows = await db.select({
     id: rondaSchedule.id,
     day: rondaSchedule.dayOfWeek,

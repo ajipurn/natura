@@ -10,6 +10,13 @@ export type Bindings = {
   APP_URL?: string;
   /** "1" saat `bun run dev`: cookie tanpa Secure dan secret bawaan boleh dipakai. */
   DEV?: string;
+  TELEGRAM_BOT_TOKEN?: string;
+  TELEGRAM_CHAT_ID?: string;
+  /** "1" menonaktifkan pengiriman; preview selalu memakai nilai ini. */
+  TELEGRAM_DISABLED?: string;
+  CRON_SECRET?: string;
+  /** Menjaga pekerjaan latar tetap hidup setelah respons Vercel dikirim. */
+  waitUntil?: (task: Promise<unknown>) => void;
 };
 
 export type AppEnv = {

@@ -63,6 +63,19 @@ export const settings = pgTable("settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 
+/** Antrean Telegram hanya menyimpan identitas pengingat; isi pesan dibaca dari sumbernya saat dikirim. */
+export const telegramNotifications = pgTable("telegram_notifications", {
+  key: text("key").primaryKey(),
+  active: boolean("active").notNull().default(true),
+  detectedAt: createdAt(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  attempts: integer("attempts").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+  leaseId: text("lease_id"),
+  leaseUntil: timestamp("lease_until", { withTimezone: true }),
+  lastError: text("last_error"),
+}, (t) => [index("telegram_notifications_pending_idx").on(t.active, t.nextAttemptAt)]).enableRLS();
+
 /**
  * Akun warga, petugas, dan pengurus. Nama akun juga nama warga di rumahnya (`houseId`): rumah yang dihuni akun
  * tidak menyimpan nama sendiri. Nama boleh kembar asal rumahnya beda.
