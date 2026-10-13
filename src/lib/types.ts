@@ -49,6 +49,14 @@ export type ScheduleDTO = {
   color: GuardColor | null;
 };
 
+export type DepositSubmission = {
+  requestedAt: string | null;
+  requestedByName: string | null;
+  receivedAmount: number | null;
+  /** Pembayaran bulanan/rapel yang uangnya diterima petugas, belum masuk kas langsung. */
+  periodAmount: number;
+};
+
 export type RondaSnapshot = {
   date: string;
   serverTime: string;
@@ -62,6 +70,7 @@ export type RondaSnapshot = {
   paymentCells?: Record<string, PaymentCell>;
   paymentPeriods?: BillingPeriod[];
   paymentPlans?: PaymentPlanDTO[];
+  depositSubmission?: DepositSubmission;
 };
 
 /** Satu catatan dari HP petugas. `none` = hapus catatan rumah itu untuk malam tersebut. */

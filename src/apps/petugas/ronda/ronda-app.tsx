@@ -48,6 +48,7 @@ import { useRondaStore } from "./ronda-store";
 import { recordingHoursLabel } from "@/lib/recording-window";
 import { canShareRecap } from "@/lib/permissions";
 import { adminPath, petugasPath } from "@/lib/app-paths";
+import { DepositRequest } from "./deposit-request";
 
 type Toast = { text: string; tone: "ok" | "error" };
 type View = "list" | "map" | "3d";
@@ -553,6 +554,20 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
               <div className="mt-6 border-t border-line pt-4">
                 <p className="mb-2 text-sm font-semibold">Rekap malam ini</p>
                 {recap}
+              </div>
+            )}
+            {allDone && onDuty && snapshot.date === store.date && (
+              <div className="mt-3">
+                <DepositRequest
+                  key={store.date}
+                  date={store.date}
+                  total={summary.total}
+                  submission={snapshot.depositSubmission}
+                  syncStatus={store.status}
+                  pendingCount={store.pendingCount}
+                  hasRejections={store.rejections.length > 0}
+                  onRefresh={store.sync}
+                />
               </div>
             )}
           </>

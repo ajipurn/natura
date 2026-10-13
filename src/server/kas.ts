@@ -1,8 +1,8 @@
-import { and, asc, desc, eq, gte, isNull, lt, lte, min, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, isNull, lt, lte, min, sql } from "drizzle-orm";
 import { daysInMonth } from "@/lib/dates";
 import { houseLabel } from "@/lib/houses";
 import { PAYMENT_LABEL } from "@/lib/payments";
-import type { Db } from "./db";
+import type { Db, Executor } from "./db";
 import { listPatrols } from "./queries";
 import { cashDeposits, cashEntries, collections, duesInvoices, duesReceipts, duesTypes, houses, payments, patrols, settings, users } from "./schema";
 
@@ -94,9 +94,13 @@ function monthEntries(db: Db, month: string) {
  * Malam-malam yang uangnya sudah lewat tapi belum dicatat setorannya, sebelum malam ini. Baru dihitung
  * sejak setoran pertama dicatat, supaya malam-malam sebelum kas dipakai tidak ikut ditagih.
  */
-export async function undepositedNights(db: Db, tonight: string): Promise<string[]> {
+export async function undepositedNights(db: Executor, tonight: string): Promise<string[]> {
   const [first] = await db.select({ date: min(cashDeposits.date) }).from(cashDeposits);
-  if (!first?.date) return [];
+  const requests = await db.select({ date: patrols.date }).from(patrols)
+      .leftJoin(cashDeposits, eq(cashDeposits.date, patrols.date))
+      .where(and(isNotNull(patrols.depositRequestedAt), lte(patrols.date, tonight), isNull(cashDeposits.id)));
+  // Pengajuan petugas ditagih sejak pertama, termasuk malam yang masih berjalan.
+  if (!first?.date) return requests.map((r) => r.date).sort();
   const rows = await db
     .select({ date: patrols.date })
     .from(patrols)
@@ -109,7 +113,7 @@ export async function undepositedNights(db: Db, tonight: string): Promise<string
   const periodRows = await db.select({ date: payments.receivedDate }).from(payments)
     .leftJoin(cashDeposits, eq(cashDeposits.date, payments.receivedDate))
     .where(and(eq(payments.receivedBy, "collector"), isNull(payments.cancelledAt), gte(payments.receivedDate, first.date), lt(payments.receivedDate, tonight), isNull(cashDeposits.id)));
-  return [...new Set([...rows, ...periodRows].map((r) => r.date))].sort();
+  return [...new Set([...rows, ...periodRows, ...requests].map((r) => r.date))].sort();
 }
 
 /**
@@ -117,7 +121,7 @@ export async function undepositedNights(db: Db, tonight: string): Promise<string
  */
 export async function getCashMonth(db: Db, month: string, tonight: string) {
   const days = daysInMonth(month);
-  const [totals, patrolRows, depositRows, entries, undeposited, periodRows, duesRows] = await Promise.all([
+  const [totals, patrolRows, depositRows, entries, undeposited, periodRows, duesRows, requestRows] = await Promise.all([
     cashTotals(db, month),
     listPatrols(db, days.length, month),
     db
@@ -151,6 +155,9 @@ export async function getCashMonth(db: Db, month: string, tonight: string) {
       .innerJoin(houses, eq(houses.id, duesInvoices.houseId))
       .leftJoin(users, eq(users.id, duesReceipts.recordedBy))
       .where(and(isNull(duesReceipts.cancelledAt), gte(duesReceipts.date, days[0]), lte(duesReceipts.date, days[days.length - 1]))),
+    db.select({ date: patrols.date, requestedAt: patrols.depositRequestedAt, requestedByName: users.name }).from(patrols)
+      .leftJoin(users, eq(users.id, patrols.depositRequestedBy))
+      .where(and(isNotNull(patrols.depositRequestedAt), gte(patrols.date, days[0]), lte(patrols.date, days[days.length - 1]))),
   ]);
 
   const transactions: CashTransaction[] = [
@@ -178,8 +185,9 @@ export async function getCashMonth(db: Db, month: string, tonight: string) {
     heldByCollectors.set(p.date, (heldByCollectors.get(p.date) ?? 0) + p.amount);
   }
   const deposits = new Map(depositRows.map((d) => [d.date, { ...d, updatedAt: d.updatedAt.toISOString() }]));
+  const submissions = new Map(requestRows.map((r) => [r.date, { requestedAt: r.requestedAt!.toISOString(), requestedByName: r.requestedByName }]));
   // Malam yang ada uangnya atau sudah ada setorannya, terbaru dulu.
-  const dates = [...new Set([...patrolRows.filter((p) => p.total > 0).map((p) => p.date), ...deposits.keys(), ...heldByCollectors.keys()])].sort().reverse();
+  const dates = [...new Set([...patrolRows.filter((p) => p.total > 0).map((p) => p.date), ...deposits.keys(), ...heldByCollectors.keys(), ...submissions.keys()])].sort().reverse();
   return {
     month,
     tonight,
@@ -191,6 +199,7 @@ export async function getCashMonth(db: Db, month: string, tonight: string) {
       periodPayments: heldByCollectors.get(date) ?? 0,
       filled: recorded.get(date)?.filled ?? 0,
       deposit: deposits.get(date) ?? null,
+      submission: submissions.get(date) ?? null,
     })),
     entries,
     directReceipts: periodRows.filter((p) => p.receivedBy === "treasurer"),

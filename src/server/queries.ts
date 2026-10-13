@@ -6,13 +6,14 @@ import { billingPeriods, planAt, type PaymentCadence } from "@/lib/payments";
 import { summarize } from "@/lib/recap";
 import type { CollectionDTO, HouseDTO, MonthCell, MonthRecap, RondaSnapshot } from "@/lib/types";
 import type { SessionUser } from "./auth";
-import type { Db } from "./db";
+import type { Db, Executor } from "./db";
 import { houseName } from "./house-name";
 import { guardDaysByUser, listSchedule } from "./schedule";
 import { collectionLogs, collections, duesInvoices, houses, paymentPlans, payments, patrols, residenceMoves, settings, users } from "./schema";
 import { getPaymentData, getPaymentMonth } from "./payments";
 import { DEFAULT_RECORDING_WINDOW } from "@/lib/recording-window";
 import { listResidents } from "./residents";
+import { getDepositSubmission } from "./deposit-submissions";
 
 export const DEFAULT_SETTINGS = { communityName: "Lingkungan Kita", defaultAmount: 500, ...DEFAULT_RECORDING_WINDOW };
 
@@ -24,7 +25,7 @@ export function logoUrl(row: { logoVersion: number; hasLogo: boolean } | undefin
   return row?.hasLogo ? `/api/logo?v=${row.logoVersion}` : null;
 }
 
-export async function getSettings(db: Db) {
+export async function getSettings(db: Executor) {
   const [row] = await db
     .select({ communityName: settings.communityName, defaultAmount: settings.defaultAmount, recordingStart: settings.recordingStart, recordingEnd: settings.recordingEnd, ...logoColumns })
     .from(settings)
@@ -105,7 +106,7 @@ const houseColumns = {
   status: houses.status,
 };
 
-export async function listHouses(db: Db): Promise<HouseDTO[]> {
+export async function listHouses(db: Executor): Promise<HouseDTO[]> {
   const rows = await db.select(houseColumns).from(houses);
   return rows.sort(compareHouses);
 }
@@ -161,15 +162,16 @@ export async function getCollectionsForDate(db: Db, date: string): Promise<Colle
   return rows.map((r) => ({ ...r, recordedAt: r.recordedAt.toISOString() }));
 }
 
-export async function getRondaSnapshot(db: Db, user: SessionUser, now = new Date()): Promise<RondaSnapshot> {
-  const date = rondaDate(now);
-  const [settingsRow, houseRows, collectionRows, schedule, planAnchors, paymentData] = await Promise.all([
+/** Tanggal eksplisit dipakai saat antrean offline menyinkronkan malam sebelumnya. */
+export async function getRondaSnapshot(db: Db, user: SessionUser, now = new Date(), date = rondaDate(now)): Promise<RondaSnapshot> {
+  const [settingsRow, houseRows, collectionRows, schedule, planAnchors, paymentData, depositSubmission] = await Promise.all([
     getSettings(db),
     listHouses(db),
     getCollectionsForDate(db, date),
     listSchedule(db),
     getPlanAnchors(db),
     getPaymentMonth(db, date.slice(0, 7)),
+    getDepositSubmission(db, date),
   ]);
   return {
     date,
@@ -180,6 +182,7 @@ export async function getRondaSnapshot(db: Db, user: SessionUser, now = new Date
     collections: collectionRows,
     schedule,
     planAnchors,
+    depositSubmission,
     // Alokasi bulan ini dan pembayaran mendatang untuk pergantian periode saat HP offline.
     paymentCells: Object.fromEntries(Object.entries(paymentData.cells).filter(([key]) => key.split(":")[1] >= date.slice(0, 7) + "-01")),
     paymentPeriods: paymentData.bills,

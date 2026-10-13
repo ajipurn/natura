@@ -9,7 +9,8 @@ import { isRecordingTime, recordingHoursLabel } from "@/lib/recording-window";
 import type { EntryInput, EntryResult } from "@/lib/types";
 import type { SessionUser } from "./auth";
 import { runBatch, type Db, type Executor, type Statement } from "./db";
-import { getHouseIds, getSettings } from "./queries";
+import { getHouseIds, getRondaSnapshot, getSettings } from "./queries";
+import { requestCompletedDeposit } from "./deposit-submissions";
 import { collectionLogs, collections, paymentPlans, patrols, rondaSchedule, users } from "./schema";
 import { scheduledAccount } from "./schedule";
 
@@ -290,5 +291,11 @@ export async function applyEntries(
   });
 
   await runBatch(db, (tx) => [...writeStatements(tx, [...latest.values()], now, true), ...logStatements(tx, logs)]);
+  // Setelah catatan terakhir tersimpan, pengajuan tetap terjadi walaupun HP menutup halaman.
+  // Antrean yang masih memuat penolakan perlu ditinjau petugas sebelum diajukan.
+  if (final.every((result) => result.ok)) {
+    const dates = new Set(final.flatMap((result) => result.ok ? [result.date] : []));
+    for (const date of dates) await requestCompletedDeposit(db, await getRondaSnapshot(db, user, now, date), now);
+  }
   return final;
 }

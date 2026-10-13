@@ -140,6 +140,8 @@ export const residenceMoves = pgTable("residence_moves", {
 export const patrols = pgTable("patrols", {
   id: serial("id").primaryKey(),
   date: date("date", { mode: "string" }).notNull().unique(),
+  depositRequestedAt: timestamp("deposit_requested_at", { withTimezone: true }),
+  depositRequestedBy: integer("deposit_requested_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: createdAt(),
 }).enableRLS();
 

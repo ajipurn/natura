@@ -15,8 +15,8 @@ export const cashFixture: CashMonth = {
     { id: 1, date: "2026-10-09", direction: "in", amount: 250000, description: "Sumbangan kegiatan warga", recordedByName: "Bendahara" },
   ],
   nights: [
-    { date: "2026-10-09", recorded: 24500, periodPayments: 0, filled: 49, deposit: null },
-    { date: "2026-10-07", recorded: 215000, periodPayments: 0, filled: 60, deposit: { id: 1, date: "2026-10-07", amount: 215000, note: "Diterima lengkap", recordedByName: "Bendahara", updatedAt: "2026-10-07T12:00:00.000Z" } },
+    { date: "2026-10-09", recorded: 24500, periodPayments: 0, filled: 49, deposit: null, submission: null },
+    { date: "2026-10-07", recorded: 215000, periodPayments: 0, filled: 60, submission: null, deposit: { id: 1, date: "2026-10-07", amount: 215000, note: "Diterima lengkap", recordedByName: "Bendahara", updatedAt: "2026-10-07T12:00:00.000Z" } },
   ],
   directReceipts: [], undeposited: ["2026-10-09"],
 };

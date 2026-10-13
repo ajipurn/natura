@@ -17,6 +17,7 @@ import {
 import { cancelRequest, createRequest, listOwnRequests } from "../requests";
 import { listSchedule } from "../schedule";
 import { getPaymentMonth } from "../payments";
+import { requestCompletedDeposit } from "../deposit-submissions";
 
 /** ?bulan=YYYY-MM; kosong/salah = bulan malam ronda sekarang. */
 const monthQuery = validator("query", (value: Record<string, string | string[]>) => {
@@ -39,6 +40,15 @@ export const rondaRoutes = new Hono<AppEnv>()
   .post("/ronda/catatan", requireUser, requireRonda, body(entriesSchema), async (c) => {
     const results = await applyEntries(c.var.db, c.var.user, c.req.valid("json").entries);
     return c.json({ results });
+  })
+
+  .post("/ronda/setoran", requireUser, requireRonda, body(z.object({ date: z.string().refine(isIsoDate, "Tanggal tidak valid.") })), async (c) => {
+    const snapshot = await getRondaSnapshot(c.var.db, c.var.user);
+    const { date } = c.req.valid("json");
+    if (date !== snapshot.date) return c.json({ error: "Malam ronda sudah berganti. Muat ulang catatan sebelum mengajukan setoran." }, 409);
+    const result = await requestCompletedDeposit(c.var.db, snapshot);
+    if (result.error) return c.json({ error: result.error }, result.status);
+    return c.json({ success: "Pengajuan terkirim. Admin atau bendahara akan mencatat uang yang diterima.", depositSubmission: result.depositSubmission });
   })
 
   .get("/jadwal", requireUser, async (c) => c.json({ schedule: await listSchedule(c.var.db) }))

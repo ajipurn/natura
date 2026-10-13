@@ -14,7 +14,7 @@ import { RupiahInput } from "@/components/rupiah-input";
 import { Select } from "@/components/select";
 import { segmentedFrameClass, segmentedItemClass } from "@/components/toggle-group";
 import { Alert, Button, Card, Field, Input, PageActions, PageHeader, buttonClass, cx } from "@/components/ui";
-import { formatDateShort, formatMonth, isMonth, localDate, rondaDate, shiftMonth } from "@/lib/dates";
+import { formatDateShort, formatMonth, formatTime, isMonth, localDate, rondaDate, shiftMonth } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import type { CashMonth } from "@/server/kas";
 import { CASH_REFRESH, cashQuery, settingsQuery } from "../queries";
@@ -51,7 +51,7 @@ export function KasPage() {
   const thisMonth = tonight.slice(0, 7);
   const bulan = params.get("bulan") ?? "";
   const month = isMonth(bulan) && bulan <= thisMonth ? bulan : thisMonth;
-  const query = useQuery({ ...cashQuery(month), placeholderData: (previous) => previous });
+  const query = useQuery({ ...cashQuery(month), placeholderData: (previous) => previous, refetchInterval: 15_000 });
   const attentionCount = query.data?.nights.filter((n) => depositStatus(n) !== "matched").length ?? 0;
   const cashPublic = useQuery(settingsQuery).data?.cashPublic;
   // Dialog pengeluaran/pemasukan lain (tanpa `entry` = tambah baru). Isinya tetap selama dialog menutup.
@@ -240,7 +240,7 @@ function Deposits({ nights, tonight, onOpen }: { nights: Night[]; tonight: strin
   const pending = nights.filter((n) => depositStatus(n) === "pending").length;
   const difference = nights.filter((n) => depositStatus(n) === "difference").length;
   const shown = nights.filter((n) => filter === "all" || (filter === "attention" ? depositStatus(n) !== "matched" : depositStatus(n) === filter))
-    .sort((a, b) => depositPriority[depositStatus(a)] - depositPriority[depositStatus(b)] || b.date.localeCompare(a.date));
+    .sort((a, b) => depositPriority[depositStatus(a)] - depositPriority[depositStatus(b)] || Number(Boolean(b.submission)) - Number(Boolean(a.submission)) || b.date.localeCompare(a.date));
   const options = [
     { value: "attention", label: "Perlu dicek", hint: `${pending + difference} malam` },
     { value: "pending", label: "Belum disetor", hint: `${pending} malam` },
@@ -305,6 +305,7 @@ function NightRow({
             {filled > 0 && ` · ${filled} rumah`}
           </p>
           {night.periodPayments > 0 && <p className="mt-1 text-xs text-muted">Termasuk pembayaran periode ke petugas <NumberTicker value={formatRupiah(night.periodPayments)} />.</p>}
+          {night.submission && <p className="mt-1 break-words text-xs text-primary">Diajukan {night.submission.requestedByName ?? "petugas"} · {formatTime(night.submission.requestedAt)}</p>}
           {deposit && (deposit.note || deposit.recordedByName) && (
             <p className="mt-1 break-words text-xs text-muted">
               {[deposit.note, deposit.recordedByName && `dicatat ${deposit.recordedByName}`].filter(Boolean).join(" · ")}
@@ -329,7 +330,7 @@ function NightRow({
           </div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
-            <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn">Belum disetor</span>
+            <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn">{night.submission ? "Menunggu pencatatan" : "Belum disetor"}</span>
             <Button variant="secondary" size="sm" onClick={onEdit}>
               Catat setoran
             </Button>

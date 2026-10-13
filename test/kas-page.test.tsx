@@ -41,6 +41,18 @@ async function selectStatus(label: string) {
 const depositDates = () => [...activePanel().querySelectorAll('ul a')].map((a) => a.getAttribute("href"));
 
 describe("kas lingkungan", () => {
+  it("pengajuan petugas muncul sebagai setoran yang perlu dicatat tanpa menambah transaksi", async () => {
+    await act(async () => client.setQueryData(["admin", "kas", "2026-10"], {
+      ...cashFixture, nights: [{ date: "2026-10-10", recorded: 1500, filled: 3, periodPayments: 0, deposit: null, submission: { requestedAt: "2026-10-10T12:00:00Z", requestedByName: "Yusuf" } }, ...cashFixture.nights],
+    }));
+    await click(tab("Setoran jimpitan"));
+    expect(depositDates()[0]).toBe("/admin/riwayat/2026-10-10");
+    expect(activePanel().textContent).toContain("Diajukan Yusuf");
+    expect(activePanel().textContent).toContain("Menunggu pencatatan");
+    await click([...activePanel().querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent === "Catat setoran")!);
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Rp 1.500");
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it("membuka tab transaksi sesudah overview dan donut serta memisahkan setoran jimpitan", () => {
     expect(container.querySelector("h1")?.textContent).toBe("Kas lingkungan");
     expect(tab("Transaksi").getAttribute("aria-selected")).toBe("true");
