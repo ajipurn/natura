@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // @vitest-environment-options {"url":"https://app.clusternatura.com/"}
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, type ReactNode } from "react";
+import { act, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,12 +9,16 @@ import { PetugasLayout } from "@/apps/petugas/layout";
 import type { RondaSnapshot, Role } from "@/lib/types";
 import { accessibleText } from "./helpers/dom";
 
-// Kamera fisik diganti pemicu deteksi; layout, store offline, dan form hasil scan tetap sungguhan.
-vi.mock("@/components/qr-scanner", () => ({
-  QrScanner: ({ onDetect, onClose, description, paused }: { onDetect: (text: string) => void; onClose: () => void; description: ReactNode; paused: boolean }) => (
-    <div><p>{description}</p><button disabled={paused} onClick={() => onDetect("https://clusternatura.com/info/r/SCANTESTQR")}>Deteksi QR</button><button disabled={paused} onClick={() => onDetect("QR lain!")}>Deteksi QR lain</button><button onClick={onClose}>Tutup scanner</button></div>
-  ),
-}));
+// Sebagian besar tes mengganti kamera dengan tombol; regresi scan ulang memakai loop scanner asli.
+const cameraMode = vi.hoisted(() => ({ real: false }));
+vi.mock("@/components/qr-scanner", async (importOriginal) => {
+  const { QrScanner: RealScanner } = await importOriginal<typeof import("@/components/qr-scanner")>();
+  return {
+    QrScanner: (props: ComponentProps<typeof RealScanner>) => cameraMode.real ? <RealScanner {...props} /> : (
+      <div><p>{props.description}</p><button disabled={props.paused} onClick={() => props.onDetect("https://clusternatura.com/info/r/SCANTESTQR")}>Deteksi QR</button><button disabled={props.paused} onClick={() => props.onDetect("QR lain!")}>Deteksi QR lain</button><button onClick={props.onClose}>Tutup scanner</button></div>
+    ),
+  };
+});
 vi.mock("idb-keyval", () => ({ del: vi.fn(async () => {}), get: vi.fn(async () => undefined), set: vi.fn(async () => {}) }));
 
 let root: Root;
@@ -23,8 +27,10 @@ let client: QueryClient;
 let snapshot: RondaSnapshot;
 let submitted: { entries: { method: string; houseId: number; status: string; recordedAt: string }[] }[];
 let navigate: ReturnType<typeof vi.spyOn>;
+const mediaDevicesDescriptor = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
 
 beforeEach(() => {
+  cameraMode.real = false;
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-10T21:00:00+07:00"));
@@ -57,6 +63,8 @@ afterEach(async () => {
   client.clear();
   container.remove();
   localStorage.clear();
+  if (mediaDevicesDescriptor) Object.defineProperty(navigator, "mediaDevices", mediaDevicesDescriptor);
+  else Reflect.deleteProperty(navigator, "mediaDevices");
   vi.restoreAllMocks();
   vi.useRealTimers();
   vi.unstubAllGlobals();
@@ -75,6 +83,40 @@ async function click(label: string) {
 const recordButtons = () => [...document.querySelectorAll("button")].filter((b) => accessibleText(b) === "Kosong" || accessibleText(b)?.startsWith("Ada ·"));
 
 describe("Scan QR langsung dari navigasi", () => {
+  it("bisa scan QR yang sama setelah menutup form tanpa mencatat, sambil tetap mencegah pengulangan setelah simpan", async () => {
+    cameraMode.real = true;
+    vi.useFakeTimers(); vi.setSystemTime(new Date(snapshot.serverTime));
+    vi.stubGlobal("AudioContext", undefined);
+    let code: string | null = null;
+    const track = { stop: vi.fn() };
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: {
+      getUserMedia: vi.fn(async () => ({ getTracks: () => [track], getVideoTracks: () => [track] })),
+    } });
+    vi.spyOn(HTMLMediaElement.prototype, "srcObject", "set").mockImplementation(() => {});
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+    vi.spyOn(HTMLMediaElement.prototype, "readyState", "get").mockReturnValue(2);
+    vi.stubGlobal("BarcodeDetector", class {
+      static async getSupportedFormats() { return ["qr_code"]; }
+      async detect() { return code ? [{ rawValue: code }] : []; }
+    });
+    await render();
+    code = "https://clusternatura.com/info/r/SCANTESTQR";
+    await act(async () => vi.advanceTimersByTimeAsync(120));
+    expect(recordButtons()).toHaveLength(2);
+    await act(async () => vi.advanceTimersByTimeAsync(600));
+    const close = document.querySelector<HTMLButtonElement>('button[aria-label="Tutup"]');
+    expect(close).not.toBeNull();
+    await act(async () => close!.click());
+    expect(recordButtons()).toHaveLength(0); expect(submitted).toEqual([]);
+    expect(document.body.textContent).toContain("Scan QR rumah");
+    await act(async () => vi.advanceTimersByTimeAsync(720));
+    expect(recordButtons()).toHaveLength(2);
+    expect(track.stop).not.toHaveBeenCalled();
+    await click("Ada · Rp 500");
+    await act(async () => vi.advanceTimersByTimeAsync(5000));
+    expect(recordButtons()).toHaveLength(0);
+    expect(submitted).toHaveLength(1);
+  });
   it("tombol tengah langsung membuka kamera dan mencatat tanpa pindah halaman", async () => {
     await render();
     expect([...container.querySelectorAll("nav li")][2].textContent?.trim()).toBe("Scan QR");

@@ -1,7 +1,8 @@
 import jsQR from "jsqr";
 import { Dialog } from "@base-ui/react/dialog";
-import { Flashlight, FlashlightOff, Keyboard, X } from "lucide-react";
+import { Check, Flashlight, FlashlightOff, Keyboard, X } from "lucide-react";
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { createScanFeedback, type ScanFeedback } from "@/lib/scan-feedback";
 import { Button, cx } from "./ui";
 
 type Detect = (video: HTMLVideoElement) => Promise<string | null>;
@@ -61,6 +62,8 @@ const TORCH_CHECK_ATTEMPTS = 20;
  * supaya rumah yang baru dicatat tidak langsung terbuka lagi.
  */
 const SAME_CODE_COOLDOWN_MS = 2500;
+const FEEDBACK_MS = 650;
+const RETRY_DELAY_MS = 600;
 
 export function QrScanner({
   paused,
@@ -69,6 +72,8 @@ export function QrScanner({
   onManual,
   description,
   finalFocus,
+  feedback,
+  retryKey = 0,
 }: {
   /** Tidak memicu onDetect (mis. saat lembar rumah sedang terbuka), kamera tetap menyala. */
   paused: boolean;
@@ -78,22 +83,35 @@ export function QrScanner({
   onManual?: () => void;
   description?: ReactNode;
   finalFocus?: ComponentProps<typeof Dialog.Popup>["finalFocus"];
+  /** Disiapkan lewat klik pembuka scanner; pemanggil menutup resource ini setelah scanner selesai. */
+  feedback?: ScanFeedback;
+  /** Ubah saat form hasil scan dibatalkan; QR yang sama boleh dibaca lagi tanpa membuka ulang kamera. */
+  retryKey?: number;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const trackRef = useRef<MediaStreamTrack | null>(null);
   const pausedRef = useRef(paused);
   const onDetectRef = useRef(onDetect);
   const lastRef = useRef<{ text: string; seenAt: number } | null>(null);
+  const retryKeyRef = useRef(retryKey);
+  const retryAtRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(true);
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [torchPending, setTorchPending] = useState(false);
   const [torchError, setTorchError] = useState<string | null>(null);
+  const [detected, setDetected] = useState(false);
 
   useEffect(() => {
     pausedRef.current = paused;
     onDetectRef.current = onDetect;
+    if (retryKeyRef.current !== retryKey) {
+      retryKeyRef.current = retryKey;
+      lastRef.current = null;
+      // Beri waktu form menutup sebelum QR di belakangnya membuka hasil scan lagi.
+      retryAtRef.current = Date.now() + RETRY_DELAY_MS;
+    }
   });
 
   useEffect(() => {
@@ -101,6 +119,8 @@ export function QrScanner({
     let stream: MediaStream | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let torchTimer: ReturnType<typeof setTimeout> | undefined;
+    let feedbackTimer: ReturnType<typeof setTimeout> | undefined;
+    const scanFeedback = feedback ?? createScanFeedback();
 
     async function start() {
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -163,9 +183,12 @@ export function QrScanner({
             if (text && !stopped) {
               if (last && last.text === text && now - last.seenAt < SAME_CODE_COOLDOWN_MS) {
                 last.seenAt = now;
-              } else if (!pausedRef.current) {
+              } else if (!pausedRef.current && now >= retryAtRef.current) {
                 lastRef.current = { text, seenAt: now };
-                navigator.vibrate?.(60);
+                setDetected(true);
+                clearTimeout(feedbackTimer);
+                feedbackTimer = setTimeout(() => setDetected(false), FEEDBACK_MS);
+                scanFeedback.play();
                 onDetectRef.current(text);
               }
             }
@@ -183,10 +206,12 @@ export function QrScanner({
       stopped = true;
       clearTimeout(timer);
       clearTimeout(torchTimer);
+      clearTimeout(feedbackTimer);
+      if (!feedback) scanFeedback.dispose();
       stream?.getTracks().forEach((t) => t.stop());
       trackRef.current = null;
     };
-  }, []);
+  }, [feedback]);
 
   async function toggleTorch() {
     const track = trackRef.current;
@@ -229,10 +254,16 @@ export function QrScanner({
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div
               className={cx(
-                "aspect-square w-[70%] max-w-80 rounded-3xl border-4 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)] transition-colors",
-                paused ? "border-white/30" : "border-white/90",
+                "relative flex aspect-square w-[70%] max-w-80 items-center justify-center rounded-3xl border-4 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)] transition-colors motion-reduce:transition-none",
+                detected ? "border-emerald-400" : paused ? "border-white/30" : "border-white/90",
               )}
-            />
+            >
+              {detected && (
+                <p role="status" className="flex items-center gap-2 rounded-full bg-black/75 px-4 py-2 text-sm font-semibold text-white">
+                  <Check className="size-5 text-emerald-400" aria-hidden /> QR terbaca
+                </p>
+              )}
+            </div>
           </div>
         )}
         {starting && !error && (
@@ -245,7 +276,7 @@ export function QrScanner({
               <Button
                 variant="plain"
                 onClick={onManual}
-                className="flex h-12 items-center gap-2 rounded-full bg-white px-6 font-semibold text-black"
+                className="flex h-11 items-center gap-2 rounded-full bg-white px-6 font-semibold text-black"
               >
                 <Keyboard className="size-5" /> Catat manual
               </Button>
@@ -266,7 +297,7 @@ export function QrScanner({
           <Button
             variant="plain"
             onClick={onManual}
-            className="flex h-12 shrink-0 items-center gap-2 rounded-full bg-white/15 px-4 text-sm font-semibold"
+            className="flex h-11 shrink-0 items-center gap-2 rounded-full bg-white/15 px-4 text-sm font-semibold"
           >
             <Keyboard className="size-5" /> Ketik manual
           </Button>

@@ -6,12 +6,13 @@ import {
   UserRound,
   type LucideIcon,
 } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { matchPath, NavLink, useLocation } from "react-router";
 import { cx } from "@/components/ui";
 import { petugasPath } from "@/lib/app-paths";
 import { useAuth } from "@/client/auth";
 import { canRonda } from "@/lib/permissions";
+import { createScanFeedback, type ScanFeedback } from "@/lib/scan-feedback";
 import { ScanQr } from "./scan-qr";
 import { RondaStoreProvider } from "./ronda/ronda-store-provider";
 
@@ -35,7 +36,9 @@ export function PetugasLayout({ children }: { children: ReactNode }) {
   const user = useAuth().data?.user;
   const { pathname } = useLocation();
   const activeIndex = ITEMS.findIndex((item) => item && matchPath({ path: item.to, end: item.end ?? false }, pathname));
-  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanFeedback, setScanFeedback] = useState<ScanFeedback | null>(null);
+  const scannerOpen = scanFeedback !== null;
+  useEffect(() => () => scanFeedback?.dispose(), [scanFeedback]);
   const scanRef = useRef<HTMLButtonElement>(null);
   const content = (
     <>
@@ -56,7 +59,7 @@ export function PetugasLayout({ children }: { children: ReactNode }) {
                       ref={scanRef}
                       type="button"
                       aria-label="Scan QR rumah"
-                      onClick={() => setScannerOpen(true)}
+                      onClick={() => setScanFeedback(createScanFeedback())}
                       className="group relative flex h-full w-full touch-manipulation select-none flex-col items-center rounded-2xl pt-12 text-[11px] font-semibold text-primary focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-4"
                     >
                       <span className="absolute -top-5 flex size-14 items-center justify-center rounded-full bg-primary text-primary-fg ring-[6px] ring-card shadow-[0_6px_16px_color-mix(in_srgb,var(--primary)_25%,transparent)] transition-[transform,background-color] duration-160 ease-[var(--ease-out)] group-hover:bg-primary/90 group-active:[transform:scale(0.97)] group-active:bg-primary/80 motion-reduce:group-active:transform-none min-[375px]:size-16">
@@ -111,8 +114,8 @@ export function PetugasLayout({ children }: { children: ReactNode }) {
           )}
         </div>
       </nav>
-      {scannerOpen && (
-        <ScanQr onClose={() => setScannerOpen(false)} triggerRef={scanRef} />
+      {scanFeedback && (
+        <ScanQr onClose={() => setScanFeedback(null)} triggerRef={scanRef} feedback={scanFeedback} />
       )}
     </>
   );

@@ -75,6 +75,7 @@ function Loading3D() {
 export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
   const store = useRondaStore();
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [active, setActive] = useState<{
     house: HouseDTO;
@@ -596,6 +597,7 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
           onDetect={handleDetect}
           onClose={() => setScannerOpen(false)}
           onManual={() => setSearchOpen(true)}
+          retryKey={retryKey}
         />
       )}
 
@@ -627,7 +629,10 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
               snapshot.paymentCells?.[active.house.id + ":" + store.date]
             }
             onRecord={handleRecord}
-            onClose={() => setActive(null)}
+            onClose={() => {
+              if (active.method === "scan") setRetryKey((key) => key + 1);
+              setActive(null);
+            }}
           />
         )}
 
