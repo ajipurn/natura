@@ -36,6 +36,7 @@ export function SwitchField({
   onCheckedChange,
   name,
   disabled,
+  className,
 }: {
   label: ReactNode;
   description?: ReactNode;
@@ -44,6 +45,7 @@ export function SwitchField({
   onCheckedChange?: (checked: boolean) => void;
   name?: string;
   disabled?: boolean;
+  className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const resetKey = useFormResetKey(ref);
@@ -51,7 +53,7 @@ export function SwitchField({
     <Field.Root
       ref={ref}
       disabled={disabled}
-      className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line px-3 data-disabled:opacity-60"
+      className={cx("flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line px-3 data-disabled:opacity-60", className)}
     >
       <div className="min-w-0">
         <Field.Label className="block text-sm font-medium">{label}</Field.Label>

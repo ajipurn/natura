@@ -22,29 +22,29 @@ export function LogoSettings({ logoUrl }: { logoUrl: string | null }) {
   });
 
   return (
-    <div className="flex items-start gap-4">
+    <div className="flex items-start gap-4 rounded-xl bg-bg/60 p-4">
       {/* Latar putih (juga di mode gelap): sama seperti di stiker, logo transparan tetap terlihat. */}
-      <div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-2xl border border-line bg-white">
-        <img src={logoUrl ?? DEFAULT_LOGO_URL} alt={logoUrl ? "Logo saat ini" : "Logo bawaan Cluster Natura"} className="size-full object-contain p-1.5" />
+      <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-black/10 bg-white sm:size-20">
+        <img src={logoUrl ?? DEFAULT_LOGO_URL} alt={logoUrl ? "Logo saat ini" : "Logo bawaan Cluster Natura"} className="size-full object-contain p-2" />
       </div>
       <div className="min-w-0 space-y-2">
         <div>
-          <p className="text-sm font-medium">Logo</p>
-          <p className="text-xs text-muted">
-            Tampil di stiker QR, Beranda app, dashboard, dan ikon tab. PNG, JPG, WebP, atau SVG;
-            diperkecil otomatis dan langsung tersimpan.
+          <p className="text-sm font-medium">Logo lingkungan</p>
+          <p className="mt-1 text-pretty text-xs leading-relaxed text-muted">
+            Untuk stiker QR, Beranda, dashboard, dan ikon tab.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" size="sm" disabled={save.isPending} onClick={() => inputRef.current?.click()}>
-            <Upload className="size-4" /> {save.isPending ? "Menyimpan…" : "Ganti logo"}
+            <Upload className="size-4" aria-hidden /> {save.isPending ? "Menyimpan…" : "Ganti logo"}
           </Button>
           {logoUrl && (
-            <Button variant="ghost" size="sm" disabled={save.isPending} onClick={() => save.mutate(null)}>
-              <RotateCcw className="size-4" /> Gunakan logo bawaan
+            <Button variant="ghost" size="sm" className="h-auto min-h-11 py-2 text-left" disabled={save.isPending} onClick={() => save.mutate(null)}>
+              <RotateCcw className="size-4 shrink-0" aria-hidden /> Gunakan bawaan
             </Button>
           )}
         </div>
+        <p className="text-pretty text-xs leading-relaxed text-muted">PNG, JPG, WebP, atau SVG. Langsung tersimpan.</p>
         <input
           ref={inputRef}
           type="file"
