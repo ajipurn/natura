@@ -50,6 +50,8 @@ json(path.join(FUNC, ".vc-config.json"), {
   launcherType: "Nodejs",
   shouldAddHelpers: false,
   shouldAddSourcemapSupport: true,
+  // Backup dengan lampiran bisa melebihi batas respons biasa Vercel (4,5 MB).
+  supportsResponseStreaming: true,
   regions: [region],
   maxDuration: 60,
 });

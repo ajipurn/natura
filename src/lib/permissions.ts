@@ -20,7 +20,7 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 export const ROLE_HINT: Record<Role, string> = {
   admin: "Semua fitur dan pengaturan akses",
-  ketua: "Semua fitur dan pengaturan akses",
+  ketua: "Semua fitur selain backup database",
   sekretaris: "Warga, keluarga, rumah, jadwal, dan informasi",
   bendahara: "Kas, iuran, dan membaca data rumah",
   humas: "Pengumuman dan kontak; membaca warga, rumah, dan jadwal",
@@ -36,7 +36,8 @@ export type Resource =
   | "finance"
   | "info"
   | "accounts"
-  | "settings";
+  | "settings"
+  | "backup";
 const ACCESS: Record<Role, Partial<Record<Resource, "read" | "write">>> = {
   admin: {},
   ketua: {},
@@ -75,6 +76,7 @@ export const isManager = (role: Role) =>
 export const canShareRecap = (role: Role, onDuty: boolean) =>
   isManager(role) || (role === "petugas" && onDuty);
 export function can(role: Role, resource: Resource, write = false): boolean {
+  if (resource === "backup") return role === "admin";
   if (role === "admin" || role === "ketua") return true;
   const access = ACCESS[role]?.[resource];
   return write ? access === "write" : access !== undefined;

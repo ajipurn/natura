@@ -141,6 +141,14 @@ Buka http://localhost:5173/admin/, buat admin pertama, lalu jalankan `bun run se
 
 Mau memakai Postgres lokal (mis. supaya bisa dibuka di DBeaver sambil `bun run dev` jalan)? Isi `DATABASE_URL` di `.env.local`, mis. `postgres://postgres:postgres@localhost:5432/natura`, lalu jalankan `bun run db:migrate` sekali. Server dev dan perintah database lokal menolak alamat remote; gunakan `REMOTE_DATABASE_URL` dan perintah `--remote` untuk Supabase.
 
+### Backup data dari dashboard
+
+Admin dapat membuka **Pengaturan → Backup database → Unduh backup** untuk mengunduh file `natura-backup-<waktu-UTC>.json`. Akses ini khusus peran `admin`; ketua dan peran lain ditolak juga di API `/api/admin/backup`.
+
+File berisi seluruh baris dan kolom tabel aplikasi pada schema `public`, termasuk hash PIN, token QR, pengaturan, bukti pembayaran, dan log, beserta riwayat migrasi. Semua tabel dibaca dalam satu snapshot. Respons memakai `Cache-Control: private, no-store`; file hanya dibuat ketika tombol ditekan. Simpan file dengan aman. Format JSON ini mencadangkan data aplikasi; pemulihan memerlukan schema dari migrasi yang sesuai dan proses impor data, belum tersedia tombol restore. Untuk dump PostgreSQL beserta schema yang dapat dipulihkan lewat `pg_restore`, gunakan `make db-dump` di bawah.
+
+Unduhan dikirim secara streaming dan build Vercel mengaktifkan `supportsResponseStreaming`, mengikuti [panduan Vercel untuk respons besar](https://vercel.com/kb/guide/how-to-bypass-vercel-body-size-limit-serverless-functions), agar lampiran yang membuat backup melebihi 4,5 MB tetap dapat diunduh.
+
 ### Menyalin database remote untuk development
 
 Pasang PostgreSQL beserta `pg_dump`, `pg_restore`, `initdb`, dan `pg_ctl` (versi tool harus minimal sama dengan server remote). Di macOS:

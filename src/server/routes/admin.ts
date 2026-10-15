@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
+import { stream } from "hono/streaming";
 import { validator } from "hono/validator";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
@@ -33,6 +34,7 @@ import { accountNameTaken as nameTaken, accountNameTakenError as nameTakenError,
 import { residents } from "../schema";
 import { moveResident } from "../residence";
 import { telegramStatus, testTelegram } from "../telegram";
+import { createDatabaseBackup } from "../backup";
 
 const BLOCK_PATTERN = /^[0-9A-Z][0-9A-Z .\-/]{0,9}$/;
 const NUMBER_PATTERN = /^[0-9A-Z][0-9A-Z\-/]{0,9}$/;
@@ -401,6 +403,21 @@ export const adminRoutes = new Hono<AppEnv>()
   })
 
   /* ---------- Pengaturan & kode warga ---------- */
+
+  .get("/backup", async (c) => {
+    const backup = await createDatabaseBackup(c.var.db);
+    const payload = new TextEncoder().encode(JSON.stringify(backup, null, 2) + "\n");
+    c.header("Cache-Control", "private, no-store");
+    c.header("Content-Disposition", `attachment; filename="natura-backup-${backup.createdAt.replace(/[:.]/g, "-")}.json"`);
+    c.header("Content-Type", "application/json; charset=utf-8");
+    c.header("X-Content-Type-Options", "nosniff");
+    return stream(c, async (output) => {
+      // Kirim per potongan byte supaya file besar tetap mengalir dan karakter UTF-8 tetap utuh.
+      for (let offset = 0; offset < payload.length; offset += 64 * 1024) {
+        await output.write(payload.subarray(offset, offset + 64 * 1024));
+      }
+    });
+  })
 
   .get("/pengaturan/telegram", async (c) => c.json(await telegramStatus(c.env)))
   .post("/pengaturan/telegram/test", async (c) => {

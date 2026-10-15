@@ -5,6 +5,7 @@ import { settingsQuery } from "../queries";
 import { LogoSettings } from "./logo-settings";
 import { SettingsForm } from "./settings-form";
 import { TelegramSettings } from "./telegram-settings";
+import { BackupSettings } from "./backup-settings";
 
 export function PengaturanPage() {
   const query = useQuery(settingsQuery);
@@ -28,6 +29,7 @@ export function PengaturanPage() {
         )}
       </QueryState>
       <TelegramSettings />
+      <BackupSettings />
     </>
   );
 }

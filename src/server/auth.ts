@@ -154,7 +154,7 @@ export const requireDashboardResource = createMiddleware<AppEnv>(async (c, next)
   const resources: Record<string, Resource> = {
     ringkasan: "overview", rumah: "houses", denah: "houses", petugas: "accounts",
     pengaturan: "settings", jadwal: "schedule", permintaan: "schedule", audit: "patrols", riwayat: "patrols",
-    kas: "finance", info: "info", pengumuman: "info", kontak: "info",
+    kas: "finance", info: "info", pengumuman: "info", kontak: "info", backup: "backup",
   };
   const resource = c.req.path.endsWith("/pengaturan/kode-warga") ? "info" : resources[section ?? ""];
   if (!resource) return requireAdmin(c, next);
