@@ -143,11 +143,33 @@ Mau memakai Postgres lokal (mis. supaya bisa dibuka di DBeaver sambil `bun run d
 
 ### Backup data dari dashboard
 
-Admin dapat membuka **Pengaturan → Backup database → Unduh backup** untuk mengunduh file `natura-backup-<waktu-UTC>.json`. Akses ini khusus peran `admin`; ketua dan peran lain ditolak juga di API `/api/admin/backup`.
+Admin dapat membuka **Pengaturan → Backup database**, memilih **SQL (.sql)** atau **JSON (.json)**, lalu menekan **Unduh backup**. SQL menjadi pilihan awal. Nama file memakai waktu UTC. Akses kedua format khusus peran `admin`; ketua dan peran lain ditolak juga di API `/api/admin/backup?format=sql` atau `?format=json`. Tanpa parameter, API tetap mengirim JSON.
 
-File berisi seluruh baris dan kolom tabel aplikasi pada schema `public`, termasuk hash PIN, token QR, pengaturan, bukti pembayaran, dan log, beserta riwayat migrasi. Semua tabel dibaca dalam satu snapshot. Respons memakai `Cache-Control: private, no-store`; file hanya dibuat ketika tombol ditekan. Simpan file dengan aman. Format JSON ini mencadangkan data aplikasi; pemulihan memerlukan schema dari migrasi yang sesuai dan proses impor data, belum tersedia tombol restore. Untuk dump PostgreSQL beserta schema yang dapat dipulihkan lewat `pg_restore`, gunakan `make db-dump` di bawah.
+Kedua format berisi seluruh baris dan kolom tabel aplikasi pada schema `public`, termasuk hash PIN, token QR, pengaturan, bukti pembayaran, dan log, beserta riwayat migrasi. Semua tabel dibaca dalam satu snapshot. Respons unduhan memakai `Cache-Control: private, no-store`. Simpan file dengan aman.
+
+SQL juga memuat struktur tabel, enum, sequence beserta nilainya, constraint, indeks, dan status RLS dari database yang sedang dipakai. File memulihkan struktur dan data aplikasi beserta schema `drizzle` dalam satu transaksi, termasuk relasi keluarga dua arah. Pulihkan ke **database PostgreSQL kosong** dengan akun pemilik tabel:
+
+```bash
+psql "$RESTORE_DATABASE_URL" -v ON_ERROR_STOP=1 -f /path/natura-backup-TIMESTAMP.sql
+```
+
+SQL tidak menghapus objek yang sudah ada; target yang sudah berisi tabel/enum aplikasi akan menolak restore. File ini mencakup struktur dan data aplikasi, tanpa akun/role database, schema internal Supabase, atau rahasia environment. JSON mencadangkan isi tabel; pemulihannya memerlukan schema yang sesuai dan proses impor khusus. Belum tersedia tombol restore di dashboard. Untuk arsip format custom yang dipulihkan lewat `pg_restore`, gunakan `make db-dump` di bawah.
 
 Unduhan dikirim secara streaming dan build Vercel mengaktifkan `supportsResponseStreaming`, mengikuti [panduan Vercel untuk respons besar](https://vercel.com/kb/guide/how-to-bypass-vercel-body-size-limit-serverless-functions), agar lampiran yang membuat backup melebihi 4,5 MB tetap dapat diunduh.
+
+### Autobackup SQL ke Telegram
+
+Jalankan migrasi **`0017_database_auto_backup`** sebelum deployment. Di **Pengaturan → Backup database**, admin dapat menyalakan **Autobackup harian** dan memilih **Jam backup (WIB)** dari 00.00 sampai 23.00. Pengaturan awal mati, dengan jam **02.00 WIB**. Perubahan jam langsung tersimpan tanpa deploy ulang. Backup tetap dikirim ketika dashboard tidak dibuka. Pada Hobby, pilihan 02.00 berarti pengiriman sekitar **02.00–02.59 WIB**, sesuai [ketentuan cron Vercel](https://vercel.com/docs/cron-jobs/usage-and-pricing).
+
+Build mendaftarkan 24 pemicu harian ke `/api/internal/backup`, masing-masing untuk satu jam UTC. Tiap ekspresi berjalan sekali sehari; total 25 cron termasuk notifikasi berada di bawah batas 100 cron per proyek. Vercel mendukung [beberapa jadwal pada path yang sama](https://vercel.com/docs/cron-jobs/manage-cron-jobs#reading-the-cron-schedule-header). Pemicu hanya memeriksa jadwal: SQL baru dibuat sesudah jam pilihan tercapai dan belum ada pengiriman sukses pada tanggal WIB itu. Cron notifikasi `/api/internal/notifications` tetap terpisah sekitar 07.00 WIB.
+
+Gunakan `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, dan `CRON_SECRET` Production yang sama dengan notifikasi. Bot perlu izin mengirim dokumen. **File berisi data pribadi dan hash PIN**, sehingga chat tujuan harus hanya dapat diakses admin. SQL diunggah langsung melalui [Telegram `sendDocument`](https://core.telegram.org/bots/api#senddocument), tanpa link publik atau penyimpanan file tambahan di database. Batas file 50 MB; file yang lebih besar tetap bisa diunduh dari dashboard.
+
+**Kirim SQL sekarang** mengirim backup saat itu juga, termasuk ketika jadwal otomatis dimatikan. Format unduhan SQL/JSON tidak memengaruhi pengiriman Telegram yang selalu SQL. Halaman menampilkan waktu/nama file terakhir yang berhasil terkirim dan kegagalan terbaru. Kontrol dan seluruh API `/api/admin/backup/*` hanya dapat diakses peran `admin`, termasuk terhadap ketua.
+
+Klaim atomik mencegah cron dan tombol mengirim bersamaan. Backup otomatis yang sudah berhasil hari itu tidak dikirim lagi pada tanggal WIB yang sama, termasuk jika admin mengubah jam; pengiriman manual juga memenuhi jadwal hari tersebut. Jika jam pilihan hari itu sudah lewat, pemicu berikutnya dapat langsung menjalankan backup yang belum terkirim. Proses yang terhenti dapat diklaim ulang setelah dua menit. Kegagalan mempertahankan informasi backup terakhir, mengikuti `retry_after` Telegram, dan dicoba lagi oleh pemicu berikutnya setelah jam pilihan atau tombol admin setelah jeda. Timeout setelah Telegram menerima file dapat menghasilkan duplikasi (*at least once*). Pemeriksaan notifikasi dan backup berjalan terpisah agar kegagalan satu pekerjaan tidak menghalangi yang lain.
+
+Deployment Preview dan `TELEGRAM_DISABLED=1` tidak mengirim. Server lokal tidak menjalankan cron otomatis; **Kirim SQL sekarang** tersedia di lokal jika bot terhubung.
 
 ### Menyalin database remote untuk development
 

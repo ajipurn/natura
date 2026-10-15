@@ -27,7 +27,7 @@ export const app = new Hono<AppEnv>()
     if (!c.res.headers.has("Cache-Control")) c.header("Cache-Control", "private, no-cache");
     const successfulWrite = !["GET", "HEAD", "OPTIONS"].includes(c.req.method);
     const dashboardOpened = c.req.path === "/api/admin/ringkasan";
-    if (c.res.ok && c.get("user") && !c.req.path.startsWith("/api/auth/") && !c.req.path.startsWith("/api/admin/pengaturan/telegram") && (successfulWrite || dashboardOpened)) {
+    if (c.res.ok && c.get("user") && !c.req.path.startsWith("/api/auth/") && !c.req.path.startsWith("/api/admin/pengaturan/telegram") && !c.req.path.startsWith("/api/admin/backup") && (successfulWrite || dashboardOpened)) {
       const task = triggerTelegramNotifications(c.env);
       if (!c.env.waitUntil) await task;
     }

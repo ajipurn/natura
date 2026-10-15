@@ -59,7 +59,12 @@ json(path.join(FUNC, ".vc-config.json"), {
 json(path.join(OUT, "config.json"), {
   version: 3,
   routes: vercelRoutes,
-  crons: [{ path: "/api/internal/notifications", schedule: "0 0 * * *" }],
+  crons: [
+    { path: "/api/internal/notifications", schedule: "0 0 * * *" },
+    // Setiap pemicu sekali sehari agar kompatibel dengan Hobby (maks. 100 cron).
+    // Server memeriksa jam pilihan admin; hanya satu backup per tanggal WIB yang dikirim.
+    ...Array.from({ length: 24 }, (_, hour) => ({ path: "/api/internal/backup", schedule: `0 ${hour} * * *` })),
+  ],
 });
 
 for (const { source, target, name, shortName, id, basePath } of DOMAIN_MANIFESTS) {

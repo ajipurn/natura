@@ -120,6 +120,13 @@
       "when": 1791814529574,
       "tag": "0016_telegram_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792044254195,
+      "tag": "0017_database_auto_backup",
+      "breakpoints": true
     }
   ]
 }

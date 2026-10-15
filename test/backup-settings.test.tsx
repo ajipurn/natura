@@ -19,6 +19,7 @@ beforeEach(() => {
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   client.setQueryData(["auth"], { setupNeeded: false, user: { id: 1, name: "Admin", role: "admin" } });
+  client.setQueryData(["admin", "backup-settings"], { enabled: false, hour: 2, telegramConfigured: true, cronConfigured: true, local: false, disabled: false, lastSentAt: null, lastFileName: null, lastError: null, inProgress: false });
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -33,8 +34,11 @@ afterEach(async () => {
 });
 
 const render = () => act(async () => root.render(<QueryClientProvider client={client}><BackupSettings /></QueryClientProvider>));
-const button = () => container.querySelector<HTMLButtonElement>("button")!;
+const button = () => [...container.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent?.includes("Unduh backup"))!;
 const click = () => act(async () => { button().click(); await tick(); await tick(); });
+const selectFormat = (format: "sql" | "json") => act(async () => {
+  [...container.querySelectorAll<HTMLElement>('[role="radio"]')].find((radio) => radio.textContent?.startsWith(format.toUpperCase()))!.click();
+});
 
 describe("tombol backup di Pengaturan", () => {
   it.each(ROLES.filter((role) => role !== "admin"))("menyembunyikan backup dari %s tanpa meminta data", async (role) => {
@@ -48,11 +52,12 @@ describe("tombol backup di Pengaturan", () => {
   it("mengunduh isi backup dengan nama bertanggal hanya setelah tombol ditekan", async () => {
     vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(backup), { headers }));
     await render();
+    await selectFormat("json");
     expect(button().textContent).toContain("Unduh backup");
     expect(fetch).not.toHaveBeenCalled();
     await click();
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(String(vi.mocked(fetch).mock.calls[0][0])).toBe("/api/admin/backup");
+    expect(String(vi.mocked(fetch).mock.calls[0][0])).toBe("/api/admin/backup?format=json");
     const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob;
     expect(JSON.parse(await blob.text())).toEqual(backup);
     expect(blob.type).toContain("application/json");
@@ -64,12 +69,31 @@ describe("tombol backup di Pengaturan", () => {
     expect(client.getQueryData(["admin", "backup"])).toBeUndefined();
   });
 
+  it("memilih SQL secara awal dan mengunduh file SQL dari API", async () => {
+    const content = "BEGIN;\nCREATE TABLE public.example (id integer);\nCOMMIT;\n";
+    vi.mocked(fetch).mockResolvedValue(new Response(content, { headers: {
+      "Content-Type": "application/sql; charset=utf-8",
+      "Content-Disposition": 'attachment; filename="natura-backup-2026-10-15T01-02-03-456Z.sql"',
+    } }));
+    await render();
+    expect(container.querySelector('[role="radio"][aria-checked="true"]')?.textContent).toContain("SQL (.sql)");
+    expect(fetch).not.toHaveBeenCalled();
+    await click();
+    expect(String(vi.mocked(fetch).mock.calls[0][0])).toBe("/api/admin/backup?format=sql");
+    const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob;
+    expect(await blob.text()).toBe(content);
+    expect(blob.type).toContain("application/sql");
+    const link = vi.mocked(HTMLAnchorElement.prototype.click).mock.instances[0] as HTMLAnchorElement;
+    expect(link.download).toBe("natura-backup-2026-10-15T01-02-03-456Z.sql");
+  });
+
   it("mencegah unduhan ganda selama proses dan mengumumkan statusnya", async () => {
     let resolve!: (response: Response) => void;
     vi.mocked(fetch).mockReturnValue(new Promise<Response>((done) => { resolve = done; }));
     await render();
     await click();
     expect(button().disabled).toBe(true);
+    expect([...container.querySelectorAll('[role="radio"]')].every((radio) => radio.hasAttribute("disabled") || radio.getAttribute("aria-disabled") === "true")).toBe(true);
     expect(container.querySelector('[role="status"]')?.textContent).toBe("Menyiapkan backup…");
     await click();
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -78,6 +102,15 @@ describe("tombol backup di Pengaturan", () => {
       await tick(); await tick();
     });
     expect(button().disabled).toBe(false);
+  });
+
+  it("menghapus status hasil unduhan ketika format diganti", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(backup), { headers }));
+    await render();
+    await click();
+    expect(container.querySelector('[role="status"]')?.textContent).toContain("disiapkan untuk diunduh");
+    await selectFormat("json");
+    expect(container.querySelector('[role="status"]')?.textContent).toBe("");
   });
 
   it("menampilkan penolakan API tanpa membuat file, lalu mengizinkan percobaan ulang", async () => {

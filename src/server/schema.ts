@@ -76,6 +76,20 @@ export const telegramNotifications = pgTable("telegram_notifications", {
   lastError: text("last_error"),
 }, (t) => [index("telegram_notifications_pending_idx").on(t.active, t.nextAttemptAt)]).enableRLS();
 
+/** Konfigurasi dan klaim satu pekerjaan backup; isi SQL tidak disimpan lagi di database. */
+export const backupSettings = pgTable("backup_settings", {
+  id: integer("id").primaryKey().default(1),
+  enabled: boolean("enabled").notNull().default(false),
+  hour: integer("hour").notNull().default(2),
+  lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+  lastSentAt: timestamp("last_sent_at", { withTimezone: true }),
+  lastFileName: text("last_file_name"),
+  lastError: text("last_error"),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+  leaseId: text("lease_id"),
+  leaseUntil: timestamp("lease_until", { withTimezone: true }),
+}, (t) => [check("backup_settings_singleton", sql`${t.id} = 1`), check("backup_settings_hour_range", sql`${t.hour} between 0 and 23`)]).enableRLS();
+
 /**
  * Akun warga, petugas, dan pengurus. Nama akun juga nama warga di rumahnya (`houseId`): rumah yang dihuni akun
  * tidak menyimpan nama sendiri. Nama boleh kembar asal rumahnya beda.

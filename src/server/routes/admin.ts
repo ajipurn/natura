@@ -25,7 +25,7 @@ import { MAX_LOGO_DATA_URL, parseLogo } from "../logo";
 import { DEFAULT_SETTINGS, getHouseIds, getPlanAnchors, getSettings, listHouses, listHousesWithUsage, listUsers, logoColumns, logoUrl } from "../queries";
 import { countPendingRequests, decideRequest, listRequestsForAdmin } from "../requests";
 import { clearSchedule, replaceSlots, residentDaysStatements, saveSchedule } from "../schedule";
-import { announcements, cashDeposits, cashEntries, collections, contacts, duesInvoices, houses, payments, residenceMoves, rondaSchedule, scheduleRequests, settings, users } from "../schema";
+import { announcements, backupSettings, cashDeposits, cashEntries, collections, contacts, duesInvoices, houses, payments, residenceMoves, rondaSchedule, scheduleRequests, settings, users } from "../schema";
 import { getAudit } from "../audit";
 import { getDashboard } from "../dashboard";
 import { getCashMonth, MAX_CASH } from "../kas";
@@ -33,8 +33,10 @@ import { monthQuery } from "./ronda";
 import { accountNameTaken as nameTaken, accountNameTakenError as nameTakenError, listResidents, selectHouseResident, setHouseResident } from "../residents";
 import { residents } from "../schema";
 import { moveResident } from "../residence";
-import { telegramStatus, testTelegram } from "../telegram";
+import { telegramConfig, telegramStatus, testTelegram } from "../telegram";
 import { createDatabaseBackup } from "../backup";
+import { createSqlDatabaseBackup } from "../backup-sql";
+import { databaseBackupStatus, processDatabaseBackup } from "../backup-telegram";
 
 const BLOCK_PATTERN = /^[0-9A-Z][0-9A-Z .\-/]{0,9}$/;
 const NUMBER_PATTERN = /^[0-9A-Z][0-9A-Z\-/]{0,9}$/;
@@ -404,12 +406,38 @@ export const adminRoutes = new Hono<AppEnv>()
 
   /* ---------- Pengaturan & kode warga ---------- */
 
-  .get("/backup", async (c) => {
-    const backup = await createDatabaseBackup(c.var.db);
-    const payload = new TextEncoder().encode(JSON.stringify(backup, null, 2) + "\n");
+  .get("/backup/settings", async (c) => {
     c.header("Cache-Control", "private, no-store");
-    c.header("Content-Disposition", `attachment; filename="natura-backup-${backup.createdAt.replace(/[:.]/g, "-")}.json"`);
-    c.header("Content-Type", "application/json; charset=utf-8");
+    return c.json(await databaseBackupStatus(c.env));
+  })
+  .put("/backup/settings", body(z.object({
+    enabled: z.boolean().optional(), hour: z.number().int().min(0).max(23).optional(),
+  }).strict().refine((value) => value.enabled !== undefined || value.hour !== undefined, "Pilih jam atau status autobackup.")), async (c) => {
+    const changes = c.req.valid("json"), { enabled } = changes;
+    if (enabled && !telegramConfig(c.env)) return c.json({ error: "Hubungkan Telegram dan aktifkan pengiriman terlebih dahulu." }, 400);
+    if (enabled && !c.env.CRON_SECRET && c.env.DEV !== "1") return c.json({ error: "Isi CRON_SECRET di Vercel, lalu deploy ulang agar autobackup terjadwal berjalan." }, 400);
+    await c.var.db.update(backupSettings).set(changes).where(eq(backupSettings.id, 1));
+    return c.json({ success: enabled === undefined ? "Jam backup tersimpan." : enabled ? "Autobackup harian diaktifkan." : "Autobackup dinonaktifkan." });
+  })
+  .post("/backup/telegram", async (c) => {
+    const result = await processDatabaseBackup(c.env, { force: true });
+    if (!result.sent) return c.json({ error: result.error ?? "Backup belum dapat dikirim. Coba lagi." }, result.reason === "busy" ? 409 : 503);
+    return c.json({ success: "File SQL terkirim. Periksa chat Telegram tujuan." });
+  })
+
+  .get("/backup", validator("query", (query, c) => {
+    const format = query.format ?? "json";
+    if (format !== "json" && format !== "sql") return c.json({ error: "Pilih format backup SQL atau JSON." }, 400);
+    return { format };
+  }), async (c) => {
+    const { format } = c.req.valid("query");
+    const backup = format === "sql"
+      ? await createSqlDatabaseBackup(c.var.db)
+      : await createDatabaseBackup(c.var.db).then((data) => ({ createdAt: data.createdAt, content: JSON.stringify(data, null, 2) + "\n" }));
+    const payload = new TextEncoder().encode(backup.content);
+    c.header("Cache-Control", "private, no-store");
+    c.header("Content-Disposition", `attachment; filename="natura-backup-${backup.createdAt.replace(/[:.]/g, "-")}.${format}"`);
+    c.header("Content-Type", format === "sql" ? "application/sql; charset=utf-8" : "application/json; charset=utf-8");
     c.header("X-Content-Type-Options", "nosniff");
     return stream(c, async (output) => {
       // Kirim per potongan byte supaya file besar tetap mengalir dan karakter UTF-8 tetap utuh.

@@ -10,9 +10,28 @@ type SendResult = { ok: true } | { ok: false; error: string; retryAfter: number 
 const MAX_MESSAGE = 3900;
 const LEASE_MS = 120_000;
 
-function config(env: Bindings): Config | null {
+export function telegramConfig(env: Bindings): Config | null {
   const token = env.TELEGRAM_BOT_TOKEN?.trim(), chatId = env.TELEGRAM_CHAT_ID?.trim();
   return env.TELEGRAM_DISABLED !== "1" && token && chatId ? { token, chatId } : null;
+}
+
+/** SQL diunggah sebagai lampiran, tanpa link unduhan publik atau token di pesan error. */
+export async function sendTelegramDocument(credentials: Config, file: Blob, fileName: string, caption: string): Promise<SendResult> {
+  if (file.size > 50_000_000) return { ok: false, error: "File SQL melebihi batas Telegram 50 MB. Unduh backup melalui dashboard.", retryAfter: 86_400 };
+  const form = new FormData();
+  form.set("chat_id", credentials.chatId);
+  form.set("document", file, fileName);
+  form.set("caption", caption);
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${credentials.token}/sendDocument`, {
+      method: "POST", body: form, signal: AbortSignal.timeout(25_000),
+    });
+    const body = await res.json().catch(() => null) as { ok?: boolean; parameters?: { retry_after?: number } } | null;
+    if (res.ok && body?.ok === true) return { ok: true };
+    return { ok: false, error: `Telegram menolak file SQL (HTTP ${res.status}). Periksa token, Chat ID, dan izin bot mengirim file.`, retryAfter: Math.max(60, Number(body?.parameters?.retry_after) || 0) };
+  } catch {
+    return { ok: false, error: "File SQL belum dapat dikirim ke Telegram. Coba lagi nanti.", retryAfter: 60 };
+  }
 }
 
 /** Token tidak pernah dikembalikan ke browser atau ditulis ke log, termasuk ketika fetch gagal. */
@@ -68,7 +87,7 @@ async function claim(db: Db, community: string, notices: DashboardNotification[]
 
 /** Dipanggil setelah perubahan data, saat Ringkasan dibuka, dan oleh cron. Kegagalan kanal tidak menggagalkan catatan bisnis. */
 export async function processTelegramNotifications(env: Bindings, now = new Date()) {
-  const credentials = config(env);
+  const credentials = telegramConfig(env);
   if (!credentials) return { sent: 0, enabled: false };
   const { communityName, notices } = await env.db.transaction(async (tx) => {
     // Snapshot lama tidak boleh menonaktifkan pengingat baru dari request yang berjalan bersamaan.
@@ -108,7 +127,7 @@ function databaseErrorCode(error: unknown): string | null {
 }
 
 export function triggerTelegramNotifications(env: Bindings) {
-  if (!config(env)) return;
+  if (!telegramConfig(env)) return;
   const task = processTelegramNotifications(env).catch((error: unknown) => {
     // Jangan log error jaringan mentah: URL fetch mengandung token bot.
     const code = databaseErrorCode(error);
@@ -127,11 +146,11 @@ export async function telegramStatus(env: Bindings) {
     env.db.select({ at: max(queue.sentAt) }).from(queue),
     env.db.select({ error: queue.lastError }).from(queue).where(and(eq(queue.active, true), isNull(queue.sentAt), sql`last_error is not null`)).orderBy(desc(queue.detectedAt)).limit(1),
   ]);
-  return { enabled: Boolean(config(env)), local: env.DEV === "1", disabled: env.TELEGRAM_DISABLED === "1", pending: pending.n, lastSentAt: last.at, error: failed?.error ?? null, cronConfigured: Boolean(env.CRON_SECRET) };
+  return { enabled: Boolean(telegramConfig(env)), local: env.DEV === "1", disabled: env.TELEGRAM_DISABLED === "1", pending: pending.n, lastSentAt: last.at, error: failed?.error ?? null, cronConfigured: Boolean(env.CRON_SECRET) };
 }
 
 export async function testTelegram(env: Bindings) {
-  const credentials = config(env);
+  const credentials = telegramConfig(env);
   if (!credentials) return { ok: false as const, error: env.TELEGRAM_DISABLED === "1" ? "Pengiriman Telegram dinonaktifkan untuk lingkungan ini." : env.DEV === "1" ? "Isi TELEGRAM_BOT_TOKEN dan TELEGRAM_CHAT_ID di .env.local, lalu mulai ulang bun run dev." : "Isi TELEGRAM_BOT_TOKEN dan TELEGRAM_CHAT_ID di Vercel, lalu deploy ulang." };
   return sendTelegram(credentials, "Cluster Natura · Pesan uji\n\nBot terhubung. Permintaan dan pengingat dashboard akan dikirim ke chat ini.\nhttps://app.clusternatura.com/dashboard");
 }

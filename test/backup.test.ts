@@ -1,9 +1,15 @@
 import { eq, sql } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+import { migrate } from "drizzle-orm/pglite/migrator";
 import { ROLES, can } from "@/lib/permissions";
 import type { Role } from "@/lib/types";
 import { app } from "@/server/app";
 import type { DatabaseBackup } from "@/server/backup";
+import { createDatabaseBackup } from "@/server/backup";
+import type { Db } from "@/server/db";
+import * as schema from "@/server/schema";
 import { cashEntries, duesInvoices, duesLogs, duesReceipts, duesTypes, families, houses, paymentLogs, payments, residents, rondaSchedule, settings, users } from "@/server/schema";
 import { apiClient, createTestEnv } from "./helpers/db";
 
@@ -13,7 +19,7 @@ let adminId: number;
 let houseId: number;
 const clients = new Map<Role, ReturnType<typeof apiClient>>();
 const proof = "data:image/png;base64,aW5pLWJ1a3Rp";
-const note = "Catatan O'Brian: \"lunas\"\\arsip\nBaris kedua 🏡";
+const note = "Catatan O'Brian: \"lunas\"\\arsip\nBaris kedua 🏡\n'); DROP TABLE houses; --";
 
 beforeAll(async () => {
   ({ env } = await createTestEnv());
@@ -52,10 +58,34 @@ beforeAll(async () => {
   await db.execute(sql`update houses set created_at = '2026-10-01 01:02:03.123456+00' where id = ${houseId}`);
 });
 
-function download() {
-  return app.request("/api/admin/backup", {
+function download(format?: string) {
+  return app.request(`/api/admin/backup${format ? `?format=${format}` : ""}`, {
     headers: { Cookie: [...admin.cookies].map(([key, value]) => `${key}=${value}`).join("; ") },
   }, env);
+}
+
+async function databaseStructure(db: Db) {
+  return (await db.execute(sql`
+    select 'column' as kind, n.nspname || '.' || c.relname || '.' || a.attname as name,
+      format_type(a.atttypid, a.atttypmod) || ':' || a.attnotnull::text || ':' || coalesce(pg_get_expr(d.adbin, d.adrelid), '') as definition
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace join pg_attribute a on a.attrelid = c.oid
+    left join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
+    where n.nspname in ('public', 'drizzle') and c.relkind = 'r' and a.attnum > 0 and not a.attisdropped
+    union all
+    select 'constraint', n.nspname || '.' || c.relname || '.' || con.conname, pg_get_constraintdef(con.oid)
+    from pg_constraint con join pg_class c on c.oid = con.conrelid join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname in ('public', 'drizzle')
+    union all
+    select 'index', schemaname || '.' || indexname, indexdef from pg_indexes where schemaname in ('public', 'drizzle')
+    union all
+    select 'rls', n.nspname || '.' || c.relname, c.relrowsecurity::text || ':' || c.relforcerowsecurity::text
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname in ('public', 'drizzle') and c.relkind = 'r'
+    union all
+    select 'enum', n.nspname || '.' || t.typname, string_agg(e.enumlabel, ',' order by e.enumsortorder)
+    from pg_type t join pg_namespace n on n.oid = t.typnamespace join pg_enum e on e.enumtypid = t.oid
+    where n.nspname = 'public' group by n.nspname, t.typname
+    order by 1, 2, 3
+  `)).rows;
 }
 
 describe("backup database khusus admin", () => {
@@ -67,11 +97,19 @@ describe("backup database khusus admin", () => {
   });
 
   it("menolak pengunjung tanpa sesi dan semua peran selain admin, termasuk ketua", async () => {
-    expect(await apiClient(env).get("/api/admin/backup")).toMatchObject({ status: 401 });
-    for (const role of ROLES.filter((role) => role !== "admin")) {
-      const response = await clients.get(role)!.get("/api/admin/backup");
-      expect(response.status, role).toBe(403);
-      expect(response.data).not.toHaveProperty("tables");
+    for (const format of ["sql", "json"]) {
+      expect(await apiClient(env).get(`/api/admin/backup?format=${format}`)).toMatchObject({ status: 401 });
+      for (const role of ROLES.filter((role) => role !== "admin")) {
+        const response = await clients.get(role)!.get(`/api/admin/backup?format=${format}`);
+        expect(response.status, `${role}: ${format}`).toBe(403);
+        expect(response.data).not.toHaveProperty("tables");
+      }
+    }
+  });
+
+  it("menolak format yang tidak didukung atau dikirim berulang", async () => {
+    for (const path of ["/api/admin/backup?format=dump", "/api/admin/backup?format=sql&format=json"]) {
+      expect(await admin.get(path)).toMatchObject({ status: 400, data: { error: "Pilih format backup SQL atau JSON." } });
     }
   });
 
@@ -137,6 +175,46 @@ describe("backup database khusus admin", () => {
       expect(backup.tables.residents).toContainEqual(expect.objectContaining({ name: note }));
     } finally {
       await env.db.update(duesReceipts).set({ proof });
+    }
+  });
+
+  it("memulihkan SQL ke database kosong dengan struktur, relasi, data, migrasi dan urutan ID yang sama", async () => {
+    await env.db.execute(sql`select setval(pg_get_serial_sequence('houses', 'id'), 10000, true)`);
+    const before = await createDatabaseBackup(env.db);
+    const structure = await databaseStructure(env.db);
+    const response = await download("sql");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toContain("application/sql");
+    expect(response.headers.get("Content-Disposition")).toMatch(/filename="natura-backup-.*\.sql"/);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    const content = await response.text();
+    expect((await createDatabaseBackup(env.db)).tables).toEqual(before.tables);
+    const target = new PGlite();
+    const restoredDb = drizzle(target, { schema });
+    const restored = restoredDb as unknown as Db;
+    try {
+      await target.exec(content);
+      const after = await createDatabaseBackup(restored);
+      expect(after.tables).toEqual(before.tables);
+      expect(after.migrations).toEqual(before.migrations);
+      expect(await databaseStructure(restored)).toEqual(structure);
+      // Target yang sudah berisi data ditolak, tanpa menimpa data yang telah dipulihkan.
+      await expect(target.exec(content)).rejects.toThrow(/already exists/);
+      await target.exec("ROLLBACK");
+      expect((await createDatabaseBackup(restored)).tables).toEqual(before.tables);
+      // Riwayat migrasi yang ikut dipulihkan mencegah migrasi lama dijalankan ulang.
+      await migrate(restoredDb, { migrationsFolder: "drizzle" });
+      expect((await createDatabaseBackup(restored)).migrations).toEqual(before.migrations);
+      // ID yang pernah terpakai lalu dihapus tetap tidak dipakai ulang.
+      const [newHouse] = await restored.insert(houses).values({ block: "Z", number: "99", token: "RESTORED" }).returning();
+      expect(newHouse.id).toBe(10001);
+      const [newContact] = await restored.insert(schema.contacts).values({ name: "Pengurus", role: "Ketua", phone: "081234567890", position: 0 }).returning();
+      expect(newContact.id).toBe(1);
+      const account = apiClient({ ...env, db: restored });
+      expect((await account.post("/api/auth/login", { userId: adminId, pin: "1234" })).status).toBe(200);
+      expect((await account.get("/api/auth")).data).toMatchObject({ user: { role: "admin", id: adminId } });
+    } finally {
+      await target.close();
     }
   });
 
