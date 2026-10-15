@@ -47,7 +47,15 @@ async function render() {
 }
 
 function searchField() {
-  return container.querySelector<HTMLInputElement>('input[role="combobox"]')!;
+  return document.querySelector<HTMLInputElement>('input[role="combobox"]')!;
+}
+
+function accountTrigger() {
+  return container.querySelector<HTMLButtonElement>('button[aria-expanded]')!;
+}
+
+async function openSearch() {
+  await act(async () => accountTrigger().click());
 }
 
 async function type(input: HTMLInputElement, value: string) {
@@ -58,12 +66,8 @@ async function type(input: HTMLInputElement, value: string) {
 }
 
 async function search(query: string) {
-  const input = searchField();
-  await act(async () => {
-    input.focus();
-    input.click();
-  });
-  await type(input, query);
+  await openSearch();
+  await type(searchField(), query);
 }
 
 function options() {
@@ -79,11 +83,14 @@ describe("pencarian akun di halaman masuk", () => {
     [" AD 8 ", ["Aji AD-8"]],
     ["12", ["Aji AC-12"]],
     ["admin", ["Admin"]],
-  ])("mencari %s langsung dari kolom utama", async (query, expected) => {
+  ])("mencari %s dari kolom di dalam popup", async (query, expected) => {
     await render();
-    const input = searchField();
-    expect(container.querySelector('label[for="' + input.id + '"]')?.textContent).toBe("Nama atau rumah");
+    expect(container.querySelector('input[role="combobox"]')).toBeNull();
+    const labels = accountTrigger().getAttribute("aria-labelledby")!.split(" ").map((id) => document.getElementById(id)?.textContent);
+    expect(labels).toContain("Nama atau rumah");
     await search(query);
+    expect(searchField().placeholder).toBe("Cari nama atau rumah…");
+    expect(searchField().getAttribute("aria-label")).toBe("Cari nama atau rumah");
     expect(options().map((option) => option.textContent)).toEqual(expected);
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -93,20 +100,20 @@ describe("pencarian akun di halaman masuk", () => {
     await search("aji");
     expect(options().map((option) => option.textContent)).toEqual(["Aji AD-8", "Aji AC-12"]);
     await act(async () => options()[1].click());
-    expect(searchField().value).toBe("Aji · AC-12");
+    expect(accountTrigger().textContent).toBe("Aji AC-12");
     expect(new FormData(container.querySelector("form")!).get("userId")).toBe("2");
     await type(container.querySelector<HTMLInputElement>('input[name="pin"]')!, "1234");
     await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     expect(fetch).toHaveBeenCalledWith("/api/auth/login", expect.objectContaining({ body: JSON.stringify({ userId: 2, pin: "1234" }) }));
-    expect(searchField().value).toBe("Aji · AC-12");
+    expect(accountTrigger().textContent).toBe("Aji AC-12");
   });
 
   it("memilih hasil pencarian dengan Enter", async () => {
     await render();
     await search("ac12");
     await act(async () => searchField().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
-    expect(searchField().value).toBe("Aji · AC-12");
-    expect(searchField().getAttribute("aria-expanded")).toBe("false");
+    expect(accountTrigger().textContent).toBe("Aji AC-12");
+    expect(accountTrigger().getAttribute("aria-expanded")).toBe("false");
     expect(new FormData(container.querySelector("form")!).get("userId")).toBe("2");
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -117,18 +124,37 @@ describe("pencarian akun di halaman masuk", () => {
     expect(options()).toHaveLength(0);
     expect(document.body.textContent).toContain("Tidak ada yang cocok.");
     await act(async () => searchField().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
-    expect(searchField().getAttribute("aria-expanded")).toBe("false");
-    expect(document.activeElement).toBe(searchField());
+    expect(accountTrigger().getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(accountTrigger());
   });
 
-  it("memulihkan akun terakhir dan menghapus pilihan saat kolom dikosongkan", async () => {
+  it("memulihkan akun terakhir dan mencari akun lain tanpa menghapus nama terpilih", async () => {
     localStorage.setItem("jimpitan:last-user", "1");
     await render();
-    expect(searchField().value).toBe("Aji · AD-8");
-    await search("");
+    expect(new FormData(container.querySelector("form")!).get("userId")).toBe("1");
+    await openSearch();
     expect(searchField().value).toBe("");
-    expect(new FormData(container.querySelector("form")!).get("userId")).toBe("");
-    await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="Tampilkan pilihan"]')!.click());
+    expect(document.activeElement).toBe(searchField());
     expect(options()).toHaveLength(users.length);
+    await type(searchField(), "Budi");
+    expect(options().map((option) => option.textContent)).toEqual(["Budi Santoso AD-18"]);
+    expect(accountTrigger().textContent).toBe("Aji AD-8");
+    expect(new FormData(container.querySelector("form")!).get("userId")).toBe("1");
+    await act(async () => options()[0].click());
+    expect(accountTrigger().textContent).toBe("Budi Santoso AD-18");
+    expect(new FormData(container.querySelector("form")!).get("userId")).toBe("3");
+    await openSearch();
+    expect(searchField().value).toBe("");
+    expect(options()).toHaveLength(users.length);
+  });
+
+  it("membatalkan pencarian tanpa mengganti akun terakhir", async () => {
+    localStorage.setItem("jimpitan:last-user", "2");
+    await render();
+    await search("Budi");
+    await act(async () => searchField().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    expect(accountTrigger().textContent).toBe("Aji AC-12");
+    expect(new FormData(container.querySelector("form")!).get("userId")).toBe("2");
+    expect(document.activeElement).toBe(accountTrigger());
   });
 });

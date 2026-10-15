@@ -99,14 +99,14 @@ export function LoginPage({ title, homePath, setupPath }: { title: string; homeP
           <form className="mt-6 space-y-5" onSubmit={submit} aria-busy={pending}>
             <Select
               label="Nama atau rumah"
-              searchInField
+              searchPlaceholder="Cari nama atau rumah…"
               name="userId"
               required
               value={list.some((u) => String(u.id) === userId) ? userId : ""}
               onValueChange={setUserId}
               // Blok/nomor rumah tampil di samping nama, jadi nama kembar tetap bisa dibedakan.
               options={list.map((u) => ({ value: String(u.id), label: u.name, hint: u.house ?? undefined }))}
-              placeholder={users.isPending ? "Memuat nama…" : "Cari nama atau rumah…"}
+              placeholder={users.isPending ? "Memuat nama…" : "Pilih nama atau rumah…"}
               disabled={users.isPending || pending}
               className="bg-bg/50"
             />
