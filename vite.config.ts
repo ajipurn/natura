@@ -5,9 +5,9 @@ import { existsSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { defineConfig, loadEnv, type Connect, type Plugin, type ViteDevServer } from "vite";
-import { DEV_SEED_PATH, DEV_TOKEN_HEADER, removeDevServerInfo, writeDevServerInfo } from "./scripts/dev-server-info";
-import { domainRedirect, pageShell } from "./scripts/app-routing";
-import { NATURA_HOSTS } from "./src/lib/app-paths";
+import { DEV_SEED_PATH, DEV_TOKEN_HEADER, removeDevServerInfo, writeDevServerInfo } from "./scripts/dev-server-info.ts";
+import { domainRedirect, pageShell } from "./scripts/app-routing.ts";
+import { NATURA_HOSTS } from "./src/lib/app-paths.ts";
 
 const src = fileURLToPath(new URL("./src", import.meta.url));
 /** Function API hasil `bun run build` (lihat scripts/build-vercel.ts). */

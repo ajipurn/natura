@@ -1,4 +1,4 @@
-import { APP_BASE_PATHS, APP_DOMAINS, COMMUNITY_DOMAIN, LEGACY_APP_DOMAINS, NATURA_HOSTS, appSurface, type AppSurface } from "../src/lib/app-paths";
+import { APP_BASE_PATHS, APP_DOMAINS, COMMUNITY_DOMAIN, LEGACY_APP_DOMAINS, NATURA_HOSTS, appSurface, type AppSurface } from "../src/lib/app-paths.ts";
 
 const SHELLS = { petugas: "/petugas/index.html", admin: "/admin/index.html", warga: "/index.html", landing: "/landing/index.html" };
 const PAGE_PATTERN = "^/(?!api(?:/|$)|assets(?:/|$)|@|.*\\.[a-zA-Z0-9]+$)(.*)$";
