@@ -1,21 +1,11 @@
 // @vitest-environment happy-dom
 import * as THREE from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mountLandingScene } from "@/apps/landing/landing-scene-3d";
+import { mountLandingScene, type LandingSceneController } from "@/apps/landing/landing-scene-3d";
 
 type Frame = (time: number) => void;
-type FakeRenderer = {
-  domElement: HTMLCanvasElement;
-  loop: Frame | null;
-  render: ReturnType<typeof vi.fn>;
-  dispose: ReturnType<typeof vi.fn>;
-  setSize: ReturnType<typeof vi.fn>;
-};
-const mocks = vi.hoisted(() => ({
-  failWebGL: false,
-  renderers: [] as FakeRenderer[],
-  parse: vi.fn(),
-}));
+type FakeRenderer = { domElement: HTMLCanvasElement; loop: Frame | null; render: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn>; setSize: ReturnType<typeof vi.fn> };
+const mocks = vi.hoisted(() => ({ failWebGL: false, renderers: [] as FakeRenderer[], environmentDispose: vi.fn(), pmremDispose: vi.fn(), roomDispose: vi.fn() }));
 vi.mock("three", async (importOriginal) => ({
   ...await importOriginal<typeof import("three")>(),
   WebGLRenderer: class {
@@ -33,11 +23,12 @@ vi.mock("three", async (importOriginal) => ({
     }
     setAnimationLoop(loop: Frame | null) { this.loop = loop; }
   },
+  PMREMGenerator: class {
+    fromScene() { return { texture: {}, dispose: mocks.environmentDispose }; }
+    dispose = mocks.pmremDispose;
+  },
 }));
-vi.mock("three/addons/loaders/GLTFLoader.js", () => ({
-  GLTFLoader: class { parseAsync = mocks.parse; },
-}));
-
+vi.mock("three/addons/environments/RoomEnvironment.js", () => ({ RoomEnvironment: class { dispose = mocks.roomDispose; } }));
 class ViewObserver {
   static instances: ViewObserver[] = [];
   disconnect = vi.fn();
@@ -53,69 +44,66 @@ class SizeObserver {
 }
 class MotionPreference extends EventTarget {
   matches = false;
-  setReduced(reduced: boolean) {
-    this.matches = reduced;
-    this.dispatchEvent(new Event("change"));
-  }
+  setReduced(reduced: boolean) { this.matches = reduced; this.dispatchEvent(new Event("change")); }
 }
-
 let container: HTMLDivElement;
 let motion: MotionPreference;
 let hidden: boolean;
-let dispose: (() => void) | undefined;
-const fetchMock = vi.fn<typeof fetch>();
+let controller: LandingSceneController | undefined;
+const fetchMock = vi.fn();
 const lastRenderer = () => mocks.renderers.at(-1)!;
 const scene = () => lastRenderer().render.mock.calls.at(-1)![0] as THREE.Scene;
-const trees = () => scene().children.filter((child) => child.name.startsWith("natura-tree-"));
-const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
+const model = () => scene().getObjectByName("natura-maquette")!;
 
 beforeEach(() => {
   mocks.failWebGL = false;
   mocks.renderers = [];
-  mocks.parse.mockReset();
+  mocks.environmentDispose.mockClear();
+  mocks.pmremDispose.mockClear();
+  mocks.roomDispose.mockClear();
   ViewObserver.instances = [];
   SizeObserver.instances = [];
   hidden = false;
   motion = new MotionPreference();
   vi.stubGlobal("IntersectionObserver", ViewObserver);
   vi.stubGlobal("ResizeObserver", SizeObserver);
-  vi.stubGlobal("fetch", fetchMock.mockReset().mockRejectedValue(new Error("CDN unavailable")));
+  vi.stubGlobal("fetch", fetchMock.mockClear());
   vi.spyOn(window, "matchMedia").mockReturnValue(motion as unknown as MediaQueryList);
   vi.spyOn(document, "hidden", "get").mockImplementation(() => hidden);
-  vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(384);
-  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(320);
+  vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1280);
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(560);
   container = document.createElement("div");
   document.body.appendChild(container);
 });
-
-afterEach(async () => {
-  dispose?.();
-  dispose = undefined;
-  await flush();
+afterEach(() => {
+  controller?.dispose();
+  controller = undefined;
   container.remove();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
-describe("adegan 3D landing page", () => {
-  it("tetap menyediakan ilustrasi SVG ketika WebGL tidak tersedia", () => {
+describe("maket Three.js landing Natura", () => {
+  it("mempertahankan fallback jika WebGL tidak tersedia dan tidak mengunduh model atau gambar", () => {
     mocks.failWebGL = true;
-    dispose = mountLandingScene(container);
+    controller = mountLandingScene(container);
     expect(container.querySelector("canvas")).toBeNull();
     expect(container.dataset.ready).toBeUndefined();
+    controller.setProgress(0.5);
+    controller.setPaused(true);
     expect(fetchMock).not.toHaveBeenCalled();
   });
-
-  it("menggerakkan pohon dari pangkal dan berhenti saat ilustrasi/tab tidak terlihat", () => {
-    dispose = mountLandingScene(container);
+  it("merender geometri lokal dan menghentikan frame saat keluar layar atau tab tersembunyi", () => {
+    controller = mountLandingScene(container);
     const renderer = lastRenderer();
+    expect(container.dataset.ready).toBe("true");
+    expect(model().children.filter((child) => child.name === "natura-house")).toHaveLength(4);
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(renderer.loop).toBeNull();
     ViewObserver.instances[0].show(true);
-    const positions = trees().map((tree) => tree.position.clone());
+    const initial = model().rotation.y;
     for (const time of [0, 40, 80, 120, 160]) renderer.loop!(time);
-    expect(trees().some((tree) => Math.abs(tree.rotation.z) > 0.001)).toBe(true);
-    expect(trees().map((tree) => tree.position)).toEqual(positions);
-
+    expect(model().rotation.y).not.toBe(initial);
     ViewObserver.instances[0].show(false);
     expect(renderer.loop).toBeNull();
     ViewObserver.instances[0].show(true);
@@ -127,23 +115,46 @@ describe("adegan 3D landing page", () => {
     document.dispatchEvent(new Event("visibilitychange"));
     expect(renderer.loop).toBeTypeOf("function");
   });
-
-  it("menampilkan 3D diam saat reduced motion aktif, termasuk ketika preferensi berubah", () => {
-    motion.matches = true;
-    dispose = mountLandingScene(container);
+  it("mengikuti progress scroll dan membekukan adegan saat dijeda", () => {
+    controller = mountLandingScene(container);
     ViewObserver.instances[0].show(true);
-    const renderer = lastRenderer();
-    expect(container.dataset.ready).toBe("true");
-    expect(renderer.loop).toBeNull();
-    motion.setReduced(false);
-    for (const time of [0, 40, 80]) renderer.loop!(time);
-    motion.setReduced(true);
-    expect(renderer.loop).toBeNull();
-    expect(trees().every((tree) => tree.rotation.x === 0 && tree.rotation.z === 0)).toBe(true);
+    controller.setProgress(0.5);
+    expect(model().rotation.y).toBeCloseTo(0.02);
+    controller.setPaused(true);
+    const frozen = model().rotation.y;
+    controller.setProgress(1);
+    expect(model().rotation.y).toBe(frozen);
+    expect(lastRenderer().loop).toBeNull();
+    controller.setPaused(false);
+    controller.setProgress(2);
+    expect(model().rotation.y).toBeCloseTo(0.26);
+    expect(lastRenderer().loop).toBeTypeOf("function");
   });
-
-  it("menampilkan cadangan ketika context WebGL hilang, lalu kembali setelah pulih", () => {
-    dispose = mountLandingScene(container);
+  it("menyediakan render statis sejak awal dan saat preferensi reduced motion berubah", () => {
+    motion.matches = true;
+    controller = mountLandingScene(container);
+    ViewObserver.instances[0].show(true);
+    expect(container.dataset.ready).toBe("true");
+    expect(lastRenderer().loop).toBeNull();
+    controller.setProgress(1);
+    expect(model().rotation.y).toBe(-0.22);
+    motion.setReduced(false);
+    expect(lastRenderer().loop).toBeTypeOf("function");
+    motion.setReduced(true);
+    expect(lastRenderer().loop).toBeNull();
+    expect(model().position.y).toBe(0);
+  });
+  it("mempertahankan pilihan jeda awal ketika preferensi sistem kembali normal", () => {
+    controller = mountLandingScene(container, true);
+    ViewObserver.instances[0].show(true);
+    motion.setReduced(true);
+    motion.setReduced(false);
+    expect(lastRenderer().loop).toBeNull();
+    controller.setPaused(false);
+    expect(lastRenderer().loop).toBeTypeOf("function");
+  });
+  it("mengembalikan fallback pada context loss dan pulih tanpa renderer tambahan", () => {
+    controller = mountLandingScene(container);
     ViewObserver.instances[0].show(true);
     const renderer = lastRenderer();
     renderer.domElement.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
@@ -152,85 +163,34 @@ describe("adegan 3D landing page", () => {
     renderer.domElement.dispatchEvent(new Event("webglcontextrestored"));
     expect(container.dataset.ready).toBe("true");
     expect(renderer.loop).toBeTypeOf("function");
+    expect(mocks.renderers).toHaveLength(1);
   });
-
-  it("mempertahankan rumah dan pohon cadangan ketika CDN Polyfork gagal", async () => {
-    dispose = mountLandingScene(container);
-    await flush();
-    expect(container.dataset.ready).toBe("true");
-    expect(container.dataset.treeSource).toBeUndefined();
-    expect(trees()).toHaveLength(3);
-    expect(trees().every((tree) => tree.children.length > 0)).toBe(true);
-  });
-
-  it("memakai model Polyfork gratis dan menjaga ukuran serta pangkal pohon", async () => {
-    motion.matches = true;
-    const model = new THREE.Group();
-    const geometry = new THREE.BoxGeometry(3, 6, 3);
-    const material = new THREE.MeshStandardMaterial();
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.y = 3;
-    model.add(mesh);
-    fetchMock.mockResolvedValue(new Response(new ArrayBuffer(8)));
-    mocks.parse.mockResolvedValue({ scene: model });
-    dispose = mountLandingScene(container);
-    await flush();
-    expect(container.dataset.treeSource).toBe("polyfork");
-    const [, options] = fetchMock.mock.calls[0];
-    expect(options?.credentials).toBe("omit");
-    for (const tree of trees()) {
-      const bounds = new THREE.Box3().setFromObject(tree);
-      expect(bounds.min.y).toBeCloseTo(0);
-      expect(bounds.max.y).toBeLessThanOrEqual(2.5);
-    }
-    const geometryDispose = vi.spyOn(geometry, "dispose");
-    const materialDispose = vi.spyOn(material, "dispose");
-    dispose();
-    dispose = undefined;
-    expect(geometryDispose).toHaveBeenCalledTimes(1);
-    expect(materialDispose).toHaveBeenCalledTimes(1);
-  });
-
-  it("menghentikan request dan melepas GPU serta observer setelah halaman ditutup", () => {
-    dispose = mountLandingScene(container);
+  it("melepas geometri, material, environment, observer, dan canvas tepat sekali", () => {
+    controller = mountLandingScene(container);
     const renderer = lastRenderer();
-    const geometryDisposers = new Map<THREE.BufferGeometry, ReturnType<typeof vi.spyOn>>();
+    const disposers = new Map<Resource, ReturnType<typeof vi.spyOn>>();
+    type Resource = THREE.BufferGeometry | THREE.Material;
     scene().traverse((child) => {
-      if (child instanceof THREE.Mesh && !geometryDisposers.has(child.geometry)) geometryDisposers.set(child.geometry, vi.spyOn(child.geometry, "dispose"));
+      if (!(child instanceof THREE.Mesh)) return;
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      for (const resource of [child.geometry, ...materials]) if (!disposers.has(resource)) disposers.set(resource, vi.spyOn(resource, "dispose"));
     });
     ViewObserver.instances[0].show(true);
-    dispose();
-    dispose = undefined;
+    controller.dispose();
+    controller.dispose();
     expect(renderer.loop).toBeNull();
     expect(renderer.dispose).toHaveBeenCalledOnce();
+    expect(mocks.environmentDispose).toHaveBeenCalledOnce();
+    expect(mocks.pmremDispose).toHaveBeenCalledOnce();
+    expect(mocks.roomDispose).toHaveBeenCalledOnce();
+    for (const spy of disposers.values()) expect(spy).toHaveBeenCalledOnce();
     expect(ViewObserver.instances[0].disconnect).toHaveBeenCalledOnce();
     expect(SizeObserver.instances[0].disconnect).toHaveBeenCalledOnce();
-    expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true);
-    for (const spy of geometryDisposers.values()) expect(spy).toHaveBeenCalledOnce();
     expect(container.querySelector("canvas")).toBeNull();
     expect(container.dataset.ready).toBeUndefined();
+    controller.setPaused(false);
     motion.setReduced(false);
     document.dispatchEvent(new Event("visibilitychange"));
     expect(renderer.loop).toBeNull();
-  });
-
-  it("melepas model yang selesai dimuat setelah halaman ditutup", async () => {
-    let finishParsing!: (value: { scene: THREE.Group }) => void;
-    mocks.parse.mockReturnValue(new Promise((resolve) => { finishParsing = resolve; }));
-    fetchMock.mockResolvedValue(new Response(new ArrayBuffer(8)));
-    dispose = mountLandingScene(container);
-    await flush();
-    dispose();
-    dispose = undefined;
-    const model = new THREE.Group();
-    const geometry = new THREE.BoxGeometry();
-    const material = new THREE.MeshStandardMaterial();
-    model.add(new THREE.Mesh(geometry, material));
-    const geometryDispose = vi.spyOn(geometry, "dispose");
-    finishParsing({ scene: model });
-    await flush();
-    expect(geometryDispose).toHaveBeenCalledOnce();
-    expect(container.dataset.ready).toBeUndefined();
-    expect(container.dataset.treeSource).toBeUndefined();
   });
 });
