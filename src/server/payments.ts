@@ -1,11 +1,16 @@
-import { and, asc, desc, eq, isNull, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lte } from "drizzle-orm";
 import { addDays, daysInMonth, localDate } from "@/lib/dates";
 import { billingPeriods, paymentCells, planAt, type PaymentPlanDTO } from "@/lib/payments";
 import type { HouseDTO } from "@/lib/types";
 import type { Db, Executor } from "./db";
 import { collections, houses, paymentLogs, paymentPlans, payments, patrols, settings, users } from "./schema";
 
-export async function getPaymentData(db: Executor, houseId?: number) {
+/** Tanpa rentang, riwayat lengkap tetap tersedia untuk tunggakan dan koreksi pembayaran. */
+export async function getPaymentData(db: Executor, houseId?: number, range?: { start: string; end?: string }) {
+  // Tagihan dihitung satu periode penuh: bulan kalender dan minggu yang melintasi batas bulan.
+  // Tanpa end, pembayaran mendatang ikut dibawa untuk pergantian periode saat Ronda offline.
+  const start = range && addDays(range.start.slice(0, 7) + "-01", -6);
+  const end = range?.end && addDays(daysInMonth(range.end.slice(0, 7)).at(-1)!, 6);
   const [plans, receipts, daily, [config]] = await Promise.all([
     db.select().from(paymentPlans).where(houseId === undefined ? undefined : eq(paymentPlans.houseId, houseId)).orderBy(asc(paymentPlans.effectiveFrom)),
     db.select({
@@ -16,13 +21,19 @@ export async function getPaymentData(db: Executor, houseId?: number) {
       collectorId: payments.collectorId, collectorName: users.name, note: payments.note,
       updatedAt: payments.updatedAt,
     }).from(payments).leftJoin(users, eq(users.id, payments.collectorId))
-      .where(and(isNull(payments.cancelledAt), houseId === undefined ? undefined : eq(payments.houseId, houseId))).orderBy(desc(payments.receivedDate), desc(payments.id)),
+      .where(and(
+        isNull(payments.cancelledAt), houseId === undefined ? undefined : eq(payments.houseId, houseId),
+        start ? gte(payments.periodEnd, start) : undefined, end ? lte(payments.periodStart, end) : undefined,
+      )).orderBy(desc(payments.receivedDate), desc(payments.id)),
     db.select({ houseId: collections.houseId, date: patrols.date, status: collections.status, amount: collections.amount })
       .from(collections).innerJoin(patrols, eq(patrols.id, collections.patrolId))
-      .where(and(eq(collections.status, "filled"), houseId === undefined ? undefined : eq(collections.houseId, houseId))),
+      .where(and(
+        eq(collections.status, "filled"), houseId === undefined ? undefined : eq(collections.houseId, houseId),
+        start ? gte(patrols.date, start) : undefined, end ? lte(patrols.date, end) : undefined,
+      )),
     db.select({ defaultAmount: settings.defaultAmount }).from(settings).limit(1),
   ]);
-  const cells = paymentCells(receipts, plans, config?.defaultAmount ?? 500);
+  const cells = paymentCells(receipts, plans, config?.defaultAmount ?? 500, start, end);
   const dailyCells = Object.fromEntries(daily.map((c) => [c.houseId + ":" + c.date, c]));
   return { plans, receipts, cells, dailyCells, defaultAmount: config?.defaultAmount ?? 500 };
 }

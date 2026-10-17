@@ -10,7 +10,7 @@ import type { Db, Executor } from "./db";
 import { houseName } from "./house-name";
 import { guardDaysByUser, listSchedule } from "./schedule";
 import { collectionLogs, collections, duesInvoices, houses, paymentPlans, payments, patrols, residenceMoves, settings, users } from "./schema";
-import { getPaymentData, getPaymentMonth, type PaymentData } from "./payments";
+import { getPaymentData, type PaymentData } from "./payments";
 import { DEFAULT_RECORDING_WINDOW } from "@/lib/recording-window";
 import { listResidents } from "./residents";
 import { getDepositSubmission } from "./deposit-submissions";
@@ -164,13 +164,14 @@ export async function getCollectionsForDate(db: Db, date: string): Promise<Colle
 
 /** Tanggal eksplisit dipakai saat antrean offline menyinkronkan malam sebelumnya. */
 export async function getRondaSnapshot(db: Db, user: SessionUser, now = new Date(), date = rondaDate(now)): Promise<RondaSnapshot> {
+  const days = daysInMonth(date.slice(0, 7));
   const [settingsRow, houseRows, collectionRows, schedule, planAnchors, paymentData, depositSubmission] = await Promise.all([
     getSettings(db),
     listHouses(db),
     getCollectionsForDate(db, date),
     listSchedule(db),
     getPlanAnchors(db),
-    getPaymentMonth(db, date.slice(0, 7)),
+    getPaymentData(db, undefined, { start: days[0] }),
     getDepositSubmission(db, date),
   ]);
   return {
@@ -185,7 +186,7 @@ export async function getRondaSnapshot(db: Db, user: SessionUser, now = new Date
     depositSubmission,
     // Alokasi bulan ini dan pembayaran mendatang untuk pergantian periode saat HP offline.
     paymentCells: Object.fromEntries(Object.entries(paymentData.cells).filter(([key]) => key.split(":")[1] >= date.slice(0, 7) + "-01")),
-    paymentPeriods: paymentData.bills,
+    paymentPeriods: billingPeriods(paymentData.plans, paymentData.cells, paymentData.dailyCells, localDate(now), days[0], days[days.length - 1]),
     paymentPlans: paymentData.plans.map(({ id, houseId, effectiveFrom, cadence, ratePerNight, dueTiming, graceDays, weekStart }) =>
       ({ id, houseId, effectiveFrom, cadence, ratePerNight, dueTiming, graceDays, weekStart })),
   };
@@ -294,7 +295,7 @@ export async function getMonthRecap(db: Db, month: string, source?: SummarySourc
       .leftJoin(collections, eq(collections.patrolId, patrols.id))
       .where(and(gte(patrols.date, days[0]), lte(patrols.date, days[days.length - 1])))
       .orderBy(asc(patrols.date)),
-    source?.payments ?? getPaymentData(db),
+    source?.payments ?? getPaymentData(db, undefined, { start: days[0], end: days[days.length - 1] }),
   ]);
 
   const dates = [...new Set(rows.map((r) => r.date))];
