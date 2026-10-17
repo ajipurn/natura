@@ -1,7 +1,7 @@
 import { NumberTicker } from "@/components/number-ticker";
 import { useQuery } from "@tanstack/react-query";
-import { LogIn, ScanLine } from "lucide-react";
-import { useParams } from "react-router";
+import { ArrowLeft, LogIn, ScanLine } from "lucide-react";
+import { Link, useParams } from "react-router";
 import { api, call } from "@/client/api";
 import { QueryState } from "@/components/query-state";
 import { Card, PageTitle, buttonClass, cx } from "@/components/ui";
@@ -16,8 +16,8 @@ import { petugasPath, wargaPath } from "@/lib/app-paths";
 import { DEFAULT_LOGO_URL } from "@/lib/branding";
 import { canRonda } from "@/lib/permissions";
 
-/** Halaman yang terbuka saat QR rumah di-scan pakai kamera HP biasa. */
-export function HousePage() {
+/** Informasi QR rumah, di halaman publik atau di dalam kerangka app saat memakai scanner PWA. */
+export function HousePage({ inApp = false }: { inApp?: boolean }) {
   const token = useParams().token ?? "";
   const query = useQuery({
     queryKey: ["rumah", token],
@@ -26,7 +26,13 @@ export function HousePage() {
   });
 
   return (
-    <main className="mx-auto w-full max-w-md px-4 py-8">
+    <main className={inApp ? undefined : "mx-auto w-full max-w-md px-4 py-8"}>
+      {inApp && <Link
+        to={petugasPath()}
+        className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-primary hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+      >
+        <ArrowLeft className="size-4" aria-hidden /> Kembali ke Beranda
+      </Link>}
       <QueryState query={query}>
         {({ communityName, logoUrl, defaultAmount, tonight, canRecord, onDuty, recordingHours, house, history, user, paymentInfo }) => {
           const month = tonight.slice(0, 7);
@@ -64,9 +70,9 @@ export function HousePage() {
                       {onDuty
                         ? `Di luar jam pencatatan. Pencatatan dibuka pukul ${recordingHours}.`
                         : `Bukan jadwal jagamu malam ini (${dayLabel(scheduleDay(tonight))}). Catatan hanya bisa diisi petugas yang jaga.`}{" "}
-                      <a href={petugasPath("/jadwal")} className="font-semibold underline">
+                      <Link to={petugasPath("/akun/jadwal")} reloadDocument={!inApp} className="font-semibold underline">
                         Lihat jadwal
-                      </a>
+                      </Link>
                     </p>
                   )}
                 </Card>
@@ -114,7 +120,7 @@ export function HousePage() {
                 </ul>
               )}
 
-              <div className="mt-8 flex flex-col items-center gap-2 text-center">
+              {!inApp && <div className="mt-8 flex flex-col items-center gap-2 text-center">
                 {user && canRonda(user.role) ? (
                   <a href={petugasPath("/ronda")} className={buttonClass("secondary")}>
                     Buka Ronda
@@ -127,7 +133,7 @@ export function HousePage() {
                 <a href={wargaPath()} className="text-sm font-semibold text-primary">
                   Beranda app
                 </a>
-              </div>
+              </div>}
             </>
           );
         }}

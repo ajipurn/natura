@@ -3,9 +3,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PetugasLayout } from "@/apps/petugas/layout";
+import { HousePage } from "@/apps/warga/rumah";
 import type { RondaSnapshot, Role } from "@/lib/types";
 import { accessibleText } from "./helpers/dom";
 
@@ -71,7 +72,17 @@ afterEach(async () => {
 });
 async function render(role: Role = "petugas") {
   client.setQueryData(["auth"], { setupNeeded: false, user: { ...snapshot.user, role } });
-  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><PetugasLayout><h1>Halaman semula</h1></PetugasLayout></MemoryRouter></QueryClientProvider>));
+  client.setQueryData(["rumah", "SCANTESTQR"], {
+    communityName: "Natura", logoUrl: null, defaultAmount: 500, tonight: snapshot.date,
+    canRecord: false, onDuty: snapshot.schedule.length > 0, recordingHours: "20.00–00.00",
+    user: { ...snapshot.user, role }, house: snapshot.houses[0],
+    history: [{ date: "2026-10-09", status: "filled", amount: 500 }],
+    paymentInfo: { periods: [], receipts: [], cells: {}, tonight: null },
+  });
+  await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><PetugasLayout><Routes>
+    <Route path="/" element={<h1>Halaman semula</h1>} />
+    <Route path="/rumah/:token" element={<HousePage inApp />} />
+  </Routes></PetugasLayout></MemoryRouter></QueryClientProvider>));
   expect(fetch).not.toHaveBeenCalled();
   await click("Scan QR");
 }
@@ -140,11 +151,16 @@ describe("Scan QR langsung dari navigasi", () => {
     expect(recordButtons()).toHaveLength(2);
     expect(navigate).not.toHaveBeenCalled();
   });
-  it.each(["warga", "petugas"] as const)("%s tanpa tugas membuka halaman QR publik tanpa pilihan Ada/Kosong", async (role) => {
+  it.each(["warga", "petugas"] as const)("%s tanpa tugas tetap di dalam app tanpa pilihan Ada/Kosong", async (role) => {
     snapshot.schedule = [];
     await render(role);
     await click("Deteksi QR");
-    expect(navigate).toHaveBeenCalledWith("https://clusternatura.com/info/r/SCANTESTQR");
+    expect(navigate).not.toHaveBeenCalled();
+    expect(container.querySelector("h1")?.textContent).toBe("Blok A No. 1");
+    expect(container.textContent).toContain("30 malam terakhir");
+    expect(container.querySelector('.mobile-app nav[aria-label="Menu app"]')).not.toBeNull();
+    expect(container.textContent).not.toContain("Deteksi QR");
+    expect(container.textContent).not.toContain("Beranda app");
     expect(recordButtons()).toHaveLength(0);
     expect(submitted).toEqual([]);
     if (role === "warga") expect(fetch).not.toHaveBeenCalled();
@@ -155,7 +171,8 @@ describe("Scan QR langsung dari navigasi", () => {
     await render();
     expect(container.textContent).toContain("Di luar jam pencatatan");
     await click("Deteksi QR");
-    expect(navigate).toHaveBeenCalledWith("https://clusternatura.com/info/r/SCANTESTQR");
+    expect(navigate).not.toHaveBeenCalled();
+    expect(container.querySelector("h1")?.textContent).toBe("Blok A No. 1");
     expect(recordButtons()).toHaveLength(0);
   });
   it("form yang dibuka sebelum tengah malam tidak bisa mencatat setelah jam selesai", async () => {
@@ -168,7 +185,21 @@ describe("Scan QR langsung dari navigasi", () => {
     expect(submitted).toEqual([]);
     expect(recordButtons()).toHaveLength(0);
     await click("Deteksi QR");
-    expect(navigate).toHaveBeenCalledWith("https://clusternatura.com/info/r/SCANTESTQR");
+    expect(navigate).not.toHaveBeenCalled();
+    expect(container.querySelector("h1")?.textContent).toBe("Blok A No. 1");
+  });
+  it("bisa kembali dan scan rumah yang sama tanpa meninggalkan app", async () => {
+    await render("warga");
+    await click("Deteksi QR");
+    const back = container.querySelector<HTMLAnchorElement>('a[href="/"]');
+    expect(back?.textContent).toContain("Kembali ke Beranda");
+    await act(async () => back!.click());
+    expect(container.querySelector("h1")?.textContent).toBe("Halaman semula");
+    await click("Scan QR");
+    await click("Deteksi QR");
+    expect(container.querySelector("h1")?.textContent).toBe("Blok A No. 1");
+    expect(container.textContent).not.toContain("Deteksi QR");
+    expect(navigate).not.toHaveBeenCalled();
   });
   it("memakai jam server saat HP salah, dan memakai pengaturan jam khusus", async () => {
     vi.setSystemTime(new Date("2026-10-10T12:00:00+07:00"));

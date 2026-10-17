@@ -106,6 +106,7 @@ describe("routing HTML Vite dan Vercel", () => {
     ["app.clusternatura.com", "/", "/petugas/index.html"],
     ["app.clusternatura.com", "/riwayat/2026-10-09", "/petugas/index.html"],
     ["app.clusternatura.com", "/ronda", "/petugas/index.html"],
+    ["app.clusternatura.com", "/rumah/SCANTESTQR", "/petugas/index.html"],
     ["app.clusternatura.com", "/jadwal", "/petugas/index.html"],
     ["app.clusternatura.com", "/masuk", "/petugas/index.html"],
     ["app.clusternatura.com", "/akun", "/petugas/index.html"],
@@ -118,6 +119,7 @@ describe("routing HTML Vite dan Vercel", () => {
     ["www.clusternatura.com", "/info/r/TOKEN", "/index.html"],
     ["localhost", "/admin/rekap", "/admin/index.html"],
     ["preview.vercel.app", "/app/jadwal", "/petugas/index.html"],
+    ["preview.vercel.app", "/app/rumah/SCANTESTQR", "/petugas/index.html"],
     ["localhost", "/landing/", "/landing/index.html"],
     ["localhost", "/", "/index.html"],
   ])("%s%s memilih %s", (hostname, pathname, shell) => {

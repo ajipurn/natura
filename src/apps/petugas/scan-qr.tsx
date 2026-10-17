@@ -1,9 +1,10 @@
 import type { RefObject } from "react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import { QrScanner } from "@/components/qr-scanner";
 import { houseLabel } from "@/lib/houses";
 import { formatRupiah } from "@/lib/format";
-import { wargaPath } from "@/lib/app-paths";
+import { petugasPath } from "@/lib/app-paths";
 import { parseQrToken } from "@/lib/qr";
 import { recordingHoursLabel } from "@/lib/recording-window";
 import type { ScanFeedback } from "@/lib/scan-feedback";
@@ -15,6 +16,7 @@ import { useOptionalRondaStore } from "./ronda/ronda-store";
 
 /** Scanner tersedia bagi semua akun; hanya petugas yang jaga dalam jam pencatatan mendapat form. */
 export function ScanQr({ onClose, triggerRef, feedback }: { onClose: () => void; triggerRef: RefObject<HTMLButtonElement | null>; feedback?: ScanFeedback }) {
+  const navigate = useNavigate();
   const store = useOptionalRondaStore();
   const [active, setActive] = useState<{ house: HouseDTO; method: CollectionMethod } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -45,7 +47,9 @@ export function ScanQr({ onClose, triggerRef, feedback }: { onClose: () => void;
       return;
     }
     if (!canRecord) {
-      window.location.assign(wargaPath(`/r/${token}`));
+      // Halaman publik berada di domain lain dan membuka browser di luar cakupan PWA.
+      onClose();
+      void navigate(petugasPath(`/rumah/${token}`));
       return;
     }
     const house = snapshot?.houses.find((h) => h.token === token);

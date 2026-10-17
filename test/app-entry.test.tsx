@@ -87,6 +87,36 @@ async function render(path = "/", user: SessionUser | null = null) {
 }
 
 describe("Beranda di dalam app dengan login", () => {
+  it("hasil scan meminta login dengan tujuan kembali ke rumah di dalam app", async () => {
+    await render("/rumah/SCANTESTQR");
+    expect(router.state.location.pathname).toBe("/masuk");
+    expect(new URLSearchParams(router.state.location.search).get("next")).toBe("/rumah/SCANTESTQR");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([warga, petugas])("hasil scan untuk $role memakai kerangka app dan tautan jadwal internal", async (user) => {
+    client.setQueryData(["rumah", "SCANTESTQR"], {
+      communityName: "Natura", logoUrl: null, defaultAmount: 500, tonight: "2026-10-10",
+      canRecord: false, onDuty: false, recordingHours: "20.00–00.00", user,
+      house: { block: "AD", number: "8", token: "SCANTESTQR", status: "active", ownerName: "Aji" },
+      history: [], paymentInfo: { periods: [], receipts: [], cells: {}, tonight: null },
+    });
+    await render("/rumah/SCANTESTQR", user);
+    expect(container.querySelector("h1")?.textContent).toBe("Blok AD No. 8");
+    expect(container.querySelector('.mobile-app nav[aria-label="Menu app"]')).not.toBeNull();
+    expect(container.querySelector('a[href="https://clusternatura.com/info/r/SCANTESTQR"]')).toBeNull();
+    expect(container.textContent).not.toContain("Beranda app");
+    expect(container.querySelector("form")).toBeNull();
+    if (user.role === "petugas") {
+      const scheduleLink = [...container.querySelectorAll("a")].find((a) => a.textContent === "Lihat jadwal");
+      expect(scheduleLink).toBeDefined();
+      await act(async () => scheduleLink!.click());
+      expect(router.state.location.pathname).toBe("/akun/jadwal");
+      expect(container.querySelector("h1")?.textContent).toBe("Jadwal ronda");
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it.each(["/", "/?kode=6G7Z5AFG", "/app", "/app?kode=6G7Z5AFG", "/petugas", "/info?kode=6G7Z5AFG"])("%s meminta login akun meskipun data warga tersimpan", async (path) => {
     await render(path);
     expect(router.state.location.pathname).toBe("/masuk");

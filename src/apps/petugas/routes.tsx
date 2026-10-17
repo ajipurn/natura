@@ -10,6 +10,7 @@ import { JadwalPetugas } from "./jadwal";
 import { RondaPage } from "./ronda/ronda-page";
 import { RondaSummary } from "./ronda/ronda-summary";
 import { BerandaPage } from "../warga/beranda";
+import { HousePage } from "../warga/rumah";
 import { adminPath, petugasPath } from "@/lib/app-paths";
 import { useAuth } from "@/client/auth";
 import { canRonda } from "@/lib/permissions";
@@ -51,6 +52,7 @@ export const router = createBrowserRouter([
     children: [
       { path: petugasPath(), element: <BerandaPage /> },
       { path: petugasPath("/ronda"), element: <RondaAccess /> },
+      { path: petugasPath("/rumah/:token"), element: <HousePage inApp /> },
       ...(atAppRoot ? [] : [{ path: petugasPath("/info"), element: <Navigate to={petugasPath()} replace /> }]),
       { path: petugasPath("/riwayat"), element: <PatrolList basePath={petugasPath("/riwayat")} /> },
       { path: petugasPath("/riwayat/:tanggal"), element: <PatrolDetail basePath={petugasPath("/riwayat")} canCorrect={false} /> },
