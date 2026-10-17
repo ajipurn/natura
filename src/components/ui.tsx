@@ -20,7 +20,7 @@ type ButtonSize = "md" | "lg" | "sm" | "icon" | "icon-sm";
 export function buttonClass(variant: ButtonVariant = "primary", size: ButtonSize = "md") {
   const icon = size === "icon" || size === "icon-sm";
   return cx(
-    "inline-flex h-11 select-none items-center justify-center gap-2 rounded-xl font-semibold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50 data-disabled:pointer-events-none data-disabled:opacity-50",
+    "inline-flex h-11 touch-manipulation select-none items-center justify-center gap-2 rounded-xl font-semibold transition-[background-color,color,border-color,box-shadow,scale] duration-150 active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50 data-disabled:pointer-events-none data-disabled:opacity-50 motion-reduce:transition-none motion-reduce:active:scale-100",
     size === "lg" && "px-6 text-lg",
     size === "md" && "px-4 text-base",
     size === "sm" && "px-3 text-sm",
@@ -59,7 +59,7 @@ export function Textarea({ className, ...props }: Omit<ComponentProps<"textarea"
 }
 
 export function Card({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cx("rounded-2xl border border-line bg-card p-4", className)} {...props} />;
+  return <div data-ui-card className={cx("rounded-2xl border border-line bg-card p-4", className)} {...props} />;
 }
 
 /** Aksi halaman: kolom yang seimbang di HP, satu baris di layar lebar. */
@@ -89,7 +89,7 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <div className={cx("mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between", className)}>
+    <div data-ui-page-header className={cx("mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between", className)}>
       <PageTitle title={title} />
       <div className="min-w-0 flex-1">
         <h1 className="text-2xl font-bold tracking-tight">{title}</h1>

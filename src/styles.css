@@ -110,6 +110,60 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Lapisan app memakai permukaan lembut; warna status tetap mengikuti token bersama. */
+.mobile-app {
+  background: radial-gradient(ellipse 90% 24rem at 0 0, color-mix(in srgb, var(--primary) 7%, var(--bg)), transparent), var(--bg);
+}
+
+.mobile-app [data-ui-card] {
+  border-radius: 1.5rem;
+  border-color: color-mix(in srgb, var(--line) 75%, transparent);
+  box-shadow: 0 2px 12px -8px color-mix(in srgb, var(--fg) 20%, transparent);
+}
+
+.mobile-app [data-ui-page-header] {
+  margin-bottom: 1.5rem;
+}
+
+.mobile-app [data-ui-page-header] h1 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.mobile-app summary {
+  list-style: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.mobile-app summary::-webkit-details-marker {
+  display: none;
+}
+
+.mobile-app :is(button, a, summary) {
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+html:has(.mobile-app) {
+  overscroll-behavior-y: none;
+}
+
+.mobile-app :is(section[id], h2[id]) {
+  scroll-margin-top: 1.5rem;
+}
+
+@media (pointer: coarse) {
+  .mobile-app :is(input, select, textarea) {
+    font-size: max(1rem, 16px);
+  }
+}
+
 /* Nominal tetap sejajar dengan teks di sekitarnya saat Torph membentuk slot digit. */
 .number-ticker-visual[torph-root] {
   vertical-align: baseline;

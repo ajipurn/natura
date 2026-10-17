@@ -22,8 +22,6 @@ import {
   Button,
   Card,
   PageHeader,
-  SectionTitle,
-  cx,
 } from "@/components/ui";
 import { adminPath, petugasPath } from "@/lib/app-paths";
 import { canRonda, isManager, ROLE_LABEL } from "@/lib/permissions";
@@ -46,12 +44,12 @@ export function AkunPage() {
 
   return (
     <main>
-      <PageHeader title="Akun" subtitle="Pengaturan akun dan jadwal ronda." />
+      <PageHeader title="Akun" subtitle="Profil dan pengaturan akun." />
 
-      <Card className="flex items-center gap-4">
+      <Card className="flex items-center gap-4 border-0 bg-primary p-5 text-primary-fg">
         <div
           aria-hidden
-          className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-2xl font-semibold text-primary"
+          className="flex size-16 shrink-0 items-center justify-center rounded-[1.25rem] bg-primary-fg/15 text-2xl font-semibold"
         >
           {Array.from(user.name.trim())[0]?.toLocaleUpperCase("id-ID")}
         </div>
@@ -59,26 +57,23 @@ export function AkunPage() {
           <h2 className="text-xl font-semibold tracking-tight [overflow-wrap:anywhere]">
             {user.name}
           </h2>
-          <p className="mt-1 text-sm text-muted">{ROLE_LABEL[user.role]}</p>
+          <p className="mt-2 inline-flex rounded-full bg-primary-fg/15 px-2.5 py-1 text-xs font-medium">{ROLE_LABEL[user.role]}</p>
         </div>
       </Card>
 
       <nav
         aria-label="Akses cepat"
-        className={cx(
-          "mt-3 grid gap-3",
-          isManager(user.role) && "sm:grid-cols-2",
-        )}
+        className="mt-5 divide-y divide-line/70 overflow-hidden rounded-3xl border border-line/75 bg-card"
       >
         <Link
           to={petugasPath("/akun/jadwal")}
-          className="flex items-center gap-3 rounded-2xl border border-line bg-card p-4 transition-colors hover:bg-idle-soft/50 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 active:bg-idle-soft"
+          className="flex items-center gap-3 p-4 transition-colors hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-4 active:bg-primary/10"
         >
-          <CalendarDays className="size-5 shrink-0 text-primary" aria-hidden />
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary"><CalendarDays className="size-5" aria-hidden /></span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold">Jadwal ronda</span>
             <span className="mt-0.5 block text-xs text-muted">
-              {canRonda(user.role) ? "Lihat jadwal dan atur permintaan jadwal jagamu." : "Lihat jadwal petugas ronda."}
+              {canRonda(user.role) ? "Giliran jaga dan permintaan jadwal." : "Lihat jadwal petugas ronda."}
             </span>
           </span>
           <ChevronRight className="size-4 shrink-0 text-muted" aria-hidden />
@@ -86,12 +81,11 @@ export function AkunPage() {
         {isManager(user.role) && (
           <a
             href={adminPath("/")}
-            className="flex items-center gap-3 rounded-2xl border border-line bg-card p-4 transition-colors hover:bg-idle-soft/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:bg-idle-soft"
+            className="flex items-center gap-3 p-4 transition-colors hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-4 active:bg-primary/10"
           >
-            <LayoutDashboard
-              className="size-5 shrink-0 text-primary"
-              aria-hidden
-            />
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-cadence-monthly-soft text-cadence-monthly">
+              <LayoutDashboard className="size-5" aria-hidden />
+            </span>
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold">
                 Buka dashboard pengurus
@@ -105,10 +99,10 @@ export function AkunPage() {
         )}
       </nav>
 
-      <SectionTitle>Pengaturan</SectionTitle>
+      <h2 className="mb-3 mt-7 text-base font-semibold tracking-tight">Pengaturan</h2>
       <Card className="divide-y divide-line p-0">
         <Field.Root className="flex items-center gap-3 p-4">
-          <Moon className="size-5 shrink-0 text-muted" aria-hidden />
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-bg text-muted"><Moon className="size-5" aria-hidden /></span>
           <div className="min-w-0 flex-1">
             <Field.Label className="block cursor-pointer text-sm font-medium">
               Mode gelap
@@ -128,7 +122,7 @@ export function AkunPage() {
           triggerClassName="gap-3 rounded-xl p-4 transition-colors hover:bg-idle-soft/40"
           title={
             <span className="flex items-center gap-3">
-              <KeyRound className="size-5 shrink-0 text-muted" aria-hidden />
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-bg text-muted"><KeyRound className="size-5" aria-hidden /></span>
               <span className="min-w-0">
                 <span className="block text-sm font-medium">Ganti PIN</span>
                 <span className="mt-0.5 block text-xs text-muted">
@@ -147,7 +141,7 @@ export function AkunPage() {
           triggerClassName="gap-3 rounded-xl p-4 transition-colors hover:bg-idle-soft/40"
           title={
             <span className="flex items-center gap-3">
-              <Smartphone className="size-5 shrink-0 text-muted" aria-hidden />
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-bg text-muted"><Smartphone className="size-5" aria-hidden /></span>
               <span className="min-w-0">
                 <span className="block text-sm font-medium">
                   Pasang di layar utama

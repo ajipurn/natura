@@ -113,11 +113,13 @@ export function HouseStatus({
   month,
   nights,
   through,
+  embedded = false,
 }: {
   perHouse: HouseRow[];
   month: string;
   nights: number;
   through: string;
+  embedded?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [view, setView] = useState<View>("list");
@@ -144,15 +146,18 @@ export function HouseStatus({
   const { notOnPlan } = matchPlan(SITE_PLAN, shown);
   const chooseHouse = (house: { id: number }) =>
     setOpen(perHouse.find((h) => h.id === house.id) ?? null);
+  const Surface = embedded ? "div" : Card;
 
   return (
     <>
-      <SectionTitle>
-        <span className="inline-flex items-center gap-1.5">
-          <Home className="size-4" /> Status per rumah
-        </span>
-      </SectionTitle>
-      <Card className="space-y-4">
+      {!embedded && (
+        <SectionTitle>
+          <span className="inline-flex items-center gap-1.5">
+            <Home className="size-4" /> Status per rumah
+          </span>
+        </SectionTitle>
+      )}
+      <Surface className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="font-semibold">{formatMonth(month)}</h2>
@@ -275,7 +280,7 @@ export function HouseStatus({
             Mudik
           </LegendItem>
         </Legend>
-      </Card>
+      </Surface>
       <HouseHistoryDialog
         houseId={open?.id ?? null}
         label={open ? houseLabel(open) : ""}

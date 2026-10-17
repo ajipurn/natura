@@ -266,11 +266,11 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
     <main>
       {/* Ringkasan tetap menempel di atas pada semua ukuran layar. */}
       <>
-        <div className="sticky top-0 z-20 -mx-4 -mt-5 bg-bg px-4 pb-2 pt-3">
-          <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
+        <div className="sticky top-0 z-20 -mx-5 -mt-6 bg-bg/95 px-5 pb-3 pt-[max(0.75rem,env(safe-area-inset-top,0px))] backdrop-blur-xl sm:-mx-6 sm:-mt-8 sm:px-6 sm:pt-4">
+          <div className="rounded-3xl border border-line/75 bg-card p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h1 className="text-base font-bold leading-tight">
+                <h1 className="text-xl font-bold leading-tight tracking-tight">
                   Ronda malam ini
                 </h1>
               </div>
@@ -287,14 +287,14 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
             </p>
             {houses.length > 0 && (
               <>
-                <div className="mt-2 flex items-baseline justify-between">
+                <div className="mt-4 flex flex-wrap items-baseline justify-between gap-2">
                   <p className="text-sm text-muted">
                     <strong className="text-2xl text-fg">
                       <NumberTicker value={summary.checked} />
                     </strong>{" "}
                     / <NumberTicker value={summary.expected} /> selesai
                   </p>
-                  <p className="text-xl font-bold">
+                  <p className="text-xl font-bold tracking-tight text-primary tabular-nums">
                     <NumberTicker value={formatRupiah(summary.total)} />
                   </p>
                 </div>
@@ -307,13 +307,13 @@ export function RondaApp({ isAdmin }: { isAdmin: boolean }) {
                   aria-label="Progres ronda"
                 >
                   <div
-                    className="h-full bg-filled transition-all"
+                    className="h-full bg-filled transition-[width] duration-300 motion-reduce:transition-none"
                     style={{
                       width: `${percent(summary.filled.length, summary.expected)}%`,
                     }}
                   />
                   <div
-                    className="h-full bg-empty transition-all"
+                    className="h-full bg-empty transition-[width] duration-300 motion-reduce:transition-none"
                     style={{
                       width: `${percent(summary.empty.length, summary.expected)}%`,
                     }}

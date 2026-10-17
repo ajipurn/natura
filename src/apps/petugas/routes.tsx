@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router";
+import { createBrowserRouter, Navigate, Outlet, ScrollRestoration, useLocation } from "react-router";
 import { LoginPage } from "@/features/auth/login-page";
 import { RequireAuth } from "@/features/auth/require-auth";
 import { PatrolDetail } from "@/features/riwayat/patrol-detail";
@@ -43,6 +43,7 @@ export const router = createBrowserRouter([
         {() => (
           <PetugasLayout>
             <Outlet />
+            <ScrollRestoration />
           </PetugasLayout>
         )}
       </RequireAuth>
