@@ -137,6 +137,31 @@ export default defineConfig({
     // three.js (tampilan 3D) memang besar, tapi hanya dimuat saat tab 3D dibuka.
     chunkSizeWarningLimit: 650,
     rolldownOptions: {
+      output: {
+        codeSplitting: {
+          // Gabungkan modul awal menurut app pemakainya agar halaman lazy tidak
+          // memecah kode awal menjadi banyak file kecil.
+          groups: [{
+            debugName: "shared-entry-modules",
+            name(id, context) {
+              const apps = new Set<string>();
+              const visited = new Set<string>();
+              const visit = (moduleId: string) => {
+                if (visited.has(moduleId)) return;
+                visited.add(moduleId);
+                const entry = moduleId.match(/\/src\/apps\/(admin|petugas|warga|landing)\/main\.tsx$/);
+                if (entry) { apps.add(entry[1]); return; }
+                for (const importer of context.getModuleInfo(moduleId)?.importers ?? []) visit(importer);
+              };
+              visit(id);
+              return apps.size ? `shared-${[...apps].sort().join("-")}` : null;
+            },
+            tags: ["$initial"],
+            minShareCount: 2,
+            includeDependenciesRecursively: false,
+          }],
+        },
+      },
       // Empat bagian dalam satu build; subdomain memilih HTML masing-masing.
       input: {
         warga: fileURLToPath(new URL("./index.html", import.meta.url)),

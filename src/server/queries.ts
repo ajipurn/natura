@@ -10,7 +10,7 @@ import type { Db, Executor } from "./db";
 import { houseName } from "./house-name";
 import { guardDaysByUser, listSchedule } from "./schedule";
 import { collectionLogs, collections, duesInvoices, houses, paymentPlans, payments, patrols, residenceMoves, settings, users } from "./schema";
-import { getPaymentData, getPaymentMonth } from "./payments";
+import { getPaymentData, getPaymentMonth, type PaymentData } from "./payments";
 import { DEFAULT_RECORDING_WINDOW } from "@/lib/recording-window";
 import { listResidents } from "./residents";
 import { getDepositSubmission } from "./deposit-submissions";
@@ -204,8 +204,11 @@ export type PatrolSummary = {
   collectors: string | null;
 };
 
+/** Sumber yang dibagi hanya selama satu permintaan, tanpa cache lintas perubahan data. */
+type SummarySource = { houses: Promise<HouseDTO[]>; payments: Promise<PaymentData> };
+
 /** Malam-malam ronda terbaru, atau semua malam di satu bulan ("YYYY-MM") kalau `month` diisi. */
-export async function listPatrols(db: Db, limit = 90, month?: string): Promise<PatrolSummary[]> {
+export async function listPatrols(db: Db, limit = 90, month?: string, source?: SummarySource): Promise<PatrolSummary[]> {
   const days = month ? daysInMonth(month) : null;
   const nights = await db
     .select({ id: patrols.id, date: patrols.date })
@@ -215,7 +218,7 @@ export async function listPatrols(db: Db, limit = 90, month?: string): Promise<P
     .limit(days ? days.length : limit);
   if (!nights.length) return [];
   const [houseRows, collectionRows, paymentData] = await Promise.all([
-    listHouses(db),
+    source?.houses ?? listHouses(db),
     db.select({
       patrolId: collections.patrolId,
       houseId: collections.houseId,
@@ -224,7 +227,7 @@ export async function listPatrols(db: Db, limit = 90, month?: string): Promise<P
       collectorName: users.name,
     }).from(collections).leftJoin(users, eq(users.id, collections.collectedBy))
       .where(inArray(collections.patrolId, nights.map((p) => p.id))),
-    getPaymentData(db),
+    source?.payments ?? getPaymentData(db),
   ]);
   const byNight = new Map<number, typeof collectionRows>();
   for (const row of collectionRows) {
@@ -276,10 +279,10 @@ export async function getHouseHistory(db: Db, house: { id: number; createdAt: Da
 }
 
 /** Data rekap bulanan: matriks rumah × tanggal ronda. */
-export async function getMonthRecap(db: Db, month: string): Promise<MonthRecap> {
+export async function getMonthRecap(db: Db, month: string, source?: SummarySource): Promise<MonthRecap> {
   const days = daysInMonth(month);
   const [houseRows, rows, paymentData] = await Promise.all([
-    listHouses(db),
+    source?.houses ?? listHouses(db),
     db
       .select({
         date: patrols.date,
@@ -291,7 +294,7 @@ export async function getMonthRecap(db: Db, month: string): Promise<MonthRecap> 
       .leftJoin(collections, eq(collections.patrolId, patrols.id))
       .where(and(gte(patrols.date, days[0]), lte(patrols.date, days[days.length - 1])))
       .orderBy(asc(patrols.date)),
-    getPaymentMonth(db, month),
+    source?.payments ?? getPaymentData(db),
   ]);
 
   const dates = [...new Set(rows.map((r) => r.date))];
@@ -308,7 +311,7 @@ export async function getMonthRecap(db: Db, month: string): Promise<MonthRecap> 
         .filter((cadence, i, cadences) => cadence !== cadences[i - 1]),
     ])),
     paymentCells: Object.fromEntries(Object.entries(paymentData.cells).filter(([key]) => key.split(":")[1].startsWith(month))),
-    paymentPeriods: paymentData.bills,
+    paymentPeriods: billingPeriods(paymentData.plans, paymentData.cells, paymentData.dailyCells, localDate(new Date()), days[0], days[days.length - 1]),
     periodPayments: paymentData.receipts.filter((p) => p.periodStart <= days[days.length - 1] && p.periodEnd >= days[0])
       .map(({ id, houseId, receivedDate, periodStart, periodEnd, cadence, amount, allocations }) => ({ id, houseId, receivedDate, periodStart, periodEnd, cadence, amount, allocations })),
   };

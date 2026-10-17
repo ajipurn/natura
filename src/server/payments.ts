@@ -1,12 +1,13 @@
 import { and, asc, desc, eq, isNull, lte } from "drizzle-orm";
 import { addDays, daysInMonth, localDate } from "@/lib/dates";
 import { billingPeriods, paymentCells, planAt, type PaymentPlanDTO } from "@/lib/payments";
+import type { HouseDTO } from "@/lib/types";
 import type { Db, Executor } from "./db";
 import { collections, houses, paymentLogs, paymentPlans, payments, patrols, settings, users } from "./schema";
 
-export async function getPaymentData(db: Executor) {
+export async function getPaymentData(db: Executor, houseId?: number) {
   const [plans, receipts, daily, [config]] = await Promise.all([
-    db.select().from(paymentPlans).orderBy(asc(paymentPlans.effectiveFrom)),
+    db.select().from(paymentPlans).where(houseId === undefined ? undefined : eq(paymentPlans.houseId, houseId)).orderBy(asc(paymentPlans.effectiveFrom)),
     db.select({
       id: payments.id, houseId: payments.houseId, clientId: payments.clientId,
       receivedDate: payments.receivedDate, periodStart: payments.periodStart, periodEnd: payments.periodEnd,
@@ -15,15 +16,18 @@ export async function getPaymentData(db: Executor) {
       collectorId: payments.collectorId, collectorName: users.name, note: payments.note,
       updatedAt: payments.updatedAt,
     }).from(payments).leftJoin(users, eq(users.id, payments.collectorId))
-      .where(isNull(payments.cancelledAt)).orderBy(desc(payments.receivedDate), desc(payments.id)),
+      .where(and(isNull(payments.cancelledAt), houseId === undefined ? undefined : eq(payments.houseId, houseId))).orderBy(desc(payments.receivedDate), desc(payments.id)),
     db.select({ houseId: collections.houseId, date: patrols.date, status: collections.status, amount: collections.amount })
-      .from(collections).innerJoin(patrols, eq(patrols.id, collections.patrolId)).where(eq(collections.status, "filled")),
+      .from(collections).innerJoin(patrols, eq(patrols.id, collections.patrolId))
+      .where(and(eq(collections.status, "filled"), houseId === undefined ? undefined : eq(collections.houseId, houseId))),
     db.select({ defaultAmount: settings.defaultAmount }).from(settings).limit(1),
   ]);
   const cells = paymentCells(receipts, plans, config?.defaultAmount ?? 500);
   const dailyCells = Object.fromEntries(daily.map((c) => [c.houseId + ":" + c.date, c]));
   return { plans, receipts, cells, dailyCells, defaultAmount: config?.defaultAmount ?? 500 };
 }
+
+export type PaymentData = Awaited<ReturnType<typeof getPaymentData>>;
 
 /** Pilihan rumah dan hari rapel berasal dari catatan kosong yang belum dilunasi. */
 export async function getRapelOptions(db: Executor, before: string, houseId?: number, excludePaymentId?: number) {
@@ -62,10 +66,9 @@ export async function getPaymentMonth(db: Db, month: string, today = localDate(n
   return { ...data, bills, previousUnpaidBills };
 }
 
-export async function getPaymentOverview(db: Db, today: string, month = today.slice(0, 7)) {
-  const data = await getPaymentData(db);
+export function summarizePaymentOverview(data: PaymentData, houseRows: Pick<HouseDTO, "id" | "status">[], today: string, month = today.slice(0, 7)) {
   const bills = billingPeriods(data.plans, data.cells, data.dailyCells, today, today, today);
-  const active = new Set((await db.select({ id: houses.id }).from(houses).where(eq(houses.status, "active"))).map((h) => h.id));
+  const active = new Set(houseRows.filter((h) => h.status === "active").map((h) => h.id));
   const unpaid = bills.filter((b) => b.status === "unpaid" && active.has(b.houseId));
   return {
     unpaidHouses: new Set(unpaid.map((b) => b.houseId)).size,
@@ -77,7 +80,7 @@ export async function getPaymentOverview(db: Db, today: string, month = today.sl
 
 /** Tampilan publik tidak membawa nama pencatat, penerima, catatan internal, maupun clientId. */
 export async function getHousePaymentInfo(db: Db, houseId: number, today: string) {
-  const data = await getPaymentData(db);
+  const data = await getPaymentData(db, houseId);
   const plans: PaymentPlanDTO[] = data.plans.filter((p) => p.houseId === houseId).map(({ id, houseId, effectiveFrom, cadence, ratePerNight, dueTiming, graceDays, weekStart }) =>
     ({ id, houseId, effectiveFrom, cadence, ratePerNight, dueTiming, graceDays, weekStart }));
   const first = plans.reduce((date, p) => p.effectiveFrom < date ? p.effectiveFrom : date, today);

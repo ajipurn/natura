@@ -1,28 +1,33 @@
 import { createBrowserRouter, Link, Navigate, Outlet, useSearchParams } from "react-router";
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { usePermission } from "@/client/permissions";
 import { Card, buttonClass } from "@/components/ui";
 import type { Resource } from "@/lib/permissions";
 import { NotFound } from "@/components/not-found";
 import { LoginPage } from "@/features/auth/login-page";
 import { RequireAuth } from "@/features/auth/require-auth";
-import { PatrolDetail } from "@/features/riwayat/patrol-detail";
-import { PatrolList } from "@/features/riwayat/patrol-list";
-import { DenahPage } from "./denah/denah-page";
-import { InfoPage } from "./info-page";
-import { JadwalPage } from "./jadwal/jadwal-page";
-import { KasPage } from "./kas/kas-page";
+import { LoadingCards } from "@/components/query-state";
 import { AdminLayout } from "./layout";
-import { PengaturanPage } from "./pengaturan/pengaturan-page";
-import { RekapPage } from "./rekap";
-import { AuditRedirect, NightLog, NightLogAlerts } from "./riwayat/night-log";
-import { RingkasanPage } from "./ringkasan-page";
-import { CetakPage } from "./rumah/cetak";
-import { RumahPage } from "./rumah/rumah-page";
-import { SetupPage } from "./setup";
-import { WargaPage } from "./warga/warga-page";
-import { IuranPage } from "./iuran/iuran-page";
 import { adminPath } from "@/lib/app-paths";
+
+// Halaman baru dimuat setelah login dan pemeriksaan akses, saat benar-benar dibuka.
+const PatrolDetail = lazy(() => import("@/features/riwayat/patrol-detail").then((m) => ({ default: m.PatrolDetail })));
+const PatrolList = lazy(() => import("@/features/riwayat/patrol-list").then((m) => ({ default: m.PatrolList })));
+const DenahPage = lazy(() => import("./denah/denah-page").then((m) => ({ default: m.DenahPage })));
+const InfoPage = lazy(() => import("./info-page").then((m) => ({ default: m.InfoPage })));
+const JadwalPage = lazy(() => import("./jadwal/jadwal-page").then((m) => ({ default: m.JadwalPage })));
+const KasPage = lazy(() => import("./kas/kas-page").then((m) => ({ default: m.KasPage })));
+const PengaturanPage = lazy(() => import("./pengaturan/pengaturan-page").then((m) => ({ default: m.PengaturanPage })));
+const RekapPage = lazy(() => import("./rekap").then((m) => ({ default: m.RekapPage })));
+const AuditRedirect = lazy(() => import("./riwayat/night-log").then((m) => ({ default: m.AuditRedirect })));
+const NightLog = lazy(() => import("./riwayat/night-log").then((m) => ({ default: m.NightLog })));
+const NightLogAlerts = lazy(() => import("./riwayat/night-log").then((m) => ({ default: m.NightLogAlerts })));
+const RingkasanPage = lazy(() => import("./ringkasan-page").then((m) => ({ default: m.RingkasanPage })));
+const CetakPage = lazy(() => import("./rumah/cetak").then((m) => ({ default: m.CetakPage })));
+const RumahPage = lazy(() => import("./rumah/rumah-page").then((m) => ({ default: m.RumahPage })));
+const SetupPage = lazy(() => import("./setup").then((m) => ({ default: m.SetupPage })));
+const WargaPage = lazy(() => import("./warga/warga-page").then((m) => ({ default: m.WargaPage })));
+const IuranPage = lazy(() => import("./iuran/iuran-page").then((m) => ({ default: m.IuranPage })));
 
 const NIGHT_LOG = { Alerts: NightLogAlerts, Log: NightLog };
 
@@ -58,14 +63,14 @@ function AccountsRedirect() {
 
 export const router = createBrowserRouter([
   { path: adminPath("/masuk"), element: <LoginPage title="Masuk dashboard" homePath={adminPath()} setupPath={adminPath("/setup")} /> },
-  { path: adminPath("/setup"), element: <SetupPage /> },
+  { path: adminPath("/setup"), element: <Suspense fallback={<LoadingCards />}><SetupPage /></Suspense> },
   {
     path: adminPath(),
     element: (
       <RequireAuth loginPath={adminPath("/masuk")} adminOnly>
         {(user) => (
           <AdminLayout user={user}>
-            <Outlet />
+            <Suspense fallback={<LoadingCards />}><Outlet /></Suspense>
           </AdminLayout>
         )}
       </RequireAuth>

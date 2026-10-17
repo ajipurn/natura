@@ -30,6 +30,10 @@ afterEach(async () => {
 });
 
 async function hover(index = 0, count = 1) {
+  await expect.poll(async () => {
+    await act(async () => {});
+    return container.querySelector(".recharts-wrapper");
+  }).not.toBeNull();
   const chart = container.querySelector(".recharts-wrapper")!;
   await act(async () => {
     chart.dispatchEvent(new MouseEvent("mousemove", {

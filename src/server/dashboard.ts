@@ -10,7 +10,7 @@ import type { Db } from "./db";
 import { getCollectionsForDate, getMonthRecap, getSettings, listHouses, listPatrols } from "./queries";
 import { countOffDuty } from "./audit";
 import { getCashOverview } from "./kas";
-import { getPaymentOverview } from "./payments";
+import { getPaymentData, summarizePaymentOverview } from "./payments";
 import { countPendingRequests } from "./requests";
 import { listSchedule } from "./schedule";
 import { users } from "./schema";
@@ -19,13 +19,14 @@ import { users } from "./schema";
 export async function getDashboard(db: Db, now: Date) {
   const date = rondaDate(now);
   const month = date.slice(0, 7);
-  const [settingsRow, houseRows, tonightRows, recap, recent, schedule, [userCounts], pendingRequests, offDuty, cash, paymentOverview] =
+  const source = { houses: listHouses(db), payments: getPaymentData(db) };
+  const [settingsRow, houseRows, tonightRows, recap, recent, schedule, [userCounts], pendingRequests, offDuty, cash, paymentData] =
     await Promise.all([
       getSettings(db),
-      listHouses(db),
+      source.houses,
       getCollectionsForDate(db, date),
-      getMonthRecap(db, month),
-      listPatrols(db, 30),
+      getMonthRecap(db, month, source),
+      listPatrols(db, 30, undefined, source),
       listSchedule(db),
       db
         .select({
@@ -35,9 +36,10 @@ export async function getDashboard(db: Db, now: Date) {
       countPendingRequests(db),
       countOffDuty(db, date),
       getCashOverview(db, date),
-      getPaymentOverview(db, localDate(now), month),
+      source.payments,
     ]);
 
+  const paymentOverview = summarizePaymentOverview(paymentData, houseRows, localDate(now), month);
   const periods = (recap.paymentPeriods ?? []).filter((p) => p.start <= date && p.end >= date);
   const tonight = summarize(houseRows, tonightRows, periods);
   const automaticIds = new Set(periods.map((p) => p.houseId));

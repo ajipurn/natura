@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { monthStats } from "@/lib/month-stats";
-import { monthHouseNights } from "@/lib/month-summary";
+import { monthHouseNights, summarizeMonth } from "@/lib/month-summary";
 import type { BillingPeriod } from "@/lib/payments";
 import type { MonthRecap } from "@/lib/types";
 
@@ -41,5 +41,23 @@ describe("ringkasan bulanan dengan status periode otomatis", () => {
 
   it("rumah harian tetap mengikuti catatan asli", () => {
     expect(monthStats({ ...recap, paymentPeriods: [] }).perHouse[0]).toMatchObject({ filled: 0, empty: 2, unchecked: 5, total: 0 });
+  });
+
+  it("alokasi dipisahkan per rumah termasuk ID berawalan sama dan hari yang belum berjalan", () => {
+    const data: MonthRecap = {
+      houses: [1, 11, 110, 2].map((id) => ({ ...house, id })), dates: [dates[0]], cells: {},
+      paymentCells: {
+        [`1:${dates[0]}`]: { amount: 500, monthlyAmount: 500, weeklyAmount: 0, paid: true },
+        "1:2026-10-31": { amount: 500, monthlyAmount: 500, weeklyAmount: 0, paid: true },
+        [`11:${dates[0]}`]: { amount: 700, monthlyAmount: 0, weeklyAmount: 700, paid: true },
+        [`110:${dates[0]}`]: { amount: 300, monthlyAmount: 0, weeklyAmount: 0, rapelAmount: 300, paid: true },
+      },
+    };
+    expect(monthStats(data).perHouse.map((h) => h.periodTotal)).toEqual([1000, 700, 300, 0]);
+    const summary = summarizeMonth(data);
+    expect(summary.rows.map((row) => [row.monthlyTotal, row.weeklyTotal, row.rapelTotal, row.periodTotal])).toEqual([
+      [1000, 0, 0, 1000], [0, 700, 0, 700], [0, 0, 300, 300], [0, 0, 0, 0],
+    ]);
+    expect(summary.grandTotal).toBe(monthStats(data).total);
   });
 });

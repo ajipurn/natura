@@ -30,6 +30,11 @@ export type MonthStats = {
 /** Ringkasan rekap bulanan per malam dan per rumah. */
 export function monthStats({ houses, dates, cells, paymentCells = {}, paymentPeriods }: MonthRecap): MonthStats {
   const perNight = dates.map((date) => ({ date, filled: 0, empty: 0, total: 0 }));
+  const periodTotals = new Map<number, number>();
+  for (const [key, cell] of Object.entries(paymentCells)) {
+    const houseId = Number(key.split(":")[0]);
+    periodTotals.set(houseId, (periodTotals.get(houseId) ?? 0) + cell.amount);
+  }
   const perHouse = houses.map((h) => {
     const stats: HouseMonthStats = {
       id: h.id,
@@ -59,7 +64,7 @@ export function monthStats({ houses, dates, cells, paymentCells = {}, paymentPer
         if (h.status === "active") perNight[i].empty++;
       }
     });
-    stats.periodTotal = Object.entries(paymentCells).filter(([key]) => key.startsWith(h.id + ":")).reduce((sum, [, cell]) => sum + cell.amount, 0);
+    stats.periodTotal = periodTotals.get(h.id) ?? 0;
     stats.total += stats.periodTotal;
     return stats;
   });

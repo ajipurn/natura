@@ -71,6 +71,10 @@ afterEach(async () => {
 async function renderPage(path: string) {
   router = createMemoryRouter(adminRouter.routes, { initialEntries: [path] });
   await act(async () => root.render(<QueryClientProvider client={client}><RouterProvider router={router!} /></QueryClientProvider>));
+  await expect.poll(async () => {
+    await act(async () => {});
+    return container.querySelector("h1");
+  }).not.toBeNull();
 }
 
 describe("dashboard Humas", () => {
